@@ -41,10 +41,10 @@ All parameters in `src/config.py`:
 - Data validation before processing
 - Percentile-based outlier filtering for h/w ratio visualization
 
-## Next Phase: SVF Computation
-See ROADMAP.md for detailed SVF implementation plan. Key requirements:
-- DTM raster + building footprints with base_height/max_height
-- 3D obstruction surface generation
-- Ray-casting SVF at 1.5m pedestrian level
-- Grid sampling (1-2m resolution) for outdoor space
-- Output: SVF raster map (0-1) and statistics
+## Phase 2: SVF and Solar Access Computation ✅ COMPLETE
+- **SVF**: STL-based computation using discretized hemispherical dome
+- **Solar Access**: Winter solstice direct sunlight hours using pvlib
+- **Shared Utilities**: `src/svf_utils.py` contains common functions
+- **Scripts**: `compute_svf.py` and `compute_solar_access.py` (separated)
+- **Ground Masking**: Both scripts exclude building interiors using footprint shapefile
+- **Progress Monitoring**: Both scripts use tqdm for real-time progress tracking

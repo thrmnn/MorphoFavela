@@ -18,96 +18,41 @@
 
 ---
 
-## Phase 2: Sky View Factor (SVF) Computation 🎯 NEXT STEP
+## Phase 2: Sky View Factor (SVF) Computation ✅ COMPLETE
 
-### Objective
-Compute Sky View Factor for outdoor/open space to analyze urban microclimate and thermal comfort in informal settlements.
+### Completed Features
+- [x] STL-based 3D scene loading and terrain extraction
+- [x] Ground-level grid generation with building footprint masking
+- [x] Hemispherical sky patch discretization
+- [x] Ray-casting SVF computation using pyviewfactor-style visibility
+- [x] Progress monitoring during computation
+- [x] SVF visualization (heatmap and histogram)
+- [x] Shared utilities module for code reuse
 
-### Requirements
+### Current Status
+- **Input**: Single STL file containing terrain + buildings
+- **Method**: Discretized hemispherical dome with ray-casting
+- **Output**: SVF raster (0-1), CSV, and visualizations
+- **Ground Masking**: Excludes building interiors using footprint shapefile
 
-#### Input Data
-- **DTM raster**: Ground elevation in meters (e.g., `vidigal_dtm_cropped.tif`)
-- **Building footprints**: Shapefile with attributes:
-  - `base_height`: Height above ground (meters)
-  - `max_height`: Total building height (meters)
+---
 
-#### Processing Steps
+## Phase 2.5: Solar Access Computation ✅ COMPLETE
 
-1. **3D Obstruction Surface Generation**
-   - Combine DTM elevation with building footprints
-   - Extrude buildings from `(DTM + base_height)` to `(DTM + max_height)`
-   - Create 3D obstruction model for sky visibility calculations
+### Completed Features
+- [x] Solar position calculation using pvlib (winter solstice)
+- [x] Ray-casting solar access computation
+- [x] Hours of direct sunlight calculation
+- [x] Threshold-based classification (deficit vs. acceptable)
+- [x] Progress monitoring during computation
+- [x] Solar access visualizations (heatmap and threshold map)
+- [x] Code reuse with SVF utilities
 
-2. **SVF Computation at Pedestrian Level**
-   - Compute SVF at 1.5 m above ground level
-   - Exclude building interiors (only outdoor space)
-   - Use pyviewfactor library for view factor computation:
-     - Convert buildings to 3D pyvista meshes
-     - Create discretized sky hemisphere (azimuth × elevation patches)
-     - Compute view factors between observer and sky patches
-     - Account for building obstructions using visibility checking
-
-3. **Sampling Strategy**
-   - Regular grid sampling (1-2 m resolution)
-   - Focus on street/open-space areas
-   - Mask out building footprints
-
-4. **Output Products**
-   - Raster SVF map (values 0-1, where 1 = fully open sky)
-   - SVF statistics for public/open space (mean, min, max, std)
-   - Optional: Point-based SVF values for specific locations
-
-#### Technical Approach
-- **Libraries**: geopandas, rasterio, numpy, shapely, **pyviewfactor**, pyvista
-- **Method**: View factor computation using pyviewfactor (double-contour integration)
-  - More accurate than ray-casting
-  - Analytical computation of view factors between planar polygons
-  - Built-in visibility checking
-- **Coordinate System**: Projected CRS (meters)
-- **Assumptions**:
-  - Buildings fully block sky where extruded
-  - Trees ignored (focus on built environment)
-  - Ground surface follows DTM
-- **Migration**: See [docs/SVF_MIGRATION_PLAN.md](docs/SVF_MIGRATION_PLAN.md) for detailed migration plan
-
-#### Implementation Plan
-
-**Step 2.1: Data Preparation**
-- [ ] Load and validate DTM raster
-- [ ] Load building footprints with height attributes
-- [ ] Align coordinate systems
-- [ ] Create building extrusion geometry
-
-**Step 2.2: 3D Obstruction Model**
-- [ ] Generate 3D building surfaces from footprints
-- [ ] Combine with DTM to create complete obstruction surface
-- [ ] Validate 3D geometry
-
-**Step 2.3: SVF Algorithm** (Updated: Using pyviewfactor)
-- [x] Install and configure pyviewfactor library
-- [ ] Convert buildings to pyvista meshes
-- [ ] Create discretized sky hemisphere
-- [ ] Implement view factor computation using pyviewfactor
-- [ ] Handle building obstructions with visibility checking
-- [ ] SVF calculation per sample point (sum of view factors)
-
-**Step 2.4: Grid Sampling**
-- [ ] Generate sampling grid (1-2 m resolution)
-- [ ] Mask building footprints
-- [ ] Compute SVF for each grid cell
-- [ ] Handle edge cases and boundaries
-
-**Step 2.5: Output Generation**
-- [ ] Create SVF raster map
-- [ ] Calculate statistics for open space
-- [ ] Generate visualizations
-- [ ] Export results
-
-#### Expected Outputs
-- `svf_map.tif` - Raster SVF map (0-1)
-- `svf_statistics.csv` - Summary statistics
-- `svf_visualization.png` - Thematic map
-- Integration with existing pipeline
+### Current Status
+- **Input**: Same STL file and building footprints as SVF
+- **Method**: Ray-casting toward sun positions for winter solstice
+- **Output**: Solar access heatmap and threshold classification map
+- **Ground Masking**: Same logic as SVF for consistency
 
 ---
 
@@ -157,10 +102,11 @@ Compute Sky View Factor for outdoor/open space to analyze urban microclimate and
 - Rich visualizations
 - Production-ready codebase
 
-### v2.0.0 (Planned)
-- SVF computation
-- 3D obstruction modeling
-- Outdoor space analysis
+### v2.0.0 (Current)
+- SVF computation (STL-based)
+- Solar access computation
+- Ground-level analysis with building masking
+- Shared utilities for code reuse
 
 ---
 

@@ -12,7 +12,7 @@ A Python pipeline for calculating morphometric metrics from building footprints 
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Next step**: Sky View Factor (SVF) computation for outdoor space analysis.
+See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Current status**: Phase 1 (Basic Morphometric Analysis) and Phase 2 (SVF & Solar Access) are complete.
 
 ## Installation
 
@@ -54,14 +54,19 @@ pip install -r requirements.txt
    
    **Sky View Factor (SVF) computation:**
    ```bash
-   python scripts/compute_svf.py --stl data/raw/scene.stl --grid-spacing 2.0 --height 0.5 --sky-patches 145
+   python scripts/compute_svf.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --sky-patches 145
+   ```
+   
+   **Solar Access computation:**
+   ```bash
+   python scripts/compute_solar_access.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --threshold 3.0
    ```
 
 3. **Check results:**
    - `outputs/buildings_with_metrics.gpkg` - Enhanced dataset
    - `outputs/summary_stats.csv` - Summary statistics
-   - `outputs/svf_map.tif` - SVF raster map (0-1)
-   - `outputs/svf_statistics.csv` - SVF statistics
+   - `outputs/svf/` - SVF computation results
+   - `outputs/solar/` - Solar access computation results
    - `outputs/maps/` - All visualization files
 
 ## Input Data Requirements
@@ -82,17 +87,20 @@ pip install -r requirements.txt
 - `base`: Base elevation (meters)
 - `altura`: Relative building height (meters)
 
-### Sky View Factor (SVF) Computation
+### Sky View Factor (SVF) and Solar Access Computation
 
 **Required Files:**
-- **DTM raster**: Ground elevation in meters (`.tif` file)
-- **Building footprints**: Shapefile with:
-  - `base_height` or `base`: Height above ground (meters)
-  - `max_height` or calculated from `base + altura`: Total building height (meters)
+- **STL mesh**: Combined 3D scene containing both terrain and buildings (`.stl` file)
+- **Building footprints** (optional): Shapefile for masking building interiors from ground-level analysis
 
-The script automatically finds DTM (`.tif`) and building footprint files in `data/raw/`.
+**Methodology**: 
+- **SVF**: Computes Sky View Factor using a discretized hemispherical dome approach. The sky is divided into equal-area patches, and ray-casting is used to determine how much of the sky is visible from each ground point. Uses `pyviewfactor`-style geometric visibility testing.
+- **Solar Access**: Computes hours of direct sunlight by casting rays toward sun positions for winter solstice. Uses `pvlib` for accurate solar position calculations.
 
-**Methodology**: SVF computation uses the `pyviewfactor` library, which employs analytical double-contour integration for accurate view factor computation between planar polygons. This provides more accurate results than ray-casting methods. See [docs/SVF_MIGRATION_PLAN.md](docs/SVF_MIGRATION_PLAN.md) for implementation details.
+Both analyses:
+- Exclude building interiors (only compute for ground-level points)
+- Use the same ground mask logic for consistency
+- Support progress monitoring during computation
 
 ### Coordinate System
 - Projected CRS required (UTM preferred) for accurate area calculations
@@ -121,11 +129,17 @@ The pipeline calculates 5 fundamental morphometric metrics:
 - `scatter_plots.png`: Relationships between metrics
 - `svf_map.png`: Sky View Factor visualization (SVF computation)
 
-### SVF Outputs
-- `svf.npy`: 2D NumPy array of SVF values
-- `svf.csv`: CSV file with columns: x, y, svf
-- `svf_heatmap.png`: Top-down SVF heatmap visualization
+### SVF Outputs (`outputs/svf/`)
+- `svf.npy`: 2D NumPy array of SVF values (NaN for building points)
+- `svf.csv`: CSV file with columns: x, y, svf (only ground points)
+- `svf_heatmap.png`: Top-down SVF heatmap visualization (0-1 scale)
 - `svf_histogram.png`: Histogram of SVF value distribution
+- `ground_mask_debug.png`: Debug plot showing ground points and building footprints
+
+### Solar Access Outputs (`outputs/solar/`)
+- `solar_access_heatmap.png`: Hours of direct sunlight heatmap
+- `solar_access_threshold.png`: Binary classification map (red: <threshold, green: ≥threshold)
+- `ground_mask_debug.png`: Debug plot showing ground points and building footprints
 
 ## Configuration
 
@@ -148,14 +162,27 @@ COLORMAP_HEIGHT = "viridis"  # Colormap for height maps
 COLORMAP_VOLUME = "plasma"   # Colormap for volume maps
 ```
 
-### SVF Computation
+### SVF and Solar Access Computation
 
-SVF computation is configured via command-line arguments:
-- Grid spacing: Controls resolution of ground sampling (e.g., 2.0m)
-- Evaluation height: Height above ground for SVF calculation (e.g., 0.5m)
-- Sky patches: Number of patches for hemisphere discretization (e.g., 145 or 290)
+Both scripts are configured via command-line arguments:
 
-See `python scripts/compute_svf.py --help` for all options.
+**SVF Script:**
+- `--grid-spacing`: Grid resolution in meters (e.g., 5.0m)
+- `--height`: Evaluation height above ground (e.g., 0.5m)
+- `--sky-patches`: Number of sky patches for hemisphere discretization (e.g., 145 or 290)
+- `--footprints`: Optional path to building footprints shapefile
+- `--buffer-distance`: Buffer distance for building footprints (default: 0.25m)
+
+**Solar Access Script:**
+- `--grid-spacing`: Grid resolution in meters (e.g., 5.0m)
+- `--height`: Evaluation height above ground (e.g., 0.5m)
+- `--threshold`: Solar access threshold in hours (default: 2.0h)
+- `--timestep`: Solar calculation time step in minutes (default: 60)
+- `--latitude` / `--longitude`: Site coordinates (default: Rio de Janeiro)
+- `--footprints`: Optional path to building footprints shapefile
+- `--buffer-distance`: Buffer distance for building footprints (default: 0.25m)
+
+See `python scripts/compute_svf.py --help` and `python scripts/compute_solar_access.py --help` for all options.
 
 Set any filter to `None` to disable it.
 
@@ -176,10 +203,13 @@ IVF/
 │   ├── __init__.py
 │   ├── config.py            # Configuration settings
 │   ├── metrics.py           # Metrics calculation & validation
-│   └── visualize.py         # Visualization functions
+│   ├── visualize.py         # Visualization functions
+│   └── svf_utils.py         # Shared utilities for SVF and solar access
 │
 ├── scripts/                 # Executable scripts
-│   └── calculate_metrics.py # Main analysis script
+│   ├── calculate_metrics.py # Basic morphometric analysis
+│   ├── compute_svf.py      # Sky View Factor computation
+│   └── compute_solar_access.py  # Solar access computation
 │
 └── outputs/                 # NOT tracked in git
     ├── buildings_with_metrics.gpkg
@@ -205,22 +235,32 @@ The pipeline applies filters in the following order:
 - `numpy>=1.24.0` - Numerical computing
 - `pandas>=2.0.0` - Data manipulation
 - `matplotlib>=3.7.0` - Visualization
-- `rasterio>=1.3.0` - Raster data handling (for SVF computation)
-- `scipy>=1.11.0` - Scientific computing
 - `tqdm>=4.65.0` - Progress bars
 - `pyviewfactor>=1.0.0` - View factor computation (for SVF)
-- `pyvista>=0.32.0` - 3D geometry handling (dependency of pyviewfactor)
+- `pyvista>=0.32.0` - 3D geometry handling and ray tracing
+- `pvlib>=0.10.0` - Solar position calculations (for solar access)
 
 ## Usage Examples
 
-### Basic Usage
+### Basic Morphometric Analysis
 ```bash
 python scripts/calculate_metrics.py
 ```
 
+### SVF Computation
+```bash
+python scripts/compute_svf.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --sky-patches 145
+```
+
+### Solar Access Computation
+```bash
+python scripts/compute_solar_access.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --threshold 3.0
+```
+
 ### Custom Configuration
-1. Edit `src/config.py` to adjust filtering thresholds
-2. Run the script as normal
+1. Edit `src/config.py` to adjust filtering thresholds for morphometric analysis
+2. Use command-line arguments to configure SVF and solar access parameters
+3. Run the scripts as normal
 
 ## Data Validation
 
