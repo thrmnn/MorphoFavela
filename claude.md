@@ -49,3 +49,9 @@ All parameters in `src/config.py`:
 - **Scripts**: `compute_svf.py` and `compute_solar_access.py` (separated)
 - **Ground Masking**: Both scripts exclude building interiors using footprint shapefile
 - **Progress Monitoring**: Both scripts use tqdm for real-time progress tracking
+
+## Phase 2.6: Sky Exposure Plane Exceedance Analysis ✅ COMPLETE
+- **Script**: `analyze_sky_exposure.py`
+- **Method**: Environmental performance envelope with base height (7.5m), setbacks (front: 5m, side/rear: 3m), sky plane angle (45°)
+- **Outputs**: Exceedance map, vertical sections, CSV with metrics
+- **Purpose**: Evaluate environmental implications (solar access, ventilation), NOT code compliance

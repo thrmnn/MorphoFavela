@@ -56,6 +56,24 @@
 
 ---
 
+## Phase 2.6: Sky Exposure Plane Exceedance Analysis ✅ COMPLETE
+
+### Completed Features
+- [x] Building mesh extraction from STL using footprints
+- [x] Sky exposure plane envelope calculation with base height and setbacks
+- [x] Volumetric exceedance computation per building
+- [x] Exceedance map visualization (plan view)
+- [x] Vertical sections showing actual vs envelope
+- [x] Summary statistics and CSV export
+
+### Current Status
+- **Input**: STL mesh and building footprints
+- **Method**: Geometric envelope calculation with base height (6-9m), setbacks (front: 5m, side/rear: 3m), and sky plane angle (45°)
+- **Output**: Exceedance maps, vertical sections, and detailed metrics
+- **Purpose**: Environmental performance evaluation (solar access and ventilation), NOT code compliance
+
+---
+
 ## Phase 3: Advanced Morphometric Analysis (Future)
 
 ### Planned Features
@@ -105,6 +123,7 @@
 ### v2.0.0 (Current)
 - SVF computation (STL-based)
 - Solar access computation
+- Sky exposure plane exceedance analysis
 - Ground-level analysis with building masking
 - Shared utilities for code reuse
 

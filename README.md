@@ -12,7 +12,7 @@ A Python pipeline for calculating morphometric metrics from building footprints 
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Current status**: Phase 1 (Basic Morphometric Analysis) and Phase 2 (SVF & Solar Access) are complete.
+See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Current status**: Phase 1 (Basic Morphometric Analysis), Phase 2 (SVF & Solar Access), and Phase 2.6 (Sky Exposure Plane Analysis) are complete.
 
 ## Installation
 
@@ -61,12 +61,18 @@ pip install -r requirements.txt
    ```bash
    python scripts/compute_solar_access.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --threshold 3.0
    ```
+   
+   **Sky Exposure Plane Exceedance analysis:**
+   ```bash
+   python scripts/analyze_sky_exposure.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --angle 45.0 --base-height 7.5 --front-setback 5.0 --side-setback 3.0
+   ```
 
 3. **Check results:**
    - `outputs/buildings_with_metrics.gpkg` - Enhanced dataset
    - `outputs/summary_stats.csv` - Summary statistics
    - `outputs/svf/` - SVF computation results
    - `outputs/solar/` - Solar access computation results
+   - `outputs/sky_exposure/` - Sky exposure plane exceedance analysis results
    - `outputs/maps/` - All visualization files
 
 ## Input Data Requirements
@@ -101,6 +107,26 @@ Both analyses:
 - Exclude building interiors (only compute for ground-level points)
 - Use the same ground mask logic for consistency
 - Support progress monitoring during computation
+
+### Sky Exposure Plane Exceedance Analysis
+
+**Required Files:**
+- **STL mesh**: Combined 3D scene containing both terrain and buildings (`.stl` file)
+- **Building footprints**: Shapefile with building footprint polygons
+
+**Methodology**: 
+The sky exposure plane is an environmental performance envelope that defines the maximum allowable built form based on:
+- **Base height**: Minimum height allowed before sky plane applies (typically 6-9m for 2-3 floors)
+- **Setbacks**: Front (5m) and side/rear (3m) setbacks from footprint boundaries
+- **Sky plane angle**: Inclined plane rising from setback lines at specified angle (typically 45°)
+
+The analysis quantifies how much built volume exceeds this envelope, evaluating environmental implications (solar access and ventilation), NOT legal code compliance.
+
+**Parameters:**
+- `--angle`: Sky exposure plane angle in degrees (default: 45.0°)
+- `--base-height`: Base height before sky plane applies (default: 7.5m, range: 6-9m)
+- `--front-setback`: Front setback distance (default: 5.0m)
+- `--side-setback`: Side/rear setback distance (default: 3.0m)
 
 ### Coordinate System
 - Projected CRS required (UTM preferred) for accurate area calculations
@@ -140,6 +166,11 @@ The pipeline calculates 6 fundamental morphometric metrics:
 - `solar_access_heatmap.png`: Hours of direct sunlight heatmap
 - `solar_access_threshold.png`: Binary classification map (red: <threshold, green: ≥threshold)
 - `ground_mask_debug.png`: Debug plot showing ground points and building footprints
+
+### Sky Exposure Plane Exceedance Outputs (`outputs/sky_exposure/`)
+- `exceedance_map.png`: Plan view map showing buildings colored by exceedance ratio (%)
+- `section_1.png`, `section_2.png`, `section_3.png`: Vertical sections showing actual built form vs sky exposure plane envelope
+- `exceedance_results.csv`: Detailed exceedance metrics per building (total volume, exceeding volume, exceedance ratio, max exceedance height)
 
 ## Configuration
 
@@ -209,7 +240,8 @@ IVF/
 ├── scripts/                 # Executable scripts
 │   ├── calculate_metrics.py # Basic morphometric analysis
 │   ├── compute_svf.py      # Sky View Factor computation
-│   └── compute_solar_access.py  # Solar access computation
+│   ├── compute_solar_access.py  # Solar access computation
+│   └── analyze_sky_exposure.py  # Sky exposure plane exceedance analysis
 │
 └── outputs/                 # NOT tracked in git
     ├── buildings_with_metrics.gpkg
@@ -255,6 +287,11 @@ python scripts/compute_svf.py --stl data/raw/full_scan.stl --footprints data/raw
 ### Solar Access Computation
 ```bash
 python scripts/compute_solar_access.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --threshold 3.0
+```
+
+### Sky Exposure Plane Exceedance Analysis
+```bash
+python scripts/analyze_sky_exposure.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --angle 45.0 --base-height 7.5 --front-setback 5.0 --side-setback 3.0
 ```
 
 ### Custom Configuration
