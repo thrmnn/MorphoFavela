@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def create_thematic_maps(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
     """
-    Create thematic maps for height and volume.
+    Create thematic maps for height, volume, and inter-building distance.
     
     Args:
         gdf: GeoDataFrame with height and volume columns
@@ -22,7 +22,12 @@ def create_thematic_maps(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
     if 'height' not in gdf.columns or 'volume' not in gdf.columns:
         raise ValueError("GeoDataFrame must have 'height' and 'volume' columns")
     
-    fig, axes = plt.subplots(1, 2, figsize=FIGURE_SIZE)
+    has_inter_dist = 'inter_building_distance' in gdf.columns
+    
+    if has_inter_dist:
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    else:
+        fig, axes = plt.subplots(1, 2, figsize=FIGURE_SIZE)
     
     # Height map
     ax1 = axes[0]
@@ -37,6 +42,22 @@ def create_thematic_maps(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
              legend=True, legend_kwds={'label': 'Volume (m³)'})
     ax2.set_title('Building Volume')
     ax2.set_axis_off()
+    
+    # Inter-building distance map (if available)
+    if has_inter_dist:
+        ax3 = axes[2]
+        inter_dist_data = gdf['inter_building_distance'].dropna()
+        if len(inter_dist_data) > 0:
+            vmin = inter_dist_data.quantile(0.02)
+            vmax = inter_dist_data.quantile(0.98)
+            gdf.plot(column='inter_building_distance', ax=ax3, cmap='RdYlGn_r',
+                     legend=True, legend_kwds={'label': 'Distance (m)'},
+                     vmin=vmin, vmax=vmax)
+        else:
+            gdf.plot(column='inter_building_distance', ax=ax3, cmap='RdYlGn_r',
+                     legend=True, legend_kwds={'label': 'Distance (m)'})
+        ax3.set_title('Inter-Building Distance')
+        ax3.set_axis_off()
     
     plt.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -59,7 +80,13 @@ def create_multi_panel_summary(gdf: gpd.GeoDataFrame, output_path: Path) -> None
     if missing:
         raise ValueError(f"GeoDataFrame must have columns: {missing}")
     
-    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    # Check if inter_building_distance is available
+    has_inter_dist = 'inter_building_distance' in gdf.columns
+    
+    if has_inter_dist:
+        fig, axes = plt.subplots(2, 3, figsize=(20, 12))
+    else:
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
     
     # Height map
     ax1 = axes[0, 0]
@@ -100,6 +127,25 @@ def create_multi_panel_summary(gdf: gpd.GeoDataFrame, output_path: Path) -> None
         ax4.set_title('Street Canyon Ratio (Height/Width)', fontsize=12, fontweight='bold')
     ax4.set_axis_off()
     
+    # Inter-building distance map (if available)
+    if has_inter_dist:
+        ax5 = axes[1, 2]
+        inter_dist_data = gdf['inter_building_distance'].dropna()
+        if len(inter_dist_data) > 0:
+            # Use percentile-based scaling
+            vmin = inter_dist_data.quantile(0.02)
+            vmax = inter_dist_data.quantile(0.98)
+            gdf.plot(column='inter_building_distance', ax=ax5, cmap='RdYlGn_r',
+                     legend=True, legend_kwds={'label': 'Distance (m)'},
+                     vmin=vmin, vmax=vmax)
+            ax5.set_title(f'Inter-Building Distance\n(scale: {vmin:.2f} - {vmax:.2f}m)', 
+                         fontsize=12, fontweight='bold')
+        else:
+            gdf.plot(column='inter_building_distance', ax=ax5, cmap='RdYlGn_r',
+                     legend=True, legend_kwds={'label': 'Distance (m)'})
+            ax5.set_title('Inter-Building Distance', fontsize=12, fontweight='bold')
+        ax5.set_axis_off()
+    
     plt.suptitle('Morphometric Analysis Summary', fontsize=16, fontweight='bold', y=0.98)
     plt.tight_layout(rect=[0, 0, 1, 0.97])
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -117,7 +163,7 @@ def create_statistical_distributions(gdf: gpd.GeoDataFrame, output_path: Path) -
         gdf: GeoDataFrame with metric columns
         output_path: Path to save the figure
     """
-    metric_cols = ['height', 'area', 'volume', 'perimeter', 'hw_ratio']
+    metric_cols = ['height', 'area', 'volume', 'perimeter', 'hw_ratio', 'inter_building_distance']
     available_cols = [col for col in metric_cols if col in gdf.columns]
     
     if not available_cols:
@@ -135,7 +181,8 @@ def create_statistical_distributions(gdf: gpd.GeoDataFrame, output_path: Path) -
         'area': 'Area (m²)',
         'volume': 'Volume (m³)',
         'perimeter': 'Perimeter (m)',
-        'hw_ratio': 'H/W Ratio'
+        'hw_ratio': 'H/W Ratio',
+        'inter_building_distance': 'Inter-Building Distance (m)'
     }
     
     for idx, col in enumerate(available_cols):
@@ -186,7 +233,13 @@ def create_scatter_plots(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
     if missing:
         raise ValueError(f"GeoDataFrame must have columns: {missing}")
     
-    fig, axes = plt.subplots(2, 2, figsize=(14, 12))
+    # Check if inter_building_distance is available
+    has_inter_dist = 'inter_building_distance' in gdf.columns
+    
+    if has_inter_dist:
+        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+    else:
+        fig, axes = plt.subplots(2, 2, figsize=(14, 12))
     
     # Height vs Area
     ax1 = axes[0, 0]
@@ -220,6 +273,24 @@ def create_scatter_plots(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
     ax4.set_ylabel('Volume (m³)')
     ax4.set_title('Volume vs Height')
     ax4.grid(True, alpha=0.3)
+    
+    # Inter-building distance plots (if available)
+    if has_inter_dist:
+        # Inter-building distance vs Area
+        ax5 = axes[1, 0]
+        ax5.scatter(gdf['area'], gdf['inter_building_distance'], alpha=0.5, s=10, edgecolors='black', linewidth=0.1)
+        ax5.set_xlabel('Area (m²)')
+        ax5.set_ylabel('Inter-Building Distance (m)')
+        ax5.set_title('Inter-Building Distance vs Area')
+        ax5.grid(True, alpha=0.3)
+        
+        # Inter-building distance vs Height
+        ax6 = axes[1, 2]
+        ax6.scatter(gdf['height'], gdf['inter_building_distance'], alpha=0.5, s=10, edgecolors='black', linewidth=0.1)
+        ax6.set_xlabel('Height (m)')
+        ax6.set_ylabel('Inter-Building Distance (m)')
+        ax6.set_title('Inter-Building Distance vs Height')
+        ax6.grid(True, alpha=0.3)
     
     plt.suptitle('Metric Relationships', fontsize=16, fontweight='bold')
     plt.tight_layout(rect=[0, 0, 1, 0.97])

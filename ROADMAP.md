@@ -4,7 +4,7 @@
 
 ### Completed Features
 - [x] Building footprint data loading and validation
-- [x] Basic metrics calculation (height, area, volume, perimeter, h/w ratio)
+- [x] Basic metrics calculation (height, area, volume, perimeter, h/w ratio, inter-building distance)
 - [x] Data filtering pipeline (height, area, volume, h/w ratio, outliers)
 - [x] Statistical analysis and summary generation
 - [x] Comprehensive visualizations (thematic maps, distributions, scatter plots)

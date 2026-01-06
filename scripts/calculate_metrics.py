@@ -46,7 +46,7 @@ def generate_summary_stats(gdf: gpd.GeoDataFrame) -> pd.DataFrame:
     Returns:
         DataFrame with summary statistics
     """
-    metric_cols = ['height', 'area', 'volume', 'perimeter', 'hw_ratio']
+    metric_cols = ['height', 'area', 'volume', 'perimeter', 'hw_ratio', 'inter_building_distance']
     available_cols = [col for col in metric_cols if col in gdf.columns]
     
     stats = gdf[available_cols].describe()

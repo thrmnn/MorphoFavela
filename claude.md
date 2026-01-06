@@ -9,6 +9,7 @@ Python pipeline for calculating morphometric metrics from building footprints wi
 - **volume**: Building volume (m³)
 - **perimeter**: Footprint perimeter (m)
 - **hw_ratio**: Street canyon ratio (height/width)
+- **inter_building_distance**: Distance to nearest neighbor building (m)
 
 ## Data Input
 - Formats: `.gpkg`, `.geojson`, `.shp`

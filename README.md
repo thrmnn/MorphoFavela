@@ -108,13 +108,14 @@ Both analyses:
 
 ## Metrics Calculated
 
-The pipeline calculates 5 fundamental morphometric metrics:
+The pipeline calculates 6 fundamental morphometric metrics:
 
 1. **height**: Building height (top_height - base_height) in meters
 2. **area**: Footprint area in m²
 3. **volume**: Building volume (area × height) in m³
 4. **perimeter**: Footprint perimeter in meters
 5. **hw_ratio**: Street canyon ratio (height/width) - building height divided by building width
+6. **inter_building_distance**: Distance to nearest neighbor building (m) - minimum distance between building boundaries. Calculated using spatial indexing for efficient computation on large datasets.
 
 ## Output Files
 
@@ -123,11 +124,10 @@ The pipeline calculates 5 fundamental morphometric metrics:
 - `summary_stats.csv`: Descriptive statistics (mean, std, min, max, quartiles)
 
 ### Visualizations
-- `height_volume_maps.png`: Height and volume thematic maps
-- `multi_panel_summary.png`: 2×2 grid showing all key metrics
+- `height_volume_maps.png`: Height, volume, and inter-building distance thematic maps
+- `multi_panel_summary.png`: Multi-panel grid showing all key metrics (2×3 when inter-building distance is available)
 - `statistical_distributions.png`: Histograms and box plots for all metrics
-- `scatter_plots.png`: Relationships between metrics
-- `svf_map.png`: Sky View Factor visualization (SVF computation)
+- `scatter_plots.png`: Relationships between metrics including inter-building distance
 
 ### SVF Outputs (`outputs/svf/`)
 - `svf.npy`: 2D NumPy array of SVF values (NaN for building points)
