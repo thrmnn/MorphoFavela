@@ -10,6 +10,10 @@ A Python pipeline for calculating morphometric metrics from building footprints 
 - **Rich visualizations**: Generates thematic maps, statistical distributions, and scatter plots
 - **Robust validation**: Validates data quality, CRS, and geometry before processing
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Next step**: Sky View Factor (SVF) computation for outdoor space analysis.
+
 ## Installation
 
 ### Prerequisites
@@ -42,22 +46,33 @@ pip install -r requirements.txt
    ```
 
 2. **Run the analysis:**
+   
+   **Basic morphometric analysis:**
    ```bash
    python scripts/calculate_metrics.py
+   ```
+   
+   **Sky View Factor (SVF) computation:**
+   ```bash
+   python scripts/compute_svf.py --stl data/raw/scene.stl --grid-spacing 2.0 --height 0.5 --sky-patches 145
    ```
 
 3. **Check results:**
    - `outputs/buildings_with_metrics.gpkg` - Enhanced dataset
    - `outputs/summary_stats.csv` - Summary statistics
+   - `outputs/svf_map.tif` - SVF raster map (0-1)
+   - `outputs/svf_statistics.csv` - SVF statistics
    - `outputs/maps/` - All visualization files
 
 ## Input Data Requirements
 
-### File Format
+### Basic Morphometric Analysis
+
+**File Format:**
 - Supported: `.gpkg`, `.geojson`, or `.shp`
 - The script automatically finds the first geospatial file in `data/raw/`
 
-### Required Attributes
+**Required Attributes:**
 
 **Standard format:**
 - `base_height`: Elevation of building base (meters)
@@ -66,6 +81,18 @@ pip install -r requirements.txt
 **Alternative format (automatically converted):**
 - `base`: Base elevation (meters)
 - `altura`: Relative building height (meters)
+
+### Sky View Factor (SVF) Computation
+
+**Required Files:**
+- **DTM raster**: Ground elevation in meters (`.tif` file)
+- **Building footprints**: Shapefile with:
+  - `base_height` or `base`: Height above ground (meters)
+  - `max_height` or calculated from `base + altura`: Total building height (meters)
+
+The script automatically finds DTM (`.tif`) and building footprint files in `data/raw/`.
+
+**Methodology**: SVF computation uses the `pyviewfactor` library, which employs analytical double-contour integration for accurate view factor computation between planar polygons. This provides more accurate results than ray-casting methods. See [docs/SVF_MIGRATION_PLAN.md](docs/SVF_MIGRATION_PLAN.md) for implementation details.
 
 ### Coordinate System
 - Projected CRS required (UTM preferred) for accurate area calculations
@@ -92,6 +119,13 @@ The pipeline calculates 5 fundamental morphometric metrics:
 - `multi_panel_summary.png`: 2×2 grid showing all key metrics
 - `statistical_distributions.png`: Histograms and box plots for all metrics
 - `scatter_plots.png`: Relationships between metrics
+- `svf_map.png`: Sky View Factor visualization (SVF computation)
+
+### SVF Outputs
+- `svf.npy`: 2D NumPy array of SVF values
+- `svf.csv`: CSV file with columns: x, y, svf
+- `svf_heatmap.png`: Top-down SVF heatmap visualization
+- `svf_histogram.png`: Histogram of SVF value distribution
 
 ## Configuration
 
@@ -113,6 +147,15 @@ FIGURE_SIZE = (12, 8)        # Figure dimensions
 COLORMAP_HEIGHT = "viridis"  # Colormap for height maps
 COLORMAP_VOLUME = "plasma"   # Colormap for volume maps
 ```
+
+### SVF Computation
+
+SVF computation is configured via command-line arguments:
+- Grid spacing: Controls resolution of ground sampling (e.g., 2.0m)
+- Evaluation height: Height above ground for SVF calculation (e.g., 0.5m)
+- Sky patches: Number of patches for hemisphere discretization (e.g., 145 or 290)
+
+See `python scripts/compute_svf.py --help` for all options.
 
 Set any filter to `None` to disable it.
 
@@ -162,6 +205,11 @@ The pipeline applies filters in the following order:
 - `numpy>=1.24.0` - Numerical computing
 - `pandas>=2.0.0` - Data manipulation
 - `matplotlib>=3.7.0` - Visualization
+- `rasterio>=1.3.0` - Raster data handling (for SVF computation)
+- `scipy>=1.11.0` - Scientific computing
+- `tqdm>=4.65.0` - Progress bars
+- `pyviewfactor>=1.0.0` - View factor computation (for SVF)
+- `pyvista>=0.32.0` - 3D geometry handling (dependency of pyviewfactor)
 
 ## Usage Examples
 

@@ -229,3 +229,5 @@ def create_scatter_plots(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
     
     logger.info(f"Saved scatter plots to {output_path}")
 
+
+

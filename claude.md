@@ -40,3 +40,11 @@ All parameters in `src/config.py`:
 - Type hints and docstrings throughout
 - Data validation before processing
 - Percentile-based outlier filtering for h/w ratio visualization
+
+## Next Phase: SVF Computation
+See ROADMAP.md for detailed SVF implementation plan. Key requirements:
+- DTM raster + building footprints with base_height/max_height
+- 3D obstruction surface generation
+- Ray-casting SVF at 1.5m pedestrian level
+- Grid sampling (1-2m resolution) for outdoor space
+- Output: SVF raster map (0-1) and statistics

@@ -29,3 +29,4 @@ FIGURE_SIZE = (12, 8)
 COLORMAP_HEIGHT = "viridis"
 COLORMAP_VOLUME = "plasma"
 
+
