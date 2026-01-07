@@ -413,6 +413,18 @@ def main():
         output_dir=output_dir
     )
     
+    # Save solar access as 2D numpy array for use in other analyses
+    solar_hours = solar_access_steps * timestep_hours
+    solar_2d = np.full((len(grid_y_coords), len(grid_x_coords)), np.nan)
+    for i, (x, y, z) in enumerate(ground_points):
+        x_idx = np.argmin(np.abs(grid_x_coords - x))
+        y_idx = np.argmin(np.abs(grid_y_coords - y))
+        solar_2d[y_idx, x_idx] = solar_hours[i]
+    
+    solar_npy_path = output_dir / "solar_access.npy"
+    np.save(solar_npy_path, solar_2d)
+    print(f"  Saved solar access raster to {solar_npy_path}")
+    
     print("\n" + "=" * 60)
     print("SOLAR ACCESS COMPUTATION COMPLETE")
     print(f"Results saved to: {output_dir}")

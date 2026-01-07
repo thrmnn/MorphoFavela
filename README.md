@@ -12,7 +12,7 @@ A Python pipeline for calculating morphometric metrics from building footprints 
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Current status**: Phase 1 (Basic Morphometric Analysis), Phase 2 (SVF & Solar Access), and Phase 2.6 (Sky Exposure Plane Analysis) are complete.
+See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Current status**: Phase 1 (Basic Morphometric Analysis), Phase 2 (SVF & Solar Access), Phase 2.6 (Sky Exposure Plane), Phase 2.7 (Sectional Porosity), Phase 2.8 (Occupancy Density Proxy), Phase 2.9 (Deprivation Index), and Phase 2.9.5 (Raster-Based Deprivation Index) are complete.
 
 ## Installation
 
@@ -67,12 +67,36 @@ pip install -r requirements.txt
    python scripts/analyze_sky_exposure.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --angle 45.0 --base-height 7.5 --front-setback 5.0 --side-setback 3.0
    ```
 
+   **Sectional Porosity computation:**
+   ```bash
+   python scripts/compute_sectional_porosity.py --footprints data/raw/vidigal_buildings.shp --grid-spacing 2.0 --height 1.5 --buffer 0.25
+   ```
+
+   **Occupancy Density Proxy computation:**
+   ```bash
+   python scripts/compute_occupancy_density.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-size 50.0
+   ```
+
+   **Morphological Environmental Deprivation Index (Unit-level):**
+   ```bash
+   python scripts/compute_deprivation_index.py --units outputs/density/density_proxy.gpkg --solar outputs/solar/solar_access.npy --svf outputs/svf/svf.npy --porosity outputs/porosity/porosity.npy --density outputs/density/density_proxy.gpkg
+   ```
+
+   **Morphological Environmental Deprivation Index (Raster-based):**
+   ```bash
+   python scripts/compute_deprivation_index_raster.py --solar outputs/solar/solar_access.npy --svf outputs/svf/svf.npy --porosity outputs/porosity/porosity.npy --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --units outputs/density/density_proxy.gpkg
+   ```
+
 3. **Check results:**
    - `outputs/buildings_with_metrics.gpkg` - Enhanced dataset
    - `outputs/summary_stats.csv` - Summary statistics
    - `outputs/svf/` - SVF computation results
    - `outputs/solar/` - Solar access computation results
    - `outputs/sky_exposure/` - Sky exposure plane exceedance analysis results
+   - `outputs/porosity/` - Sectional porosity computation results
+   - `outputs/density/` - Occupancy density proxy results
+   - `outputs/deprivation/` - Unit-level deprivation index results
+   - `outputs/deprivation_raster/` - Raster-based deprivation index results
    - `outputs/maps/` - All visualization files
 
 ## Input Data Requirements
@@ -241,7 +265,11 @@ IVF/
 │   ├── calculate_metrics.py # Basic morphometric analysis
 │   ├── compute_svf.py      # Sky View Factor computation
 │   ├── compute_solar_access.py  # Solar access computation
-│   └── analyze_sky_exposure.py  # Sky exposure plane exceedance analysis
+│   ├── analyze_sky_exposure.py  # Sky exposure plane exceedance analysis
+│   ├── compute_sectional_porosity.py  # Sectional porosity computation
+│   ├── compute_occupancy_density.py  # Occupancy density proxy computation
+│   ├── compute_deprivation_index.py  # Unit-level deprivation index
+│   └── compute_deprivation_index_raster.py  # Raster-based deprivation index
 │
 └── outputs/                 # NOT tracked in git
     ├── buildings_with_metrics.gpkg
@@ -251,7 +279,9 @@ IVF/
 
 ## Filtering Pipeline
 
-The pipeline applies filters in the following order:
+**Note**: Filtering is only applied to **informal settlements** (e.g., Vidigal). **Formal settlements** (e.g., Copacabana) skip all filtering to preserve the complete dataset.
+
+For informal areas, the pipeline applies filters in the following order:
 
 1. **Height filter**: Removes buildings exceeding maximum height
 2. **Metrics calculation**: Computes all morphometric metrics
@@ -292,6 +322,26 @@ python scripts/compute_solar_access.py --stl data/raw/full_scan.stl --footprints
 ### Sky Exposure Plane Exceedance Analysis
 ```bash
 python scripts/analyze_sky_exposure.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --angle 45.0 --base-height 7.5 --front-setback 5.0 --side-setback 3.0
+```
+
+### Sectional Porosity Computation
+```bash
+python scripts/compute_sectional_porosity.py --footprints data/raw/vidigal_buildings.shp --grid-spacing 2.0 --height 1.5 --buffer 0.25
+```
+
+### Occupancy Density Proxy Computation
+```bash
+python scripts/compute_occupancy_density.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-size 50.0
+```
+
+### Morphological Environmental Deprivation Index (Unit-level)
+```bash
+python scripts/compute_deprivation_index.py --units outputs/density/density_proxy.gpkg --solar outputs/solar/solar_access.npy --svf outputs/svf/svf.npy --porosity outputs/porosity/porosity.npy --density outputs/density/density_proxy.gpkg
+```
+
+### Morphological Environmental Deprivation Index (Raster-based)
+```bash
+python scripts/compute_deprivation_index_raster.py --solar outputs/solar/solar_access.npy --svf outputs/svf/svf.npy --porosity outputs/porosity/porosity.npy --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --units outputs/density/density_proxy.gpkg
 ```
 
 ### Custom Configuration

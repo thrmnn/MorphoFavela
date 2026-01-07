@@ -17,6 +17,9 @@ Python pipeline for calculating morphometric metrics from building footprints wi
 - CRS: Projected (UTM preferred)
 
 ## Filtering Pipeline
+**Note**: Filtering is only applied to informal settlements (e.g., Vidigal). Formal settlements (e.g., Copacabana) skip filtering.
+
+For informal areas:
 1. Height filter (max 20m)
 2. Metrics calculation
 3. Area filter (max 500m²)
@@ -55,3 +58,41 @@ All parameters in `src/config.py`:
 - **Method**: Environmental performance envelope with base height (7.5m), setbacks (front: 5m, side/rear: 3m), sky plane angle (45°)
 - **Outputs**: Exceedance map, vertical sections, CSV with metrics
 - **Purpose**: Evaluate environmental implications (solar access, ventilation), NOT code compliance
+
+## Phase 2.7: Sectional Porosity Computation ✅ COMPLETE
+- **Script**: `compute_sectional_porosity.py`
+- **Method**: Plan-view porosity as proxy for wind access (fraction of open area in horizontal slice)
+- **Outputs**: Porosity raster (.npy), CSV, heatmap visualization
+
+## Phase 2.8: Occupancy Density Proxy ✅ COMPLETE
+- **Script**: `compute_occupancy_density.py`
+- **Method**: Built volume / open space ratio per analysis unit (auto-generated grid)
+- **Outputs**: GeoDataFrame, density map, CSV summary
+
+## Phase 2.9: Morphological Environmental Deprivation Index (Unit-level) ✅ COMPLETE
+- **Script**: `compute_deprivation_index.py`
+- **Method**: Composite index combining solar deficit, ventilation deficit, and occupancy pressure at unit level
+- **Outputs**: Hotspot map, deficit overlap map, ranking table
+
+## Phase 2.9.5: Morphological Environmental Deprivation Index (Raster-based) ✅ COMPLETE
+- **Script**: `compute_deprivation_index_raster.py`
+- **Method**: Continuous 2D raster of deprivation index with pixel-level occupancy pressure computation
+- **Features**: Works with native raster resolutions, building mask, continuous and classified visualizations, unit-level aggregation
+- **Outputs**: Raster (.npy), continuous heatmap, classified hotspot map, unit-level aggregation
+
+## Phase 3: Multi-Area Data Organization ✅ IN PROGRESS
+- **Structure**: Area-based data organization (`data/{area}/raw/`) for comparative analysis
+- **Supported Areas**: 
+  - `vidigal` (informal settlement)
+  - `copacabana` (formal neighborhood)
+- **Configuration**: `src/config.py` includes `get_area_data_dir()` and `get_area_output_dir()` helper functions
+- **Next Steps**: 
+  1. Migrate existing Vidigal data to `data/vidigal/raw/`
+  2. Add Copacabana data to `data/copacabana/raw/`
+  3. Implement comparative analysis scripts (Phase 3.1)
+
+## Data Organization
+- **Area-based structure**: `data/{area}/raw/` for input files
+- **Area-based outputs**: `outputs/{area}/` for analysis results
+- **Helper functions**: `src/config.py` provides `get_area_data_dir(area)` and `get_area_output_dir(area)`
+- **Backward compatibility**: Legacy `data/raw/` path still supported

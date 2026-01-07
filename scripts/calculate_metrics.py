@@ -3,11 +3,12 @@
 Calculate basic morphometric metrics for building footprints.
 
 Usage:
-    python scripts/calculate_metrics.py
+    python scripts/calculate_metrics.py [--area AREA] [--input INPUT_PATH] [--output OUTPUT_DIR]
 """
 
 import logging
 import sys
+import argparse
 from pathlib import Path
 import geopandas as gpd
 import pandas as pd
@@ -18,7 +19,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import (
     RAW_DATA, OUTPUTS_DIR, MAX_FILTER_HEIGHT, MAX_FILTER_AREA,
-    MAX_FILTER_VOLUME, MAX_FILTER_HW_RATIO, MAX_HEIGHT_AREA_RATIO, HEIGHT_AREA_PERCENTILE
+    MAX_FILTER_VOLUME, MAX_FILTER_HW_RATIO, MAX_HEIGHT_AREA_RATIO, HEIGHT_AREA_PERCENTILE,
+    get_area_data_dir, get_area_analysis_dir, is_formal_area
 )
 from src.metrics import calculate_basic_metrics, validate_footprints, normalize_height_columns
 from src.visualize import (
@@ -56,21 +58,39 @@ def generate_summary_stats(gdf: gpd.GeoDataFrame) -> pd.DataFrame:
 def main():
     """Run basic metrics calculation pipeline."""
     
+    parser = argparse.ArgumentParser(description='Calculate basic morphometric metrics')
+    parser.add_argument('--area', type=str, default=None, help='Area name (vidigal, copacabana)')
+    parser.add_argument('--input', type=str, default=None, help='Input footprints file path')
+    parser.add_argument('--output', type=str, default=None, help='Output directory')
+    args = parser.parse_args()
+    
     logger.info("Starting morphometric analysis")
     
     # 1. Load data
-    # Look for any geospatial file in the raw data directory
-    input_path = None
-    for pattern in ["footprints.gpkg", "footprints.geojson", "footprints.shp", "*.gpkg", "*.geojson", "*.shp"]:
-        matches = list(RAW_DATA.glob(pattern))
-        if matches:
-            input_path = matches[0]
-            break
+    if args.input:
+        input_path = Path(args.input)
+    elif args.area:
+        # Use area-based data directory
+        area_data_dir = get_area_data_dir(args.area)
+        input_path = None
+        for pattern in ["*.shp", "*.gpkg", "*.geojson"]:
+            matches = list(area_data_dir.glob(pattern))
+            if matches:
+                input_path = matches[0]
+                break
+    else:
+        # Fallback to legacy RAW_DATA
+        input_path = None
+        for pattern in ["footprints.gpkg", "footprints.geojson", "footprints.shp", "*.gpkg", "*.geojson", "*.shp"]:
+            matches = list(RAW_DATA.glob(pattern))
+            if matches:
+                input_path = matches[0]
+                break
     
-    if input_path is None:
+    if input_path is None or not input_path.exists():
         raise FileNotFoundError(
-            f"No geospatial file found in {RAW_DATA}. "
-            f"Expected: .gpkg, .geojson, or .shp file"
+            f"No geospatial file found. "
+            f"Use --input PATH or --area AREA to specify data location."
         )
     
     logger.info(f"Loading footprints from {input_path}")
@@ -97,8 +117,19 @@ def main():
     logger.info("Preprocessing data...")
     buildings = normalize_height_columns(buildings)
     
-    # Filter buildings by maximum height
-    if MAX_FILTER_HEIGHT is not None:
+    # Determine if filtering should be applied
+    # Formal areas (e.g., Copacabana) skip filtering
+    # Informal areas (e.g., Vidigal) apply filtering
+    apply_filtering = True
+    if args.area:
+        if is_formal_area(args.area):
+            apply_filtering = False
+            logger.info(f"Formal area detected ({args.area}): Skipping building filters")
+        else:
+            logger.info(f"Informal area detected ({args.area}): Applying building filters")
+    
+    # Filter buildings by maximum height (only for informal areas)
+    if apply_filtering and MAX_FILTER_HEIGHT is not None:
         initial_count = len(buildings)
         # Calculate height for filtering
         buildings['_temp_height'] = buildings['top_height'] - buildings['base_height']
@@ -117,8 +148,8 @@ def main():
     buildings = calculate_basic_metrics(buildings)
     logger.info(f"✓ Calculated metrics for {len(buildings)} buildings")
     
-    # 3.5. Filter buildings by maximum area
-    if MAX_FILTER_AREA is not None and 'area' in buildings.columns:
+    # 3.5. Filter buildings by maximum area (only for informal areas)
+    if apply_filtering and MAX_FILTER_AREA is not None and 'area' in buildings.columns:
         initial_count = len(buildings)
         buildings = buildings[buildings['area'] <= MAX_FILTER_AREA].copy()
         filtered_count = len(buildings)
@@ -127,8 +158,8 @@ def main():
             logger.info(f"Filtered out {removed} buildings with area > {MAX_FILTER_AREA}m²")
             logger.info(f"Processing {filtered_count} buildings after area filter")
     
-    # 3.6. Filter buildings by maximum volume
-    if MAX_FILTER_VOLUME is not None and 'volume' in buildings.columns:
+    # 3.6. Filter buildings by maximum volume (only for informal areas)
+    if apply_filtering and MAX_FILTER_VOLUME is not None and 'volume' in buildings.columns:
         initial_count = len(buildings)
         buildings = buildings[buildings['volume'] <= MAX_FILTER_VOLUME].copy()
         filtered_count = len(buildings)
@@ -137,8 +168,8 @@ def main():
             logger.info(f"Filtered out {removed} buildings with volume > {MAX_FILTER_VOLUME}m³")
             logger.info(f"Processing {filtered_count} buildings after volume filter")
     
-    # 3.7. Filter buildings by maximum h/w ratio
-    if MAX_FILTER_HW_RATIO is not None and 'hw_ratio' in buildings.columns:
+    # 3.7. Filter buildings by maximum h/w ratio (only for informal areas)
+    if apply_filtering and MAX_FILTER_HW_RATIO is not None and 'hw_ratio' in buildings.columns:
         initial_count = len(buildings)
         hw_valid = buildings['hw_ratio'].notna()
         buildings = buildings[(~hw_valid) | (buildings['hw_ratio'] <= MAX_FILTER_HW_RATIO)].copy()
@@ -148,8 +179,8 @@ def main():
             logger.info(f"Filtered out {removed} buildings with h/w ratio > {MAX_FILTER_HW_RATIO}")
             logger.info(f"Processing {filtered_count} buildings after h/w ratio filter")
     
-    # 3.8. Filter outliers based on height vs area relationship
-    if 'height' in buildings.columns and 'area' in buildings.columns:
+    # 3.8. Filter outliers based on height vs area relationship (only for informal areas)
+    if apply_filtering and 'height' in buildings.columns and 'area' in buildings.columns:
         initial_count = len(buildings)
         # Calculate height/area ratio
         buildings['height_area_ratio'] = buildings['height'] / buildings['area']
@@ -179,10 +210,19 @@ def main():
     logger.info("Generating summary statistics...")
     stats = generate_summary_stats(buildings)
     
+    # Determine output directory
+    if args.output:
+        output_base = Path(args.output)
+    elif args.area:
+        output_base = get_area_analysis_dir(args.area, "metrics")
+    else:
+        output_base = OUTPUTS_DIR
+    
+    output_base.mkdir(parents=True, exist_ok=True)
+    
     # 5. Create visualizations
     logger.info("Creating visualizations...")
-    OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
-    maps_dir = OUTPUTS_DIR / "maps"
+    maps_dir = output_base / "maps"
     maps_dir.mkdir(exist_ok=True)
     
     # Original height/volume maps
@@ -217,12 +257,12 @@ def main():
     logger.info("Saving outputs...")
     
     # Save enhanced dataset
-    output_path = OUTPUTS_DIR / "buildings_with_metrics.gpkg"
+    output_path = output_base / "buildings_with_metrics.gpkg"
     buildings.to_file(output_path, driver="GPKG")
     logger.info(f"✓ Saved metrics to {output_path}")
     
     # Save statistics
-    stats_path = OUTPUTS_DIR / "summary_stats.csv"
+    stats_path = output_base / "summary_stats.csv"
     stats.to_csv(stats_path)
     logger.info(f"✓ Saved statistics to {stats_path}")
     

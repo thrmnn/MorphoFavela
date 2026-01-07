@@ -74,14 +74,117 @@
 
 ---
 
-## Phase 3: Advanced Morphometric Analysis (Future)
+## Phase 2.7: Sectional Porosity Computation ✅ COMPLETE
 
-### Planned Features
+### Completed Features
+- [x] Load and prepare building footprints (reprojection, buffering)
+- [x] Generate regular 2D grid covering analysis domain
+- [x] Compute sectional porosity per grid cell using vectorized operations
+- [x] Generate top-down porosity heatmap visualization
+- [x] Provide summary statistics (mean, 10th percentile)
+
+### Current Status
+- **Input**: Building footprints shapefile
+- **Method**: Geometric calculation of void area fraction within horizontal slice
+- **Output**: Porosity raster (.npy), CSV, and heatmap visualization
+- **Conceptual Framing**: Geometric proxy for wind access, no airflow simulation
+
+---
+
+## Phase 2.8: Occupancy Density Proxy ✅ COMPLETE
+
+### Completed Features
+- [x] Compute built volume per building from STL and footprints
+- [x] Automatically generate analysis units as regular grid
+- [x] Aggregate built volume per analysis unit
+- [x] Compute open space area per analysis unit
+- [x] Compute density proxy (built volume / open space area) safely handling zero open space
+- [x] Generate choropleth density map and summary statistics
+
+### Current Status
+- **Input**: STL mesh and building footprints
+- **Method**: Aggregation of built volume and open space area at defined spatial unit
+- **Output**: GeoDataFrame, density map, CSV summary
+- **Conceptual Framing**: Proxy for occupancy pressure, relative ranking
+
+---
+
+## Phase 2.9: Morphological Environmental Deprivation Index (Unit-level) ✅ COMPLETE
+
+### Completed Features
+- [x] Aggregate solar access, SVF, and sectional porosity to analysis units
+- [x] Compute normalized deficit scores for solar, ventilation, and occupancy pressure
+- [x] Compute composite hotspot index using equal weighting
+- [x] Classify analysis units into "Extreme hotspot", "High deprivation", and "Baseline"
+- [x] Generate hotspot map, deficit overlap map, and ranking table
+
+### Current Status
+- **Input**: Analysis units, solar/SVF/porosity rasters, occupancy density GeoDataFrame
+- **Method**: Composite index combining multiple environmental performance proxies
+- **Output**: GeoDataFrame, hotspot map, deficit overlap map, ranking table
+- **Conceptual Framing**: Highlights zones of compounded environmental deprivation, non-causal
+
+---
+
+## Phase 2.9.5: Morphological Environmental Deprivation Index (Raster-based) ✅ COMPLETE
+
+### Completed Features
+- [x] Continuous 2D raster computation at pixel level
+- [x] Pixel-level occupancy pressure computation (built volume / open space per cell)
+- [x] Coordinate-based resampling for different raster resolutions
+- [x] Building mask application (excludes building interiors)
+- [x] Continuous heatmap visualization
+- [x] Classified hotspot map with thresholds (Extreme, High, Baseline)
+- [x] Unit-level aggregation for policy interpretation
+
+### Current Status
+- **Input**: Solar/SVF/porosity rasters, STL mesh, building footprints, optional analysis units
+- **Method**: Continuous raster with pixel-level deficit computation and composite index
+- **Output**: Raster (.npy), continuous heatmap, classified map, unit-level aggregation
+- **Advantages**: Higher spatial resolution, continuous gradients, precise hotspot identification
+
+---
+
+## Phase 3: Multi-Area Comparative Analysis 🚧 IN PROGRESS
+
+### Phase 3.0: Data Organization Structure ✅ COMPLETE
+
+#### Completed Features
+- [x] Area-based data directory structure (`data/{area}/raw/`)
+- [x] Area-based output directory structure (`outputs/{area}/`)
+- [x] Configuration helpers for area paths (`get_area_data_dir()`, `get_area_output_dir()`)
+- [x] Supported areas: `vidigal` (informal), `copacabana` (formal)
+- [x] Documentation for data organization and file naming conventions
+
+#### Current Status
+- **Structure**: Ready for multi-area data organization
+- **Areas**: Vidigal and Copacabana directories created
+- **Next**: Migrate existing data and add Copacabana data files
+
+### Phase 3.1: Comparative Analysis Framework (Planned)
+
+#### Planned Features
+- [ ] Update scripts to support `--area` parameter for area-specific processing
+- [ ] Comparative analysis script comparing metrics across areas
+- [ ] Side-by-side visualization framework for formal vs informal comparisons
+- [ ] Statistical comparison of morphometric metrics (mean, distributions, tests)
+- [ ] Comparative environmental performance analysis (SVF, solar access, deprivation index)
+- [ ] Automated comparison report generation
+
+#### Priority Areas for Comparison
+- **Morphometric metrics**: Height, area, volume distributions
+- **Environmental performance**: SVF, solar access, ventilation proxies
+- **Spatial patterns**: Density, porosity, building arrangement
+- **Deprivation index**: Hotspot identification and spatial distribution
+
+### Phase 3.2: Advanced Morphometric Analysis (Future)
+
+#### Planned Features
 - [ ] Neighborhood-level metrics (BCR, FAR)
 - [ ] Spatial autocorrelation analysis
 - [ ] Building adjacency analysis
 - [ ] Fractal dimension calculation
-- [ ] Multi-site comparison framework
+- [ ] Urban form typology classification
 
 ---
 
@@ -96,15 +199,83 @@
 
 ---
 
+## Next Steps & Priorities
+
+### High Priority - Code Quality & Robustness
+
+#### Performance Optimization
+- [ ] **Parallelize SVF/solar access computation** - Ray-casting operations can be parallelized across grid points
+- [ ] **Optimize pixel-level occupancy pressure** - Vectorize building volume computation where possible
+- [ ] **Cache intermediate results** - Building volumes, ground masks, and resampled rasters
+- [ ] **Profile and benchmark** - Identify bottlenecks in raster-based deprivation index computation
+- **Priority**: High - Current computation can be slow for large datasets
+
+#### Error Handling & Validation
+- [ ] **Validate raster alignment** - Check CRS consistency and spatial bounds before processing
+- [ ] **Handle edge cases** - Empty rasters, mismatched bounds, missing data gracefully
+- [ ] **Improve error messages** - Provide actionable guidance when errors occur
+- [ ] **Input validation** - Comprehensive checks for all input files and parameters
+- **Priority**: High - Prevents runtime failures and improves user experience
+
+#### Testing
+- [ ] **Unit tests** - Core functions (metrics calculation, deficit computation, aggregation)
+- [ ] **Integration tests** - Full pipeline end-to-end tests
+- [ ] **Test data fixtures** - Small representative datasets for testing
+- [ ] **Regression tests** - Ensure outputs remain consistent across code changes
+- **Priority**: Medium-High - Ensures reliability and maintainability
+
+### Medium Priority - Functionality Enhancements
+
+#### Configuration Management
+- [ ] **Centralize parameters** - All thresholds, percentiles, and classification parameters in one place
+- [ ] **Configuration file support** - YAML/JSON config files for easy parameter adjustment
+- [ ] **Command-line argument validation** - Better validation and defaults
+- **Priority**: Medium - Improves usability and reproducibility
+
+#### Output Enhancements
+- [ ] **GeoTIFF export** - Export rasters with CRS metadata for GIS integration
+- [ ] **Interactive visualizations** - Plotly/Folium maps for exploration
+- [ ] **Summary report generation** - PDF/HTML reports with key findings
+- [ ] **Standardized output formats** - Consistent naming and structure across all scripts
+- **Priority**: Medium - Improves usability and integration with other tools
+
+#### Documentation
+- [ ] **Methodology documentation** - Detailed explanation of how each metric is computed
+- [ ] **Tutorial notebooks** - Step-by-step examples for each analysis
+- [ ] **API documentation** - Sphinx-generated documentation for all functions
+- [ ] **Example datasets** - Sample data for users to test the pipeline
+- **Priority**: Medium - Improves accessibility for new users
+
+### Lower Priority - Advanced Features
+
+#### Advanced Morphometric Analysis (Phase 3)
+- [ ] Neighborhood-level metrics (BCR, FAR)
+- [ ] Spatial autocorrelation analysis
+- [ ] Building adjacency analysis
+- [ ] Fractal dimension calculation
+- [ ] Multi-site comparison framework
+- **Priority**: Low - Future research direction
+
+#### Environmental Performance Modeling (Phase 4)
+- [ ] Thermal comfort modeling
+- [ ] Wind flow analysis
+- [ ] Solar radiation mapping
+- [ ] Integration with SVF results
+- [ ] Policy recommendations generation
+- **Priority**: Low - Requires domain expertise and additional data
+
+---
+
 ## Technical Debt & Improvements
 
 ### Code Quality
+- [x] Add progress bars for long operations (tqdm implemented)
 - [ ] Add unit tests
 - [ ] Improve error messages
-- [ ] Add progress bars for long operations
 - [ ] Optimize performance for large datasets
 
 ### Documentation
+- [x] Basic README and ROADMAP documentation
 - [ ] API documentation
 - [ ] Tutorial notebooks
 - [ ] Methodology documentation
@@ -114,26 +285,62 @@
 
 ## Version History
 
-### v1.0.0 (Current)
+### v1.0.0
 - Basic morphometric analysis
 - Comprehensive filtering pipeline
 - Rich visualizations
 - Production-ready codebase
 
-### v2.0.0 (Current)
+### v2.0.0 (Current - January 2025)
 - SVF computation (STL-based)
 - Solar access computation
 - Sky exposure plane exceedance analysis
+- Sectional porosity computation
+- Occupancy density proxy
+- Morphological environmental deprivation index (unit-level and raster-based)
 - Ground-level analysis with building masking
 - Shared utilities for code reuse
+- **Status**: All Phase 2 analyses complete and production-ready
+
+### v2.1.0 (Planned)
+- Performance optimizations (parallelization, caching)
+- Enhanced error handling and validation
+- GeoTIFF export with CRS metadata
+- Configuration file support
+- Basic unit tests
+
+### v2.2.0 (Planned)
+- Interactive visualizations
+- Summary report generation
+- Methodology documentation
+- Tutorial notebooks
 
 ---
 
+## Immediate Action Items (Current Focus)
+
+### Phase 3: Multi-Area Setup (This Week)
+1. **Migrate Vidigal data** - Move existing data from `data/raw/` to `data/vidigal/raw/`
+2. **Add Copacabana data** - Place STL mesh and building footprints in `data/copacabana/raw/`
+3. **Verify data structure** - Ensure all files are properly organized following naming conventions
+4. **Test area-based paths** - Verify `get_area_data_dir()` and `get_area_output_dir()` work correctly
+
+### Next Phase: Comparative Analysis (Next 1-2 Weeks)
+5. **Update scripts for area parameter** - Add `--area` flag to support area-specific processing
+6. **Create comparative analysis script** - Framework for side-by-side comparisons
+7. **Generate comparison visualizations** - Compare formal vs informal morphometric patterns
+
+### Future Improvements (After Phase 3.1)
+8. **Performance profiling** - Identify bottlenecks in raster-based deprivation index computation
+9. **Add GeoTIFF export** - Include CRS metadata for GIS integration
+10. **Configuration file** - Create `config.yaml` for all analysis parameters
+11. **Basic unit tests** - Start with metrics calculation and deficit computation functions
+
 ## Notes
 
-- SVF computation is computationally intensive - consider parallelization
-- May need to handle large datasets efficiently
-- Consider user-configurable sampling resolution
-- Integration with existing filtering pipeline
+- SVF computation is computationally intensive - parallelization is a high priority
+- Raster-based deprivation index works with native resolutions but may need optimization for very large datasets
+- All Phase 2 analyses are complete and production-ready
+- Focus should shift to optimization, robustness, and usability improvements
 
 
