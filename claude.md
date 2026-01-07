@@ -47,11 +47,12 @@ All parameters in `src/config.py`:
 
 ## Phase 2: SVF and Solar Access Computation ✅ COMPLETE
 - **SVF**: STL-based computation using discretized hemispherical dome
+- **Street-Level SVF**: Point sampling along street centerlines with pedestrian perspective (1.5m height)
 - **Solar Access**: Winter solstice direct sunlight hours using pvlib
 - **Shared Utilities**: `src/svf_utils.py` contains common functions
-- **Scripts**: `compute_svf.py` and `compute_solar_access.py` (separated)
+- **Scripts**: `compute_svf.py`, `compute_svf_streets.py`, and `compute_solar_access.py`
 - **Ground Masking**: Both scripts exclude building interiors using footprint shapefile
-- **Progress Monitoring**: Both scripts use tqdm for real-time progress tracking
+- **Progress Monitoring**: All scripts use tqdm for real-time progress tracking
 
 ## Phase 2.6: Sky Exposure Plane Exceedance Analysis ✅ COMPLETE
 - **Script**: `analyze_sky_exposure.py`

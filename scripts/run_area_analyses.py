@@ -20,9 +20,26 @@ from src.config import get_area_data_dir, get_area_analysis_dir
 def find_data_files(area_data_dir):
     """Find STL and building footprint files in area data directory."""
     stl_files = list(area_data_dir.glob("*.stl"))
-    footprint_files = list(area_data_dir.glob("*.shp")) + \
-                     list(area_data_dir.glob("*.gpkg")) + \
-                     list(area_data_dir.glob("*.geojson"))
+    
+    # Prefer building footprints over road networks
+    building_patterns = ["*building*.shp", "*building*.gpkg", "*building*.geojson",
+                        "*footprint*.shp", "*footprint*.gpkg", "*footprint*.geojson",
+                        "*vidigal*.shp", "*vidigal*.gpkg", "*vidigal*.geojson",
+                        "*copa*.shp", "*copa*.gpkg", "*copa*.geojson"]
+    
+    footprint_files = []
+    for pattern in building_patterns:
+        footprint_files.extend(list(area_data_dir.glob(pattern)))
+    
+    # Filter out road files
+    footprint_files = [f for f in footprint_files if 'road' not in f.name.lower()]
+    
+    # If no building files found, get all shapefiles but prefer non-road
+    if not footprint_files:
+        all_shp = list(area_data_dir.glob("*.shp")) + \
+                  list(area_data_dir.glob("*.gpkg")) + \
+                  list(area_data_dir.glob("*.geojson"))
+        footprint_files = [f for f in all_shp if 'road' not in f.name.lower()]
     
     stl = stl_files[0] if stl_files else None
     footprints = footprint_files[0] if footprint_files else None
@@ -85,7 +102,7 @@ def main():
         if not run_command(cmd, "Basic morphometric metrics"):
             print("Warning: Metrics calculation failed, continuing...")
     
-    # 2. SVF
+    # 2. SVF (grid-based)
     svf_output = get_area_analysis_dir(area, "svf")
     cmd = [
         sys.executable, "scripts/compute_svf.py",
@@ -96,8 +113,37 @@ def main():
         "--sky-patches", "145",
         "--output-dir", str(svf_output)
     ]
-    if not run_command(cmd, "Sky View Factor (SVF)"):
+    if not run_command(cmd, "Sky View Factor (SVF - Grid-based)"):
         print("Warning: SVF computation failed, continuing...")
+    
+    # 2.1. Street-Level SVF (if road network available)
+    roads_files = list(area_data_dir.glob("*road*.shp")) + list(area_data_dir.glob("*road*.gpkg"))
+    dtm_files = list(area_data_dir.glob("*.tif")) + list(area_data_dir.glob("*.tiff"))
+    
+    if roads_files:
+        roads_file = roads_files[0]
+        dtm_file = dtm_files[0] if dtm_files else None
+        
+        street_svf_output = get_area_analysis_dir(area, "svf_streets")
+        cmd = [
+            sys.executable, "scripts/compute_svf_streets.py",
+            "--stl", str(stl_file),
+            "--roads", str(roads_file),
+            "--footprints", str(footprints_file),
+            "--spacing", "3.0",
+            "--height", "1.5",
+            "--sky-patches", "145",
+            "--area", area,
+            "--output-dir", str(street_svf_output)
+        ]
+        if dtm_file:
+            cmd.extend(["--dtm", str(dtm_file)])
+        
+        if not run_command(cmd, "Street-Level Sky View Factor (SVF)"):
+            print("Warning: Street SVF computation failed, continuing...")
+    else:
+        print(f"\nSkipping Street SVF: No road network file found in {area_data_dir}")
+        print("  Looking for files matching: *road*.shp or *road*.gpkg")
     
     # 3. Solar Access
     solar_output = get_area_analysis_dir(area, "solar")

@@ -59,6 +59,11 @@ pip install -r requirements.txt
    python scripts/compute_svf.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --sky-patches 145
    ```
    
+   **Street-level SVF computation:**
+   ```bash
+   python scripts/compute_svf_streets.py --stl data/vidigal/raw/full_scan.stl --roads data/vidigal/raw/roads_vidigal.shp --dtm data/vidigal/raw/vidigal_dtm_cropped.tif --footprints data/vidigal/raw/vidigal_buildings.shp --spacing 3.0 --height 1.5
+   ```
+   
    **Solar Access computation:**
    ```bash
    python scripts/compute_solar_access.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --threshold 3.0
@@ -98,7 +103,8 @@ pip install -r requirements.txt
 3. **Check results:**
    - `outputs/buildings_with_metrics.gpkg` - Enhanced dataset
    - `outputs/summary_stats.csv` - Summary statistics
-   - `outputs/svf/` - SVF computation results
+   - `outputs/svf/` - SVF computation results (grid-based)
+   - `outputs/svf_streets/` - Street-level SVF computation results
    - `outputs/solar/` - Solar access computation results
    - `outputs/sky_exposure/` - Sky exposure plane exceedance analysis results
    - `outputs/porosity/` - Sectional porosity computation results

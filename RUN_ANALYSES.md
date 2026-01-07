@@ -29,12 +29,13 @@ python scripts/run_area_analyses.py --area copacabana
 
 This will run all analyses in the correct order:
 1. Basic morphometric metrics
-2. Sky View Factor (SVF)
-3. Solar Access
-4. Sectional Porosity
-5. Occupancy Density
-6. Sky Exposure Plane Exceedance
-7. Deprivation Index (Raster-based)
+2. Sky View Factor (SVF) - Grid-based
+3. Street-Level Sky View Factor (SVF) - if road network available
+4. Solar Access
+5. Sectional Porosity
+6. Occupancy Density
+7. Sky Exposure Plane Exceedance
+8. Deprivation Index (Raster-based)
 
 ## Individual Analysis Commands
 
@@ -62,6 +63,11 @@ Results will be saved to:
 Each analysis creates:
 - Data files (`.npy`, `.csv`, `.gpkg`)
 - Visualizations (`.png`)
+
+**Street-Level SVF** requires:
+- Road network shapefile (`*road*.shp` or `*road*.gpkg`) in area data directory
+- Optional: DTM raster for accurate elevation extraction
+- Automatically detected and run if available
 
 ## Troubleshooting
 

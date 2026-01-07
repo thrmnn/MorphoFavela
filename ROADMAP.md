@@ -34,6 +34,31 @@
 - **Method**: Discretized hemispherical dome with ray-casting
 - **Output**: SVF raster (0-1), CSV, and visualizations
 - **Ground Masking**: Excludes building interiors using footprint shapefile
+- **Street-Level Analysis**: Additional street centerline-based SVF computation (see Phase 2.1)
+
+---
+
+## Phase 2.1: Street-Level SVF Computation ✅ COMPLETE
+
+### Completed Features
+- [x] Point sampling along street centerlines
+- [x] DTM and mesh-based elevation extraction
+- [x] Street-level SVF computation using existing infrastructure
+- [x] Segment-level aggregation and statistics
+- [x] Street-colored visualization maps
+- [x] Statistical distribution plots
+
+### Current Status
+- **Script**: `scripts/compute_svf_streets.py`
+- **Input**: STL mesh, road network shapefile (LineString), optional DTM raster
+- **Method**: Sample points along streets, compute SVF at pedestrian eye level (1.5m)
+- **Output**: Point-level and segment-level GeoPackages, statistics CSV, visualizations
+- **Complementary**: Works alongside grid-based SVF (does not replace it)
+
+### Use Cases
+- Pedestrian-level environmental assessment
+- Street hierarchy comparison
+- Identification of problematic street segments with low sky access
 
 ---
 
