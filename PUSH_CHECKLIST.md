@@ -13,6 +13,8 @@
 - [x] Data directory README
 - [x] Outputs directory README
 - [x] LICENSE file added
+- [x] Updated all docs for unified sky exposure analysis
+- [x] Legacy script marked as deprecated
 
 ## ✅ Project Structure
 - [x] Clean directory structure

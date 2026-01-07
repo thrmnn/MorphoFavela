@@ -55,10 +55,21 @@ All parameters in `src/config.py`:
 - **Progress Monitoring**: All scripts use tqdm for real-time progress tracking
 
 ## Phase 2.6: Sky Exposure Plane Exceedance Analysis ✅ COMPLETE
-- **Script**: `analyze_sky_exposure.py`
-- **Method**: Environmental performance envelope with base height (7.5m), setbacks (front: 5m, side/rear: 3m), sky plane angle (45°)
-- **Outputs**: Exceedance map, vertical sections, CSV with metrics
-- **Purpose**: Evaluate environmental implications (solar access, ventilation), NOT code compliance
+- **Script**: `analyze_sky_exposure_streets.py` (unified)
+- **Method**: 
+  - **Building-level**: Exceedance per building using Rio/São Paulo rulesets (percentage of volume exceeding envelope)
+  - **Street-level**: Point sampling along street centerlines with pedestrian perspective, implementing Rio (1/5 ratio) or São Paulo (1/10 ratio) building code rulesets
+  - **Section views**: Vertical cross-sections showing actual vs. allowed building heights at selected points
+- **Rulesets**: 
+  - **Rio de Janeiro**: Variable setbacks (max(2.5m, H/5)), base height from first ventilated floor
+  - **São Paulo**: Fixed 10m threshold, variable setbacks (max(3.0m, (H-6)/10)) for buildings > 10m
+- **Outputs**: 
+  - Building-level exceedance map (percentage per building)
+  - Street-level exceedance (points, segments, maps)
+  - Section views (high, mean, low exceedance points)
+  - Statistics (CSV)
+- **Purpose**: Evaluate building code compliance and environmental performance (solar access, ventilation)
+- **Note**: Legacy `analyze_sky_exposure.py` is deprecated in favor of unified approach
 
 ## Phase 2.7: Sectional Porosity Computation ✅ COMPLETE
 - **Script**: `compute_sectional_porosity.py`

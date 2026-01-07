@@ -87,6 +87,9 @@ python scripts/compute_solar_access.py \
 ### 4. Sky Exposure Plane Exceedance
 
 ```bash
+# [DEPRECATED] Use unified script instead:
+# python scripts/analyze_sky_exposure_streets.py --stl <stl> --footprints <footprints> --ruleset rio --area copacabana
+
 python scripts/analyze_sky_exposure.py \
     --stl data/copacabana/raw/copa1.stl \
     --footprints data/copacabana/raw/buildings_copa1.shp \

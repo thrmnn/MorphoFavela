@@ -69,9 +69,13 @@ pip install -r requirements.txt
    python scripts/compute_solar_access.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --threshold 3.0
    ```
    
-   **Sky Exposure Plane Exceedance analysis:**
+   **Sky Exposure Plane Exceedance analysis (unified):**
    ```bash
-   python scripts/analyze_sky_exposure.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --angle 45.0 --base-height 7.5 --front-setback 5.0 --side-setback 3.0
+   # Building-level only (no roads required)
+   python scripts/analyze_sky_exposure_streets.py --stl data/vidigal/raw/full_scan.stl --footprints data/vidigal/raw/vidigal_buildings.shp --ruleset rio --area vidigal
+   
+   # Building-level + Street-level (with road network)
+   python scripts/analyze_sky_exposure_streets.py --stl data/vidigal/raw/full_scan.stl --roads data/vidigal/raw/roads_vidigal.shp --footprints data/vidigal/raw/vidigal_buildings.shp --ruleset rio --area vidigal --spacing 5.0
    ```
 
    **Sectional Porosity computation:**
@@ -280,7 +284,8 @@ IVF/
 │   ├── calculate_metrics.py # Basic morphometric analysis
 │   ├── compute_svf.py      # Sky View Factor computation
 │   ├── compute_solar_access.py  # Solar access computation
-│   ├── analyze_sky_exposure.py  # Sky exposure plane exceedance analysis
+│   ├── analyze_sky_exposure_streets.py  # Unified sky exposure exceedance (building + street-level)
+│   ├── analyze_sky_exposure.py  # [DEPRECATED] Legacy sky exposure analysis
 │   ├── compute_sectional_porosity.py  # Sectional porosity computation
 │   ├── compute_occupancy_density.py  # Occupancy density proxy computation
 │   ├── compute_deprivation_index.py  # Unit-level deprivation index
@@ -334,9 +339,13 @@ python scripts/compute_svf.py --stl data/raw/full_scan.stl --footprints data/raw
 python scripts/compute_solar_access.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --threshold 3.0
 ```
 
-### Sky Exposure Plane Exceedance Analysis
+### Sky Exposure Plane Exceedance Analysis (Unified)
 ```bash
-python scripts/analyze_sky_exposure.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --angle 45.0 --base-height 7.5 --front-setback 5.0 --side-setback 3.0
+# Building-level only
+python scripts/analyze_sky_exposure_streets.py --stl data/vidigal/raw/full_scan.stl --footprints data/vidigal/raw/vidigal_buildings.shp --ruleset rio --area vidigal
+
+# Building-level + Street-level (with road network)
+python scripts/analyze_sky_exposure_streets.py --stl data/vidigal/raw/full_scan.stl --roads data/vidigal/raw/roads_vidigal.shp --footprints data/vidigal/raw/vidigal_buildings.shp --ruleset rio --area vidigal --spacing 5.0
 ```
 
 ### Sectional Porosity Computation

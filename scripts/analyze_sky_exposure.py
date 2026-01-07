@@ -1,7 +1,21 @@
 #!/usr/bin/env python3
 """
-Sky Exposure Plane Exceedance Analysis
+[DEPRECATED] Sky Exposure Plane Exceedance Analysis
 
+**NOTE**: This script is deprecated in favor of the unified `analyze_sky_exposure_streets.py`
+script which provides:
+- Building-level exceedance (same as this script)
+- Street-level exceedance analysis
+- Brazilian building code rulesets (Rio and São Paulo)
+- Section views showing actual vs. allowed heights
+
+Use the unified script instead:
+    python scripts/analyze_sky_exposure_streets.py --stl <stl> --footprints <footprints> --ruleset rio --area <area>
+
+This legacy script is kept for backward compatibility but may be removed in future versions.
+It uses a fixed 45° sky plane envelope, while the unified script implements ruleset-based envelopes.
+
+Original description:
 This script quantifies how much of the existing built volume in an informal settlement
 exceeds a reference sky exposure plane envelope. The sky exposure plane is an environmental
 performance envelope that defines the maximum allowable built form based on an inclined plane

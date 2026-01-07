@@ -11,7 +11,9 @@ The sky exposure plane analysis uses the following default parameters:
 | **Front Setback** | `5.0 m` | Minimum distance from front edge of building footprint |
 | **Side/Rear Setback** | `3.0 m` | Minimum distance from side/rear edges of building footprint |
 
-These defaults can be adjusted via command-line arguments:
+**Note**: The unified script (`analyze_sky_exposure_streets.py`) now implements Brazilian building code rulesets (Rio and São Paulo) instead of the fixed 45° envelope. See `STREET_SKY_EXPOSURE_METHODOLOGY.md` for details.
+
+The legacy script (`analyze_sky_exposure.py`) with fixed parameters is deprecated but can still be used:
 ```bash
 python scripts/analyze_sky_exposure.py \
     --angle 45.0 \

@@ -84,18 +84,36 @@
 ## Phase 2.6: Sky Exposure Plane Exceedance Analysis ✅ COMPLETE
 
 ### Completed Features
+- [x] Unified analysis script (`analyze_sky_exposure_streets.py`) combining building-level and street-level exceedance
+- [x] Building-level exceedance computation (percentage of volume exceeding envelope per building)
+- [x] Street-level exceedance computation (point sampling along street centerlines)
+- [x] Rio de Janeiro ruleset implementation (1/5 ratio, variable setbacks)
+- [x] São Paulo ruleset implementation (1/10 ratio, 10m threshold)
 - [x] Building mesh extraction from STL using footprints
-- [x] Sky exposure plane envelope calculation with base height and setbacks
+- [x] Sky exposure plane envelope calculation with ruleset-specific parameters
 - [x] Volumetric exceedance computation per building
-- [x] Exceedance map visualization (plan view)
-- [x] Vertical sections showing actual vs envelope
+- [x] Street point-level and segment-level exceedance aggregation
+- [x] Exceedance map visualization (building-level and street-level)
+- [x] Vertical section views showing actual vs. allowed building heights
 - [x] Summary statistics and CSV export
+- [x] Support for analysis with or without road network (building-level always computed)
 
 ### Current Status
-- **Input**: STL mesh and building footprints
-- **Method**: Geometric envelope calculation with base height (6-9m), setbacks (front: 5m, side/rear: 3m), and sky plane angle (45°)
-- **Output**: Exceedance maps, vertical sections, and detailed metrics
-- **Purpose**: Environmental performance evaluation (solar access and ventilation), NOT code compliance
+- **Script**: `scripts/analyze_sky_exposure_streets.py`
+- **Input**: STL mesh, building footprints, optional road network shapefile
+- **Method**: 
+  - **Building-level**: Ruleset-based envelope calculation per building, percentage exceedance
+  - **Street-level**: Point sampling along streets, pedestrian perspective (1.5m height), ruleset-based envelope calculation
+- **Rulesets**: 
+  - **Rio de Janeiro**: Base height from first ventilated floor, setback = max(2.5m, H/5), envelope = base + (distance × 5)
+  - **São Paulo**: 10m threshold, setback = max(3.0m, (H-6)/10) for H > 10m, envelope = 10 + (distance × 10)
+- **Output**: 
+  - Building exceedance map (percentage per building)
+  - Street exceedance maps (points, segments, colored by exceedance)
+  - Section views (high, mean, low exceedance points)
+  - Statistics (building and street-level)
+- **Purpose**: Building code compliance evaluation and environmental performance assessment
+- **Note**: Legacy `analyze_sky_exposure.py` (45° fixed envelope) is deprecated
 
 ---
 

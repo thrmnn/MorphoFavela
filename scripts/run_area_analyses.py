@@ -184,19 +184,33 @@ def main():
     if not run_command(cmd, "Occupancy Density"):
         print("Warning: Density computation failed, continuing...")
     
-    # 6. Sky Exposure
-    sky_exposure_output = get_area_analysis_dir(area, "sky_exposure")
+    # 6. Sky Exposure Plane Exceedance (Unified: Building-level + Street-level if roads available)
+    roads_files = list(area_data_dir.glob("*road*.shp")) + list(area_data_dir.glob("*road*.gpkg"))
+    
+    sky_exposure_output = get_area_analysis_dir(area, "sky_exposure_streets")
     cmd = [
-        sys.executable, "scripts/analyze_sky_exposure.py",
+        sys.executable, "scripts/analyze_sky_exposure_streets.py",
         "--stl", str(stl_file),
         "--footprints", str(footprints_file),
-        "--angle", "45.0",
-        "--base-height", "7.5",
-        "--front-setback", "5.0",
-        "--side-setback", "3.0",
+        "--ruleset", "rio",
+        "--area", area,
         "--output-dir", str(sky_exposure_output)
     ]
-    if not run_command(cmd, "Sky Exposure Plane Exceedance"):
+    
+    if roads_files:
+        roads_file = roads_files[0]
+        cmd.extend([
+            "--roads", str(roads_file),
+            "--spacing", "5.0",
+            "--search-radius", "75.0"
+        ])
+        description = "Sky Exposure Plane Exceedance (Building-level + Street-level)"
+    else:
+        description = "Sky Exposure Plane Exceedance (Building-level only)"
+        print(f"\nNo road network found - computing building-level exceedance only")
+        print(f"  Looking for files matching: *road*.shp or *road*.gpkg")
+    
+    if not run_command(cmd, description):
         print("Warning: Sky exposure analysis failed, continuing...")
     
     # 7. Deprivation Index (Raster-based) - requires SVF, solar, porosity

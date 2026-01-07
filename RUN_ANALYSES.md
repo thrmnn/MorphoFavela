@@ -34,7 +34,7 @@ This will run all analyses in the correct order:
 4. Solar Access
 5. Sectional Porosity
 6. Occupancy Density
-7. Sky Exposure Plane Exceedance
+7. Sky Exposure Plane Exceedance (unified: building-level + street-level if roads available)
 8. Deprivation Index (Raster-based)
 
 ## Individual Analysis Commands
