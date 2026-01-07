@@ -38,7 +38,20 @@ This will run all analyses in the correct order:
 
 ## Individual Analysis Commands
 
-See `COPACABANA_ANALYSIS_GUIDE.md` for detailed commands for each analysis type.
+See area-specific guides or the main README.md for detailed commands for each analysis type.
+
+## Comparative Analysis
+
+After running analyses for both areas, generate comparison report:
+
+```bash
+python scripts/compare_areas.py
+```
+
+This generates:
+- Comprehensive PDF report: `outputs/comparative/comparison_report.pdf`
+- Comparison tables: `outputs/comparative/tables/`
+- Side-by-side visualizations: `outputs/comparative/visualizations/`
 
 ## Expected Outputs
 

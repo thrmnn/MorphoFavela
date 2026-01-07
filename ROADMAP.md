@@ -157,25 +157,37 @@
 - [x] Documentation for data organization and file naming conventions
 
 #### Current Status
-- **Structure**: Ready for multi-area data organization
-- **Areas**: Vidigal and Copacabana directories created
-- **Next**: Migrate existing data and add Copacabana data files
+- **Structure**: Complete - area-based data organization implemented
+- **Areas**: Vidigal and Copacabana data organized and analyzed
+- **Status**: Ready for comparative analysis (see Phase 3.1)
 
-### Phase 3.1: Comparative Analysis Framework (Planned)
+### Phase 3.1: Comparative Analysis Framework ✅ COMPLETE
 
-#### Planned Features
-- [ ] Update scripts to support `--area` parameter for area-specific processing
-- [ ] Comparative analysis script comparing metrics across areas
-- [ ] Side-by-side visualization framework for formal vs informal comparisons
-- [ ] Statistical comparison of morphometric metrics (mean, distributions, tests)
-- [ ] Comparative environmental performance analysis (SVF, solar access, deprivation index)
-- [ ] Automated comparison report generation
+#### Completed Features
+- [x] Area-based script support (`--area` parameter in `calculate_metrics.py`)
+- [x] Comparative analysis script (`compare_areas.py`) comparing metrics across areas
+- [x] Side-by-side visualization framework for formal vs informal comparisons
+- [x] Statistical comparison of morphometric metrics (mean, distributions, Mann-Whitney U tests)
+- [x] Comparative environmental performance analysis (SVF, solar access, porosity, deprivation index)
+- [x] Automated PDF report generation with clean Swiss design aesthetic
+- [x] Area normalization for fair spatial comparisons
+- [x] Aspect ratio preservation in side-by-side visualizations
 
-#### Priority Areas for Comparison
-- **Morphometric metrics**: Height, area, volume distributions
-- **Environmental performance**: SVF, solar access, ventilation proxies
-- **Spatial patterns**: Density, porosity, building arrangement
-- **Deprivation index**: Hotspot identification and spatial distribution
+#### Current Status
+- **Script**: `scripts/compare_areas.py`
+- **Output**: Comprehensive PDF report with statistics, visualizations, and findings
+- **Features**: 
+  - Morphometric metrics comparison with statistical tests
+  - Environmental performance comparison (SVF, solar, porosity, deprivation)
+  - Area-normalized statistics accounting for different study area sizes
+  - Professional PDF report with clean design
+- **Results**: `outputs/comparative/comparison_report.pdf`
+
+#### Comparisons Included
+- **Morphometric metrics**: Height, area, volume, perimeter, H/W ratio, inter-building distance
+- **Environmental performance**: SVF, solar access, porosity distributions and statistics
+- **Deprivation analysis**: Hotspot identification and spatial patterns
+- **Statistical rigor**: Mann-Whitney U tests, significance indicators, effect sizes
 
 ### Phase 3.2: Advanced Morphometric Analysis (Future)
 
@@ -291,7 +303,7 @@
 - Rich visualizations
 - Production-ready codebase
 
-### v2.0.0 (Current - January 2025)
+### v2.0.0 (January 2025)
 - SVF computation (STL-based)
 - Solar access computation
 - Sky exposure plane exceedance analysis
@@ -302,7 +314,17 @@
 - Shared utilities for code reuse
 - **Status**: All Phase 2 analyses complete and production-ready
 
-### v2.1.0 (Planned)
+### v3.0.0 (Current - January 2025)
+- Multi-area data organization structure
+- Area-based filtering policy (formal vs informal)
+- Comparative analysis framework (`compare_areas.py`)
+- Automated PDF report generation with clean Swiss design
+- Statistical comparison tools (Mann-Whitney U tests)
+- Area-normalized spatial comparisons
+- Aspect ratio preservation in visualizations
+- **Status**: Phase 3 complete - ready for formal vs informal settlement research
+
+### v3.1.0 (Planned)
 - Performance optimizations (parallelization, caching)
 - Enhanced error handling and validation
 - GeoTIFF export with CRS metadata

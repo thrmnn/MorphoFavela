@@ -1,5 +1,7 @@
 # Area Analysis Guide
 
+This guide covers running analyses for individual areas (Vidigal or Copacabana).
+
 ## Prerequisites
 
 Before running analyses, ensure your Python environment is activated and dependencies are installed:

@@ -4,15 +4,17 @@ A Python pipeline for calculating morphometric metrics from building footprints 
 
 ## Features
 
-- **Automatic data discovery**: Finds and processes any geospatial file (`.gpkg`, `.geojson`, `.shp`) in the data directory
-- **Flexible input formats**: Supports standard (`base_height`, `top_height`) or alternative (`base`, `altura`) column names
-- **Comprehensive filtering**: Multiple filtering options for height, area, volume, and h/w ratio
-- **Rich visualizations**: Generates thematic maps, statistical distributions, and scatter plots
+- **Multi-area analysis**: Support for comparing multiple study areas (formal vs informal settlements)
+- **Comprehensive metrics**: Building morphometry, environmental performance (SVF, solar access, porosity), and deprivation indices
+- **Area-based filtering**: Automatic filtering policy (applied to informal, skipped for formal areas)
+- **Comparative analysis**: Automated comparison framework with statistical tests and PDF reports
+- **Rich visualizations**: Thematic maps, statistical distributions, side-by-side comparisons
+- **Professional reports**: Clean, academic-style PDF reports with comprehensive findings
 - **Robust validation**: Validates data quality, CRS, and geometry before processing
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Current status**: Phase 1 (Basic Morphometric Analysis), Phase 2 (SVF & Solar Access), Phase 2.6 (Sky Exposure Plane), Phase 2.7 (Sectional Porosity), Phase 2.8 (Occupancy Density Proxy), Phase 2.9 (Deprivation Index), and Phase 2.9.5 (Raster-Based Deprivation Index) are complete.
+See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Current status**: All Phase 1 and Phase 2 analyses complete. Phase 3 (Multi-Area Comparative Analysis) complete - supports formal vs informal settlement comparison with comprehensive PDF reports.
 
 ## Installation
 
@@ -87,6 +89,12 @@ pip install -r requirements.txt
    python scripts/compute_deprivation_index_raster.py --solar outputs/solar/solar_access.npy --svf outputs/svf/svf.npy --porosity outputs/porosity/porosity.npy --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --units outputs/density/density_proxy.gpkg
    ```
 
+   **Comparative Analysis (Formal vs Informal):**
+   ```bash
+   python scripts/compare_areas.py
+   ```
+   Generates comprehensive PDF report comparing Vidigal and Copacabana across all metrics with statistical tests and visualizations.
+
 3. **Check results:**
    - `outputs/buildings_with_metrics.gpkg` - Enhanced dataset
    - `outputs/summary_stats.csv` - Summary statistics
@@ -97,6 +105,7 @@ pip install -r requirements.txt
    - `outputs/density/` - Occupancy density proxy results
    - `outputs/deprivation/` - Unit-level deprivation index results
    - `outputs/deprivation_raster/` - Raster-based deprivation index results
+   - `outputs/comparative/` - Comparative analysis results (PDF report, tables, visualizations)
    - `outputs/maps/` - All visualization files
 
 ## Input Data Requirements

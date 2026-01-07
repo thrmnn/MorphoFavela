@@ -80,16 +80,26 @@ All parameters in `src/config.py`:
 - **Features**: Works with native raster resolutions, building mask, continuous and classified visualizations, unit-level aggregation
 - **Outputs**: Raster (.npy), continuous heatmap, classified hotspot map, unit-level aggregation
 
-## Phase 3: Multi-Area Data Organization ✅ IN PROGRESS
+## Phase 3: Multi-Area Comparative Analysis ✅ COMPLETE
+
+### Phase 3.0: Data Organization ✅ COMPLETE
 - **Structure**: Area-based data organization (`data/{area}/raw/`) for comparative analysis
 - **Supported Areas**: 
   - `vidigal` (informal settlement)
   - `copacabana` (formal neighborhood)
-- **Configuration**: `src/config.py` includes `get_area_data_dir()` and `get_area_output_dir()` helper functions
-- **Next Steps**: 
-  1. Migrate existing Vidigal data to `data/vidigal/raw/`
-  2. Add Copacabana data to `data/copacabana/raw/`
-  3. Implement comparative analysis scripts (Phase 3.1)
+- **Configuration**: `src/config.py` includes area classification and helper functions
+- **Filtering Policy**: Formal areas (Copacabana) skip filtering; informal areas (Vidigal) apply filtering
+
+### Phase 3.1: Comparative Analysis Framework ✅ COMPLETE
+- **Script**: `scripts/compare_areas.py`
+- **Features**: 
+  - Comprehensive comparison of all metrics between formal and informal settlements
+  - Statistical tests (Mann-Whitney U) with significance indicators
+  - Area-normalized statistics for fair comparisons
+  - Side-by-side visualizations preserving aspect ratios
+  - Professional PDF report generation with clean Swiss design
+- **Outputs**: PDF report, comparison tables, side-by-side visualizations
+- **Results**: `outputs/comparative/comparison_report.pdf`
 
 ## Data Organization
 - **Area-based structure**: `data/{area}/raw/` for input files
