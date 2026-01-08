@@ -97,8 +97,13 @@ All parameters in `src/config.py`:
 ### Phase 3.0: Data Organization ✅ COMPLETE
 - **Structure**: Area-based data organization (`data/{area}/raw/`) for comparative analysis
 - **Supported Areas**: 
-  - `vidigal` (informal settlement)
-  - `copacabana` (formal neighborhood)
+  - `vidigal` (informal settlement) - `data/vidigal/raw/`
+  - `copacabana` (formal neighborhood) - `data/copacabana/raw/copa2/`
+- **Copacabana Data (copa2)**:
+  - STL mesh: `copa2.stl`
+  - Buildings: `copa_buildings2_processed.shp` (preprocessed with base/top heights from 3D polygons + DTM)
+  - Streets: `copa_streets2.shp`
+  - DTM: `DTM_copa2.tif`
 - **Configuration**: `src/config.py` includes area classification and helper functions
 - **Filtering Policy**: Formal areas (Copacabana) skip filtering; informal areas (Vidigal) apply filtering
 

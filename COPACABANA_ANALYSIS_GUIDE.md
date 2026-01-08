@@ -24,9 +24,10 @@ pip install -r requirements.txt
 - **Building footprints**: `data/vidigal/raw/vidigal_buildings.shp`
 
 ### Copacabana (Formal Neighborhood)
-- **STL mesh**: `data/copacabana/raw/copa1.stl`
-- **Building footprints**: `data/copacabana/raw/buildings_copa1.shp`
-- **DTM** (optional): `data/copacabana/raw/dtm_copa1.tif`
+- **STL mesh**: `data/copacabana/raw/copa2/copa2.stl`
+- **Building footprints**: `data/copacabana/raw/copa2/copa_buildings2_processed.gpkg`
+- **Road network**: `data/copacabana/raw/copa2/copa_streets2.shp`
+- **DTM**: `data/copacabana/raw/copa2/DTM_copa2.tif`
 
 ## Quick Start: Run All Analyses for an Area
 
@@ -64,8 +65,8 @@ python scripts/calculate_metrics.py \
 
 ```bash
 python scripts/compute_svf.py \
-    --stl data/copacabana/raw/copa1.stl \
-    --footprints data/copacabana/raw/buildings_copa1.shp \
+    --stl data/copacabana/raw/copa2/copa2.stl \
+    --footprints data/copacabana/raw/copa2/copa_buildings2_processed.gpkg \
     --grid-spacing 5.0 \
     --height 0.5 \
     --sky-patches 145 \
@@ -76,8 +77,8 @@ python scripts/compute_svf.py \
 
 ```bash
 python scripts/compute_solar_access.py \
-    --stl data/copacabana/raw/copa1.stl \
-    --footprints data/copacabana/raw/buildings_copa1.shp \
+    --stl data/copacabana/raw/copa2/copa2.stl \
+    --footprints data/copacabana/raw/copa2/copa_buildings2_processed.gpkg \
     --grid-spacing 5.0 \
     --height 0.5 \
     --threshold 3.0 \
@@ -87,24 +88,20 @@ python scripts/compute_solar_access.py \
 ### 4. Sky Exposure Plane Exceedance
 
 ```bash
-# [DEPRECATED] Use unified script instead:
-# python scripts/analyze_sky_exposure_streets.py --stl <stl> --footprints <footprints> --ruleset rio --area copacabana
-
-python scripts/analyze_sky_exposure.py \
-    --stl data/copacabana/raw/copa1.stl \
-    --footprints data/copacabana/raw/buildings_copa1.shp \
-    --angle 45.0 \
-    --base-height 7.5 \
-    --front-setback 5.0 \
-    --side-setback 3.0 \
-    --output-dir outputs/copacabana/sky_exposure/
+python scripts/analyze_sky_exposure_streets.py \
+    --stl data/copacabana/raw/copa2/copa2.stl \
+    --roads data/copacabana/raw/copa2/copa_streets2.shp \
+    --footprints data/copacabana/raw/copa2/copa_buildings2_processed.gpkg \
+    --ruleset rio \
+    --area copacabana \
+    --spacing 3.0
 ```
 
 ### 5. Sectional Porosity
 
 ```bash
 python scripts/compute_sectional_porosity.py \
-    --footprints data/copacabana/raw/buildings_copa1.shp \
+    --footprints data/copacabana/raw/copa2/copa_buildings2_processed.gpkg \
     --grid-spacing 2.0 \
     --height 1.5 \
     --buffer 0.25 \
@@ -115,8 +112,8 @@ python scripts/compute_sectional_porosity.py \
 
 ```bash
 python scripts/compute_occupancy_density.py \
-    --stl data/copacabana/raw/copa1.stl \
-    --footprints data/copacabana/raw/buildings_copa1.shp \
+    --stl data/copacabana/raw/copa2/copa2.stl \
+    --footprints data/copacabana/raw/copa2/copa_buildings2_processed.gpkg \
     --grid-size 50.0 \
     --output-dir outputs/copacabana/density/
 ```
@@ -144,8 +141,8 @@ python scripts/compute_deprivation_index_raster.py \
     --solar outputs/copacabana/solar/solar_access.npy \
     --svf outputs/copacabana/svf/svf.npy \
     --porosity outputs/copacabana/porosity/porosity.npy \
-    --stl data/copacabana/raw/copa1.stl \
-    --footprints data/copacabana/raw/buildings_copa1.shp \
+    --stl data/copacabana/raw/copa2/copa2.stl \
+    --footprints data/copacabana/raw/copa2/copa_buildings2_processed.gpkg \
     --units outputs/copacabana/density/density_proxy.gpkg \
     --output-dir outputs/copacabana/deprivation_raster/
 ```

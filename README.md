@@ -39,6 +39,20 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+### Activating the Environment (Start of Each Session)
+
+**Important**: Before running any analysis, activate the conda environment:
+
+```bash
+# Source conda activation script
+source ../conda_activate.sh
+
+# Activate the IVF conda environment
+conda activate IVF
+```
+
+This should be done at the start of every new session before running any scripts.
+
 ## Quick Start
 
 1. **Prepare your data:**

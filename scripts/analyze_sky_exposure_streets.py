@@ -33,6 +33,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.svf_utils import load_mesh, extract_terrain_surface, load_building_footprints
 from src.metrics import normalize_height_columns
+from src.config import MIN_BUILDING_AREA, MAX_FILTER_AREA, is_formal_area
 from scripts.compute_svf_streets import sample_points_along_line, extract_elevation_from_mesh
 from scripts.analyze_sky_exposure import extract_building_meshes
 
@@ -394,21 +395,38 @@ def compute_street_exceedance(
             pbar.update(1)
             continue
         
-        # Calculate exceedance for each nearby building
-        building_exceedances = []
-        envelope_heights = []
-        actual_heights = []
-        
+        # Sort buildings by distance from street point (closest first)
+        # This ensures we check the front-most buildings first
+        building_distances = []
         for building_idx in nearby_indices:
+            if building_idx not in building_meshes:
+                continue
+            building_row = buildings_gdf.loc[building_idx]
+            footprint = building_row.geometry
+            # Calculate distance from street point to building footprint
+            distance = footprint.distance(street_point)
+            building_distances.append((building_idx, distance))
+        
+        # Sort by distance (closest first)
+        building_distances.sort(key=lambda x: x[1])
+        
+        # Find the first (front-most) building that intersects the sky exposure plane
+        # Buildings behind it are occluded and do not contribute unless the front building is lower than the plane
+        max_exceedance = 0.0
+        max_envelope = np.nan
+        max_actual = np.nan
+        front_building_found = False
+        
+        for building_idx, distance in building_distances:
             if building_idx not in building_meshes:
                 continue
             
             building_row = buildings_gdf.loc[building_idx]
-            building_data = building_meshes[building_idx]
             
             footprint = building_row.geometry
             base_height = float(building_row['base_height'])
             building_height = float(building_row['building_height'])
+            top_height = float(building_row['top_height'])  # Use attribute directly
             
             # Calculate envelope height based on ruleset
             # base_height is already in absolute Z coordinates, so pass it directly
@@ -423,35 +441,29 @@ def compute_street_exceedance(
             else:
                 raise ValueError(f"Unknown ruleset: {ruleset}")
             
-            # Extract actual building height at this location
-            actual_height = extract_building_height_at_point(
-                street_point, footprint, building_data['mesh'], terrain
-            )
+            # Use top_height from building attributes directly (not mesh extraction)
+            # This is more reliable and consistent with the envelope calculation
+            actual_height = top_height
             
-            # Debug: Check if we're getting valid heights
-            # Only process if we have a valid actual height
-            if not np.isnan(actual_height) and actual_height > 0:
-                # Both envelope_height and actual_height should be absolute Z coordinates
-                # Exceedance = how much the actual building exceeds the allowed envelope
-                exceedance = max(0.0, actual_height - envelope_height)
-                building_exceedances.append(exceedance)
-                envelope_heights.append(envelope_height)
-                actual_heights.append(actual_height)
-        
-        # Take maximum exceedance (worst-case violation)
-        if len(building_exceedances) > 0:
-            max_exceedance = max(building_exceedances)
-            max_idx = building_exceedances.index(max_exceedance)
-            max_envelope = envelope_heights[max_idx]
-            max_actual = actual_heights[max_idx]
-        else:
-            max_exceedance = 0.0
-            max_envelope = np.nan
-            max_actual = np.nan
+            # Check if this building intersects the sky exposure plane
+            # A building intersects the plane if its actual height exceeds the envelope
+            if actual_height > envelope_height:
+                # This is the front-most building that intersects the plane
+                # Calculate exceedance and stop (buildings behind are occluded)
+                exceedance = actual_height - envelope_height
+                max_exceedance = exceedance
+                max_envelope = envelope_height
+                max_actual = actual_height
+                front_building_found = True
+                break
+            # If actual_height <= envelope_height, the building doesn't intersect the plane
+            # Continue to check next building (it might be behind but taller, intersecting the plane)
         
         exceedance_values.append(max_exceedance)
         metadata_list.append({
             'n_buildings': len(nearby_indices),
+            'n_buildings_checked': len(building_distances),
+            'front_building_found': front_building_found,
             'max_exceedance': max_exceedance,
             'max_envelope_height': max_envelope,
             'max_actual_height': max_actual
@@ -990,7 +1002,8 @@ def create_street_section_views(
         
         # Get terrain elevation along section
         terrain_z = []
-        building_heights = []
+        building_heights = []  # Tallest building at each point (for visualization)
+        front_building_heights = []  # Front-most building that intersects plane (for exceedance)
         envelope_heights_section = []
         
         for x, y in zip(section_x, section_y):
@@ -1021,75 +1034,60 @@ def create_street_section_views(
                     max_building_height = max(max_building_height, top_height)
             
             # Calculate envelope height at this point
-            # The envelope should only apply where buildings actually exist
-            # For points with no building, there's no envelope restriction (just terrain)
+            # Apply occlusion: only consider front-most building that intersects the plane
             envelope_height_at_point = z_terrain  # Default: no restriction beyond terrain
+            front_building_height = z_terrain  # Height of front-most building that intersects (for exceedance)
             
             # Check if there's actually a building at this point
             if max_building_height > z_terrain + 1.0:
-                # There's a building here - find which building it belongs to
-                # and calculate its envelope at this point
-                
-                # Find the building that contains or is closest to this point
-                closest_building_idx = None
-                min_distance = float('inf')
-                
+                # Sort buildings by distance from this point (closest first) for occlusion logic
+                building_distances = []
                 for building_idx in nearby_buildings:
                     if building_idx not in building_meshes:
                         continue
-                    
                     building_row = buildings_gdf.loc[building_idx]
                     footprint = building_row.geometry
-                    
-                    # Check if point is within this building's footprint
-                    if footprint.contains(point_2d) or footprint.touches(point_2d):
-                        # Point is in/on this building - use this building
-                        closest_building_idx = building_idx
-                        min_distance = 0.0
-                        break
-                    else:
-                        # Check distance to building
-                        distance_to_building = footprint.distance(point_2d)
-                        if distance_to_building < min_distance:
-                            min_distance = distance_to_building
-                            closest_building_idx = building_idx
+                    distance = footprint.distance(point_2d)
+                    building_distances.append((building_idx, distance))
                 
-                # If we found a building (within reasonable distance), calculate its envelope
-                if closest_building_idx is not None and min_distance < 10.0:  # Within 10m
-                    building_row = buildings_gdf.loc[closest_building_idx]
+                building_distances.sort(key=lambda x: x[1])
+                
+                # Find the first (front-most) building that intersects the sky exposure plane
+                for building_idx, distance in building_distances:
+                    building_row = buildings_gdf.loc[building_idx]
                     footprint = building_row.geometry
-                    
                     base_height = float(building_row['base_height'])
                     top_height = float(building_row['top_height'])
                     building_height_attr = top_height - base_height
                     
-                    # Calculate envelope height for THIS building at this point
+                    # Calculate envelope height for this building at this point
                     if ruleset.lower() == 'rio':
-                        envelope_height_at_point = calculate_rio_envelope_height(
+                        envelope_height = calculate_rio_envelope_height(
                             point_2d, footprint, base_height, building_height_attr, origin_z=base_height
                         )
                     elif ruleset.lower() == 'saopaulo':
-                        envelope_height_at_point = calculate_saopaulo_envelope_height(
+                        envelope_height = calculate_saopaulo_envelope_height(
                             point_2d, footprint, base_height, building_height_attr, origin_z=base_height
                         )
                     else:
-                        envelope_height_at_point = z_terrain
+                        envelope_height = z_terrain
                     
-                    # Validate envelope height makes sense
-                    # Envelope should be at least base_height, but shouldn't be unreasonably high
-                    if np.isnan(envelope_height_at_point):
-                        envelope_height_at_point = z_terrain
-                    elif envelope_height_at_point < base_height:
-                        envelope_height_at_point = base_height
-                    # Cap envelope at a reasonable maximum (e.g., base + 50m for very far points)
-                    max_reasonable_envelope = base_height + 50.0
-                    if envelope_height_at_point > max_reasonable_envelope:
-                        envelope_height_at_point = max_reasonable_envelope
-                else:
-                    # No building found nearby - no envelope restriction
-                    envelope_height_at_point = z_terrain
+                    # Use top_height directly from building attributes (consistent with point exceedance)
+                    actual_height = top_height
+                    
+                    # Check if this building intersects the sky exposure plane
+                    if actual_height > envelope_height:
+                        # This is the front-most building that intersects the plane
+                        envelope_height_at_point = envelope_height
+                        front_building_height = actual_height  # Store this building's height for exceedance
+                        break
             
-            building_heights.append(max_building_height)
+            # Validate envelope height makes sense
+            if np.isnan(envelope_height_at_point):
+                envelope_height_at_point = z_terrain
+            
+            building_heights.append(max_building_height)  # Tallest building (for visualization)
+            front_building_heights.append(front_building_height)  # Front-most building that intersects (for exceedance)
             envelope_heights_section.append(envelope_height_at_point)
         
         # Calculate distances along section (relative to street point)
@@ -1100,7 +1098,8 @@ def create_street_section_views(
         
         # Convert to numpy arrays for easier manipulation
         terrain_z_array = np.array(terrain_z)
-        building_heights_array = np.array(building_heights)
+        building_heights_array = np.array(building_heights)  # Tallest building (for visualization)
+        front_building_heights_array = np.array(front_building_heights)  # Front-most building that intersects (for exceedance)
         envelope_heights_array = np.array(envelope_heights_section)
         distances_array = np.array(distances)
         
@@ -1136,31 +1135,118 @@ def create_street_section_views(
         ax.plot(distances_array, envelope_heights_array, 'r--', linewidth=2.5, 
                label='Envelope (Allowed)', alpha=0.9)
         
-        # Highlight exceedance areas (where actual > envelope)
-        exceedance_mask = building_heights_array > envelope_heights_array
+        # Highlight exceedance areas (where front-most building > envelope)
+        # Use front_building_heights_array for exceedance calculation (not building_heights_array)
+        # IMPORTANT: Only show exceedance where there's actually a building visible at that point
+        # This prevents showing exceedance in areas where no building is drawn
+        has_building_at_point = building_heights_array > terrain_z_array + 0.5
+        exceedance_mask = has_building_at_point & (front_building_heights_array > envelope_heights_array)
         if np.any(exceedance_mask):
             # Fill exceedance areas with red
+            # Use the MINIMUM of front_building_heights and building_heights to ensure
+            # the red fill never extends beyond the visible building profile
+            exceedance_top = np.minimum(front_building_heights_array[exceedance_mask], 
+                                        building_heights_array[exceedance_mask])
             ax.fill_between(
                 distances_array[exceedance_mask],
                 envelope_heights_array[exceedance_mask],
-                building_heights_array[exceedance_mask],
+                exceedance_top,
                 color='red', alpha=0.4, label='Exceedance Area', zorder=5
             )
             
-            # Add text annotation with exceedance values
+            # Calculate exceedance metrics
+            # Use the POINT EXCEEDANCE value (exceedance_value) for max height
+            # This is the correct value from street-level analysis at this exact point
+            max_exceedance_height = exceedance_value  # Use the point exceedance, not section max
+            
+            # Calculate exceedance area (2D area in section view)
+            # This represents the cross-sectional area of exceedance
+            # Use the bounded exceedance heights (matching the visual fill)
+            bounded_top = np.minimum(front_building_heights_array[exceedance_mask], 
+                                     building_heights_array[exceedance_mask])
+            exceedance_heights = bounded_top - envelope_heights_array[exceedance_mask]
+            exceedance_heights = np.maximum(exceedance_heights, 0)  # Ensure non-negative
+            sample_spacing = np.abs(distances_array[1] - distances_array[0]) if len(distances_array) > 1 else 1.0
+            exceedance_area = np.sum(exceedance_heights) * sample_spacing  # m² (area in 2D section)
+            
+            # Calculate exceedance volume (approximate as area × unit width)
+            # In a 2D section, this represents volume per unit width perpendicular to section
+            # For a more accurate volume, we'd need the actual building width, but this gives a good approximation
+            exceedance_volume = exceedance_area * 1.0  # m³ per meter width (approximate)
+            
+            # Add text annotation with exceedance values (sparse annotations)
             for i in np.where(exceedance_mask)[0]:
                 if i % 20 == 0:  # Annotate every 20th point to avoid clutter
-                    exceedance_val = building_heights_array[i] - envelope_heights_array[i]
+                    bounded_height = min(front_building_heights_array[i], building_heights_array[i])
+                    exceedance_val = bounded_height - envelope_heights_array[i]
                     if exceedance_val > 1.0:  # Only show significant exceedances
-                        ax.text(distances_array[i], building_heights_array[i] + 2,
+                        ax.text(distances_array[i], bounded_height + 2,
                                f'{exceedance_val:.1f}m', fontsize=8, ha='center',
                                bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
+        else:
+            # No exceedance
+            max_exceedance_height = exceedance_value  # Use the point exceedance value
+            exceedance_area = 0.0
+            exceedance_volume = 0.0
         
         # Mark street point location
         ax.axvline(0, color='blue', linestyle=':', linewidth=2.5, label='Street Point', zorder=10)
         street_terrain_z = street_point.z  # Use street point Z as terrain reference
         ax.scatter([0], [street_terrain_z], color='blue', s=150, zorder=15, 
                   marker='o', edgecolors='black', linewidths=2, label='Street Location')
+        
+        # Add visual arrow showing exceedance height at street point
+        if exceedance_value > 0:
+            # Use the envelope and actual height from the point exceedance calculation
+            # These are stored in the point_row metadata
+            envelope_at_street = point_row.get('max_envelope_height', np.nan)
+            building_at_street = point_row.get('max_actual_height', np.nan)
+            
+            # Only draw if we have valid values
+            if not np.isnan(envelope_at_street) and not np.isnan(building_at_street):
+                # Draw double-headed arrow showing exceedance
+                arrow_x = 5.0  # Offset slightly from x=0 for visibility
+                
+                # Draw vertical line for exceedance
+                ax.annotate('', 
+                           xy=(arrow_x, building_at_street),
+                           xytext=(arrow_x, envelope_at_street),
+                           arrowprops=dict(arrowstyle='<->', color='darkred', lw=3, 
+                                          shrinkA=0, shrinkB=0),
+                           zorder=25)
+                
+                # Add label with exceedance value
+                mid_y = (building_at_street + envelope_at_street) / 2
+                ax.text(arrow_x + 3, mid_y, f'{exceedance_value:.2f}m',
+                       fontsize=12, fontweight='bold', color='darkred',
+                       verticalalignment='center', horizontalalignment='left',
+                       bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
+                                edgecolor='darkred', linewidth=2, alpha=0.95),
+                       zorder=26)
+                
+                # Draw horizontal dashed lines to connect to the arrow
+                ax.plot([0, arrow_x], [envelope_at_street, envelope_at_street], 
+                       'r:', linewidth=1.5, alpha=0.7, zorder=24)
+                ax.plot([0, arrow_x], [building_at_street, building_at_street], 
+                       'k:', linewidth=1.5, alpha=0.7, zorder=24)
+        
+        # Add exceedance metrics text box
+        metrics_text = (
+            f'Exceedance Metrics:\n'
+            f'Height: {max_exceedance_height:.2f} m\n'
+            f'Area (2D): {exceedance_area:.1f} m²\n'
+            f'Volume (approx): {exceedance_volume:.1f} m³/m'
+        )
+        
+        # Position text box in upper left corner
+        text_x = distances_array[0] + (distances_array[-1] - distances_array[0]) * 0.02
+        text_y = ax.get_ylim()[1] * 0.95
+        
+        ax.text(text_x, text_y, metrics_text,
+               fontsize=11, fontweight='bold',
+               bbox=dict(boxstyle='round,pad=0.8', facecolor='white', edgecolor='red', linewidth=2, alpha=0.9),
+               verticalalignment='top', horizontalalignment='left',
+               zorder=20)
         
         # Formatting
         ax.set_xlabel('Distance from Street Point (meters)', fontsize=12, fontweight='bold')
@@ -1169,7 +1255,7 @@ def create_street_section_views(
         ruleset_name = {'rio': 'Rio de Janeiro', 'saopaulo': 'São Paulo'}.get(ruleset.lower(), ruleset)
         ax.set_title(
             f'Street Section View - {label.upper()} Exceedance\n'
-            f'Exceedance: {exceedance_value:.2f}m | {ruleset_name} Ruleset',
+            f'Point Exceedance: {exceedance_value:.2f}m | {ruleset_name} Ruleset',
             fontsize=14, fontweight='bold'
         )
         ax.grid(True, alpha=0.3, linestyle='--')
@@ -1328,6 +1414,43 @@ def main():
     if 'base_height' not in buildings_gdf.columns or 'top_height' not in buildings_gdf.columns:
         raise ValueError(f"Building footprints must have 'base_height' and 'top_height' columns. "
                         f"Found columns: {list(buildings_gdf.columns)}")
+    
+    # Filter outlier buildings
+    # These thresholds remove erroneous/very small buildings that can skew the analysis
+    MIN_BUILDING_HEIGHT = 1.5  # meters - buildings shorter than this are likely errors
+    
+    original_count = len(buildings_gdf)
+    
+    # Calculate building footprint area and height
+    buildings_gdf['footprint_area'] = buildings_gdf.geometry.area
+    buildings_gdf['building_height'] = buildings_gdf['top_height'] - buildings_gdf['base_height']
+    
+    # Apply filters
+    # 1. Remove buildings with footprint area too small (noise/errors)
+    area_mask = buildings_gdf['footprint_area'] >= MIN_BUILDING_AREA
+    
+    # 2. Remove buildings with height too low (noise/errors)
+    height_mask = buildings_gdf['building_height'] >= MIN_BUILDING_HEIGHT
+    
+    # 3. For informal areas, also filter very large buildings (likely misclassified)
+    if args.area and not is_formal_area(args.area):
+        max_area_mask = buildings_gdf['footprint_area'] <= MAX_FILTER_AREA
+        combined_mask = area_mask & height_mask & max_area_mask
+        logger.info(f"Filtering buildings (informal area: {args.area}):")
+    else:
+        combined_mask = area_mask & height_mask
+        logger.info(f"Filtering buildings:")
+    
+    buildings_gdf = buildings_gdf[combined_mask].copy()
+    filtered_count = len(buildings_gdf)
+    
+    logger.info(f"  Original: {original_count} buildings")
+    logger.info(f"  Removed: {original_count - filtered_count} outliers")
+    logger.info(f"    - Min area: {MIN_BUILDING_AREA} m² (removed {(~area_mask).sum()})")
+    logger.info(f"    - Min height: {MIN_BUILDING_HEIGHT} m (removed {(~height_mask).sum()})")
+    if args.area and not is_formal_area(args.area):
+        logger.info(f"    - Max area: {MAX_FILTER_AREA} m² (removed {(~max_area_mask).sum()})")
+    logger.info(f"  Remaining: {filtered_count} buildings")
     
     # Extract building meshes
     logger.info("Extracting building meshes from STL...")
