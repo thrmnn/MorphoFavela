@@ -49,9 +49,14 @@ All parameters in `src/config.py`:
 - **SVF**: STL-based computation using discretized hemispherical dome
 - **Street-Level SVF**: Point sampling along street centerlines with pedestrian perspective (1.5m height)
 - **Solar Access**: Winter solstice direct sunlight hours using pvlib
+- **Street-Level Solar Access**: Point sampling along street centerlines for pedestrian solar exposure
 - **Shared Utilities**: `src/svf_utils.py` contains common functions
-- **Scripts**: `compute_svf.py`, `compute_svf_streets.py`, and `compute_solar_access.py`
-- **Ground Masking**: Both scripts exclude building interiors using footprint shapefile
+- **Scripts**: 
+  - `compute_svf.py` - grid-based SVF
+  - `compute_svf_streets.py` - street-level SVF
+  - `compute_solar_access.py` - grid-based solar access
+  - `compute_solar_access_streets.py` - street-level solar access
+- **Ground Masking**: All scripts exclude building interiors using footprint shapefile
 - **Progress Monitoring**: All scripts use tqdm for real-time progress tracking
 
 ## Phase 2.6: Sky Exposure Plane Exceedance Analysis ✅ COMPLETE
@@ -114,9 +119,12 @@ All parameters in `src/config.py`:
   - Statistical tests (Mann-Whitney U) with significance indicators
   - Area-normalized statistics for fair comparisons
   - Side-by-side visualizations preserving aspect ratios
+  - Street-level metrics comparison (SVF and solar access along street centerlines)
   - Professional PDF report generation with clean Swiss design
-- **Outputs**: PDF report, comparison tables, side-by-side visualizations
-- **Results**: `outputs/comparative/comparison_report.pdf`
+- **Outputs**: 
+  - PDF report: `outputs/comparative/comparison_report.pdf`
+  - Tables: `comparison_morphometric_stats.csv`, `comparison_environmental_stats.csv`, `comparison_street_level_stats.csv`
+  - Visualizations: distributions, boxplots, side-by-side maps for all metrics
 
 ## Data Organization
 - **Area-based structure**: `data/{area}/raw/` for input files
