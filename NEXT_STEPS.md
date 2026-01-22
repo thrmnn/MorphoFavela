@@ -149,8 +149,8 @@ python scripts/analyze_sky_exposure_streets.py \
 ## 📋 NICE TO HAVE (Future)
 
 ### 7. GeoTIFF Export
-**Status**: Only .npy rasters  
-**Time**: 2-3 hours  
+**Status**: Only .npy rasters
+**Time**: 2-3 hours
 **Priority**: LOW
 
 Add GeoTIFF export with CRS metadata for GIS integration.
@@ -158,11 +158,33 @@ Add GeoTIFF export with CRS metadata for GIS integration.
 ---
 
 ### 8. Configuration File Support
-**Status**: Hard-coded parameters  
-**Time**: 4-6 hours  
+**Status**: Hard-coded parameters
+**Time**: 4-6 hours
 **Priority**: LOW
 
 YAML/JSON config files for easier parameter adjustment without code changes.
+
+---
+
+### 9. Urban Morphology Metrics (Phase 4)
+**Status**: Planned - detailed design complete
+**Priority**: MEDIUM
+**Documentation**: See `URBAN_MORPHOLOGY_PLAN.md`
+
+Implement urban morphology metrics for environmental analysis:
+- Plan area density (λp) - footprint area / total area per 50m grid cell
+- Frontal area density (λf) - building frontal area perpendicular to wind
+- Height variability (σh) - standard deviation of building heights per unit
+- Street orientation entropy (H) - Shannon entropy of street directions
+- Zone flagging (SVF < 0.3, λf > 0.4 thresholds)
+- Morphological typology clustering (K-means/hierarchical)
+
+**New files to create**:
+- `src/urban_morphology.py` - Core module
+- `scripts/compute_urban_morphology.py` - Main script
+- `scripts/compute_typology_clustering.py` - Clustering script
+
+**Why useful**: Enables formal vs informal settlement comparison using standardized urban form metrics, supports environmental performance proxies for ventilation and sky access.
 
 ---
 

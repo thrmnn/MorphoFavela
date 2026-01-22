@@ -243,7 +243,40 @@
 
 ---
 
-## Phase 4: Environmental Performance Analysis (Future)
+## Phase 4: Urban Morphology Metrics 🆕 PLANNED
+
+### Overview
+Add comprehensive urban morphology metrics for environmental analysis, including plan area density, frontal area density, height variability, street orientation entropy, and morphological typology clustering.
+
+### Planned Features
+- [ ] Plan area density (λp) - footprint area / total area per analysis unit
+- [ ] Frontal area density (λf) - building frontal area perpendicular to wind
+- [ ] Height variability (σh) - standard deviation of building heights per unit
+- [ ] Street orientation entropy (H) - Shannon entropy of street directions
+- [ ] Zone flagging (SVF < 0.3, λf > 0.4)
+- [ ] Morphological typology clustering (K-means/hierarchical)
+- [ ] Integration with comparative analysis framework
+
+### New Files to Create
+- `src/urban_morphology.py` - Core module with metric computation functions
+- `scripts/compute_urban_morphology.py` - Main script for running the analysis
+- `scripts/compute_typology_clustering.py` - Clustering on morphology features
+
+### Implementation Phases
+1. **Core Functions**: Plan density, height variability
+2. **Complex Metrics**: Frontal density, entropy
+3. **Main Script**: Visualizations, integration
+4. **Zone Flagging**: Threshold-based flags
+5. **Typology Clustering**: K-means/hierarchical analysis
+6. **Comparative Analysis**: Multi-area comparison
+
+### Status
+- **Planning**: Complete - see `URBAN_MORPHOLOGY_PLAN.md` for detailed design
+- **Implementation**: Not started
+
+---
+
+## Phase 5: Environmental Performance Analysis (Future)
 
 ### Planned Features
 - [ ] Thermal comfort modeling
