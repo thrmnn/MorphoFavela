@@ -182,39 +182,73 @@ def plot_ground_mask_debug(
     grid_y: np.ndarray,
     ground_mask: np.ndarray,
     building_footprints: gpd.GeoDataFrame,
-    output_path: Path
+    output_path: Path,
+    building_buffer: float = None,
+    building_buffer_geom = None,
+    original_ground_count: int = None
 ):
     """
     Create a debug plot showing grid points, ground points, and building footprints.
     
     Args:
-        grid_x: X coordinates of all grid points
-        grid_y: Y coordinates of all grid points
-        ground_mask: Boolean mask for ground points
+        grid_x: X coordinates of filtered grid points (after proximity filter if applied)
+        grid_y: Y coordinates of filtered grid points
+        ground_mask: Boolean mask for ground points (after filtering)
         building_footprints: GeoDataFrame with building footprints
         output_path: Path to save the plot
+        building_buffer: Optional buffer distance used for filtering
+        building_buffer_geom: Optional buffer geometry to visualize
+        original_ground_count: Optional original count before proximity filtering
     """
     print(f"Creating debug plot: {output_path}")
     
-    fig, ax = plt.subplots(figsize=(12, 10))
+    fig, ax = plt.subplots(figsize=(14, 12))
     
-    # Plot all grid points (grey)
-    ax.scatter(grid_x, grid_y, c='lightgrey', s=1, alpha=0.3, label='All grid points')
+    # Plot building buffer zone if provided (semi-transparent overlay)
+    if building_buffer_geom is not None:
+        buffer_gdf = gpd.GeoDataFrame(geometry=[building_buffer_geom], crs=building_footprints.crs)
+        buffer_gdf.plot(ax=ax, facecolor='yellow', edgecolor='orange', linewidth=1, 
+                       alpha=0.2, label=f'Buffer zone ({building_buffer}m)')
     
-    # Plot ground points (green) - only show points that are ground
+    # Plot building footprints (red outlines)
+    building_footprints.plot(ax=ax, facecolor='red', edgecolor='darkred', 
+                            linewidth=1.5, alpha=0.4, label='Building footprints')
+    
+    # Plot all filtered grid points (light grey - these are the ones we're considering)
+    ax.scatter(grid_x, grid_y, c='lightgrey', s=1, alpha=0.4, label='All filtered grid points')
+    
+    # Plot ground points (green) - only show points that are ground (will be used for SVF)
     if len(ground_mask) == len(grid_x):
         ground_x = grid_x[ground_mask]
         ground_y = grid_y[ground_mask]
-        ax.scatter(ground_x, ground_y, c='green', s=2, alpha=0.6, label='Ground points (SVF computed)')
+        ax.scatter(ground_x, ground_y, c='green', s=3, alpha=0.7, 
+                  label='Ground points (SVF will be computed)', edgecolors='darkgreen', linewidths=0.2)
     
-    # Plot building footprints (red outlines)
-    building_footprints.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1.5, label='Building footprints')
+    # Add statistics text
+    stats_text = []
+    if original_ground_count is not None and len(grid_x) < original_ground_count:
+        reduction = 100 * (1 - len(grid_x) / original_ground_count)
+        stats_text.append(f"Points reduced by {reduction:.1f}%")
+    if len(ground_mask) == len(grid_x):
+        stats_text.append(f"SVF points: {np.sum(ground_mask):,}")
+    
+    if stats_text:
+        stats_str = "\n".join(stats_text)
+        ax.text(0.02, 0.98, stats_str, transform=ax.transAxes, 
+               fontsize=10, verticalalignment='top',
+               bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     
     ax.set_xlabel('X (meters)', fontsize=12)
     ax.set_ylabel('Y (meters)', fontsize=12)
-    ax.set_title('Ground Mask Debug Plot\n(Green = SVF computed, Red = Building footprints)', fontsize=14, fontweight='bold')
+    
+    title = 'Ground Mask Debug Plot'
+    if building_buffer is not None:
+        title += f'\n(Proximity filter: {building_buffer}m buffer)'
+    title += '\nGreen = SVF computed, Red = Buildings, Yellow = Buffer zone'
+    
+    ax.set_title(title, fontsize=14, fontweight='bold')
     ax.set_aspect('equal')
-    ax.legend(loc='upper right')
+    ax.legend(loc='upper right', fontsize=9)
     ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
@@ -229,7 +263,8 @@ def generate_ground_points(
     grid_spacing: float, 
     ground_mask: np.ndarray = None,
     building_footprints: gpd.GeoDataFrame = None,
-    output_dir: Path = None
+    output_dir: Path = None,
+    building_buffer: float = None
 ) -> tuple:
     """
     Generate a regular 2D grid over the terrain bounding box.
@@ -241,6 +276,8 @@ def generate_ground_points(
                     If provided, only ground points are projected and returned
         building_footprints: Optional GeoDataFrame with building footprints for mask computation
         output_dir: Optional output directory for debug plots
+        building_buffer: Optional buffer distance in meters. If provided, only compute SVF
+                        for points within this distance of buildings (reduces computation)
         
     Returns:
         Tuple of (projected_points, grid_x_coords, grid_y_coords, original_mask)
@@ -272,11 +309,6 @@ def generate_ground_points(
     if building_footprints is not None and ground_mask is None:
         print("  Computing ground mask from building footprints...")
         ground_mask = compute_ground_mask(grid_x_flat, grid_y_flat, building_footprints)
-        
-        # Create debug plot
-        if output_dir is not None:
-            debug_plot_path = output_dir / "ground_mask_debug.png"
-            plot_ground_mask_debug(grid_x_flat, grid_y_flat, ground_mask, building_footprints, debug_plot_path)
     
     # Apply ground mask if provided (ensure sizes match)
     if ground_mask is not None:
@@ -300,6 +332,52 @@ def generate_ground_points(
     else:
         ground_mask = np.ones(len(grid_points_2d), dtype=bool)
     
+    # Store original counts for reporting
+    original_ground_count = len(grid_points_2d)
+    building_buffer_geom = None
+    
+    # Apply building proximity filter if requested
+    if building_buffer is not None and building_footprints is not None and len(grid_points_2d) > 0:
+        print(f"  Filtering to points within {building_buffer}m of buildings...")
+        # Create buffer around buildings
+        building_buffers = building_footprints.buffer(building_buffer)
+        # Combine all buffers into single geometry using unary_union
+        from shapely.ops import unary_union
+        try:
+            building_buffer_geom = unary_union(building_buffers.geometry.values)
+        except Exception as e:
+            print(f"  Warning: Could not create unified buffer geometry: {e}")
+            print(f"  Using individual building buffers...")
+            # Fallback: use the first buffer (less efficient but works)
+            building_buffer_geom = building_buffers.geometry.iloc[0]
+            for geom in building_buffers.geometry.iloc[1:]:
+                building_buffer_geom = building_buffer_geom.union(geom)
+        
+        # Convert grid points to GeoDataFrame for spatial query
+        from shapely.geometry import Point
+        grid_points_gdf = gpd.GeoDataFrame(
+            geometry=[Point(x, y) for x, y in zip(grid_x_flat, grid_y_flat)],
+            crs=building_footprints.crs
+        )
+        
+        # Find points within buffer using spatial query
+        proximity_mask = grid_points_gdf.geometry.within(building_buffer_geom)
+        num_near_buildings = np.sum(proximity_mask)
+        
+        print(f"  Points near buildings: {num_near_buildings}/{len(grid_points_2d)} ({100*num_near_buildings/len(grid_points_2d):.1f}%)")
+        
+        if num_near_buildings == 0:
+            print(f"  WARNING: No points found within {building_buffer}m of buildings!")
+            print(f"  Continuing with all points...")
+        else:
+            # Apply proximity filter
+            grid_points_2d = grid_points_2d[proximity_mask]
+            grid_x_flat = grid_x_flat[proximity_mask]
+            grid_y_flat = grid_y_flat[proximity_mask]
+            # Update ground_mask to match filtered points
+            if len(ground_mask) == len(proximity_mask):
+                ground_mask = ground_mask[proximity_mask]
+    
     # Project each point vertically onto terrain surface
     # We'll set Z to a low value first, then project upward
     z_coords = np.full(len(grid_points_2d), bounds[4] - 100)  # Start below terrain
@@ -320,6 +398,17 @@ def generate_ground_points(
     
     projected_points = np.array(projected_points)
     
-    print(f"  Generated {len(projected_points)} ground points (after masking)")
+    print(f"  Generated {len(projected_points)} ground points (after masking and filtering)")
+    
+    # Create debug plot after all filtering is done
+    if output_dir is not None and building_footprints is not None:
+        debug_plot_path = output_dir / "ground_mask_debug.png"
+        plot_ground_mask_debug(
+            grid_x_flat, grid_y_flat, ground_mask, building_footprints, debug_plot_path,
+            building_buffer=building_buffer,
+            building_buffer_geom=building_buffer_geom,
+            original_ground_count=original_ground_count
+        )
+    
     return projected_points, x_coords, y_coords, ground_mask
 

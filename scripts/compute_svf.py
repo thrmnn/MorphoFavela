@@ -301,7 +301,9 @@ def main():
     parser.add_argument('--height', type=float, default=0.5, help='Evaluation height above ground (meters)')
     parser.add_argument('--sky-patches', type=int, default=145, help='Number of sky patches')
     parser.add_argument('--buffer-distance', type=float, default=0.25, help='Buffer distance for building footprints (meters)')
+    parser.add_argument('--building-buffer', type=float, default=None, help='Only compute SVF for points within this distance of buildings (meters). Reduces computation by focusing on relevant areas.')
     parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/svf)')
+    parser.add_argument('--debug-only', action='store_true', help='Only generate debug plot, skip SVF computation')
     
     args = parser.parse_args()
     
@@ -357,12 +359,21 @@ def main():
     # If footprints provided, pass them for mask computation
     if args.footprints and building_footprints is not None:
         ground_points, grid_x_coords, grid_y_coords, original_mask = generate_ground_points(
-            terrain, args.grid_spacing, building_footprints=building_footprints, output_dir=output_dir
+            terrain, args.grid_spacing, building_footprints=building_footprints, 
+            output_dir=output_dir, building_buffer=args.building_buffer
         )
     else:
         ground_points, grid_x_coords, grid_y_coords, original_mask = generate_ground_points(
-            terrain, args.grid_spacing
+            terrain, args.grid_spacing, building_buffer=args.building_buffer
         )
+    
+    # If debug-only mode, stop here
+    if args.debug_only:
+        print("\n" + "=" * 60)
+        print("DEBUG PLOT GENERATION COMPLETE")
+        print(f"Debug plot saved to: {output_dir / 'ground_mask_debug.png'}")
+        print("=" * 60)
+        return
     
     # Generate sky patches
     sky_patches, _ = generate_sky_patches(args.sky_patches)
