@@ -352,6 +352,160 @@ def aggregate_segment_statistics(
     return segments_gdf
 
 
+def plot_street_debug(
+    roads_gdf: gpd.GeoDataFrame,
+    points_gdf: gpd.GeoDataFrame,
+    building_footprints: gpd.GeoDataFrame = None,
+    isolated_buildings: gpd.GeoDataFrame = None,
+    area_filtered_buildings: gpd.GeoDataFrame = None,
+    output_path: Path = None,
+    spacing: float = None,
+    height: float = None,
+    building_buffer: float = None,
+    building_buffer_geom = None,
+    filtered_roads_gdf: gpd.GeoDataFrame = None,
+    original_roads_count: int = None
+):
+    """
+    Create a debug plot showing street centerlines, sample points, and building footprints.
+    
+    Args:
+        roads_gdf: GeoDataFrame with street centerlines
+        points_gdf: GeoDataFrame with sample points along streets
+        building_footprints: GeoDataFrame with main cluster building footprints
+        isolated_buildings: GeoDataFrame with isolated buildings (for visualization)
+        area_filtered_buildings: GeoDataFrame with area-filtered buildings (for visualization)
+        output_path: Path to save the plot
+        spacing: Point spacing used for sampling
+        height: Evaluation height
+    """
+    logger.info(f"Creating street debug plot: {output_path}")
+    
+    from src.config import MAX_FILTER_AREA, BUILDING_CLUSTER_BUFFER
+    
+    fig, ax = plt.subplots(figsize=(14, 12))
+    
+    # Plot area-filtered buildings in yellow (first, so they appear behind)
+    if area_filtered_buildings is not None and len(area_filtered_buildings) > 0:
+        if area_filtered_buildings.crs != roads_gdf.crs:
+            area_filtered_buildings = area_filtered_buildings.to_crs(roads_gdf.crs)
+        area_filtered_buildings.plot(ax=ax, facecolor='yellow', edgecolor='orange', 
+                                     linewidth=1.5, alpha=0.5, 
+                                     label=f'Area-filtered buildings (area > {MAX_FILTER_AREA}m², n={len(area_filtered_buildings)})')
+    
+    # Plot isolated buildings (gray/transparent)
+    if isolated_buildings is not None and len(isolated_buildings) > 0:
+        if isolated_buildings.crs != roads_gdf.crs:
+            isolated_buildings = isolated_buildings.to_crs(roads_gdf.crs)
+        isolated_buildings.plot(ax=ax, facecolor='lightgray', edgecolor='gray', 
+                               linewidth=1, alpha=0.3, 
+                               label=f'Isolated buildings (n={len(isolated_buildings)})')
+    
+    # Plot building buffer zone if provided
+    if building_buffer_geom is not None and building_buffer is not None:
+        from shapely.geometry import shape
+        buffer_gdf = gpd.GeoDataFrame(geometry=[building_buffer_geom], crs=roads_gdf.crs)
+        buffer_gdf.plot(ax=ax, facecolor='none', edgecolor='orange', linestyle='--', 
+                       linewidth=1.5, alpha=0.7, 
+                       label=f'Building buffer zone ({building_buffer}m)')
+    
+    # Plot building footprints (red) - main cluster
+    if building_footprints is not None and len(building_footprints) > 0:
+        if building_footprints.crs != roads_gdf.crs:
+            building_footprints = building_footprints.to_crs(roads_gdf.crs)
+        building_footprints.plot(ax=ax, facecolor='red', edgecolor='darkred', 
+                                linewidth=1.5, alpha=0.4, 
+                                label=f'Main cluster buildings (n={len(building_footprints)})')
+    
+    # Plot filtered-out streets (light gray, if any)
+    if filtered_roads_gdf is not None and original_roads_count is not None:
+        if len(filtered_roads_gdf) < original_roads_count:
+            # Find streets that were filtered out
+            filtered_out_mask = ~roads_gdf.index.isin(filtered_roads_gdf.index)
+            filtered_out_roads = roads_gdf[filtered_out_mask]
+            if len(filtered_out_roads) > 0:
+                filtered_out_roads.plot(ax=ax, color='lightgray', linewidth=1, 
+                                       alpha=0.3, linestyle=':', 
+                                       label=f'Filtered-out streets (n={len(filtered_out_roads)})')
+    
+    # Plot filtered street centerlines (blue)
+    if filtered_roads_gdf is not None:
+        filtered_roads_gdf.plot(ax=ax, color='blue', linewidth=2, alpha=0.7, 
+                               label=f'Filtered street centerlines (n={len(filtered_roads_gdf)})')
+    else:
+        roads_gdf.plot(ax=ax, color='blue', linewidth=2, alpha=0.7, 
+                      label=f'Street centerlines (n={len(roads_gdf)})')
+    
+    # Plot sample points along streets
+    if len(points_gdf) > 0:
+        # Extract 2D coordinates for plotting
+        points_2d = np.array([[geom.x, geom.y] for geom in points_gdf.geometry])
+        ax.scatter(points_2d[:, 0], points_2d[:, 1], c='green', s=8, alpha=0.8, 
+                  edgecolors='darkgreen', linewidths=0.3,
+                  label=f'Sample points (n={len(points_gdf)})')
+    
+    # Add statistics text
+    stats_text = []
+    if original_roads_count is not None:
+        stats_text.append(f"Original streets: {original_roads_count:,}")
+        if filtered_roads_gdf is not None:
+            stats_text.append(f"Filtered streets: {len(filtered_roads_gdf):,}")
+            if len(filtered_roads_gdf) < original_roads_count:
+                reduction = 100 * (1 - len(filtered_roads_gdf) / original_roads_count)
+                stats_text.append(f"Filtered out: {reduction:.1f}%")
+    else:
+        stats_text.append(f"Street segments: {len(roads_gdf):,}")
+    stats_text.append(f"Sample points: {len(points_gdf):,}")
+    if spacing is not None:
+        stats_text.append(f"Point spacing: {spacing}m")
+    if height is not None:
+        stats_text.append(f"Evaluation height: {height}m")
+    total_street_length = roads_gdf.geometry.length.sum()
+    stats_text.append(f"Total street length: {total_street_length:.1f}m")
+    if len(points_gdf) > 0:
+        avg_points_per_segment = len(points_gdf) / len(roads_gdf)
+        stats_text.append(f"Avg points/segment: {avg_points_per_segment:.1f}")
+    if building_footprints is not None and len(building_footprints) > 0:
+        stats_text.append(f"Main cluster: {len(building_footprints):,} buildings")
+    if area_filtered_buildings is not None and len(area_filtered_buildings) > 0:
+        stats_text.append(f"Area-filtered: {len(area_filtered_buildings):,} buildings")
+    if isolated_buildings is not None and len(isolated_buildings) > 0:
+        stats_text.append(f"Isolated: {len(isolated_buildings):,} buildings")
+    
+    if stats_text:
+        stats_str = "\n".join(stats_text)
+        ax.text(0.02, 0.98, stats_str, transform=ax.transAxes, 
+               fontsize=10, verticalalignment='top',
+               bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+    
+    ax.set_xlabel('X (meters)', fontsize=12)
+    ax.set_ylabel('Y (meters)', fontsize=12)
+    
+    title = 'Street-Level SVF Debug Plot'
+    if spacing is not None:
+        title += f'\n(Point spacing: {spacing}m)'
+    if height is not None:
+        title += f'\n(Evaluation height: {height}m)'
+    if building_buffer is not None and building_buffer > 0:
+        title += f'\n(Street filter: {building_buffer}m buffer)'
+    if MAX_FILTER_AREA is not None:
+        title += f'\n(Area filter: >{MAX_FILTER_AREA}m² excluded)'
+    title += f'\n(Cluster filter: {BUILDING_CLUSTER_BUFFER}m buffer)'
+    title += '\nBlue = Filtered streets, Gray dotted = Filtered-out streets, Green = Sample points'
+    title += '\nRed = Main cluster, Yellow = Area-filtered, Gray = Isolated, Orange dashed = Buffer zone'
+    
+    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_aspect('equal')
+    ax.legend(loc='upper right', fontsize=9)
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    logger.info(f"  Saved street debug plot to {output_path}")
+
+
 def create_street_svf_map(
     segments_gdf: gpd.GeoDataFrame,
     points_gdf: gpd.GeoDataFrame = None,
@@ -494,6 +648,8 @@ def main():
     parser.add_argument('--sky-patches', type=int, default=145, help='Number of sky patches (default: 145)')
     parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/svf_streets)')
     parser.add_argument('--area', type=str, default=None, help='Area name (e.g., vidigal, copacabana) for automatic path resolution')
+    parser.add_argument('--building-buffer', type=float, default=30.0, help='Buffer distance from buildings to filter streets (meters, default: 30.0)')
+    parser.add_argument('--debug-only', action='store_true', help='Only generate debug plot and exit, do not compute SVF')
     
     args = parser.parse_args()
     
@@ -545,32 +701,113 @@ def main():
     logger.info(f"  Original CRS: {roads_gdf.crs}")
     logger.info(f"  Road bounds: {roads_gdf.total_bounds}")
     
-    # Handle coordinate system transformation if needed
-    # STL mesh is typically in local coordinates, roads may be in UTM
-    # Detect and apply translation similar to building footprints
+    # Handle coordinate system transformation
+    # Calculate transformation using the SAME reference point as buildings for alignment
     terrain_bounds = terrain.bounds
     stl_center_x = (terrain_bounds[0] + terrain_bounds[1]) / 2
     stl_center_y = (terrain_bounds[2] + terrain_bounds[3]) / 2
     
-    roads_center_x = (roads_gdf.total_bounds[0] + roads_gdf.total_bounds[2]) / 2
-    roads_center_y = (roads_gdf.total_bounds[1] + roads_gdf.total_bounds[3]) / 2
-    
-    dx = stl_center_x - roads_center_x
-    dy = stl_center_y - roads_center_y
-    
-    # Check if translation is needed (if centers are very far apart)
-    if abs(dx) > 100 or abs(dy) > 100:  # Threshold: 100m
-        logger.info(f"  Detected coordinate system mismatch - transforming to local coordinates")
-        logger.info(f"  Applying translation: dx={dx:.1f}, dy={dy:.1f}")
-        roads_gdf.geometry = roads_gdf.geometry.translate(xoff=dx, yoff=dy)
-        logger.info(f"  Transformed road bounds: {roads_gdf.total_bounds}")
+    # If building footprints are provided, use their ORIGINAL center (before filtering)
+    # to calculate transformation, ensuring perfect alignment
+    if args.footprints:
+        footprints_path = Path(args.footprints)
+        if footprints_path.exists():
+            # Load original footprints (before filtering) to get their center
+            original_footprints = gpd.read_file(str(footprints_path))
+            footprints_center_x = (original_footprints.total_bounds[0] + original_footprints.total_bounds[2]) / 2
+            footprints_center_y = (original_footprints.total_bounds[1] + original_footprints.total_bounds[3]) / 2
+            dx = stl_center_x - footprints_center_x
+            dy = stl_center_y - footprints_center_y
+            logger.info(f"  Using building footprints center for transformation alignment")
+        else:
+            # Fallback to roads center if footprints not found
+            roads_center_x = (roads_gdf.total_bounds[0] + roads_gdf.total_bounds[2]) / 2
+            roads_center_y = (roads_gdf.total_bounds[1] + roads_gdf.total_bounds[3]) / 2
+            dx = stl_center_x - roads_center_x
+            dy = stl_center_y - roads_center_y
     else:
-        logger.info(f"  Coordinate systems appear aligned (translation < 100m)")
+        # Use roads center if no footprints provided
+        roads_center_x = (roads_gdf.total_bounds[0] + roads_gdf.total_bounds[2]) / 2
+        roads_center_y = (roads_gdf.total_bounds[1] + roads_gdf.total_bounds[3]) / 2
+        dx = stl_center_x - roads_center_x
+        dy = stl_center_y - roads_center_y
     
-    # Sample points along streets
+    # Apply transformation to roads
+    logger.info(f"  Transforming roads to match STL coordinate system")
+    logger.info(f"  Applying translation: dx={dx:.1f}, dy={dy:.1f}")
+    roads_gdf.geometry = roads_gdf.geometry.translate(xoff=dx, yoff=dy)
+    logger.info(f"  Transformed road bounds: {roads_gdf.total_bounds}")
+    
+    # Now load building footprints (they will use the same transformation)
+    building_footprints = None
+    isolated_buildings = None
+    area_filtered_buildings = None
+    building_buffer_geom = None
+    if args.footprints:
+        footprints_path = Path(args.footprints)
+        if footprints_path.exists():
+            from src.svf_utils import load_building_footprints
+            building_footprints, isolated_buildings, area_filtered_buildings = load_building_footprints(
+                footprints_path,
+                terrain_bounds=terrain.bounds,
+                buffer_distance=0.0,  # No buffer needed for visualization
+                area=args.area
+            )
+            
+            # Create buffer geometry for street filtering
+            if building_footprints is not None and len(building_footprints) > 0 and args.building_buffer > 0:
+                from shapely.ops import unary_union
+                building_union = unary_union(building_footprints.geometry.values)
+                building_buffer_geom = building_union.buffer(args.building_buffer)
+                logger.info(f"  Created building buffer zone ({args.building_buffer}m) for street filtering")
+    
+    # Filter streets to only keep those within building buffer
+    # Use a stricter criterion: require at least 50% of the street segment to be within the buffer
+    original_roads_count = len(roads_gdf)
+    filtered_roads_gdf = roads_gdf.copy()
+    if building_buffer_geom is not None and args.building_buffer > 0:
+        import numpy as np
+        from shapely.geometry import Point
+        
+        # Check each street segment to see what percentage is within the buffer
+        street_mask = np.zeros(len(roads_gdf), dtype=bool)
+        min_percentage_within = 0.7  # Require at least 70% of street to be within buffer (more conservative)
+        
+        logger.info(f"  Checking street segments for buffer inclusion (min {min_percentage_within*100:.0f}% within buffer)...")
+        for idx, row in tqdm(roads_gdf.iterrows(), total=len(roads_gdf), desc="  Filtering streets"):
+            line = row.geometry
+            line_length = line.length
+            
+            # Sample points along the line to check what percentage is within buffer
+            # Sample every 5 meters or at least 10 points
+            num_samples = max(10, int(line_length / 5.0))
+            sample_distances = np.linspace(0, line_length, num_samples)
+            
+            points_within = 0
+            for dist in sample_distances:
+                point = line.interpolate(dist)
+                if building_buffer_geom.contains(point):
+                    points_within += 1
+            
+            percentage_within = points_within / num_samples
+            if percentage_within >= min_percentage_within:
+                street_mask[idx] = True
+        
+        filtered_roads_gdf = roads_gdf[street_mask].copy()
+        
+        n_filtered = original_roads_count - len(filtered_roads_gdf)
+        if n_filtered > 0:
+            logger.info(f"  Filtered out {n_filtered} street segments (<{min_percentage_within*100:.0f}% within {args.building_buffer}m buffer)")
+            logger.info(f"  Remaining streets: {len(filtered_roads_gdf)} / {original_roads_count}")
+        else:
+            logger.info(f"  All {original_roads_count} street segments meet the buffer criterion")
+    else:
+        logger.info(f"  No building buffer applied - processing all {original_roads_count} street segments")
+    
+    # Sample points along filtered streets
     dtm_path = Path(args.dtm) if args.dtm else None
     points_gdf = sample_street_points(
-        roads_gdf, args.spacing, dtm_path=dtm_path, terrain=terrain
+        filtered_roads_gdf, args.spacing, dtm_path=dtm_path, terrain=terrain
     )
     
     # Remove points with invalid elevation
@@ -578,6 +815,30 @@ def main():
     if not valid_mask.all():
         logger.warning(f"  Removed {np.sum(~valid_mask)} points with invalid elevation")
         points_gdf = points_gdf[valid_mask].copy()
+    
+    # Create debug plot
+    debug_plot_path = output_dir / "street_debug.png"
+    plot_street_debug(
+        roads_gdf, points_gdf, 
+        building_footprints=building_footprints,
+        isolated_buildings=isolated_buildings,
+        area_filtered_buildings=area_filtered_buildings,
+        output_path=debug_plot_path,
+        spacing=args.spacing,
+        height=args.height,
+        building_buffer=args.building_buffer if args.building_buffer > 0 else None,
+        building_buffer_geom=building_buffer_geom,
+        filtered_roads_gdf=filtered_roads_gdf,
+        original_roads_count=original_roads_count
+    )
+    
+    # If debug-only mode, stop here
+    if args.debug_only:
+        print("\n" + "=" * 60)
+        print("DEBUG PLOT GENERATION COMPLETE")
+        print(f"Debug plot saved to: {debug_plot_path}")
+        print("=" * 60)
+        return
     
     # Convert points to numpy array for SVF computation
     # Extract coordinates, handling coordinate system transformation if needed
@@ -600,8 +861,8 @@ def main():
     points_gdf = points_gdf.copy()
     points_gdf['svf'] = svf_values
     
-    # Aggregate to segment level
-    segments_gdf = aggregate_segment_statistics(points_gdf, svf_values, roads_gdf)
+    # Aggregate to segment level (use filtered roads for aggregation)
+    segments_gdf = aggregate_segment_statistics(points_gdf, svf_values, filtered_roads_gdf)
     
     # Save results
     logger.info("Saving results...")
@@ -624,19 +885,7 @@ def main():
     # Visualizations
     logger.info("Generating visualizations...")
     
-    # Load building footprints if provided
-    building_footprints = None
-    if args.footprints:
-        footprints_path = Path(args.footprints)
-        if footprints_path.exists():
-            from src.svf_utils import load_building_footprints
-            building_footprints = load_building_footprints(
-                footprints_path,
-                terrain_bounds=terrain.bounds,
-                buffer_distance=0.0  # No buffer needed for visualization
-            )
-    
-    # Street SVF map
+    # Street SVF map (building footprints already loaded above)
     map_path = output_dir / "street_svf_map.png"
     create_street_svf_map(segments_gdf, points_gdf, building_footprints, map_path)
     

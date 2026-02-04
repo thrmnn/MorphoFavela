@@ -32,6 +32,7 @@ from src.svf_utils import (
     plot_ground_mask_debug,
     generate_ground_points
 )
+from src.config import is_informal_area
 
 
 def generate_sky_patches(num_patches: int, radius: float = 1000.0) -> tuple:
@@ -304,6 +305,7 @@ def main():
     parser.add_argument('--building-buffer', type=float, default=None, help='Only compute SVF for points within this distance of buildings (meters). Reduces computation by focusing on relevant areas.')
     parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/svf)')
     parser.add_argument('--debug-only', action='store_true', help='Only generate debug plot, skip SVF computation')
+    parser.add_argument('--area', type=str, default=None, help='Area name (vidigal, copacabana, riodaspedras) - used to determine if filtering should be applied')
     
     args = parser.parse_args()
     
@@ -345,25 +347,33 @@ def main():
             print("  Continuing without building mask...")
         else:
             # Load and transform building footprints to match terrain coordinate system
-            building_footprints = load_building_footprints(
+            # Filtering is applied inside load_building_footprints if area is informal
+            # Returns (main_cluster_footprints, isolated_footprints, area_filtered_footprints)
+            building_footprints, isolated_footprints, area_filtered_footprints = load_building_footprints(
                 footprints_path,
                 terrain_bounds=terrain.bounds,
-                buffer_distance=args.buffer_distance
+                buffer_distance=args.buffer_distance,
+                area=args.area
             )
             
             # Compute ground mask - we'll do this inside generate_ground_points
             # to ensure the grid is consistent
             pass  # Will compute mask in generate_ground_points
+    else:
+        isolated_footprints = None
+        area_filtered_footprints = None
     
     # Generate ground points (with mask applied if available)
     # If footprints provided, pass them for mask computation
     if args.footprints and building_footprints is not None:
-        ground_points, grid_x_coords, grid_y_coords, original_mask = generate_ground_points(
+        ground_points, grid_x_coords, grid_y_coords, original_mask, building_buffer_geom = generate_ground_points(
             terrain, args.grid_spacing, building_footprints=building_footprints, 
-            output_dir=output_dir, building_buffer=args.building_buffer
+            output_dir=output_dir, building_buffer=args.building_buffer,
+            isolated_buildings=isolated_footprints,
+            area_filtered_buildings=area_filtered_footprints
         )
     else:
-        ground_points, grid_x_coords, grid_y_coords, original_mask = generate_ground_points(
+        ground_points, grid_x_coords, grid_y_coords, original_mask, building_buffer_geom = generate_ground_points(
             terrain, args.grid_spacing, building_buffer=args.building_buffer
         )
     

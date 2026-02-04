@@ -13,6 +13,8 @@ from pathlib import Path
 from shapely.geometry import Point
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from src.config import MAX_FILTER_AREA, MAX_FILTER_HEIGHT, is_informal_area, BUILDING_CLUSTER_BUFFER
+from shapely.ops import unary_union
 
 
 def load_mesh(stl_path: Path) -> pv.PolyData:
@@ -63,24 +65,167 @@ def extract_terrain_surface(mesh: pv.PolyData) -> pv.PolyData:
     return terrain
 
 
+def filter_buildings(
+    footprints: gpd.GeoDataFrame,
+    area: str = None
+) -> tuple:
+    """
+    Filter buildings based on area and height thresholds, and cluster filtering (for informal areas only).
+    
+    Uses connected components analysis to identify the main building cluster and filter out isolated buildings.
+    
+    Args:
+        footprints: GeoDataFrame with building footprints
+        area: Optional area name to determine if filtering should be applied
+        
+    Returns:
+        Tuple of (filtered_footprints, isolated_footprints, area_filtered_footprints):
+        - filtered_footprints: GeoDataFrame with valid buildings in main cluster
+        - isolated_footprints: GeoDataFrame with isolated buildings (for visualization)
+        - area_filtered_footprints: GeoDataFrame with buildings filtered by area threshold (for visualization)
+    """
+    # Check if filtering should be applied
+    apply_filtering = False
+    if area is not None:
+        apply_filtering = is_informal_area(area)
+    
+    if not apply_filtering:
+        print(f"  Formal area or no area specified: skipping building filters")
+        # Return all buildings as "filtered", empty isolated and area_filtered
+        isolated = gpd.GeoDataFrame(geometry=[], crs=footprints.crs)
+        area_filtered = gpd.GeoDataFrame(geometry=[], crs=footprints.crs)
+        return footprints, isolated, area_filtered
+    
+    print(f"  Applying building filters (informal area)...")
+    initial_count = len(footprints)
+    
+    # Calculate area if not already present
+    if 'area' not in footprints.columns:
+        footprints = footprints.copy()
+        footprints['area'] = footprints.geometry.area
+    
+    # Filter by area first - track what was filtered
+    area_filtered = gpd.GeoDataFrame(geometry=[], crs=footprints.crs)
+    if MAX_FILTER_AREA is not None:
+        area_mask = footprints['area'] <= MAX_FILTER_AREA
+        filtered_by_area = (~area_mask).sum()
+        area_filtered = footprints[~area_mask].copy()  # Buildings filtered by area
+        footprints = footprints[area_mask].copy()  # Keep only buildings that passed area filter
+        if filtered_by_area > 0:
+            print(f"    Filtered out {filtered_by_area} buildings with area > {MAX_FILTER_AREA}m²")
+    
+    # Apply cluster filtering to identify main blob
+    if len(footprints) == 0:
+        isolated = gpd.GeoDataFrame(geometry=[], crs=footprints.crs if len(footprints) > 0 else area_filtered.crs)
+        return footprints, isolated, area_filtered
+    
+    print(f"  Applying cluster filtering (buffer: {BUILDING_CLUSTER_BUFFER}m)...")
+    cluster_filtered, isolated = filter_isolated_buildings(footprints)
+    
+    final_count = len(cluster_filtered)
+    isolated_count = len(isolated)
+    
+    if initial_count != final_count:
+        total_removed = initial_count - final_count
+        print(f"  Total filtered: {initial_count} → {final_count} ({100*total_removed/initial_count:.1f}% removed)")
+        if isolated_count > 0:
+            print(f"    - Isolated buildings removed: {isolated_count}")
+    
+    return cluster_filtered, isolated, area_filtered
+
+
+def filter_isolated_buildings(
+    footprints: gpd.GeoDataFrame
+) -> tuple:
+    """
+    Filter out isolated buildings using connected components analysis.
+    
+    Buffers buildings and finds the largest connected component (main cluster).
+    Buildings not in the main cluster are considered isolated.
+    
+    Args:
+        footprints: GeoDataFrame with building footprints
+        
+    Returns:
+        Tuple of (main_cluster_footprints, isolated_footprints):
+        - main_cluster_footprints: Buildings in the main cluster
+        - isolated_footprints: Isolated buildings (for visualization)
+    """
+    if len(footprints) == 0:
+        isolated = gpd.GeoDataFrame(geometry=[], crs=footprints.crs)
+        return footprints, isolated
+    
+    print(f"    Identifying main building cluster...")
+    initial_count = len(footprints)
+    
+    # Buffer buildings to account for gaps between them
+    buffered = footprints.buffer(BUILDING_CLUSTER_BUFFER)
+    
+    # Create unified geometry from all buffers
+    unified = unary_union(buffered.values)
+    
+    # Handle MultiPolygon vs Polygon
+    if hasattr(unified, 'geoms'):
+        # MultiPolygon - multiple components
+        components = list(unified.geoms)
+    else:
+        # Single Polygon - one component
+        components = [unified]
+    
+    if len(components) == 0:
+        print(f"    Warning: No components found, keeping all buildings")
+        isolated = gpd.GeoDataFrame(geometry=[], crs=footprints.crs)
+        return footprints, isolated
+    
+    # Find the largest component (main cluster)
+    component_areas = [comp.area for comp in components]
+    main_component_idx = np.argmax(component_areas)
+    main_component = components[main_component_idx]
+    
+    main_area = component_areas[main_component_idx]
+    total_area = sum(component_areas)
+    main_pct = 100 * main_area / total_area if total_area > 0 else 0
+    
+    print(f"    Found {len(components)} component(s), main cluster: {main_pct:.1f}% of total area")
+    
+    # Identify which buildings are in the main component
+    # A building is in the main cluster if its buffered geometry intersects the main component
+    in_main_cluster = buffered.intersects(main_component)
+    
+    main_cluster_footprints = footprints[in_main_cluster].copy()
+    isolated_footprints = footprints[~in_main_cluster].copy()
+    
+    isolated_count = len(isolated_footprints)
+    if isolated_count > 0:
+        print(f"    Isolated buildings: {isolated_count} ({100*isolated_count/initial_count:.1f}%)")
+    
+    return main_cluster_footprints, isolated_footprints
+
+
 def load_building_footprints(
     footprints_path: Path, 
     terrain_bounds: tuple,
-    buffer_distance: float = 0.25
-) -> gpd.GeoDataFrame:
+    buffer_distance: float = 0.25,
+    area: str = None
+) -> tuple:
     """
     Load and prepare building footprints for masking.
     
     Automatically transforms footprints to match terrain/STL coordinate system
     by detecting coordinate system mismatch and applying translation if needed.
+    Applies filtering for informal areas before transformation.
     
     Args:
         footprints_path: Path to building footprints shapefile
         terrain_bounds: Terrain bounding box (x_min, x_max, y_min, y_max, z_min, z_max)
         buffer_distance: Outward buffer distance in meters to avoid façade-adjacent artifacts
+        area: Optional area name to determine if filtering should be applied
         
     Returns:
-        GeoDataFrame with buffered building footprints in terrain coordinate system
+        Tuple of (buffered_footprints, isolated_footprints, area_filtered_footprints):
+        - buffered_footprints: GeoDataFrame with filtered and buffered building footprints in terrain coordinate system
+        - isolated_footprints: GeoDataFrame with isolated buildings (for visualization, already transformed)
+        - area_filtered_footprints: GeoDataFrame with buildings filtered by area threshold (for visualization, already transformed)
     """
     print(f"Loading building footprints from {footprints_path}...")
     footprints = gpd.read_file(str(footprints_path))
@@ -88,39 +233,52 @@ def load_building_footprints(
     print(f"  Loaded {len(footprints)} building footprints")
     print(f"  Original CRS: {footprints.crs}")
     print(f"  Footprint bounds: {footprints.total_bounds}")
-
-    # Determine translation to align with STL's local coordinate system
-    # Assuming STL's origin is roughly at the center of its bounds
-    # And that the STL's coordinate system is a local Cartesian system
-    # We need to translate the building footprints to this local system
     
-    # Calculate translation vector based on the center of the terrain bounds
-    # This is a heuristic and might need adjustment based on actual STL origin
+    # Calculate transformation using ORIGINAL (unfiltered) footprints center
+    # This ensures consistent alignment with other datasets (e.g., streets)
     stl_center_x = (terrain_bounds[0] + terrain_bounds[1]) / 2
     stl_center_y = (terrain_bounds[2] + terrain_bounds[3]) / 2
     
-    footprints_center_x = (footprints.total_bounds[0] + footprints.total_bounds[2]) / 2
-    footprints_center_y = (footprints.total_bounds[1] + footprints.total_bounds[3]) / 2
+    # Use ORIGINAL footprints center (before filtering) for transformation
+    original_footprints_center_x = (footprints.total_bounds[0] + footprints.total_bounds[2]) / 2
+    original_footprints_center_y = (footprints.total_bounds[1] + footprints.total_bounds[3]) / 2
     
-    dx = stl_center_x - footprints_center_x
-    dy = stl_center_y - footprints_center_y
+    dx = stl_center_x - original_footprints_center_x
+    dy = stl_center_y - original_footprints_center_y
+    
+    # Apply filtering BEFORE transformation (filtering uses original CRS)
+    # Returns (filtered_footprints, isolated_footprints, area_filtered_footprints)
+    footprints, isolated_footprints, area_filtered_footprints = filter_buildings(footprints, area=area)
     
     print(f"  Detected coordinate system mismatch - transforming to local coordinates")
     print(f"  Applying translation: dx={dx:.1f}, dy={dy:.1f}")
     
-    # Apply translation
-    footprints.geometry = footprints.translate(xoff=dx, yoff=dy)
+    # Apply translation to filtered, isolated, and area-filtered footprints
+    footprints.geometry = footprints.geometry.translate(xoff=dx, yoff=dy)
+    if len(isolated_footprints) > 0:
+        isolated_footprints.geometry = isolated_footprints.geometry.translate(xoff=dx, yoff=dy)
+        # Ensure CRS matches for plotting
+        isolated_footprints.crs = footprints.crs
+    if len(area_filtered_footprints) > 0:
+        area_filtered_footprints.geometry = area_filtered_footprints.geometry.translate(xoff=dx, yoff=dy)
+        # Ensure CRS matches for plotting
+        area_filtered_footprints.crs = footprints.crs
     
     print(f"  Transformed footprint bounds: {footprints.total_bounds}")
     
-    # Apply buffer to avoid façade-adjacent artifacts
+    # Apply buffer to avoid façade-adjacent artifacts (only to main cluster)
     if buffer_distance > 0:
         print(f"  Applying {buffer_distance}m buffer...")
         # Ensure geometry column is active
         footprints = footprints.set_geometry(footprints.geometry.buffer(buffer_distance))
     
-    print(f"  Prepared {len(footprints)} buffered footprints")
-    return footprints
+    print(f"  Prepared {len(footprints)} buffered footprints (main cluster)")
+    if len(isolated_footprints) > 0:
+        print(f"  Isolated buildings: {len(isolated_footprints)} (for visualization only)")
+    if len(area_filtered_footprints) > 0:
+        print(f"  Area-filtered buildings: {len(area_filtered_footprints)} (for visualization only)")
+    
+    return footprints, isolated_footprints, area_filtered_footprints
 
 
 def compute_ground_mask(grid_x: np.ndarray, grid_y: np.ndarray, building_footprints: gpd.GeoDataFrame) -> np.ndarray:
@@ -185,7 +343,9 @@ def plot_ground_mask_debug(
     output_path: Path,
     building_buffer: float = None,
     building_buffer_geom = None,
-    original_ground_count: int = None
+    original_ground_count: int = None,
+    isolated_buildings: gpd.GeoDataFrame = None,
+    area_filtered_buildings: gpd.GeoDataFrame = None
 ):
     """
     Create a debug plot showing grid points, ground points, and building footprints.
@@ -207,36 +367,35 @@ def plot_ground_mask_debug(
     
     fig, ax = plt.subplots(figsize=(14, 12))
     
-    # Plot building buffer zone if provided (semi-transparent overlay)
+    # Plot area-filtered buildings in yellow (first, so they appear behind)
+    if area_filtered_buildings is not None and len(area_filtered_buildings) > 0:
+        area_filtered_buildings.plot(ax=ax, facecolor='yellow', edgecolor='orange', 
+                                     linewidth=1.5, alpha=0.5, 
+                                     label=f'Area-filtered buildings (area > {MAX_FILTER_AREA}m², n={len(area_filtered_buildings)})')
+    
+    # Plot isolated buildings (gray/transparent) - so they appear behind
+    if isolated_buildings is not None and len(isolated_buildings) > 0:
+        # Ensure CRS matches for plotting
+        if isolated_buildings.crs != building_footprints.crs:
+            isolated_buildings = isolated_buildings.to_crs(building_footprints.crs)
+        isolated_buildings.plot(ax=ax, facecolor='lightgray', edgecolor='gray', 
+                               linewidth=1, alpha=0.3, 
+                               label=f'Isolated buildings (n={len(isolated_buildings)})')
+    
+    # Plot building buffer zone if provided (semi-transparent overlay, very light)
     if building_buffer_geom is not None:
         buffer_gdf = gpd.GeoDataFrame(geometry=[building_buffer_geom], crs=building_footprints.crs)
-        buffer_gdf.plot(ax=ax, facecolor='yellow', edgecolor='orange', linewidth=1, 
-                       alpha=0.2, label=f'Buffer zone ({building_buffer}m)')
+        buffer_gdf.plot(ax=ax, facecolor='none', edgecolor='orange', linewidth=1, 
+                       alpha=0.3, linestyle='--', label=f'Proximity buffer ({building_buffer}m)')
     
-    # Calculate building areas and identify filtered buildings
+    # Plot building footprints (red) - these are already filtered, so all shown are valid
+    # Calculate area for statistics
     building_footprints = building_footprints.copy()
     building_footprints['area'] = building_footprints.geometry.area
     
-    # Identify buildings that would be filtered
-    filtered_buildings = building_footprints.copy()
-    if MAX_FILTER_AREA is not None:
-        filtered_mask = filtered_buildings['area'] > MAX_FILTER_AREA
-        filtered_buildings = filtered_buildings[filtered_mask]
-        valid_buildings = building_footprints[~filtered_mask]
-    else:
-        valid_buildings = building_footprints
-        filtered_buildings = gpd.GeoDataFrame(geometry=[], crs=building_footprints.crs)
-    
-    # Plot filtered buildings (orange/purple) - buildings that would be excluded
-    if len(filtered_buildings) > 0:
-        filtered_buildings.plot(ax=ax, facecolor='orange', edgecolor='darkorange', 
-                              linewidth=2, alpha=0.6, 
-                              label=f'Filtered buildings (area > {MAX_FILTER_AREA}m², n={len(filtered_buildings)})')
-    
-    # Plot valid buildings (red) - buildings that would be kept
-    valid_buildings.plot(ax=ax, facecolor='red', edgecolor='darkred', 
-                        linewidth=1.5, alpha=0.4, 
-                        label=f'Valid buildings (area ≤ {MAX_FILTER_AREA}m², n={len(valid_buildings)})')
+    building_footprints.plot(ax=ax, facecolor='red', edgecolor='darkred', 
+                            linewidth=1.5, alpha=0.4, 
+                            label=f'Main cluster buildings (n={len(building_footprints)})')
     
     # Plot all filtered grid points (light grey - these are the ones we're considering)
     ax.scatter(grid_x, grid_y, c='lightgrey', s=1, alpha=0.4, label='All filtered grid points')
@@ -255,10 +414,13 @@ def plot_ground_mask_debug(
         stats_text.append(f"Points reduced by {reduction:.1f}%")
     if len(ground_mask) == len(grid_x):
         stats_text.append(f"SVF points: {np.sum(ground_mask):,}")
-    if MAX_FILTER_AREA is not None and len(filtered_buildings) > 0:
-        filter_pct = 100 * len(filtered_buildings) / len(building_footprints)
-        stats_text.append(f"Filtered buildings: {len(filtered_buildings):,} ({filter_pct:.1f}%)")
-        stats_text.append(f"Max filtered area: {filtered_buildings['area'].max():.1f} m²")
+    stats_text.append(f"Main cluster: {len(building_footprints):,} buildings")
+    if area_filtered_buildings is not None and len(area_filtered_buildings) > 0:
+        stats_text.append(f"Area-filtered: {len(area_filtered_buildings):,} buildings")
+    if isolated_buildings is not None and len(isolated_buildings) > 0:
+        stats_text.append(f"Isolated: {len(isolated_buildings):,} buildings")
+    if 'area' in building_footprints.columns and len(building_footprints) > 0:
+        stats_text.append(f"Max building area: {building_footprints['area'].max():.1f} m²")
     
     if stats_text:
         stats_str = "\n".join(stats_text)
@@ -274,7 +436,8 @@ def plot_ground_mask_debug(
         title += f'\n(Proximity filter: {building_buffer}m buffer)'
     if MAX_FILTER_AREA is not None:
         title += f'\n(Area filter: >{MAX_FILTER_AREA}m² excluded)'
-    title += '\nGreen = SVF points, Red = Valid buildings, Orange = Filtered buildings'
+    title += f'\n(Cluster filter: {BUILDING_CLUSTER_BUFFER}m buffer)'
+    title += '\nGreen = SVF points, Red = Main cluster, Yellow = Area-filtered, Gray = Isolated'
     
     ax.set_title(title, fontsize=14, fontweight='bold')
     ax.set_aspect('equal')
@@ -294,7 +457,9 @@ def generate_ground_points(
     ground_mask: np.ndarray = None,
     building_footprints: gpd.GeoDataFrame = None,
     output_dir: Path = None,
-    building_buffer: float = None
+    building_buffer: float = None,
+    isolated_buildings: gpd.GeoDataFrame = None,
+    area_filtered_buildings: gpd.GeoDataFrame = None
 ) -> tuple:
     """
     Generate a regular 2D grid over the terrain bounding box.
@@ -437,8 +602,10 @@ def generate_ground_points(
             grid_x_flat, grid_y_flat, ground_mask, building_footprints, debug_plot_path,
             building_buffer=building_buffer,
             building_buffer_geom=building_buffer_geom,
-            original_ground_count=original_ground_count
+            original_ground_count=original_ground_count,
+            isolated_buildings=isolated_buildings,
+            area_filtered_buildings=area_filtered_buildings
         )
     
-    return projected_points, x_coords, y_coords, ground_mask
+    return projected_points, x_coords, y_coords, ground_mask, building_buffer_geom
 
