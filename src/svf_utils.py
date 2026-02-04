@@ -202,6 +202,9 @@ def plot_ground_mask_debug(
     """
     print(f"Creating debug plot: {output_path}")
     
+    # Import config to check filtering thresholds
+    from src.config import MAX_FILTER_AREA, MAX_FILTER_HEIGHT
+    
     fig, ax = plt.subplots(figsize=(14, 12))
     
     # Plot building buffer zone if provided (semi-transparent overlay)
@@ -210,9 +213,30 @@ def plot_ground_mask_debug(
         buffer_gdf.plot(ax=ax, facecolor='yellow', edgecolor='orange', linewidth=1, 
                        alpha=0.2, label=f'Buffer zone ({building_buffer}m)')
     
-    # Plot building footprints (red outlines)
-    building_footprints.plot(ax=ax, facecolor='red', edgecolor='darkred', 
-                            linewidth=1.5, alpha=0.4, label='Building footprints')
+    # Calculate building areas and identify filtered buildings
+    building_footprints = building_footprints.copy()
+    building_footprints['area'] = building_footprints.geometry.area
+    
+    # Identify buildings that would be filtered
+    filtered_buildings = building_footprints.copy()
+    if MAX_FILTER_AREA is not None:
+        filtered_mask = filtered_buildings['area'] > MAX_FILTER_AREA
+        filtered_buildings = filtered_buildings[filtered_mask]
+        valid_buildings = building_footprints[~filtered_mask]
+    else:
+        valid_buildings = building_footprints
+        filtered_buildings = gpd.GeoDataFrame(geometry=[], crs=building_footprints.crs)
+    
+    # Plot filtered buildings (orange/purple) - buildings that would be excluded
+    if len(filtered_buildings) > 0:
+        filtered_buildings.plot(ax=ax, facecolor='orange', edgecolor='darkorange', 
+                              linewidth=2, alpha=0.6, 
+                              label=f'Filtered buildings (area > {MAX_FILTER_AREA}m², n={len(filtered_buildings)})')
+    
+    # Plot valid buildings (red) - buildings that would be kept
+    valid_buildings.plot(ax=ax, facecolor='red', edgecolor='darkred', 
+                        linewidth=1.5, alpha=0.4, 
+                        label=f'Valid buildings (area ≤ {MAX_FILTER_AREA}m², n={len(valid_buildings)})')
     
     # Plot all filtered grid points (light grey - these are the ones we're considering)
     ax.scatter(grid_x, grid_y, c='lightgrey', s=1, alpha=0.4, label='All filtered grid points')
@@ -231,6 +255,10 @@ def plot_ground_mask_debug(
         stats_text.append(f"Points reduced by {reduction:.1f}%")
     if len(ground_mask) == len(grid_x):
         stats_text.append(f"SVF points: {np.sum(ground_mask):,}")
+    if MAX_FILTER_AREA is not None and len(filtered_buildings) > 0:
+        filter_pct = 100 * len(filtered_buildings) / len(building_footprints)
+        stats_text.append(f"Filtered buildings: {len(filtered_buildings):,} ({filter_pct:.1f}%)")
+        stats_text.append(f"Max filtered area: {filtered_buildings['area'].max():.1f} m²")
     
     if stats_text:
         stats_str = "\n".join(stats_text)
@@ -244,7 +272,9 @@ def plot_ground_mask_debug(
     title = 'Ground Mask Debug Plot'
     if building_buffer is not None:
         title += f'\n(Proximity filter: {building_buffer}m buffer)'
-    title += '\nGreen = SVF computed, Red = Buildings, Yellow = Buffer zone'
+    if MAX_FILTER_AREA is not None:
+        title += f'\n(Area filter: >{MAX_FILTER_AREA}m² excluded)'
+    title += '\nGreen = SVF points, Red = Valid buildings, Orange = Filtered buildings'
     
     ax.set_title(title, fontsize=14, fontweight='bold')
     ax.set_aspect('equal')

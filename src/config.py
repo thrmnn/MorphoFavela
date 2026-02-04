@@ -83,7 +83,7 @@ MAX_BUILDING_HEIGHT = 100.0  # m (sanity check for validation)
 # Filtering parameters (applied only to informal areas, not formal areas)
 # See is_formal_area() to determine if filtering should be skipped
 MAX_FILTER_HEIGHT = 20.0  # m (maximum height for filtering buildings)
-MAX_FILTER_AREA = 500.0  # m² (maximum area for filtering buildings)
+MAX_FILTER_AREA = 200.0  # m² (maximum area for filtering buildings)
 MAX_FILTER_VOLUME = 3000.0  # m³ (maximum volume for filtering buildings)
 MAX_FILTER_HW_RATIO = 100.0  # Maximum h/w ratio for filtering buildings
 
