@@ -11,12 +11,12 @@ RAW_DATA = DATA_DIR / "raw"  # Legacy path (for backward compatibility)
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 # Area-based data organization
-# Areas: vidigal (informal), copacabana (formal)
-SUPPORTED_AREAS = ["vidigal", "copacabana"]
+# Areas: vidigal (informal), copacabana (formal), riodaspedras (informal)
+SUPPORTED_AREAS = ["vidigal", "copacabana", "riodaspedras"]
 
 # Area classification: formal vs informal
 FORMAL_AREAS = ["copacabana"]  # Formal settlements (no filtering)
-INFORMAL_AREAS = ["vidigal"]   # Informal settlements (with filtering)
+INFORMAL_AREAS = ["vidigal", "riodaspedras"]   # Informal settlements (with filtering)
 
 def is_formal_area(area: str) -> bool:
     """Check if an area is classified as formal (no filtering applied)."""
