@@ -73,6 +73,11 @@ This should be done at the start of every new session before running any scripts
    python scripts/calculate_morphology_metrics.py --area vidigal
    ```
    
+   **Morphology risk mapping (spatial risk hotspots):**
+   ```bash
+   python scripts/analyze_morphology_risk.py --area vidigal
+   ```
+   
    **Sky View Factor (SVF) computation:**
    ```bash
    python scripts/compute_svf.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --sky-patches 145
