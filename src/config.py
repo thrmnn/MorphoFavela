@@ -66,6 +66,7 @@ def get_comparative_analysis_dir() -> Path:
 # Standard analysis type subdirectories
 ANALYSIS_TYPES = {
     "metrics": "metrics",           # Basic morphometric metrics
+    "morphology_metrics": "morphology_metrics",  # Extended morphology metrics
     "svf": "svf",                   # Sky View Factor
     "solar": "solar",               # Solar access
     "sky_exposure": "sky_exposure", # Sky exposure plane exceedance

@@ -5,7 +5,7 @@ A Python pipeline for calculating morphometric metrics from building footprints 
 ## Features
 
 - **Multi-area analysis**: Support for comparing multiple study areas (formal vs informal settlements)
-- **Comprehensive metrics**: Building morphometry, environmental performance (SVF, solar access, porosity), and deprivation indices
+- **Comprehensive metrics**: Building morphometry, extended morphology indicators, environmental performance (SVF, solar access, porosity), and deprivation indices
 - **Area-based filtering**: Automatic filtering policy (applied to informal, skipped for formal areas)
 - **Comparative analysis**: Automated comparison framework with statistical tests and PDF reports
 - **Rich visualizations**: Thematic maps, statistical distributions, side-by-side comparisons
@@ -66,6 +66,11 @@ This should be done at the start of every new session before running any scripts
    **Basic morphometric analysis:**
    ```bash
    python scripts/calculate_metrics.py
+   ```
+   
+   **Extended morphology metrics (25 indicators):**
+   ```bash
+   python scripts/calculate_morphology_metrics.py --area vidigal
    ```
    
    **Sky View Factor (SVF) computation:**

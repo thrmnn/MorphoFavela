@@ -5,6 +5,7 @@ import geopandas as gpd
 import numpy as np
 from pathlib import Path
 import logging
+import math
 
 from src.config import DPI, FIGURE_SIZE, COLORMAP_HEIGHT, COLORMAP_VOLUME
 
@@ -218,6 +219,56 @@ def create_statistical_distributions(gdf: gpd.GeoDataFrame, output_path: Path) -
     plt.close()
     
     logger.info(f"Saved statistical distributions to {output_path}")
+
+
+def create_metric_map(
+    gdf: gpd.GeoDataFrame,
+    column: str,
+    output_path: Path,
+    cmap: str = "viridis",
+    title: str | None = None,
+) -> None:
+    """Create a single thematic map for a metric column."""
+    if column not in gdf.columns:
+        raise ValueError(f"GeoDataFrame must have '{column}' column")
+    fig, ax = plt.subplots(1, 1, figsize=FIGURE_SIZE)
+    gdf.plot(column=column, ax=ax, cmap=cmap, legend=True, legend_kwds={"label": column})
+    ax.set_title(title or column)
+    ax.set_axis_off()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
+    plt.close()
+    logger.info(f"Saved {column} map to {output_path}")
+
+
+def create_metric_distributions(
+    gdf: gpd.GeoDataFrame,
+    metrics: list[str],
+    output_path: Path,
+) -> None:
+    """Create histogram grid for a list of metrics."""
+    available = [m for m in metrics if m in gdf.columns]
+    if not available:
+        raise ValueError("No metric columns available for distribution plot")
+    n = len(available)
+    ncols = 3
+    nrows = int(math.ceil(n / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 4 * nrows))
+    axes = np.atleast_1d(axes).flatten()
+    for idx, metric in enumerate(available):
+        ax = axes[idx]
+        data = gdf[metric].replace([np.inf, -np.inf], np.nan).dropna()
+        ax.hist(data, bins=30, color="steelblue", alpha=0.8)
+        ax.set_title(metric)
+        ax.set_xlabel(metric)
+        ax.set_ylabel("Count")
+    for ax in axes[len(available):]:
+        ax.axis("off")
+    plt.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
+    plt.close()
+    logger.info(f"Saved metric distributions to {output_path}")
 
 
 def create_scatter_plots(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
