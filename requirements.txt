@@ -9,4 +9,6 @@ pyvista>=0.32.0
 pvlib>=0.10.0
 rasterio>=1.3.0
 scipy>=1.8.0
+libpysal>=4.8.0
+esda>=2.5.0
 

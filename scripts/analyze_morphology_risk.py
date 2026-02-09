@@ -134,12 +134,41 @@ def _plot_bivariate(
     logger.info(f"Saved bivariate map: {output_path}")
 
 
+def _compute_hotspots(grid: gpd.GeoDataFrame, value_col: str) -> gpd.GeoDataFrame:
+    try:
+        from libpysal.weights import Queen
+        from esda.getisord import G_Local
+    except Exception as exc:
+        raise ImportError("Hotspot analysis requires libpysal and esda") from exc
+
+    grid = grid.copy()
+    valid = grid[value_col].notna()
+    if valid.sum() == 0:
+        grid["hotspot_gi"] = np.nan
+        grid["hotspot_p"] = np.nan
+        grid["hotspot_class"] = np.nan
+        return grid
+
+    weights = Queen.from_dataframe(grid[valid], use_index=True)
+    weights.transform = "r"
+    gi = G_Local(grid.loc[valid, value_col].values, weights)
+    grid.loc[valid, "hotspot_gi"] = gi.Zs
+    grid.loc[valid, "hotspot_p"] = gi.p_sim
+
+    # Classification: 1 = hotspot, -1 = coldspot, 0 = not significant
+    grid["hotspot_class"] = 0
+    grid.loc[valid & (grid["hotspot_p"] <= 0.05) & (grid["hotspot_gi"] > 0), "hotspot_class"] = 1
+    grid.loc[valid & (grid["hotspot_p"] <= 0.05) & (grid["hotspot_gi"] < 0), "hotspot_class"] = -1
+    return grid
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Morphology risk visualization")
     parser.add_argument("--area", type=str, required=True, help="Area name (vidigal, riodaspedras)")
     parser.add_argument("--input", type=str, default=None, help="Input morphology GPKG path")
     parser.add_argument("--output", type=str, default=None, help="Output directory")
     parser.add_argument("--grid-size", type=float, default=50.0, help="Grid aggregation size (m)")
+    parser.add_argument("--hotspots", action="store_true", help="Compute hotspot clusters (Gi*)")
     args = parser.parse_args()
 
     if args.input:
@@ -191,6 +220,27 @@ def main() -> None:
             maps_dir / "bivariate_adjacency_shared_walls.png",
             "Bivariate: Adjacency vs Shared Walls",
         )
+
+    # Hotspot clusters (Gi*)
+    if args.hotspots:
+        logger.info("Computing hotspot clusters (Gi*) on grid risk_mean...")
+        try:
+            grid_hot = _compute_hotspots(grid, "risk_mean")
+            grid_hot.to_file(output_base / "risk_hotspots.gpkg", driver="GPKG")
+            _plot_map(
+                grid_hot,
+                "hotspot_gi",
+                maps_dir / "risk_hotspot_gi_zscore.png",
+                "Risk Hotspots (Gi* Z-score)"
+            )
+            _plot_map(
+                grid_hot,
+                "hotspot_class",
+                maps_dir / "risk_hotspot_class.png",
+                "Risk Hotspots (1=hotspot, -1=coldspot)"
+            )
+        except ImportError as exc:
+            logger.warning(str(exc))
 
     logger.info("Risk visualization complete")
 

@@ -75,7 +75,7 @@ This should be done at the start of every new session before running any scripts
    
    **Morphology risk mapping (spatial risk hotspots):**
    ```bash
-   python scripts/analyze_morphology_risk.py --area vidigal
+   python scripts/analyze_morphology_risk.py --area vidigal --hotspots
    ```
    
    **Sky View Factor (SVF) computation:**
