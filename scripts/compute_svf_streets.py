@@ -581,12 +581,23 @@ def create_statistics_plots(
     
     # Distribution histogram
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.hist(points_gdf['svf'], bins=50, edgecolor='black', alpha=0.7, color='steelblue')
+    
+    # Calculate histogram - use weights to get proportions as percentages
+    svf_values = points_gdf['svf'].values
+    total_points = len(svf_values)
+    
+    # Create histogram with percentage on y-axis
+    counts, bins, patches = ax.hist(svf_values, bins=50, edgecolor='black', alpha=0.7, color='steelblue', 
+                                    weights=np.ones_like(svf_values) * (100.0 / total_points))
+    
     ax.set_xlabel('SVF Value', fontsize=12)
-    ax.set_ylabel('Frequency', fontsize=12)
+    ax.set_ylabel('Proportion of street network (%)', fontsize=12)
     ax.set_title('Distribution of Street-Level SVF Values', fontsize=14, fontweight='bold')
     ax.set_xlim(0, 1)
     ax.grid(True, alpha=0.3)
+    
+    # Add comfort SVF threshold at 0.3
+    ax.axvline(0.3, color='orange', linestyle=':', linewidth=2, label='Comfort threshold (SVF = 0.3)')
     
     # Add statistics
     mean_svf = points_gdf['svf'].mean()
