@@ -768,7 +768,18 @@ def main():
             # Create buffer geometry for street filtering
             if building_footprints is not None and len(building_footprints) > 0 and args.building_buffer > 0:
                 from shapely.ops import unary_union
-                building_union = unary_union(building_footprints.geometry.values)
+                # Repair invalid polygons before union (common with large city-wide datasets).
+                geom_series = building_footprints.geometry.copy()
+                invalid_mask = ~geom_series.is_valid
+                if invalid_mask.any():
+                    n_invalid = int(invalid_mask.sum())
+                    logger.warning(f"  Found {n_invalid} invalid building geometries; attempting repair with buffer(0)")
+                    geom_series.loc[invalid_mask] = geom_series.loc[invalid_mask].buffer(0)
+                    geom_series = geom_series[~geom_series.is_empty]
+                    geom_series = geom_series[geom_series.is_valid]
+                    logger.info(f"  Using {len(geom_series)} valid geometries after repair")
+
+                building_union = unary_union(geom_series.values)
                 building_buffer_geom = building_union.buffer(args.building_buffer)
                 logger.info(f"  Created building buffer zone ({args.building_buffer}m) for street filtering")
     
