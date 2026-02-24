@@ -79,8 +79,8 @@ def main():
     parser.add_argument('--area', type=str, default=None, help='Area name (e.g., riodaspedras) for automatic path resolution')
     parser.add_argument('--building-buffer', type=float, default=30.0, help='Buffer distance from buildings to filter streets (meters, default: 30.0)')
     parser.add_argument('--use-gpu', action='store_true', help='Use GPU acceleration (requires CUDA-capable GPU)')
-    parser.add_argument('--gpu-batch-size', type=int, default=100, help='Batch size for GPU processing (default: 100)')
-    parser.add_argument('--gpu-samples-per-ray', type=int, default=50, help='Number of samples per ray for GPU computation (default: 50)')
+    parser.add_argument('--gpu-batch-size', type=int, default=200, help='Batch size for GPU processing (default: 200, optimized for speed)')
+    parser.add_argument('--gpu-samples-per-ray', type=int, default=20, help='Number of samples per ray for GPU computation (default: 20, optimized for speed vs accuracy)')
     parser.add_argument('--force-cpu', action='store_true', help='Force CPU computation even if GPU is available')
     
     args = parser.parse_args()
