@@ -201,13 +201,13 @@ def _compute_batch_svf(
 def _check_points_visible(
     points: torch.Tensor,
     mesh: Meshes,
-    threshold: float = 0.1
+    threshold: float = 0.5
 ) -> torch.Tensor:
     """
     Check if points are visible (not inside/on mesh surface).
     
-    OPTIMIZED VERSION: Uses spatial partitioning and early termination
-    for much faster computation on large meshes.
+    Uses PyTorch3D's point-to-mesh face distance for accurate computation.
+    This is more accurate than distance-to-vertices but slower.
     
     Args:
         points: Tensor of shape (N, 3) with points to check
@@ -217,60 +217,110 @@ def _check_points_visible(
     Returns:
         Boolean tensor of shape (N,) indicating visibility (True = visible)
     """
-    # Get mesh vertices
-    verts = mesh.verts_list()[0]  # (V, 3)
+    try:
+        from pytorch3d.loss import point_mesh_face_distance
+    except ImportError:
+        # Fallback to vertex distance if PyTorch3D function not available
+        logger.warning("point_mesh_face_distance not available, using vertex distance (less accurate)")
+        return _check_points_visible_vertex_approx(points, mesh, threshold)
     
-    # OPTIMIZATION 1: Use spatial partitioning with bounding box pre-filtering
-    # Compute mesh bounding box
+    # Get mesh vertices and faces
+    verts = mesh.verts_list()[0]  # (V, 3)
+    faces = mesh.faces_list()[0]  # (F, 3)
+    
+    # OPTIMIZATION: Use bounding box pre-filtering
     mesh_min = verts.min(dim=0)[0]  # (3,)
     mesh_max = verts.max(dim=0)[0]  # (3,)
     
     # Quick check: points far outside bounding box are definitely visible
-    # Expand bbox by threshold for safety
     expanded_min = mesh_min - threshold
     expanded_max = mesh_max + threshold
     
-    # Check which points are outside expanded bounding box
     outside_mask = (
         (points[:, 0] < expanded_min[0]) | (points[:, 0] > expanded_max[0]) |
         (points[:, 1] < expanded_min[1]) | (points[:, 1] > expanded_max[1]) |
         (points[:, 2] < expanded_min[2]) | (points[:, 2] > expanded_max[2])
     )
     
-    # Points outside bbox are definitely visible
     visible = outside_mask.clone()
     
     # Only check points inside/near bounding box
     points_to_check = points[~outside_mask]
     
     if len(points_to_check) > 0:
-        # OPTIMIZATION 2: For large meshes, use chunked distance computation
-        # to avoid OOM and improve cache efficiency
-        chunk_size = min(10000, len(verts))  # Process vertices in chunks
+        # Use PyTorch3D's point-to-mesh face distance
+        # This computes distance to mesh surface (triangles), not just vertices
+        # Process in chunks to avoid OOM
+        chunk_size = 5000
+        min_distances = torch.full(
+            (len(points_to_check),),
+            float('inf'),
+            device=points.device,
+            dtype=points.dtype
+        )
         
-        if len(verts) > chunk_size:
-            # Chunked computation for large meshes
-            min_distances = torch.full(
-                (len(points_to_check),), 
-                float('inf'), 
-                device=points.device, 
-                dtype=points.dtype
-            )
+        for i in range(0, len(points_to_check), chunk_size):
+            chunk_end = min(i + chunk_size, len(points_to_check))
+            points_chunk = points_to_check[i:chunk_end]
             
-            for i in range(0, len(verts), chunk_size):
-                verts_chunk = verts[i:i+chunk_size]
-                distances_chunk = torch.cdist(points_to_check, verts_chunk)  # (N, chunk_size)
-                min_distances_chunk = distances_chunk.min(dim=1)[0]  # (N,)
-                min_distances = torch.minimum(min_distances, min_distances_chunk)
-        else:
-            # Direct computation for smaller meshes
-            distances = torch.cdist(points_to_check, verts)  # (N, V)
-            min_distances = distances.min(dim=1)[0]  # (N,)
+            # Compute distance to mesh faces
+            # point_mesh_face_distance returns squared distances
+            distances_sq = point_mesh_face_distance(mesh, points_chunk.unsqueeze(0))
+            distances = torch.sqrt(distances_sq)  # Convert to actual distances
+            
+            min_distances[i:chunk_end] = distances.squeeze(0)
         
         # Points are visible if distance > threshold
         visible[~outside_mask] = min_distances > threshold
     else:
         # All points are outside bounding box - all visible
         pass
+    
+    return visible
+
+
+def _check_points_visible_vertex_approx(
+    points: torch.Tensor,
+    mesh: Meshes,
+    threshold: float = 0.5
+) -> torch.Tensor:
+    """
+    Fallback: Check visibility using distance to vertices (less accurate).
+    """
+    verts = mesh.verts_list()[0]
+    mesh_min = verts.min(dim=0)[0]
+    mesh_max = verts.max(dim=0)[0]
+    
+    expanded_min = mesh_min - threshold
+    expanded_max = mesh_max + threshold
+    
+    outside_mask = (
+        (points[:, 0] < expanded_min[0]) | (points[:, 0] > expanded_max[0]) |
+        (points[:, 1] < expanded_min[1]) | (points[:, 1] > expanded_max[1]) |
+        (points[:, 2] < expanded_min[2]) | (points[:, 2] > expanded_max[2])
+    )
+    
+    visible = outside_mask.clone()
+    points_to_check = points[~outside_mask]
+    
+    if len(points_to_check) > 0:
+        chunk_size = min(10000, len(verts))
+        if len(verts) > chunk_size:
+            min_distances = torch.full(
+                (len(points_to_check),),
+                float('inf'),
+                device=points.device,
+                dtype=points.dtype
+            )
+            for i in range(0, len(verts), chunk_size):
+                verts_chunk = verts[i:i+chunk_size]
+                distances_chunk = torch.cdist(points_to_check, verts_chunk)
+                min_distances_chunk = distances_chunk.min(dim=1)[0]
+                min_distances = torch.minimum(min_distances, min_distances_chunk)
+        else:
+            distances = torch.cdist(points_to_check, verts)
+            min_distances = distances.min(dim=1)[0]
+        
+        visible[~outside_mask] = min_distances > threshold
     
     return visible
