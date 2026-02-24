@@ -23,6 +23,7 @@ from src.config import (
     get_area_data_dir, get_area_analysis_dir, is_formal_area
 )
 from src.metrics import calculate_basic_metrics, validate_footprints, normalize_height_columns
+from src.morphology_metrics import calculate_morphology_metrics
 from src.visualize import (
     create_thematic_maps,
     create_multi_panel_summary,
@@ -49,6 +50,15 @@ def generate_summary_stats(gdf: gpd.GeoDataFrame) -> pd.DataFrame:
         DataFrame with summary statistics
     """
     metric_cols = ['height', 'area', 'volume', 'perimeter', 'hw_ratio', 'inter_building_distance']
+    extra_cols = [
+        "longest_axis_length", "shape_index", "compactness_weighted_axis", "convexity",
+        "shared_walls", "perimeter_wall", "num_corners", "equivalent_rectangular_index",
+        "rectangularity", "squareness", "square_compactness", "elongation", "cwt",
+        "mean_distance_between_buildings", "building_adjacency", "covered_area_ratio",
+        "tessellation_area", "cell_alignment", "tessellation_neighbors",
+        "fractal_dimension", "average_weighted_distance", "facade_ratio",
+    ]
+    metric_cols.extend([c for c in extra_cols if c in gdf.columns])
     available_cols = [col for col in metric_cols if col in gdf.columns]
     
     stats = gdf[available_cols].describe()
@@ -62,30 +72,34 @@ def main():
     parser.add_argument('--area', type=str, default=None, help='Area name (vidigal, copacabana)')
     parser.add_argument('--input', type=str, default=None, help='Input footprints file path')
     parser.add_argument('--output', type=str, default=None, help='Output directory')
+    parser.add_argument('--include-morphology', action='store_true', help='Compute extended morphology metrics')
+    parser.add_argument('--streets', type=str, default=None, help='Optional streets file path for facade ratio')
+    parser.add_argument('--street-buffer', type=float, default=1.0, help='Street buffer distance (m)')
+    parser.add_argument('--voronoi-buffer', type=float, default=50.0, help='Voronoi envelope buffer distance (m)')
+    parser.add_argument('--weight-mode', type=str, default="adjacent", help='Weighting mode for d_w (adjacent)')
     args = parser.parse_args()
     
     logger.info("Starting morphometric analysis")
     
     # 1. Load data
+    def _find_buildings_file(area_dir: Path) -> Path | None:
+        candidates = []
+        for pattern in ["*.shp", "*.gpkg", "*.geojson"]:
+            candidates.extend(list(area_dir.glob(pattern)))
+        building_candidates = [c for c in candidates if "building" in c.name.lower()]
+        if building_candidates:
+            return building_candidates[0]
+        return candidates[0] if candidates else None
+
     if args.input:
         input_path = Path(args.input)
     elif args.area:
         # Use area-based data directory
         area_data_dir = get_area_data_dir(args.area)
-        input_path = None
-        for pattern in ["*.shp", "*.gpkg", "*.geojson"]:
-            matches = list(area_data_dir.glob(pattern))
-            if matches:
-                input_path = matches[0]
-                break
+        input_path = _find_buildings_file(area_data_dir)
     else:
         # Fallback to legacy RAW_DATA
-        input_path = None
-        for pattern in ["footprints.gpkg", "footprints.geojson", "footprints.shp", "*.gpkg", "*.geojson", "*.shp"]:
-            matches = list(RAW_DATA.glob(pattern))
-            if matches:
-                input_path = matches[0]
-                break
+        input_path = _find_buildings_file(RAW_DATA)
     
     if input_path is None or not input_path.exists():
         raise FileNotFoundError(
@@ -206,7 +220,27 @@ def main():
             logger.info(f"Filtered out {removed} buildings with extreme height/area ratios")
             logger.info(f"Processing {filtered_count} buildings after height/area filter")
     
-    # 4. Generate statistics
+    # 4.5 Extended morphology metrics (optional)
+    if args.include_morphology:
+        streets = None
+        if args.streets:
+            streets_path = Path(args.streets)
+            if streets_path.exists():
+                streets = gpd.read_file(streets_path)
+                logger.info(f"Loaded streets from {streets_path} ({len(streets)} features)")
+            else:
+                logger.warning(f"Streets file not found: {streets_path}")
+
+        logger.info("Calculating extended morphology metrics...")
+        buildings = calculate_morphology_metrics(
+            buildings,
+            streets=streets,
+            street_buffer=args.street_buffer,
+            voronoi_buffer=args.voronoi_buffer,
+            weight_mode=args.weight_mode,
+        )
+
+    # 5. Generate statistics
     logger.info("Generating summary statistics...")
     stats = generate_summary_stats(buildings)
     

@@ -581,12 +581,23 @@ def create_statistics_plots(
     
     # Distribution histogram
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.hist(points_gdf['svf'], bins=50, edgecolor='black', alpha=0.7, color='steelblue')
+    
+    # Calculate histogram - use weights to get proportions as percentages
+    svf_values = points_gdf['svf'].values
+    total_points = len(svf_values)
+    
+    # Create histogram with percentage on y-axis
+    counts, bins, patches = ax.hist(svf_values, bins=50, edgecolor='black', alpha=0.7, color='steelblue', 
+                                    weights=np.ones_like(svf_values) * (100.0 / total_points))
+    
     ax.set_xlabel('SVF Value', fontsize=12)
-    ax.set_ylabel('Frequency', fontsize=12)
+    ax.set_ylabel('Proportion of street network (%)', fontsize=12)
     ax.set_title('Distribution of Street-Level SVF Values', fontsize=14, fontweight='bold')
     ax.set_xlim(0, 1)
     ax.grid(True, alpha=0.3)
+    
+    # Add comfort SVF threshold at 0.3
+    ax.axvline(0.3, color='orange', linestyle=':', linewidth=2, label='Comfort threshold (SVF = 0.3)')
     
     # Add statistics
     mean_svf = points_gdf['svf'].mean()
@@ -757,7 +768,18 @@ def main():
             # Create buffer geometry for street filtering
             if building_footprints is not None and len(building_footprints) > 0 and args.building_buffer > 0:
                 from shapely.ops import unary_union
-                building_union = unary_union(building_footprints.geometry.values)
+                # Repair invalid polygons before union (common with large city-wide datasets).
+                geom_series = building_footprints.geometry.copy()
+                invalid_mask = ~geom_series.is_valid
+                if invalid_mask.any():
+                    n_invalid = int(invalid_mask.sum())
+                    logger.warning(f"  Found {n_invalid} invalid building geometries; attempting repair with buffer(0)")
+                    geom_series.loc[invalid_mask] = geom_series.loc[invalid_mask].buffer(0)
+                    geom_series = geom_series[~geom_series.is_empty]
+                    geom_series = geom_series[geom_series.is_valid]
+                    logger.info(f"  Using {len(geom_series)} valid geometries after repair")
+
+                building_union = unary_union(geom_series.values)
                 building_buffer_geom = building_union.buffer(args.building_buffer)
                 logger.info(f"  Created building buffer zone ({args.building_buffer}m) for street filtering")
     

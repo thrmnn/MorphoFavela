@@ -11,6 +11,30 @@ Python pipeline for calculating morphometric metrics from building footprints wi
 - **hw_ratio**: Street canyon ratio (height/width)
 - **inter_building_distance**: Distance to nearest neighbor building (m)
 
+## Extended Morphology Metrics
+- **longest_axis_length**: Max of major/minor axes
+- **shape_index**: Perimeter / sqrt(area)
+- **compactness_weighted_axis**: (L_major/L_minor) × (4πA/P²)
+- **convexity**: Area / convex hull area
+- **shared_walls**: Sum of shared boundary lengths
+- **perimeter_wall**: External perimeter (perimeter - shared_walls)
+- **num_corners**: Polygon vertex count
+- **equivalent_rectangular_index**: Area / minimum bounding rectangle area
+- **rectangularity**: Area / (L_major × L_minor)
+- **squareness**: Mean deviation from 90° angles (normalized)
+- **square_compactness**: Area / (max axis length)²
+- **elongation**: L_major / L_minor
+- **cwt**: Compactness-weighted tessellation axis
+- **mean_distance_between_buildings**: Mean centroid distance (all pairs)
+- **building_adjacency**: Count of intersecting neighbors
+- **covered_area_ratio**: Sum of building areas / site area
+- **tessellation_area**: Voronoi cell area
+- **cell_alignment**: Orientation consistency of Voronoi cells
+- **tessellation_neighbors**: Voronoi neighbor count
+- **fractal_dimension**: 2 ln(P) / ln(A)
+- **average_weighted_distance**: Weighted neighbor distance
+- **facade_ratio**: Street-adjacent facade length / perimeter (optional)
+
 ## Data Input
 - Formats: `.gpkg`, `.geojson`, `.shp`
 - Columns: `base_height`/`top_height` OR `base`/`altura` (auto-normalized)
