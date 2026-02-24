@@ -1,230 +1,139 @@
-# Most Urgent Next Steps
+# Next Steps: GPU SVF Acceleration Testing
 
-## 🚨 IMMEDIATE (Do First)
+## ✅ Current Status
 
-### 1. Commit and Push Changes ⚡
-**Status**: Ready now  
-**Time**: 5 minutes  
-**Priority**: CRITICAL
+**Dependencies Installed:**
+- ✓ PyTorch 2.5.1+cu121 (CUDA 12.1)
+- ✓ PyTorch3D 0.7.9
+- ✓ GPU: NVIDIA GeForce RTX 4060 Laptop GPU (8.6 GB)
+- ✓ CUDA available and working
 
+**Implementation:**
+- ✓ GPU computation module complete
+- ✓ GPU-enabled script ready
+- ✓ Comparison tools ready
+- ✓ Test script prepared
+
+## 🎯 Next Steps
+
+### Step 1: Run GPU-Accelerated SVF Computation for riodaspedras
+
+**Option A: Use the automated test script**
 ```bash
-# Stage all changes
-git add .
-
-# Commit with descriptive message
-git commit -m "Unified sky exposure analysis: building + street-level with Rio/São Paulo rulesets
-
-- Unified analyze_sky_exposure_streets.py replaces legacy script
-- Building-level exceedance: percentage per building
-- Street-level exceedance: point sampling with pedestrian perspective
-- Rio and São Paulo building code rulesets implemented
-- Section views for high/mean/low exceedance points
-- Updated all documentation
-- Marked legacy script as deprecated"
-
-# Push to remote
-git push
+cd /home/theo/IVF
+source /home/theo/miniconda3/etc/profile.d/conda.sh
+conda activate IVF
+./scripts/test_gpu_svf_riodaspedras.sh
 ```
 
-**Why urgent**: Ensures all recent work is safely version-controlled and backed up.
-
----
-
-### 2. End-to-End Testing Verification ⚡
-**Status**: Should verify before declaring complete  
-**Time**: 30-60 minutes  
-**Priority**: HIGH
-
-Verify the complete pipeline works for both areas:
-
+**Option B: Run manually**
 ```bash
-# Test Vidigal (informal - with filtering)
-python scripts/run_area_analyses.py --area vidigal
+cd /home/theo/IVF
+source /home/theo/miniconda3/etc/profile.d/conda.sh
+conda activate IVF
 
-# Test Copacabana (formal - no filtering)
-python scripts/run_area_analyses.py --area copacabana
-
-# Test unified sky exposure script
-python scripts/analyze_sky_exposure_streets.py \
-    --stl data/vidigal/raw/full_scan.stl \
-    --roads data/vidigal/raw/roads_vidigal.shp \
-    --footprints data/vidigal/raw/vidigal_buildings.shp \
-    --ruleset rio \
-    --area vidigal \
-    --spacing 5.0
+python scripts/compute_svf_streets_gpu.py \
+    --stl data/riodaspedras/raw/full_scan.stl \
+    --roads data/riodaspedras/raw/roads_riodaspedras.shp \
+    --footprints data/riodaspedras/raw/riodaspedras_buildings.shp \
+    --area riodaspedras \
+    --use-gpu \
+    --spacing 3.0 \
+    --height 1.5 \
+    --sky-patches 145 \
+    --gpu-batch-size 100 \
+    --gpu-samples-per-ray 50
 ```
 
-**What to check**:
-- ✅ All scripts complete without errors
-- ✅ Output files are generated correctly
-- ✅ Visualizations look correct
-- ✅ No missing dependencies
-- ✅ Both rulesets work (rio, saopaulo)
+**Expected Output:**
+- `outputs/riodaspedras/svf_streets_gpu/street_svf_points.gpkg`
+- `outputs/riodaspedras/svf_streets_gpu/street_svf_segments.gpkg`
+- `outputs/riodaspedras/svf_streets_gpu/street_svf_statistics.csv`
+- `outputs/riodaspedras/svf_streets_gpu/street_svf_map.png`
+- `outputs/riodaspedras/svf_streets_gpu/street_svf_distribution.png`
 
-**Why urgent**: Catches any breaking issues before they become technical debt.
+### Step 2: Compare GPU Results with Previous CPU Results
 
----
+After GPU computation completes, compare with existing CPU results:
 
-## 🔥 HIGH PRIORITY (This Week)
+```bash
+python scripts/compare_svf_cpu_gpu.py \
+    --cpu-results outputs/riodaspedras/svf_streets/street_svf_points.gpkg \
+    --gpu-results outputs/riodaspedras/svf_streets_gpu/street_svf_points.gpkg \
+    --output-dir outputs/riodaspedras/svf_streets_comparison
+```
 
-### 3. Error Handling & Input Validation
-**Status**: Partial (some validation exists)  
-**Time**: 4-8 hours  
-**Priority**: HIGH
+**This will generate:**
+- Comparison statistics (mean, std, correlation)
+- Scatter plot (CPU vs GPU SVF values)
+- Difference histogram
+- Comparison CSV with detailed differences
 
-**Current gaps**:
-- Missing CRS validation before raster operations
-- Limited error messages (hard to debug failures)
-- No graceful handling of edge cases (empty rasters, mismatched bounds)
+### Step 3: Validate Results
 
-**Quick wins**:
-- Add input file validation (exists, readable, correct format)
-- Better error messages with actionable guidance
-- Validate CRS consistency before processing
-- Handle missing optional inputs gracefully
+**Check the following:**
 
-**Why urgent**: Prevents cryptic failures during analysis runs.
+1. **Correlation**: Should be >0.95 (high correlation between CPU and GPU)
+2. **Mean Absolute Difference**: Should be <0.05 (acceptable accuracy)
+3. **Computation Time**: GPU should be significantly faster
+4. **Visual Inspection**: Review comparison plots
 
----
+**Expected Performance:**
+- **CPU**: ~7 seconds per point → ~65 hours for 33,387 points
+- **GPU (RTX 4060)**: ~0.1-0.5 seconds per point → ~1-3 hours for 33,387 points
+- **Speedup**: 10-70× depending on batch size and sampling
 
-### 4. Basic Testing Framework
-**Status**: None exists  
-**Time**: 4-6 hours  
-**Priority**: HIGH
+### Step 4: Optimize Parameters (if needed)
 
-**Minimum viable testing**:
-1. Unit tests for core functions:
-   - `calculate_basic_metrics()` 
-   - `normalize_height_columns()`
-   - Ruleset envelope calculations (Rio/São Paulo)
-2. Integration test:
-   - End-to-end run on small test dataset
-3. Test fixtures:
-   - Small synthetic dataset (10-20 buildings)
+Based on test results, you may need to adjust:
 
-**Why urgent**: Prevents regressions as code evolves.
+- **`--gpu-batch-size`**: Increase if GPU memory allows (default: 100)
+- **`--gpu-samples-per-ray`**: Increase for accuracy, decrease for speed (default: 50)
+- **`--sky-patches`**: Same as CPU version (145 for standard, 300 for high precision)
 
----
+### Step 5: Document Results
 
-## ⚡ MEDIUM PRIORITY (Next 2 Weeks)
+After successful testing:
+1. Document performance improvements
+2. Note any accuracy differences
+3. Update implementation status
+4. Commit test results (if desired)
 
-### 5. Performance Profiling & Optimization
-**Status**: Not profiled  
-**Time**: 8-16 hours  
-**Priority**: MEDIUM
+## 📊 What to Monitor
 
-**What to profile**:
-- SVF/solar access computation (ray-casting bottleneck)
-- Street-level sky exposure (building mesh extraction)
-- Raster-based deprivation index (pixel-level operations)
+During GPU computation, monitor:
+- GPU memory usage: `watch -n 1 nvidia-smi`
+- Computation progress (shown in progress bar)
+- Any warnings or errors
+- Final computation time
 
-**Quick wins**:
-- Parallelize SVF/solar access across grid points
-- Cache building mesh extraction
-- Vectorize occupancy pressure computation
+## 🔧 Troubleshooting
 
-**Why not urgent**: System works, but slow for large datasets. Can optimize after testing.
+**If GPU computation fails:**
+- Check GPU memory: Reduce `--gpu-batch-size`
+- Check accuracy: Increase `--gpu-samples-per-ray`
+- Fallback: Remove `--use-gpu` flag to use CPU
 
----
+**If results differ significantly:**
+- Increase `--gpu-samples-per-ray` for better accuracy
+- Check threshold in `_check_points_visible()` function
+- Compare with CPU results point-by-point
 
-### 6. Output Standardization
-**Status**: Inconsistent naming/structure  
-**Time**: 2-4 hours  
-**Priority**: MEDIUM
+## 📝 Quick Reference
 
-**Issues**:
-- Mixed naming conventions across scripts
-- Inconsistent output directory structure
-- Some outputs have CRS metadata, others don't
+**Data Files:**
+- STL: `data/riodaspedras/raw/full_scan.stl`
+- Roads: `data/riodaspedras/raw/roads_riodaspedras.shp`
+- Buildings: `data/riodaspedras/raw/riodaspedras_buildings.shp`
 
-**Standardize**:
-- Consistent file naming: `{metric}_{area}_{ruleset}_{timestamp}.{ext}`
-- Add CRS metadata to all geospatial outputs
-- Document output structure in README
+**Previous CPU Results:**
+- Points: `outputs/riodaspedras/svf_streets/street_svf_points.gpkg`
+- Segments: `outputs/riodaspedras/svf_streets/street_svf_segments.gpkg`
 
-**Why not urgent**: Works as-is, but consistency improves usability.
+**New GPU Results:**
+- Points: `outputs/riodaspedras/svf_streets_gpu/street_svf_points.gpkg`
+- Segments: `outputs/riodaspedras/svf_streets_gpu/street_svf_segments.gpkg`
 
----
+## 🚀 Ready to Test!
 
-## 📋 NICE TO HAVE (Future)
-
-### 7. GeoTIFF Export
-**Status**: Only .npy rasters
-**Time**: 2-3 hours
-**Priority**: LOW
-
-Add GeoTIFF export with CRS metadata for GIS integration.
-
----
-
-### 8. Configuration File Support
-**Status**: Hard-coded parameters
-**Time**: 4-6 hours
-**Priority**: LOW
-
-YAML/JSON config files for easier parameter adjustment without code changes.
-
----
-
-### 9. Urban Morphology Metrics (Phase 4)
-**Status**: Planned - detailed design complete
-**Priority**: MEDIUM
-**Documentation**: See `URBAN_MORPHOLOGY_PLAN.md`
-
-Implement urban morphology metrics for environmental analysis:
-- Plan area density (λp) - footprint area / total area per 50m grid cell
-- Frontal area density (λf) - building frontal area perpendicular to wind
-- Height variability (σh) - standard deviation of building heights per unit
-- Street orientation entropy (H) - Shannon entropy of street directions
-- Zone flagging (SVF < 0.3, λf > 0.4 thresholds)
-- Morphological typology clustering (K-means/hierarchical)
-
-**New files to create**:
-- `src/urban_morphology.py` - Core module
-- `scripts/compute_urban_morphology.py` - Main script
-- `scripts/compute_typology_clustering.py` - Clustering script
-
-**Why useful**: Enables formal vs informal settlement comparison using standardized urban form metrics, supports environmental performance proxies for ventilation and sky access.
-
----
-
-## Recommended Action Plan
-
-### This Week:
-1. ✅ **Commit & Push** (5 min)
-2. ✅ **End-to-End Testing** (1 hour)
-3. ⚠️ **Error Handling** (4-8 hours) - Focus on critical paths
-4. ⚠️ **Basic Tests** (4-6 hours) - Core functions only
-
-### Next Week:
-5. ⚠️ **Performance Profiling** (4 hours) - Identify bottlenecks
-6. ⚠️ **Output Standardization** (2 hours)
-
-### Later:
-7. GeoTIFF export
-8. Configuration files
-
----
-
-## Decision Points
-
-**Before starting optimization**: 
-- ✅ Do you have test data?
-- ✅ Are current runtimes acceptable?
-- ✅ Is the system stable enough to optimize?
-
-**If YES to all**: Proceed with optimization  
-**If NO**: Focus on testing and error handling first
-
----
-
-## Estimated Timeline
-
-- **Week 1**: Commit, test, error handling (critical fixes)
-- **Week 2**: Basic testing framework + performance profiling
-- **Week 3-4**: Performance optimization + output standardization
-
-**Total**: ~40-60 hours of focused work to reach production-ready state with testing.
-
-
-
+All dependencies are installed and verified. You can now proceed with Step 1.
