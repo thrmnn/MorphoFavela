@@ -48,12 +48,43 @@ def pv_mesh_to_pytorch3d(
         )
     
     # Extract vertices and faces
-    vertices = torch.tensor(pv_mesh.points, dtype=torch.float32, device=device)
+    # Filter out NaN values from mesh points
+    points = pv_mesh.points.copy()
+    valid_mask = ~np.isnan(points).any(axis=1)
     
-    # Extract faces (PyVista uses different format)
-    # PyVista: [n, v1, v2, v3, n, v1, v2, v3, ...]
-    # PyTorch3D: [[v1, v2, v3], [v1, v2, v3], ...]
-    faces = pv_mesh.faces.reshape(-1, 4)[:, 1:]  # Remove cell count
+    if not valid_mask.all():
+        n_invalid = np.sum(~valid_mask)
+        print(f"  Warning: Found {n_invalid} vertices with NaN values, filtering them out")
+        points = points[valid_mask]
+        
+        # Need to remap face indices
+        # Create mapping from old index to new index
+        old_to_new = np.full(len(valid_mask), -1, dtype=np.int64)
+        new_idx = 0
+        for old_idx, is_valid in enumerate(valid_mask):
+            if is_valid:
+                old_to_new[old_idx] = new_idx
+                new_idx += 1
+        
+        # Remap faces
+        faces_old = pv_mesh.faces.reshape(-1, 4)[:, 1:]  # Remove cell count
+        # Filter faces that reference only valid vertices
+        valid_faces_mask = valid_mask[faces_old].all(axis=1)
+        faces_old = faces_old[valid_faces_mask]
+        
+        # Remap face indices
+        faces = old_to_new[faces_old]
+        
+        # Remove faces that reference invalid vertices (shouldn't happen after filtering)
+        invalid_face_mask = (faces < 0).any(axis=1)
+        if invalid_face_mask.any():
+            faces = faces[~invalid_face_mask]
+        
+        print(f"  After filtering: {len(points)} vertices, {len(faces)} faces")
+    else:
+        faces = pv_mesh.faces.reshape(-1, 4)[:, 1:]  # Remove cell count
+    
+    vertices = torch.tensor(points, dtype=torch.float32, device=device)
     faces = torch.tensor(faces, dtype=torch.long, device=device)
     
     # Create PyTorch3D mesh

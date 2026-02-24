@@ -201,7 +201,7 @@ def _compute_batch_svf(
 def _check_points_visible(
     points: torch.Tensor,
     mesh: Meshes,
-    threshold: float = 1.0
+    threshold: float = 0.1
 ) -> torch.Tensor:
     """
     Check if points are visible (not inside/on mesh surface).
