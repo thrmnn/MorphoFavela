@@ -17,3 +17,10 @@ ipywidgets>=8.0.0
 pyarrow>=10.0.0  # For parquet file support (recommended for better performance)
 # Note: If pyarrow is not available, the notebook will fallback to CSV caching
 
+
+# GPU acceleration (optional - for GPU-accelerated SVF computation)
+# Install PyTorch with CUDA: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# Install PyTorch3D: pip install "git+https://github.com/facebookresearch/pytorch3d.git"
+# torch>=2.0.0
+# pytorch3d>=0.7.0
+# See GPU_SETUP.md for detailed installation instructions
