@@ -86,42 +86,125 @@ def plot_svf_with_isolines(
     if segments.crs and dtm_crs and str(segments.crs) != str(dtm_crs):
         segments = segments.to_crs(dtm_crs)
 
-    segments = align_layer_to_dtm(segments, dtm_bounds=dtm_bounds, reference_roads=reference_roads)
-
+    # Align segments if they're in local STL coordinates (centered around 0)
     # Optional building footprints to preserve original street_svf_map components.
+    # Buildings should already be in the correct CRS (EPSG:31983) and NOT need alignment.
     building_footprints = None
     if footprints_path and footprints_path.exists():
         building_footprints = gpd.read_file(footprints_path)
         if building_footprints.crs and dtm_crs and str(building_footprints.crs) != str(dtm_crs):
             building_footprints = building_footprints.to_crs(dtm_crs)
-        building_footprints = align_layer_to_dtm(
-            building_footprints, dtm_bounds=dtm_bounds, reference_roads=reference_roads
-        )
+        # Buildings should already overlap with DTM (they're in the same CRS)
+        if not _bounds_overlap(building_footprints.total_bounds, dtm_bounds):
+            print("Warning: Building footprints don't overlap with DTM, attempting alignment...")
+            building_footprints = align_layer_to_dtm(
+                building_footprints, dtm_bounds=dtm_bounds, reference_roads=reference_roads
+            )
+        else:
+            print("Building footprints already aligned with DTM (no shift needed)")
+    
+    # Align segments to match buildings (not roads) - this is what compute_svf_streets does
+    # Segments are in STL local coordinates, need to be aligned to buildings in EPSG:31983
+    if building_footprints is not None and not building_footprints.empty:
+        # Use building footprints center for alignment (same as compute_svf_streets.py)
+        build_center = _center(building_footprints.total_bounds)
+        seg_center = _center(segments.total_bounds)
+        dx = build_center[0] - seg_center[0]
+        dy = build_center[1] - seg_center[1]
+        print(f"Aligning segments to building footprints center: dx={dx:.3f}, dy={dy:.3f}")
+        segments = segments.copy()
+        segments.geometry = segments.geometry.translate(xoff=dx, yoff=dy)
+    elif reference_roads and reference_roads.exists():
+        # Fallback to roads if buildings not available
+        segments = align_layer_to_dtm(segments, dtm_bounds=dtm_bounds, reference_roads=reference_roads)
+    else:
+        # Last resort: align to DTM center
+        segments = align_layer_to_dtm(segments, dtm_bounds=dtm_bounds, reference_roads=None)
 
-    # Build X/Y grid for contouring
-    rows, cols = np.indices(dem.shape)
-    # Build 2D coordinate grids matching DEM shape.
-    xs = transform.c + (cols + 0.5) * transform.a + (rows + 0.5) * transform.b
-    ys = transform.f + (cols + 0.5) * transform.d + (rows + 0.5) * transform.e
+    # Build X/Y grid for contouring using affine transform
+    # Create row and column index arrays
+    rows, cols = np.meshgrid(
+        np.arange(dem.shape[0], dtype=float),
+        np.arange(dem.shape[1], dtype=float),
+        indexing='ij'
+    )
+    # Affine transform: x = a*col + b*row + c, y = d*col + e*row + f
+    # Note: transform.a, transform.b, etc. are the 6 affine parameters
+    xs = transform.a * cols + transform.b * rows + transform.c
+    ys = transform.d * cols + transform.e * rows + transform.f
 
     zmin = float(np.nanmin(dem))
     zmax = float(np.nanmax(dem))
     levels = np.linspace(zmin, zmax, n_levels)
+    print(f"DTM elevation range: {zmin:.2f} to {zmax:.2f} m")
+    print(f"Generating {len(levels)} contour levels")
+    print(f"DTM coordinate range: X=[{xs.min():.2f}, {xs.max():.2f}], Y=[{ys.min():.2f}, {ys.max():.2f}]")
 
     fig, ax = plt.subplots(figsize=(12, 10))
 
+    # Determine plot extent: union of DTM bounds, aligned segments, and buildings
+    seg_bounds = segments.total_bounds
+    print(f"Aligned segments bounds: {seg_bounds}")
+    
+    # Start with DTM bounds
+    plot_bounds = [dtm_bounds.left, dtm_bounds.bottom, dtm_bounds.right, dtm_bounds.top]
+    
+    # Expand to include segments
+    plot_bounds[0] = min(plot_bounds[0], seg_bounds[0])
+    plot_bounds[1] = min(plot_bounds[1], seg_bounds[1])
+    plot_bounds[2] = max(plot_bounds[2], seg_bounds[2])
+    plot_bounds[3] = max(plot_bounds[3], seg_bounds[3])
+    
+    # Expand to include buildings if present
+    if building_footprints is not None and not building_footprints.empty:
+        build_bounds = building_footprints.total_bounds
+        plot_bounds[0] = min(plot_bounds[0], build_bounds[0])
+        plot_bounds[1] = min(plot_bounds[1], build_bounds[1])
+        plot_bounds[2] = max(plot_bounds[2], build_bounds[2])
+        plot_bounds[3] = max(plot_bounds[3], build_bounds[3])
+    
+    print(f"Plot extent: X=[{plot_bounds[0]:.2f}, {plot_bounds[2]:.2f}], Y=[{plot_bounds[1]:.2f}, {plot_bounds[3]:.2f}]")
+    
+    # Set plot extent BEFORE drawing anything to ensure contours are visible
+    ax.set_xlim(plot_bounds[0], plot_bounds[2])
+    ax.set_ylim(plot_bounds[1], plot_bounds[3])
+    ax.set_aspect('equal')
+
     # Terrain isolines: subtle dotted lines in the background.
-    contour = ax.contour(
-        xs,
-        ys,
-        dem,
-        levels=levels,
-        colors="#3a506b",
-        linewidths=0.35,
-        linestyles="dotted",
-        alpha=0.35,
-        zorder=1,
-    )
+    # Convert masked array to regular array for contour (fill masked values with NaN)
+    dem_for_contour = np.ma.filled(dem, np.nan)
+    
+    # Verify coordinate arrays match DEM shape
+    assert xs.shape == dem.shape, f"X coordinate array shape {xs.shape} doesn't match DEM shape {dem.shape}"
+    assert ys.shape == dem.shape, f"Y coordinate array shape {ys.shape} doesn't match DEM shape {dem.shape}"
+    
+    # Draw contours FIRST (before other layers) to ensure they're visible
+    try:
+        # Use the requested number of levels
+        visible_levels = np.linspace(zmin, zmax, n_levels)
+        
+        # Fine, dotted, muted isolines in the background (more visible)
+        contour = ax.contour(
+            xs,
+            ys,
+            dem_for_contour,
+            levels=visible_levels,
+            colors="#6a7c8d",  # Slightly darker muted blue-grey for better visibility
+            linewidths=0.4,  # Slightly thicker for clarity
+            linestyles="dotted",
+            alpha=0.55,  # More visible while still subtle
+            zorder=1,  # Behind everything
+        )
+        # Count actual contour lines generated (not just collections)
+        n_contour_lines = sum(len(seg) > 0 for coll in contour.allsegs for seg in coll)
+        print(f"Generated {len(contour.allsegs)} contour collections with {n_contour_lines} total contour lines")
+        if n_contour_lines == 0:
+            print("WARNING: No contour lines were generated! Check coordinate grid and DEM data.")
+    except Exception as e:
+        print(f"ERROR generating contours: {e}")
+        print(f"DEM shape: {dem.shape}, X shape: {xs.shape}, Y shape: {ys.shape}")
+        print(f"X range: [{xs.min():.2f}, {xs.max():.2f}], Y range: [{ys.min():.2f}, {ys.max():.2f}]")
+        raise
 
     # Same base component as street_svf_map: building footprints background.
     if building_footprints is not None and not building_footprints.empty:
@@ -147,9 +230,13 @@ def plot_svf_with_isolines(
         zorder=4,
     )
 
+    # Re-apply plot extent after geopandas plots (they might reset it)
+    ax.set_xlim(plot_bounds[0], plot_bounds[2])
+    ax.set_ylim(plot_bounds[1], plot_bounds[3])
+    ax.set_aspect('equal')
+    
     ax.set_title("Street-Level SVF with Terrain Isolines", fontsize=14, fontweight="bold")
     ax.set_axis_off()
-    ax.set_aspect("equal")
     plt.tight_layout()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
