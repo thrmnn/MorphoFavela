@@ -71,10 +71,10 @@ python scripts/compute_svf_streets.py \
 
 ### Visualizations
 - **`street_svf_map.png`**: Map showing streets colored by mean SVF
-- **`street_svf_map_minmax_purple.png`**: Additional robust min-max SVF map (purple tones), preserving `street_svf_map.png`
+- **`street_svf_map_minmax.png`**: Additional robust min-max SVF map (brown low SVF to sand high SVF), preserving `street_svf_map.png`
   - Uses percentile-capped normalization to reduce upper-tail noise:
     `n = (clip(SVF, min, p95) - min) / (p95 - min)`
-  - Colorbar ticks show both normalized values and corresponding SVF values
+  - Colorbar ticks show the corresponding SVF values only
   - If `--dtm` is provided, terrain isolines are overlaid for context
 - **`street_svf_distribution.png`**: Histogram of SVF values
 - **`street_svf_by_segment.png`**: Box plot by street segment (if ≤20 segments)
