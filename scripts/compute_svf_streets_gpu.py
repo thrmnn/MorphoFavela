@@ -81,6 +81,8 @@ def main():
     parser.add_argument('--use-gpu', action='store_true', help='Use GPU acceleration (requires CUDA-capable GPU)')
     parser.add_argument('--gpu-batch-size', type=int, default=200, help='Batch size for GPU processing (default: 200, optimized for speed)')
     parser.add_argument('--gpu-samples-per-ray', type=int, default=20, help='Number of samples per ray for GPU computation (default: 20, optimized for speed vs accuracy)')
+    parser.add_argument('--gpu-ray-chunk-size', type=int, default=1024, help='Ray chunk size for exact GPU intersection kernel (default: 1024)')
+    parser.add_argument('--gpu-tri-chunk-size', type=int, default=4096, help='Triangle chunk size for exact GPU intersection kernel (default: 4096)')
     parser.add_argument('--force-cpu', action='store_true', help='Force CPU computation even if GPU is available')
     
     args = parser.parse_args()
@@ -296,7 +298,9 @@ def main():
                 sky_patches_torch,
                 pytorch3d_mesh,
                 batch_size=args.gpu_batch_size,
-                num_samples_per_ray=args.gpu_samples_per_ray
+                num_samples_per_ray=args.gpu_samples_per_ray,
+                ray_chunk_size=args.gpu_ray_chunk_size,
+                tri_chunk_size=args.gpu_tri_chunk_size,
             )
             
             # Convert back to numpy
