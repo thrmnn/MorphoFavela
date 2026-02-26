@@ -566,7 +566,7 @@ def create_street_svf_map(
     logger.info(f"  Saved street SVF map to {output_path}")
 
 
-def create_street_svf_map_minmax_purple(
+def create_street_svf_map_minmax(
     segments_gdf: gpd.GeoDataFrame,
     building_footprints: gpd.GeoDataFrame = None,
     output_path: Path = None,
@@ -574,11 +574,12 @@ def create_street_svf_map_minmax_purple(
     clip_percentile: float = 95.0,
 ):
     """
-    Create an additional min-max scaled SVF map using a purple palette.
+    Create an additional min-max scaled SVF map.
 
     The default scaling is robust to upper-tail outliers by clipping SVF at p95.
+    Color convention: low SVF (0) is brown, high SVF (~1) is sand.
     """
-    logger.info("Creating min-max purple street SVF map...")
+    logger.info("Creating min-max street SVF map...")
 
     if 'svf_mean' not in segments_gdf.columns:
         raise ValueError("GeoDataFrame must have 'svf_mean' column")
@@ -596,10 +597,11 @@ def create_street_svf_map_minmax_purple(
 
     fig, ax = plt.subplots(figsize=(12, 10))
 
-    # Build a purple-only ramp that avoids near-white tones at the high end.
-    base = colormaps['Purples_r']
-    purple_no_white = LinearSegmentedColormap.from_list(
-        'Purples_r_no_white_strong', base(np.linspace(0.00, 0.68, 256))
+    # Low SVF -> brown, high SVF -> sand.
+    brown_to_sand = LinearSegmentedColormap.from_list(
+        'brown_to_sand',
+        ['#6E4423', '#9A6A3A', '#C69A5B', '#DFC08A', '#F2E3B3'],
+        N=256
     )
 
     # Optional terrain isolines when a DTM is provided.
@@ -667,7 +669,7 @@ def create_street_svf_map_minmax_purple(
     plot_segments.plot(
         ax=ax,
         column='svf_minmax',
-        cmap=purple_no_white,
+        cmap=brown_to_sand,
         vmin=0,
         vmax=1,
         linewidth=3.0,
@@ -675,7 +677,7 @@ def create_street_svf_map_minmax_purple(
     )
 
     sm = plt.cm.ScalarMappable(
-        cmap=purple_no_white,
+        cmap=brown_to_sand,
         norm=colors.Normalize(vmin=0, vmax=1)
     )
     sm.set_array([])
@@ -684,11 +686,8 @@ def create_street_svf_map_minmax_purple(
     norm_ticks = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
     svf_ticks = svf_min + norm_ticks * (svf_high - svf_min)
     cbar.set_ticks(norm_ticks)
-    cbar.set_ticklabels([f"{n:.2f} (SVF {s:.3f})" for n, s in zip(norm_ticks, svf_ticks)])
-    cbar.set_label(
-        f"Min-max SVF with p{int(clip_percentile)} cap: "
-        "n = (clip(SVF, min, p95) - min) / (p95 - min)"
-    )
+    cbar.set_ticklabels([f"{s:.3f}" for s in svf_ticks])
+    cbar.set_label(f"SVF (p{int(clip_percentile)} capped min-max mapping)")
 
     ax.set_title('Street-Level SVF (Min-Max Scaled)', fontsize=14, fontweight='bold')
     ax.set_aspect('equal')
@@ -698,7 +697,24 @@ def create_street_svf_map_minmax_purple(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
-    logger.info(f"  Saved min-max purple street SVF map to {output_path}")
+    logger.info(f"  Saved min-max street SVF map to {output_path}")
+
+
+def create_street_svf_map_minmax_purple(
+    segments_gdf: gpd.GeoDataFrame,
+    building_footprints: gpd.GeoDataFrame = None,
+    output_path: Path = None,
+    dtm_path: Path = None,
+    clip_percentile: float = 95.0,
+):
+    """Backward-compatible wrapper for older calls."""
+    return create_street_svf_map_minmax(
+        segments_gdf=segments_gdf,
+        building_footprints=building_footprints,
+        output_path=output_path,
+        dtm_path=dtm_path,
+        clip_percentile=clip_percentile,
+    )
 
 
 def create_statistics_plots(
@@ -1048,9 +1064,9 @@ def main():
     map_path = output_dir / "street_svf_map.png"
     create_street_svf_map(segments_gdf, points_gdf, building_footprints, map_path)
 
-    # Additional robust min-max purple map (kept as a separate output).
-    minmax_map_path = output_dir / "street_svf_map_minmax_purple.png"
-    create_street_svf_map_minmax_purple(
+    # Additional robust min-max map (brown->sand, kept as a separate output).
+    minmax_map_path = output_dir / "street_svf_map_minmax.png"
+    create_street_svf_map_minmax(
         segments_gdf,
         building_footprints,
         minmax_map_path,

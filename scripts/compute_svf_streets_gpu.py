@@ -52,7 +52,7 @@ from scripts.compute_svf_streets import (
     aggregate_segment_statistics,
     plot_street_debug,
     create_street_svf_map,
-    create_street_svf_map_minmax_purple,
+    create_street_svf_map_minmax,
     create_statistics_plots
 )
 
@@ -343,8 +343,8 @@ def main():
     map_path = output_dir / "street_svf_map.png"
     create_street_svf_map(segments_gdf, points_gdf, building_footprints, map_path)
 
-    minmax_map_path = output_dir / "street_svf_map_minmax_purple.png"
-    create_street_svf_map_minmax_purple(
+    minmax_map_path = output_dir / "street_svf_map_minmax.png"
+    create_street_svf_map_minmax(
         segments_gdf,
         building_footprints,
         minmax_map_path,
