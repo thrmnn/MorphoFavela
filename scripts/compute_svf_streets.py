@@ -24,6 +24,8 @@ from tqdm import tqdm
 import argparse
 import sys
 from shapely.geometry import Point, LineString
+from matplotlib import colors, colormaps
+from matplotlib.colors import LinearSegmentedColormap
 try:
     import rasterio
     HAS_RASTERIO = True
@@ -564,6 +566,141 @@ def create_street_svf_map(
     logger.info(f"  Saved street SVF map to {output_path}")
 
 
+def create_street_svf_map_minmax_purple(
+    segments_gdf: gpd.GeoDataFrame,
+    building_footprints: gpd.GeoDataFrame = None,
+    output_path: Path = None,
+    dtm_path: Path = None,
+    clip_percentile: float = 95.0,
+):
+    """
+    Create an additional min-max scaled SVF map using a purple palette.
+
+    The default scaling is robust to upper-tail outliers by clipping SVF at p95.
+    """
+    logger.info("Creating min-max purple street SVF map...")
+
+    if 'svf_mean' not in segments_gdf.columns:
+        raise ValueError("GeoDataFrame must have 'svf_mean' column")
+
+    plot_segments = segments_gdf.copy()
+    svf = plot_segments['svf_mean'].astype(float)
+    svf_min = float(svf.min())
+    svf_high = float(np.percentile(svf, clip_percentile))
+    svf_clipped = svf.clip(lower=svf_min, upper=svf_high)
+
+    if svf_high > svf_min:
+        plot_segments['svf_minmax'] = (svf_clipped - svf_min) / (svf_high - svf_min)
+    else:
+        plot_segments['svf_minmax'] = 0.5
+
+    fig, ax = plt.subplots(figsize=(12, 10))
+
+    # Build a purple-only ramp that avoids near-white tones at the high end.
+    base = colormaps['Purples_r']
+    purple_no_white = LinearSegmentedColormap.from_list(
+        'Purples_r_no_white_strong', base(np.linspace(0.00, 0.68, 256))
+    )
+
+    # Optional terrain isolines when a DTM is provided.
+    if dtm_path is not None and dtm_path.exists() and HAS_RASTERIO:
+        try:
+            with rasterio.open(dtm_path) as src:
+                dem = src.read(1, masked=True)
+                if src.nodata is not None:
+                    dem = np.ma.masked_equal(dem, src.nodata)
+                transform = src.transform
+
+            rows, cols = np.meshgrid(
+                np.arange(dem.shape[0], dtype=float),
+                np.arange(dem.shape[1], dtype=float),
+                indexing='ij'
+            )
+            xs = transform.a * cols + transform.b * rows + transform.c
+            ys = transform.d * cols + transform.e * rows + transform.f
+
+            dem_arr = np.ma.filled(dem, np.nan)
+            seg_bounds = plot_segments.total_bounds
+            dtm_bounds = np.array([np.nanmin(xs), np.nanmin(ys), np.nanmax(xs), np.nanmax(ys)])
+
+            # If DTM and streets are in different coordinate spaces, align by center shift.
+            def _center(bounds):
+                return (bounds[0] + bounds[2]) / 2.0, (bounds[1] + bounds[3]) / 2.0
+
+            def _overlap(a, b):
+                return not (a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1])
+
+            if not _overlap(seg_bounds, dtm_bounds):
+                dx = _center(seg_bounds)[0] - _center(dtm_bounds)[0]
+                dy = _center(seg_bounds)[1] - _center(dtm_bounds)[1]
+                xs = xs + dx
+                ys = ys + dy
+
+            zmin = float(np.nanmin(dem_arr))
+            zmax = float(np.nanmax(dem_arr))
+            levels_minor = np.linspace(zmin, zmax, 24)
+            levels_major = np.linspace(zmin, zmax, 12)
+
+            ax.contour(
+                xs, ys, dem_arr, levels=levels_minor,
+                colors='#596b7a', linewidths=0.55,
+                linestyles='dotted', alpha=0.70, zorder=1
+            )
+            ax.contour(
+                xs, ys, dem_arr, levels=levels_major,
+                colors='#435564', linewidths=0.95,
+                linestyles='solid', alpha=0.60, zorder=1
+            )
+        except Exception as exc:
+            logger.warning(f"  Could not draw terrain isolines from DTM: {exc}")
+
+    if building_footprints is not None:
+        building_footprints.plot(
+            ax=ax,
+            facecolor='lightgrey',
+            edgecolor='black',
+            linewidth=0.35,
+            alpha=0.48,
+            zorder=2
+        )
+
+    plot_segments.plot(
+        ax=ax,
+        column='svf_minmax',
+        cmap=purple_no_white,
+        vmin=0,
+        vmax=1,
+        linewidth=3.0,
+        zorder=4
+    )
+
+    sm = plt.cm.ScalarMappable(
+        cmap=purple_no_white,
+        norm=colors.Normalize(vmin=0, vmax=1)
+    )
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=ax, shrink=0.8)
+
+    norm_ticks = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
+    svf_ticks = svf_min + norm_ticks * (svf_high - svf_min)
+    cbar.set_ticks(norm_ticks)
+    cbar.set_ticklabels([f"{n:.2f} (SVF {s:.3f})" for n, s in zip(norm_ticks, svf_ticks)])
+    cbar.set_label(
+        f"Min-max SVF with p{int(clip_percentile)} cap: "
+        "n = (clip(SVF, min, p95) - min) / (p95 - min)"
+    )
+
+    ax.set_title('Street-Level SVF (Min-Max Scaled)', fontsize=14, fontweight='bold')
+    ax.set_aspect('equal')
+    ax.set_axis_off()
+
+    plt.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    logger.info(f"  Saved min-max purple street SVF map to {output_path}")
+
+
 def create_statistics_plots(
     segments_gdf: gpd.GeoDataFrame,
     points_gdf: gpd.GeoDataFrame,
@@ -657,7 +794,7 @@ def main():
     parser.add_argument('--spacing', type=float, default=3.0, help='Distance between sample points (meters, default: 3.0)')
     parser.add_argument('--height', type=float, default=1.5, help='Evaluation height above ground (meters, default: 1.5)')
     parser.add_argument('--sky-patches', type=int, default=145, help='Number of sky patches (default: 145)')
-    parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/svf_streets)')
+    parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/svf_street)')
     parser.add_argument('--area', type=str, default=None, help='Area name (e.g., vidigal, copacabana) for automatic path resolution')
     parser.add_argument('--building-buffer', type=float, default=30.0, help='Buffer distance from buildings to filter streets (meters, default: 30.0)')
     parser.add_argument('--debug-only', action='store_true', help='Only generate debug plot and exit, do not compute SVF')
@@ -680,9 +817,9 @@ def main():
         output_dir = Path(args.output_dir)
     elif args.area:
         from src.config import get_area_output_dir
-        output_dir = get_area_output_dir(args.area) / "svf_streets"
+        output_dir = get_area_output_dir(args.area) / "svf_street"
     else:
-        output_dir = PROJECT_ROOT / "outputs" / "svf_streets"
+        output_dir = PROJECT_ROOT / "outputs" / "svf_street"
     
     output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -910,6 +1047,16 @@ def main():
     # Street SVF map (building footprints already loaded above)
     map_path = output_dir / "street_svf_map.png"
     create_street_svf_map(segments_gdf, points_gdf, building_footprints, map_path)
+
+    # Additional robust min-max purple map (kept as a separate output).
+    minmax_map_path = output_dir / "street_svf_map_minmax_purple.png"
+    create_street_svf_map_minmax_purple(
+        segments_gdf,
+        building_footprints,
+        minmax_map_path,
+        dtm_path=dtm_path,
+        clip_percentile=95.0
+    )
     
     # Statistics plots
     create_statistics_plots(segments_gdf, points_gdf, output_dir)

@@ -52,6 +52,7 @@ from scripts.compute_svf_streets import (
     aggregate_segment_statistics,
     plot_street_debug,
     create_street_svf_map,
+    create_street_svf_map_minmax_purple,
     create_statistics_plots
 )
 
@@ -75,7 +76,7 @@ def main():
     parser.add_argument('--spacing', type=float, default=3.0, help='Distance between sample points (meters, default: 3.0)')
     parser.add_argument('--height', type=float, default=1.5, help='Evaluation height above ground (meters, default: 1.5)')
     parser.add_argument('--sky-patches', type=int, default=145, help='Number of sky patches (default: 145)')
-    parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/svf_streets_gpu)')
+    parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/svf_street)')
     parser.add_argument('--area', type=str, default=None, help='Area name (e.g., riodaspedras) for automatic path resolution')
     parser.add_argument('--building-buffer', type=float, default=30.0, help='Buffer distance from buildings to filter streets (meters, default: 30.0)')
     parser.add_argument('--use-gpu', action='store_true', help='Use GPU acceleration (requires CUDA-capable GPU)')
@@ -114,9 +115,9 @@ def main():
         output_dir = Path(args.output_dir)
     elif args.area:
         from src.config import get_area_output_dir
-        output_dir = get_area_output_dir(args.area) / "svf_streets_gpu"
+        output_dir = get_area_output_dir(args.area) / "svf_street"
     else:
-        output_dir = PROJECT_ROOT / "outputs" / "svf_streets_gpu"
+        output_dir = PROJECT_ROOT / "outputs" / "svf_street"
     
     output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -341,6 +342,15 @@ def main():
     
     map_path = output_dir / "street_svf_map.png"
     create_street_svf_map(segments_gdf, points_gdf, building_footprints, map_path)
+
+    minmax_map_path = output_dir / "street_svf_map_minmax_purple.png"
+    create_street_svf_map_minmax_purple(
+        segments_gdf,
+        building_footprints,
+        minmax_map_path,
+        dtm_path=dtm_path,
+        clip_percentile=95.0
+    )
     
     create_statistics_plots(segments_gdf, points_gdf, output_dir)
     
