@@ -132,7 +132,8 @@ def compute_svf(
     svf_values = []
     
     # Create observer points (ground points + evaluation height)
-    observer_points = ground_points.copy()
+    # Ensure float dtype to avoid casting errors
+    observer_points = ground_points.astype(np.float64).copy()
     observer_points[:, 2] += evaluation_height
     
     # Compute SVF for each observer point

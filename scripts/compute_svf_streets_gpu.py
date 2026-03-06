@@ -216,6 +216,39 @@ def main():
                 building_union = unary_union(geom_series.values)
                 building_buffer_geom = building_union.buffer(args.building_buffer)
                 logger.info(f"  Created building buffer zone ({args.building_buffer}m) for street filtering")
+            
+            # Redirect roads to avoid building intersections (preprocessing step)
+            if building_footprints is not None and len(building_footprints) > 0:
+                from src.data_alignment_utils import redirect_roads, detect_road_building_intersections
+                
+                # Detect intersections before redirection
+                intersections_before = detect_road_building_intersections(roads_gdf, building_footprints)
+                
+                if len(intersections_before) > 0:
+                    logger.warning(f"  Found {len(intersections_before)} road segments intersecting buildings")
+                    logger.info(f"  Redirecting roads to avoid collisions...")
+                    
+                    # Redirect roads (using parallel offset method)
+                    roads_gdf, intersection_info = redirect_roads(
+                        roads_gdf,
+                        building_footprints,
+                        method='parallel_offset',
+                        offset_distance=2.0
+                    )
+                    
+                    # Verify redirection success
+                    intersections_after = detect_road_building_intersections(roads_gdf, building_footprints)
+                    if len(intersections_after) == 0:
+                        logger.info(f"  Successfully redirected all {len(intersection_info)} intersecting roads")
+                    else:
+                        logger.warning(f"  {len(intersections_after)} roads still intersect after redirection")
+                else:
+                    intersection_info = gpd.GeoDataFrame(columns=['road_idx'], crs=roads_gdf.crs)
+                    logger.info(f"  No road-building intersections detected")
+            else:
+                intersection_info = None
+    else:
+        intersection_info = None
     
     # Filter streets (same as CPU version)
     original_roads_count = len(roads_gdf)
@@ -261,7 +294,7 @@ def main():
     # Create debug plot
     debug_plot_path = output_dir / "street_debug.png"
     plot_street_debug(
-        roads_gdf, points_gdf,
+        roads_gdf, points_gdf, 
         building_footprints=building_footprints,
         isolated_buildings=isolated_buildings,
         area_filtered_buildings=area_filtered_buildings,
@@ -271,7 +304,8 @@ def main():
         building_buffer=args.building_buffer if args.building_buffer > 0 else None,
         building_buffer_geom=building_buffer_geom,
         filtered_roads_gdf=filtered_roads_gdf,
-        original_roads_count=original_roads_count
+        original_roads_count=original_roads_count,
+        intersection_info=intersection_info
     )
     
     # Convert points to numpy array for SVF computation

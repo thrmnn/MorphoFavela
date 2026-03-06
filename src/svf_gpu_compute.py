@@ -188,7 +188,7 @@ def _rays_blocked_by_mesh_exact(
     mesh_triangles: Dict[str, torch.Tensor],
     ray_chunk_size: int = 1024,
     tri_chunk_size: int = 4096,
-    eps: float = 1e-6,
+    eps: float = 1e-4,  # Increased epsilon to match CPU behavior better
 ) -> torch.Tensor:
     """
     Exact segment-triangle intersection using chunked Moller-Trumbore on GPU.
@@ -232,7 +232,16 @@ def _rays_blocked_by_mesh_exact(
             v_mask = (v >= 0.0) & ((u + v) <= 1.0)
 
             t = torch.sum(e2[None, :, :] * qvec, dim=-1) * inv_det
-            t_mask = (t > eps) & (t < (l[:, None] - eps))
+            # Match CPU PyVista ray_trace behavior:
+            # - PyVista detects intersections at t=0 when observer is on surface
+            # - For corner/edge cases, PyVista may ignore some t=0 intersections
+            # - Use adaptive threshold: very small for normal cases, slightly larger for edge cases
+            # - Allow small negative t to catch intersections at origin, but be conservative
+            t_eps_min = eps * 10  # Minimum threshold for edge cases
+            t_eps_max = eps * 50  # Maximum threshold (for very long rays)
+            # Adaptive threshold based on ray length (longer rays need larger threshold)
+            t_eps = torch.clamp(l[:, None] * 1e-6, t_eps_min, t_eps_max)
+            t_mask = (t >= -t_eps) & (t <= (l[:, None] + t_eps))
 
             hits = det_mask & u_mask & v_mask & t_mask
             ray_hit |= hits.any(dim=1)

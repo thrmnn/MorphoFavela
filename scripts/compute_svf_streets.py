@@ -366,7 +366,8 @@ def plot_street_debug(
     building_buffer: float = None,
     building_buffer_geom = None,
     filtered_roads_gdf: gpd.GeoDataFrame = None,
-    original_roads_count: int = None
+    original_roads_count: int = None,
+    intersection_info: gpd.GeoDataFrame = None
 ):
     """
     Create a debug plot showing street centerlines, sample points, and building footprints.
@@ -430,6 +431,14 @@ def plot_street_debug(
                                        alpha=0.3, linestyle=':', 
                                        label=f'Filtered-out streets (n={len(filtered_out_roads)})')
     
+    # Plot redirected roads (if any) in purple
+    if intersection_info is not None and len(intersection_info) > 0:
+        redirected_indices = intersection_info['road_idx'].values
+        redirected_roads = roads_gdf.loc[redirected_indices]
+        if len(redirected_roads) > 0:
+            redirected_roads.plot(ax=ax, color='purple', linewidth=2.5, alpha=0.8, 
+                                 linestyle='--', label=f'Redirected roads (n={len(redirected_roads)})')
+    
     # Plot filtered street centerlines (blue)
     if filtered_roads_gdf is not None:
         filtered_roads_gdf.plot(ax=ax, color='blue', linewidth=2, alpha=0.7, 
@@ -473,6 +482,8 @@ def plot_street_debug(
         stats_text.append(f"Area-filtered: {len(area_filtered_buildings):,} buildings")
     if isolated_buildings is not None and len(isolated_buildings) > 0:
         stats_text.append(f"Isolated: {len(isolated_buildings):,} buildings")
+    if intersection_info is not None and len(intersection_info) > 0:
+        stats_text.append(f"Redirected roads: {len(intersection_info):,}")
     
     if stats_text:
         stats_str = "\n".join(stats_text)
@@ -493,8 +504,9 @@ def plot_street_debug(
     if MAX_FILTER_AREA is not None:
         title += f'\n(Area filter: >{MAX_FILTER_AREA}m² excluded)'
     title += f'\n(Cluster filter: {BUILDING_CLUSTER_BUFFER}m buffer)'
-    title += '\nBlue = Filtered streets, Gray dotted = Filtered-out streets, Green = Sample points'
-    title += '\nRed = Main cluster, Yellow = Area-filtered, Gray = Isolated, Orange dashed = Buffer zone'
+    title += '\nBlue = Filtered streets, Purple dashed = Redirected roads, Gray dotted = Filtered-out streets'
+    title += '\nGreen = Sample points, Red = Main cluster, Yellow = Area-filtered, Gray = Isolated'
+    title += '\nOrange dashed = Buffer zone'
     
     ax.set_title(title, fontsize=14, fontweight='bold')
     ax.set_aspect('equal')
@@ -995,6 +1007,39 @@ def main():
                 building_union = unary_union(geom_series.values)
                 building_buffer_geom = building_union.buffer(args.building_buffer)
                 logger.info(f"  Created building buffer zone ({args.building_buffer}m) for street filtering")
+            
+            # Redirect roads to avoid building intersections (preprocessing step)
+            if building_footprints is not None and len(building_footprints) > 0:
+                from src.data_alignment_utils import redirect_roads, detect_road_building_intersections
+                
+                # Detect intersections before redirection
+                intersections_before = detect_road_building_intersections(roads_gdf, building_footprints)
+                
+                if len(intersections_before) > 0:
+                    logger.warning(f"  Found {len(intersections_before)} road segments intersecting buildings")
+                    logger.info(f"  Redirecting roads to avoid collisions...")
+                    
+                    # Redirect roads (using parallel offset method)
+                    roads_gdf, intersection_info = redirect_roads(
+                        roads_gdf,
+                        building_footprints,
+                        method='parallel_offset',
+                        offset_distance=2.0
+                    )
+                    
+                    # Verify redirection success
+                    intersections_after = detect_road_building_intersections(roads_gdf, building_footprints)
+                    if len(intersections_after) == 0:
+                        logger.info(f"  Successfully redirected all {len(intersection_info)} intersecting roads")
+                    else:
+                        logger.warning(f"  {len(intersections_after)} roads still intersect after redirection")
+                else:
+                    intersection_info = gpd.GeoDataFrame(columns=['road_idx'], crs=roads_gdf.crs)
+                    logger.info(f"  No road-building intersections detected")
+            else:
+                intersection_info = None
+    else:
+        intersection_info = None
     
     # Filter streets to only keep those within building buffer
     # Use a stricter criterion: require at least 50% of the street segment to be within the buffer
@@ -1057,6 +1102,7 @@ def main():
         roads_gdf, points_gdf, 
         building_footprints=building_footprints,
         isolated_buildings=isolated_buildings,
+        intersection_info=intersection_info if 'intersection_info' in locals() else None,
         area_filtered_buildings=area_filtered_buildings,
         output_path=debug_plot_path,
         spacing=args.spacing,

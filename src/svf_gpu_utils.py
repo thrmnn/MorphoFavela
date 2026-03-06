@@ -52,6 +52,38 @@ def pv_mesh_to_pytorch3d(
     points = pv_mesh.points.copy()
     valid_mask = ~np.isnan(points).any(axis=1)
     
+    # Extract faces - PyVista stores faces in VTK format: [n_verts, v0, v1, ..., n_verts, v0, v1, ...]
+    # PyTorch3D requires triangular faces, so we need to triangulate any non-triangular faces
+    faces_list = []
+    if pv_mesh.faces.size > 0:
+        faces_array = pv_mesh.faces
+        i = 0
+        while i < len(faces_array):
+            n_verts = int(faces_array[i])
+            if i + n_verts < len(faces_array):
+                verts = faces_array[i+1:i+1+n_verts]
+                if n_verts == 3:
+                    # Already triangular
+                    faces_list.append(verts)
+                elif n_verts == 4:
+                    # Quadrilateral - split into two triangles
+                    # Triangle 1: v0, v1, v2
+                    faces_list.append(verts[[0, 1, 2]])
+                    # Triangle 2: v0, v2, v3
+                    faces_list.append(verts[[0, 2, 3]])
+                elif n_verts > 4:
+                    # Polygon with more than 4 vertices - triangulate using fan method
+                    for j in range(1, n_verts - 1):
+                        faces_list.append(verts[[0, j, j+1]])
+                i += n_verts + 1
+            else:
+                break
+    
+    if len(faces_list) > 0:
+        faces_old = np.array(faces_list, dtype=np.int64)
+    else:
+        faces_old = np.empty((0, 3), dtype=np.int64)
+    
     if not valid_mask.all():
         n_invalid = np.sum(~valid_mask)
         print(f"  Warning: Found {n_invalid} vertices with NaN values, filtering them out")
@@ -66,23 +98,24 @@ def pv_mesh_to_pytorch3d(
                 old_to_new[old_idx] = new_idx
                 new_idx += 1
         
-        # Remap faces
-        faces_old = pv_mesh.faces.reshape(-1, 4)[:, 1:]  # Remove cell count
         # Filter faces that reference only valid vertices
-        valid_faces_mask = valid_mask[faces_old].all(axis=1)
+        valid_faces_mask = valid_mask[faces_old].all(axis=1) if len(faces_old) > 0 else np.array([], dtype=bool)
         faces_old = faces_old[valid_faces_mask]
         
         # Remap face indices
-        faces = old_to_new[faces_old]
-        
-        # Remove faces that reference invalid vertices (shouldn't happen after filtering)
-        invalid_face_mask = (faces < 0).any(axis=1)
-        if invalid_face_mask.any():
-            faces = faces[~invalid_face_mask]
+        if len(faces_old) > 0:
+            faces = old_to_new[faces_old]
+            
+            # Remove faces that reference invalid vertices (shouldn't happen after filtering)
+            invalid_face_mask = (faces < 0).any(axis=1)
+            if invalid_face_mask.any():
+                faces = faces[~invalid_face_mask]
+        else:
+            faces = np.empty((0, 3), dtype=np.int64)
         
         print(f"  After filtering: {len(points)} vertices, {len(faces)} faces")
     else:
-        faces = pv_mesh.faces.reshape(-1, 4)[:, 1:]  # Remove cell count
+        faces = faces_old
     
     vertices = torch.tensor(points, dtype=torch.float32, device=device)
     faces = torch.tensor(faces, dtype=torch.long, device=device)
@@ -113,7 +146,8 @@ def prepare_observer_points(
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    observer_points = ground_points.copy()
+    # Ensure float dtype to avoid casting errors
+    observer_points = ground_points.astype(np.float32).copy()
     observer_points[:, 2] += evaluation_height
     
     return torch.tensor(observer_points, dtype=torch.float32, device=device)
