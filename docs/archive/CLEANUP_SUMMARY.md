@@ -34,7 +34,7 @@ Updated all documentation to reflect the unified sky exposure analysis approach:
   - SUMMARY.md
   - docs/SVF_MIGRATION_PLAN.md
 
-- **Note**: Old `outputs/vidigal/sky_exposure/` directory contains legacy results but is not tracked by git (in .gitignore). These can be kept for comparison or manually removed.
+- **Note**: Old `outputs/vidigal_tls/sky_exposure/` directory contains legacy results but is not tracked by git (in .gitignore). These can be kept for comparison or manually removed.
 
 ### 4. Repository Status
 

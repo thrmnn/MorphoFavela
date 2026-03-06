@@ -227,7 +227,7 @@ selected = explore_favelas()
 ```bash
 python scripts/extract_favela_data.py \
     --favela "Vidigal" \
-    --output-dir data/vidigal/raw
+    --output-dir data/vidigal_tls/raw
 ```
 
 ### Command Line - Batch Extraction
@@ -248,7 +248,7 @@ result = extract_favela_data(
     buildings_path="data/RJ/buildings_RJ_2019.shp",
     streets_path="data/RJ/Logradouros.shp",
     favelas_path="data/RJ/Favelas_Limit_2019.shp",
-    output_dir="data/vidigal/raw"
+    output_dir="data/vidigal_tls/raw"
 )
 ```
 

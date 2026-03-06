@@ -3,7 +3,7 @@
 ## Branch Information
 - **Branch**: `feature/morphology-metrics`
 - **Purpose**: Add multiple morphology metrics to the analysis pipeline
-- **Test Areas**: RioDasPedras (informal), Vidigal (informal)
+- **Test Areas**: RioDasPedras (informal), Vidigal_TLS (informal)
 - **Status**: Planning Phase
 
 ---
@@ -248,7 +248,7 @@ This document outlines the plan for adding new morphology metrics to the analysi
   - Data availability (buildings, streets, STL mesh)
   - Computational feasibility
   - Research relevance
-  - Comparative value (RioDasPedras vs Vidigal)
+  - Comparative value (RioDasPedras vs Vidigal_TLS)
 - [ ] Document selected metrics in detail above
 
 ### Phase 2: Code Structure Design
@@ -287,14 +287,14 @@ This document outlines the plan for adding new morphology metrics to the analysi
 - [ ] Output files are correctly formatted
 - [ ] Memory usage is acceptable
 
-#### 4.3 Validation Tests (Vidigal)
-- [ ] Run all metrics on Vidigal data
+#### 4.3 Validation Tests (Vidigal_TLS)
+- [ ] Run all metrics on Vidigal_TLS data
 - [ ] Validate output ranges
 - [ ] Compare with manual calculations
 - [ ] Check spatial consistency
-- [ ] Validate against known characteristics of Vidigal
+- [ ] Validate against known characteristics of Vidigal_TLS
 
-**Vidigal Validation Checklist:**
+**Vidigal_TLS Validation Checklist:**
 - [ ] Building count matches expected (~X buildings)
 - [ ] Metric distributions are reasonable
 - [ ] No computational errors or warnings
@@ -302,7 +302,7 @@ This document outlines the plan for adding new morphology metrics to the analysi
 - [ ] Memory usage is acceptable
 
 #### 4.4 Comparative Validation
-- [ ] Compare metric distributions between RioDasPedras and Vidigal
+- [ ] Compare metric distributions between RioDasPedras and Vidigal_TLS
 - [ ] Verify expected differences (e.g., density, compactness)
 - [ ] Check for consistency in metric relationships
 - [ ] Validate that metrics capture morphological differences
@@ -313,7 +313,7 @@ This document outlines the plan for adding new morphology metrics to the analysi
 - [ ] Create thematic map function for each metric category
 - [ ] Design color schemes appropriate for each metric
 - [ ] Add legends and scale bars
-- [ ] Create side-by-side comparisons (RioDasPedras vs Vidigal)
+- [ ] Create side-by-side comparisons (RioDasPedras vs Vidigal_TLS)
 
 **Visualization Requirements:**
 - [ ] Building-level maps (colored by metric value)
@@ -321,11 +321,11 @@ This document outlines the plan for adding new morphology metrics to the analysi
 - [ ] Street-level maps (for street-related metrics)
 - [ ] Statistical distribution plots
 - [ ] Scatter plots (metric relationships)
-- [ ] Comparative visualizations (RioDasPedras vs Vidigal)
+- [ ] Comparative visualizations (RioDasPedras vs Vidigal_TLS)
 
 #### 5.2 Statistical Visualizations
 - [ ] Histograms for each metric
-- [ ] Box plots (RioDasPedras vs Vidigal)
+- [ ] Box plots (RioDasPedras vs Vidigal_TLS)
 - [ ] Scatter plots (metric correlations)
 - [ ] Summary statistics tables
 
@@ -358,11 +358,11 @@ This document outlines the plan for adding new morphology metrics to the analysi
 - **STL Mesh**: `data/riodaspedras/raw/full_scan.stl` ✅
 - **DTM**: `data/riodaspedras/raw/riodaspedras_dtm.tif` ✅
 
-### Vidigal
-- **Buildings**: `data/vidigal/raw/vidigal_buildings.shp` ✅
-- **Streets**: `data/vidigal/raw/roads_vidigal.shp` ✅
-- **STL Mesh**: `data/vidigal/raw/full_scan.stl` ✅
-- **DTM**: `data/vidigal/raw/vidigal_dtm_cropped.tif` ✅
+### Vidigal_TLS
+- **Buildings**: `data/vidigal_tls/raw/vidigal_buildings.shp` ✅
+- **Streets**: `data/vidigal_tls/raw/roads_vidigal.shp` ✅
+- **STL Mesh**: `data/vidigal_tls/raw/full_scan.stl` ✅
+- **DTM**: `data/vidigal_tls/raw/vidigal_dtm_cropped.tif` ✅
 
 ---
 
@@ -382,7 +382,7 @@ Create simple test cases with known expected values:
 - **Cross-Validation**: Compare with manual calculations for sample buildings
 
 ### 3. Comparative Validation
-- **RioDasPedras vs Vidigal**: Expected differences should be captured
+- **RioDasPedras vs Vidigal_TLS**: Expected differences should be captured
 - **Metric Correlations**: Check relationships between metrics
 - **Literature Comparison**: Compare with published values for similar settlements
 
@@ -416,7 +416,7 @@ Create simple test cases with known expected values:
 ### Statistical Visualizations
 - **Format**: Multi-panel figures (histograms, box plots, scatter plots)
 - **Output**: PNG files
-- **Layout**: Side-by-side comparisons (RioDasPedras vs Vidigal)
+- **Layout**: Side-by-side comparisons (RioDasPedras vs Vidigal_TLS)
 
 ---
 
@@ -436,7 +436,7 @@ outputs/
 │           ├── distributions.png
 │           ├── correlations.png
 │           └── summary_stats.csv
-└── vidigal/
+└── vidigal_tls/
     └── morphology_metrics/
         └── [same structure]
 ```
@@ -452,7 +452,7 @@ outputs/
 
 ### Functional Requirements
 - [ ] All selected metrics implemented and tested
-- [ ] Metrics computed correctly for RioDasPedras and Vidigal
+- [ ] Metrics computed correctly for RioDasPedras and Vidigal_TLS
 - [ ] Output files generated in correct format
 - [ ] Visualizations created for all metrics
 - [ ] Comparative analysis possible between areas
@@ -479,7 +479,7 @@ outputs/
 3. **Design implementation** approach for each metric category
 4. **Create test cases** for validation
 5. **Implement metrics** one category at a time
-6. **Test and validate** on both RioDasPedras and Vidigal
+6. **Test and validate** on both RioDasPedras and Vidigal_TLS
 7. **Create visualizations** for all metrics
 8. **Integrate** into existing pipeline
 9. **Document** usage and interpretation

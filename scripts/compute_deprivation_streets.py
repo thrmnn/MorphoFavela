@@ -7,7 +7,7 @@ SVF deficit and solar access deficit. The deprivation index ranges from 0-1,
 where higher values indicate more environmental deprivation.
 
 Usage:
-    python scripts/compute_deprivation_streets.py --area vidigal
+    python scripts/compute_deprivation_streets.py --area vidigal_tls
     python scripts/compute_deprivation_streets.py --area copacabana
 """
 

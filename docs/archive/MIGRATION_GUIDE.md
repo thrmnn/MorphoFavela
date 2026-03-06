@@ -3,14 +3,14 @@
 **Status**: ✅ Migration complete! This guide is kept for reference only.
 
 All data has been successfully migrated to the area-based structure:
-- Vidigal data: `data/vidigal/raw/`
+- Vidigal_TLS data: `data/vidigal_tls/raw/`
 - Copacabana data: `data/copacabana/raw/`
 
 The comparative analysis framework is complete and operational.
 
 ## Overview
 
-The project now supports analysis of multiple areas (e.g., Vidigal and Copacabana) for comparative studies. This requires reorganizing data and outputs into area-specific directories.
+The project now supports analysis of multiple areas (e.g., Vidigal_TLS and Copacabana) for comparative studies. This requires reorganizing data and outputs into area-specific directories.
 
 ## Step 1: Data Migration
 
@@ -26,7 +26,7 @@ data/
 ### New Structure
 ```
 data/
-├── vidigal/
+├── vidigal_tls/
 │   └── raw/
 │       ├── full_scan.stl
 │       ├── vidigal_buildings.shp
@@ -38,10 +38,10 @@ data/
 
 ### Migration Steps
 
-1. **Migrate Vidigal data:**
+1. **Migrate Vidigal_TLS data:**
    ```bash
    # Move existing files to the new location
-   mv data/raw/* data/vidigal/raw/
+   mv data/raw/* data/vidigal_tls/raw/
    ```
 
 2. **Add Copacabana data:**
@@ -56,7 +56,7 @@ Existing outputs can remain in `outputs/` (root) for backward compatibility, but
 ### New Output Structure
 ```
 outputs/
-├── vidigal/
+├── vidigal_tls/
 │   ├── buildings_with_metrics.gpkg
 │   ├── summary_stats.csv
 │   ├── svf/
@@ -69,15 +69,15 @@ outputs/
 ### To Migrate Existing Outputs (Optional)
 ```bash
 # Create area-specific output directory
-mkdir -p outputs/vidigal
+mkdir -p outputs/vidigal_tls
 
 # Move existing outputs (choose one approach):
 # Option 1: Move everything
-mv outputs/* outputs/vidigal/ 2>/dev/null || true
+mv outputs/* outputs/vidigal_tls/ 2>/dev/null || true
 
 # Option 2: Move specific subdirectories
-mv outputs/svf outputs/vidigal/ 2>/dev/null || true
-mv outputs/solar outputs/vidigal/ 2>/dev/null || true
+mv outputs/svf outputs/vidigal_tls/ 2>/dev/null || true
+mv outputs/solar outputs/vidigal_tls/ 2>/dev/null || true
 # ... etc for other directories
 ```
 
@@ -89,8 +89,8 @@ mv outputs/solar outputs/vidigal/ 2>/dev/null || true
 Scripts will continue to work with explicit file paths:
 ```bash
 python scripts/compute_svf.py \
-    --stl data/vidigal/raw/full_scan.stl \
-    --footprints data/vidigal/raw/vidigal_buildings.shp \
+    --stl data/vidigal_tls/raw/full_scan.stl \
+    --footprints data/vidigal_tls/raw/vidigal_buildings.shp \
     --grid-spacing 5.0
 ```
 
@@ -98,7 +98,7 @@ python scripts/compute_svf.py \
 Future versions may support an `--area` parameter:
 ```bash
 python scripts/compute_svf.py \
-    --area vidigal \
+    --area vidigal_tls \
     --grid-spacing 5.0
 ```
 
@@ -106,7 +106,7 @@ python scripts/compute_svf.py \
 
 1. **Check data structure:**
    ```bash
-   ls -la data/vidigal/raw/
+   ls -la data/vidigal_tls/raw/
    ls -la data/copacabana/raw/
    ```
 
@@ -115,10 +115,10 @@ python scripts/compute_svf.py \
    from src.config import get_area_data_dir, get_area_output_dir
    
    # Should work without errors
-   vidigal_data = get_area_data_dir("vidigal")
+   vidigal_tls_data = get_area_data_dir("vidigal_tls")
    copacabana_data = get_area_data_dir("copacabana")
    
-   print(f"Vidigal data: {vidigal_data}")
+   print(f"Vidigal_TLS data: {vidigal_tls_data}")
    print(f"Copacabana data: {copacabana_data}")
    ```
 
@@ -126,7 +126,7 @@ python scripts/compute_svf.py \
 
 ### Recommended Naming
 
-**Vidigal:**
+**Vidigal_TLS:**
 - STL: `full_scan.stl` or `vidigal_mesh.stl`
 - Buildings: `vidigal_buildings.shp`
 

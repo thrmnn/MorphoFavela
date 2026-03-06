@@ -305,7 +305,7 @@ def main():
     parser.add_argument('--building-buffer', type=float, default=None, help='Only compute SVF for points within this distance of buildings (meters). Reduces computation by focusing on relevant areas.')
     parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/svf)')
     parser.add_argument('--debug-only', action='store_true', help='Only generate debug plot, skip SVF computation')
-    parser.add_argument('--area', type=str, default=None, help='Area name (vidigal, copacabana, riodaspedras) - used to determine if filtering should be applied')
+    parser.add_argument('--area', type=str, default=None, help='Area name (vidigal_tls, copacabana, riodaspedras) - used to determine if filtering should be applied')
     
     args = parser.parse_args()
     

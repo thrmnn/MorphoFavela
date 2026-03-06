@@ -3,7 +3,7 @@
 Run all analyses for a specific area.
 
 Usage:
-    python scripts/run_area_analyses.py --area vidigal
+    python scripts/run_area_analyses.py --area vidigal_tls
     python scripts/run_area_analyses.py --area copacabana
 """
 

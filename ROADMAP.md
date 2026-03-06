@@ -418,7 +418,7 @@ Add comprehensive urban morphology metrics for environmental analysis, including
 ## Immediate Action Items (Current Focus)
 
 ### Phase 3: Multi-Area Setup (This Week)
-1. **Migrate Vidigal data** - Move existing data from `data/raw/` to `data/vidigal/raw/`
+1. **Migrate Vidigal_TLS data** - Move existing data from `data/raw/` to `data/vidigal_tls/raw/`
 2. **Add Copacabana data** - Place STL mesh and building footprints in `data/copacabana/raw/`
 3. **Verify data structure** - Ensure all files are properly organized following naming conventions
 4. **Test area-based paths** - Verify `get_area_data_dir()` and `get_area_output_dir()` work correctly

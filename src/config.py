@@ -11,12 +11,13 @@ RAW_DATA = DATA_DIR / "raw"  # Legacy path (for backward compatibility)
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 # Area-based data organization
-# Areas: vidigal (informal), copacabana (formal), riodaspedras (informal)
-SUPPORTED_AREAS = ["vidigal", "copacabana", "riodaspedras"]
+# Areas: vidigal (informal), vidigal_tls (informal), copacabana (formal), riodaspedras (informal),
+# rocinha (informal), maré (informal)
+SUPPORTED_AREAS = ["vidigal", "vidigal_tls", "copacabana", "riodaspedras", "rocinha", "maré"]
 
 # Area classification: formal vs informal
 FORMAL_AREAS = ["copacabana"]  # Formal settlements (no filtering)
-INFORMAL_AREAS = ["vidigal", "riodaspedras"]   # Informal settlements (with filtering)
+INFORMAL_AREAS = ["vidigal", "vidigal_tls", "riodaspedras", "rocinha", "maré"]   # Informal settlements (with filtering)
 
 def is_formal_area(area: str) -> bool:
     """Check if an area is classified as formal (no filtering applied)."""
@@ -43,15 +44,15 @@ def get_area_analysis_dir(area: str, analysis_type: str) -> Path:
     Get the output directory for a specific area and analysis type.
     
     Args:
-        area: Area name (e.g., 'vidigal', 'copacabana')
+        area: Area name (e.g., 'vidigal_tls', 'copacabana')
         analysis_type: Type of analysis (e.g., 'svf', 'solar', 'deprivation', 'metrics')
         
     Returns:
         Path to the analysis-specific output directory
         
     Examples:
-        >>> get_area_analysis_dir('vidigal', 'svf')
-        Path('outputs/vidigal/svf')
+        >>> get_area_analysis_dir('vidigal_tls', 'svf')
+        Path('outputs/vidigal_tls/svf')
         >>> get_area_analysis_dir('copacabana', 'deprivation_raster')
         Path('outputs/copacabana/deprivation_raster')
     """

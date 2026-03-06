@@ -10,8 +10,8 @@ The street-level SVF computation complements the grid-based SVF analysis by comp
 
 ```bash
 python scripts/compute_svf_streets.py \
-    --stl data/vidigal/raw/full_scan.stl \
-    --roads data/vidigal/raw/roads_vidigal.shp \
+    --stl data/vidigal_tls/raw/full_scan.stl \
+    --roads data/vidigal_tls/raw/roads_vidigal.shp \
     --spacing 3.0 \
     --height 1.5
 ```
@@ -20,24 +20,24 @@ python scripts/compute_svf_streets.py \
 
 ```bash
 python scripts/compute_svf_streets.py \
-    --stl data/vidigal/raw/full_scan.stl \
-    --roads data/vidigal/raw/roads_vidigal.shp \
-    --dtm data/vidigal/raw/vidigal_dtm_cropped.tif \
-    --footprints data/vidigal/raw/vidigal_buildings.shp \
+    --stl data/vidigal_tls/raw/full_scan.stl \
+    --roads data/vidigal_tls/raw/roads_vidigal.shp \
+    --dtm data/vidigal_tls/raw/vidigal_dtm_cropped.tif \
+    --footprints data/vidigal_tls/raw/vidigal_buildings.shp \
     --spacing 3.0 \
     --height 1.5 \
-    --output-dir outputs/vidigal/svf_streets
+    --output-dir outputs/vidigal_tls/svf_streets
 ```
 
 ### Using Area Parameter (Automatic Path Resolution)
 
 ```bash
 python scripts/compute_svf_streets.py \
-    --stl data/vidigal/raw/full_scan.stl \
-    --roads data/vidigal/raw/roads_vidigal.shp \
-    --dtm data/vidigal/raw/vidigal_dtm_cropped.tif \
-    --footprints data/vidigal/raw/vidigal_buildings.shp \
-    --area vidigal \
+    --stl data/vidigal_tls/raw/full_scan.stl \
+    --roads data/vidigal_tls/raw/roads_vidigal.shp \
+    --dtm data/vidigal_tls/raw/vidigal_dtm_cropped.tif \
+    --footprints data/vidigal_tls/raw/vidigal_buildings.shp \
+    --area vidigal_tls \
     --spacing 3.0 \
     --height 1.5
 ```
@@ -54,7 +54,7 @@ python scripts/compute_svf_streets.py \
 | `--height` | 1.5 | Evaluation height above ground (meters, pedestrian eye level) |
 | `--sky-patches` | 145 | Number of sky patches for SVF computation |
 | `--output-dir` | `outputs/svf_streets` | Output directory |
-| `--area` | None | Area name (vidigal/copacabana) for automatic path resolution |
+| `--area` | None | Area name (vidigal_tls/copacabana) for automatic path resolution |
 
 ## Output Files
 
@@ -85,13 +85,13 @@ python scripts/compute_svf_streets.py \
 ============================================================
 STREET-LEVEL SKY VIEW FACTOR (SVF) COMPUTATION
 ============================================================
-STL file: data/vidigal/raw/full_scan.stl
-Road network: data/vidigal/raw/roads_vidigal.shp
+STL file: data/vidigal_tls/raw/full_scan.stl
+Road network: data/vidigal_tls/raw/roads_vidigal.shp
 Point spacing: 3.0m
 Evaluation height: 1.5m (pedestrian eye level)
 Sky patches: 145
-DTM raster: data/vidigal/raw/vidigal_dtm_cropped.tif
-Output directory: outputs/vidigal/svf_streets
+DTM raster: data/vidigal_tls/raw/vidigal_dtm_cropped.tif
+Output directory: outputs/vidigal_tls/svf_streets
 ============================================================
 
 Sampling points along streets with 3.0m spacing...
@@ -135,7 +135,7 @@ Streets with low SVF (< 0.3) indicate constrained sky access, potentially affect
 Compare main streets vs. secondary streets/alleyways:
 ```python
 import geopandas as gpd
-segments = gpd.read_file('outputs/vidigal/svf_streets/street_svf_segments.gpkg')
+segments = gpd.read_file('outputs/vidigal_tls/svf_streets/street_svf_segments.gpkg')
 
 main_streets = segments[segments['hierarchy'] == 'Main']
 secondary = segments[segments['hierarchy'] == 'Secondary']

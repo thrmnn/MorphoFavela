@@ -103,5 +103,5 @@
 
 1. Review the detailed plan: `docs/FAVELA_DATA_EXTRACTION_PLAN.md`
 2. Start with notebook implementation
-3. Test extraction on known favelas (Vidigal, Rio das Pedras)
+3. Test extraction on known favelas (Vidigal_TLS, Rio das Pedras)
 4. Scale up to batch processing

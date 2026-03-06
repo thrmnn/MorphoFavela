@@ -1,6 +1,6 @@
 # Area Analysis Guide
 
-This guide covers running analyses for individual areas (Vidigal or Copacabana).
+This guide covers running analyses for individual areas (Vidigal_TLS or Copacabana).
 
 ## Prerequisites
 
@@ -19,9 +19,9 @@ pip install -r requirements.txt
 
 ## Data Files
 
-### Vidigal (Informal Settlement)
-- **STL mesh**: `data/vidigal/raw/full_scan.stl`
-- **Building footprints**: `data/vidigal/raw/vidigal_buildings.shp`
+### Vidigal_TLS (Informal Settlement)
+- **STL mesh**: `data/vidigal_tls/raw/full_scan.stl`
+- **Building footprints**: `data/vidigal_tls/raw/vidigal_buildings.shp`
 
 ### Copacabana (Formal Neighborhood)
 - **STL mesh**: `data/copacabana/raw/copa2/copa2.stl`
@@ -34,14 +34,14 @@ pip install -r requirements.txt
 The easiest way to run all analyses is using the batch script:
 
 ```bash
-# Run all analyses for Vidigal
-python scripts/run_area_analyses.py --area vidigal
+# Run all analyses for Vidigal_TLS
+python scripts/run_area_analyses.py --area vidigal_tls
 
 # Run all analyses for Copacabana
 python scripts/run_area_analyses.py --area copacabana
 
 # With custom grid spacing
-python scripts/run_area_analyses.py --area vidigal --grid-spacing 3.0
+python scripts/run_area_analyses.py --area vidigal_tls --grid-spacing 3.0
 ```
 
 ## Running Individual Analyses
@@ -52,13 +52,13 @@ python scripts/run_area_analyses.py --area vidigal --grid-spacing 3.0
 
 ```bash
 # Using area parameter (recommended)
-python scripts/calculate_metrics.py --area vidigal
+python scripts/calculate_metrics.py --area vidigal_tls
 python scripts/calculate_metrics.py --area copacabana
 
 # Or with explicit paths
 python scripts/calculate_metrics.py \
-    --input data/vidigal/raw/vidigal_buildings.shp \
-    --output outputs/vidigal/metrics/
+    --input data/vidigal_tls/raw/vidigal_buildings.shp \
+    --output outputs/vidigal_tls/metrics/
 ```
 
 ### 2. Sky View Factor (SVF)
@@ -187,7 +187,7 @@ ls outputs/copacabana/porosity/*.npy
 
 ## Next Steps
 
-Once both Vidigal and Copacabana analyses are complete:
+Once both Vidigal_TLS and Copacabana analyses are complete:
 - Comparative analysis scripts (Phase 3.1) will enable side-by-side comparisons
 - Statistical comparisons between formal and informal settlements
 - Visual comparison dashboards

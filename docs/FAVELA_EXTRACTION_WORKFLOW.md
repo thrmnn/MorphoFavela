@@ -206,7 +206,7 @@ Time: 5-30 seconds per favela
 ```bash
 python scripts/extract_favela_data.py \
     --favela "Vidigal" \
-    --output-dir data/vidigal/raw
+    --output-dir data/vidigal_tls/raw
 ```
 
 ### Scenario 3: Batch Extraction (CLI)

@@ -10,6 +10,8 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import LinearSegmentedColormap, Normalize
 from shapely.geometry import box
 
 
@@ -64,6 +66,8 @@ def plot_svf_with_isolines(
     footprints_path: Path | None = None,
     reference_roads: Path | None = None,
     n_levels: int = 18,
+    scale_mode: str = "full",
+    clip_percentile: float = 95.0,
 ) -> None:
     """Create map of SVF segments with DTM contour lines."""
     if not segments_path.exists():
@@ -142,28 +146,33 @@ def plot_svf_with_isolines(
 
     fig, ax = plt.subplots(figsize=(12, 10))
 
-    # Determine plot extent: union of DTM bounds, aligned segments, and buildings
+    # Determine plot extent from polygon bbox (buildings) and segments.
+    # This keeps zoom focused on the analyzed urban fabric instead of full DTM.
     seg_bounds = segments.total_bounds
     print(f"Aligned segments bounds: {seg_bounds}")
-    
-    # Start with DTM bounds
-    plot_bounds = [dtm_bounds.left, dtm_bounds.bottom, dtm_bounds.right, dtm_bounds.top]
-    
-    # Expand to include segments
-    plot_bounds[0] = min(plot_bounds[0], seg_bounds[0])
-    plot_bounds[1] = min(plot_bounds[1], seg_bounds[1])
-    plot_bounds[2] = max(plot_bounds[2], seg_bounds[2])
-    plot_bounds[3] = max(plot_bounds[3], seg_bounds[3])
-    
-    # Expand to include buildings if present
+
     if building_footprints is not None and not building_footprints.empty:
         build_bounds = building_footprints.total_bounds
-        plot_bounds[0] = min(plot_bounds[0], build_bounds[0])
-        plot_bounds[1] = min(plot_bounds[1], build_bounds[1])
-        plot_bounds[2] = max(plot_bounds[2], build_bounds[2])
-        plot_bounds[3] = max(plot_bounds[3], build_bounds[3])
+        plot_bounds = [
+            min(build_bounds[0], seg_bounds[0]),
+            min(build_bounds[1], seg_bounds[1]),
+            max(build_bounds[2], seg_bounds[2]),
+            max(build_bounds[3], seg_bounds[3]),
+        ]
+    else:
+        plot_bounds = [seg_bounds[0], seg_bounds[1], seg_bounds[2], seg_bounds[3]]
     
-    print(f"Plot extent: X=[{plot_bounds[0]:.2f}, {plot_bounds[2]:.2f}], Y=[{plot_bounds[1]:.2f}, {plot_bounds[3]:.2f}]")
+    # Add a consistent margin so the map is not overly tight around features.
+    width = max(plot_bounds[2] - plot_bounds[0], 1e-6)
+    height = max(plot_bounds[3] - plot_bounds[1], 1e-6)
+    pad_x = 0.07 * width
+    pad_y = 0.07 * height
+    plot_bounds[0] -= pad_x
+    plot_bounds[1] -= pad_y
+    plot_bounds[2] += pad_x
+    plot_bounds[3] += pad_y
+
+    print(f"Plot extent (padded): X=[{plot_bounds[0]:.2f}, {plot_bounds[2]:.2f}], Y=[{plot_bounds[1]:.2f}, {plot_bounds[3]:.2f}]")
     
     # Set plot extent BEFORE drawing anything to ensure contours are visible
     ax.set_xlim(plot_bounds[0], plot_bounds[2])
@@ -178,26 +187,44 @@ def plot_svf_with_isolines(
     assert xs.shape == dem.shape, f"X coordinate array shape {xs.shape} doesn't match DEM shape {dem.shape}"
     assert ys.shape == dem.shape, f"Y coordinate array shape {ys.shape} doesn't match DEM shape {dem.shape}"
     
-    # Draw contours FIRST (before other layers) to ensure they're visible
+    # Draw contours FIRST (before other layers) to ensure they're visible.
+    # Use two passes (minor + major) for stronger terrain readability.
     try:
-        # Use the requested number of levels
-        visible_levels = np.linspace(zmin, zmax, n_levels)
-        
-        # Fine, dotted, muted isolines in the background (more visible)
-        contour = ax.contour(
+        minor_levels = np.linspace(zmin, zmax, n_levels)
+        major_levels = np.linspace(zmin, zmax, max(6, n_levels // 2))
+
+        contour_minor = ax.contour(
             xs,
             ys,
             dem_for_contour,
-            levels=visible_levels,
-            colors="#6a7c8d",  # Slightly darker muted blue-grey for better visibility
-            linewidths=0.4,  # Slightly thicker for clarity
+            levels=minor_levels,
+            colors="#4e6375",
+            linewidths=0.75,
             linestyles="dotted",
-            alpha=0.55,  # More visible while still subtle
-            zorder=1,  # Behind everything
+            alpha=0.85,
+            zorder=1,
         )
-        # Count actual contour lines generated (not just collections)
-        n_contour_lines = sum(len(seg) > 0 for coll in contour.allsegs for seg in coll)
-        print(f"Generated {len(contour.allsegs)} contour collections with {n_contour_lines} total contour lines")
+
+        contour_major = ax.contour(
+            xs,
+            ys,
+            dem_for_contour,
+            levels=major_levels,
+            colors="#2f4557",
+            linewidths=1.15,
+            linestyles="solid",
+            alpha=0.70,
+            zorder=1,
+        )
+
+        # Count actual contour lines generated (not just collections).
+        n_contour_lines_minor = sum(len(seg) > 0 for coll in contour_minor.allsegs for seg in coll)
+        n_contour_lines_major = sum(len(seg) > 0 for coll in contour_major.allsegs for seg in coll)
+        n_contour_lines = n_contour_lines_minor + n_contour_lines_major
+        print(
+            f"Generated {len(contour_minor.allsegs) + len(contour_major.allsegs)} contour collections "
+            f"with {n_contour_lines} total contour lines"
+        )
         if n_contour_lines == 0:
             print("WARNING: No contour lines were generated! Check coordinate grid and DEM data.")
     except Exception as e:
@@ -217,18 +244,44 @@ def plot_svf_with_isolines(
             zorder=2,
         )
 
-    # SVF segments
+    # SVF segments (supports full-range or percentile-capped minmax scaling).
+    svf_values = segments["svf_mean"].to_numpy(dtype=float)
+    if scale_mode == "minmax":
+        svf_min = float(np.nanmin(svf_values))
+        svf_high = float(np.nanpercentile(svf_values, clip_percentile))
+        if not np.isfinite(svf_high) or svf_high <= svf_min:
+            svf_high = float(np.nanmax(svf_values))
+        denom = max(svf_high - svf_min, 1e-9)
+        segments = segments.copy()
+        segments["__svf_plot"] = np.clip(svf_values, svf_min, svf_high)
+        cmap = LinearSegmentedColormap.from_list(
+            "brown_to_sand",
+            ["#5C3A21", "#C8A26E", "#E8D8B0"],
+        )
+        norm = Normalize(vmin=svf_min, vmax=svf_high)
+        legend_label = f"Street SVF (min-max p{int(clip_percentile)} capped)"
+    else:
+        segments = segments.copy()
+        segments["__svf_plot"] = svf_values
+        cmap = "RdYlGn"
+        norm = Normalize(vmin=0.0, vmax=1.0)
+        legend_label = "Street SVF (mean)"
+
     segments.plot(
         ax=ax,
-        column="svf_mean",
-        cmap="RdYlGn",
-        vmin=0,
-        vmax=1,
+        column="__svf_plot",
+        cmap=cmap,
+        vmin=norm.vmin,
+        vmax=norm.vmax,
         linewidth=3.0,
-        legend=True,
-        legend_kwds={"label": "Street SVF (mean)", "shrink": 0.8},
+        legend=False,
         zorder=4,
     )
+
+    sm = ScalarMappable(norm=norm, cmap=cmap)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=ax, fraction=0.036, pad=0.01, shrink=0.8)
+    cbar.set_label(legend_label)
 
     # Re-apply plot extent after geopandas plots (they might reset it)
     ax.set_xlim(plot_bounds[0], plot_bounds[2])
@@ -261,6 +314,18 @@ def main() -> None:
         help="Optional roads shapefile in original CRS for robust alignment",
     )
     parser.add_argument("--levels", type=int, default=18, help="Number of contour levels")
+    parser.add_argument(
+        "--scale-mode",
+        choices=["full", "minmax"],
+        default="full",
+        help="SVF color scaling: full range [0,1] or percentile-capped minmax.",
+    )
+    parser.add_argument(
+        "--clip-percentile",
+        type=float,
+        default=95.0,
+        help="Upper percentile cap used when --scale-mode=minmax (default: 95).",
+    )
     args = parser.parse_args()
 
     plot_svf_with_isolines(
@@ -270,6 +335,8 @@ def main() -> None:
         footprints_path=Path(args.footprints) if args.footprints else None,
         reference_roads=Path(args.reference_roads) if args.reference_roads else None,
         n_levels=args.levels,
+        scale_mode=args.scale_mode,
+        clip_percentile=args.clip_percentile,
     )
 
 

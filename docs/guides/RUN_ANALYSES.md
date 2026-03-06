@@ -20,8 +20,8 @@ pip install -r requirements.txt
 The easiest way is to use the batch script that runs all analyses for an area:
 
 ```bash
-# Vidigal
-python scripts/run_area_analyses.py --area vidigal
+# Vidigal_TLS
+python scripts/run_area_analyses.py --area vidigal_tls
 
 # Copacabana  
 python scripts/run_area_analyses.py --area copacabana
@@ -57,7 +57,7 @@ This generates:
 ## Expected Outputs
 
 Results will be saved to:
-- **Vidigal**: `outputs/vidigal/{analysis_type}/`
+- **Vidigal_TLS**: `outputs/vidigal_tls/{analysis_type}/`
 - **Copacabana**: `outputs/copacabana/{analysis_type}/`
 
 Each analysis creates:

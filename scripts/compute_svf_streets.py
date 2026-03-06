@@ -8,8 +8,8 @@ by focusing specifically on pedestrian experience along street networks.
 
 Usage:
     python scripts/compute_svf_streets.py \
-        --stl data/vidigal/raw/full_scan.stl \
-        --roads data/vidigal/raw/roads_vidigal.shp \
+        --stl data/vidigal_tls/raw/full_scan.stl \
+        --roads data/vidigal_tls/raw/roads_vidigal.shp \
         --spacing 3.0 \
         --height 1.5
 """
@@ -527,26 +527,37 @@ def create_street_svf_map(
     
     fig, ax = plt.subplots(figsize=(14, 12))
     
+    # Building footprints should already be in the correct coordinate system
+    # (aligned in the main script before calling this function)
+    # No need for additional alignment here
+    
     # Plot building footprints as background (if available)
-    if building_footprints is not None:
+    if building_footprints is not None and not building_footprints.empty:
         building_footprints.plot(
             ax=ax, facecolor='lightgrey', edgecolor='black', 
             linewidth=0.5, alpha=0.5, label='Buildings'
         )
     
+    # Use actual SVF range for better visualization (not fixed 0-1)
+    svf_values = segments_gdf['svf_mean'].values
+    svf_min = float(svf_values.min())
+    svf_max = float(svf_values.max())
+    
     # Plot street segments colored by mean SVF
     segments_gdf.plot(
         ax=ax, column='svf_mean', cmap='RdYlGn',
-        vmin=0, vmax=1, linewidth=3, legend=True,
-        legend_kwds={'label': 'Mean SVF (0-1)', 'shrink': 0.8},
+        vmin=svf_min, vmax=svf_max, linewidth=3, legend=True,
+        legend_kwds={'label': f'Mean SVF ({svf_min:.3f}-{svf_max:.3f})', 'shrink': 0.8},
         label='Street segments'
     )
     
     # Optionally plot points (for detailed view)
     if points_gdf is not None and len(points_gdf) < 1000:  # Only if not too many points
+        points_svf_min = float(points_gdf['svf'].min())
+        points_svf_max = float(points_gdf['svf'].max())
         points_gdf.plot(
             ax=ax, column='svf', cmap='RdYlGn',
-            vmin=0, vmax=1, markersize=2, alpha=0.6, zorder=10
+            vmin=points_svf_min, vmax=points_svf_max, markersize=2, alpha=0.6, zorder=10
         )
     
     ax.set_xlabel('X (meters)', fontsize=12)
@@ -556,7 +567,7 @@ def create_street_svf_map(
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     
-    if building_footprints is not None:
+    if building_footprints is not None and not building_footprints.empty:
         ax.legend(loc='upper right')
     
     plt.tight_layout()
@@ -572,6 +583,7 @@ def create_street_svf_map_minmax(
     output_path: Path = None,
     dtm_path: Path = None,
     clip_percentile: float = 95.0,
+    show_isolines: bool = False,
 ):
     """
     Create an additional min-max scaled SVF map.
@@ -604,8 +616,9 @@ def create_street_svf_map_minmax(
         N=256
     )
 
-    # Optional terrain isolines when a DTM is provided.
-    if dtm_path is not None and dtm_path.exists() and HAS_RASTERIO:
+    # Optional terrain isolines only for dedicated isoline variants.
+    dtm_bounds_aligned = None
+    if show_isolines and dtm_path is not None and dtm_path.exists() and HAS_RASTERIO:
         try:
             with rasterio.open(dtm_path) as src:
                 dem = src.read(1, masked=True)
@@ -637,6 +650,8 @@ def create_street_svf_map_minmax(
                 dy = _center(seg_bounds)[1] - _center(dtm_bounds)[1]
                 xs = xs + dx
                 ys = ys + dy
+                dtm_bounds = dtm_bounds + np.array([dx, dy, dx, dy])
+            dtm_bounds_aligned = dtm_bounds
 
             zmin = float(np.nanmin(dem_arr))
             zmax = float(np.nanmax(dem_arr))
@@ -656,7 +671,11 @@ def create_street_svf_map_minmax(
         except Exception as exc:
             logger.warning(f"  Could not draw terrain isolines from DTM: {exc}")
 
-    if building_footprints is not None:
+    # Building footprints should already be in the correct coordinate system
+    # (aligned in the main script before calling this function)
+    # No need for additional alignment here
+
+    if building_footprints is not None and not building_footprints.empty:
         building_footprints.plot(
             ax=ax,
             facecolor='lightgrey',
@@ -689,6 +708,26 @@ def create_street_svf_map_minmax(
     cbar.set_ticklabels([f"{s:.3f}" for s in svf_ticks])
     cbar.set_label(f"SVF (p{int(clip_percentile)} capped min-max mapping)")
 
+    # Set map extent from polygon bbox (building footprints), with segments fallback.
+    # This prevents DTM-driven over-zoom into a much larger surrounding area.
+    bounds_to_merge = [plot_segments.total_bounds]
+    if building_footprints is not None and not building_footprints.empty:
+        bounds_to_merge = [aligned_footprints.total_bounds, plot_segments.total_bounds]
+
+    merged = np.array(bounds_to_merge, dtype=float)
+    minx = float(np.min(merged[:, 0]))
+    miny = float(np.min(merged[:, 1]))
+    maxx = float(np.max(merged[:, 2]))
+    maxy = float(np.max(merged[:, 3]))
+
+    width = max(maxx - minx, 1e-6)
+    height = max(maxy - miny, 1e-6)
+    pad_x = 0.07 * width
+    pad_y = 0.07 * height
+
+    ax.set_xlim(minx - pad_x, maxx + pad_x)
+    ax.set_ylim(miny - pad_y, maxy + pad_y)
+
     ax.set_title('Street-Level SVF (Min-Max Scaled)', fontsize=14, fontweight='bold')
     ax.set_aspect('equal')
     ax.set_axis_off()
@@ -706,6 +745,7 @@ def create_street_svf_map_minmax_purple(
     output_path: Path = None,
     dtm_path: Path = None,
     clip_percentile: float = 95.0,
+    show_isolines: bool = False,
 ):
     """Backward-compatible wrapper for older calls."""
     return create_street_svf_map_minmax(
@@ -714,6 +754,7 @@ def create_street_svf_map_minmax_purple(
         output_path=output_path,
         dtm_path=dtm_path,
         clip_percentile=clip_percentile,
+        show_isolines=show_isolines,
     )
 
 
@@ -749,15 +790,34 @@ def create_statistics_plots(
     ax.set_xlim(0, 1)
     ax.grid(True, alpha=0.3)
     
-    # Add comfort SVF threshold at 0.3
-    ax.axvline(0.3, color='orange', linestyle=':', linewidth=2, label='Comfort threshold (SVF = 0.3)')
+    # Add comfort SVF threshold at 0.3.
+    comfort_threshold = 0.3
+    ax.axvline(
+        comfort_threshold,
+        color='orange',
+        linestyle=':',
+        linewidth=2,
+        label=f'Comfort threshold (SVF = {comfort_threshold:.1f})'
+    )
     
     # Add statistics
     mean_svf = points_gdf['svf'].mean()
     median_svf = points_gdf['svf'].median()
     ax.axvline(mean_svf, color='red', linestyle='--', linewidth=2, label=f'Mean: {mean_svf:.3f}')
     ax.axvline(median_svf, color='green', linestyle='--', linewidth=2, label=f'Median: {median_svf:.3f}')
-    ax.legend()
+
+    # Add segment-level comfort share as a legend entry.
+    pct_segments_below = 100.0 * float((segments_gdf['svf_mean'] < comfort_threshold).mean())
+    from matplotlib.lines import Line2D
+    comfort_handle = Line2D(
+        [0], [0],
+        color='none',
+        label=f'Segments below comfort threshold: {pct_segments_below:.1f}%'
+    )
+    handles, labels = ax.get_legend_handles_labels()
+    handles.append(comfort_handle)
+    labels.append(comfort_handle.get_label())
+    ax.legend(handles, labels)
     
     plt.tight_layout()
     hist_path = output_dir / "street_svf_distribution.png"
@@ -811,7 +871,7 @@ def main():
     parser.add_argument('--height', type=float, default=1.5, help='Evaluation height above ground (meters, default: 1.5)')
     parser.add_argument('--sky-patches', type=int, default=145, help='Number of sky patches (default: 145)')
     parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/svf_street)')
-    parser.add_argument('--area', type=str, default=None, help='Area name (e.g., vidigal, copacabana) for automatic path resolution')
+    parser.add_argument('--area', type=str, default=None, help='Area name (e.g., vidigal_tls, copacabana) for automatic path resolution')
     parser.add_argument('--building-buffer', type=float, default=30.0, help='Buffer distance from buildings to filter streets (meters, default: 30.0)')
     parser.add_argument('--debug-only', action='store_true', help='Only generate debug plot and exit, do not compute SVF')
     
@@ -1039,43 +1099,59 @@ def main():
     # Aggregate to segment level (use filtered roads for aggregation)
     segments_gdf = aggregate_segment_statistics(points_gdf, svf_values, filtered_roads_gdf)
     
+    # Translate results back to source (world) coordinates before saving.
+    # Streets were shifted into STL-local space for ray casting.
+    points_gdf_world = points_gdf.copy()
+    points_gdf_world.geometry = points_gdf_world.geometry.translate(xoff=-dx, yoff=-dy)
+
+    segments_gdf_world = segments_gdf.copy()
+    segments_gdf_world.geometry = segments_gdf_world.geometry.translate(xoff=-dx, yoff=-dy)
+    
+    # Also translate building footprints back to world coordinates for visualization
+    # (they were transformed to local coordinates by load_building_footprints)
+    building_footprints_world = None
+    if building_footprints is not None:
+        building_footprints_world = building_footprints.copy()
+        building_footprints_world.geometry = building_footprints_world.geometry.translate(xoff=-dx, yoff=-dy)
+
     # Save results
     logger.info("Saving results...")
     
     # Point-level output
     points_output = output_dir / "street_svf_points.gpkg"
-    points_gdf.to_file(points_output, driver='GPKG')
+    points_gdf_world.to_file(points_output, driver='GPKG')
     logger.info(f"  Saved point-level results to {points_output}")
     
     # Segment-level output
     segments_output = output_dir / "street_svf_segments.gpkg"
-    segments_gdf.to_file(segments_output, driver='GPKG')
+    segments_gdf_world.to_file(segments_output, driver='GPKG')
     logger.info(f"  Saved segment-level results to {segments_output}")
     
     # CSV summary
     csv_output = output_dir / "street_svf_statistics.csv"
-    segments_gdf.drop(columns=['geometry']).to_csv(csv_output, index=False)
+    segments_gdf_world.drop(columns=['geometry']).to_csv(csv_output, index=False)
     logger.info(f"  Saved statistics to {csv_output}")
     
     # Visualizations
     logger.info("Generating visualizations...")
     
-    # Street SVF map (building footprints already loaded above)
+    # Street SVF map (use world coordinates for buildings)
     map_path = output_dir / "street_svf_map.png"
-    create_street_svf_map(segments_gdf, points_gdf, building_footprints, map_path)
+    create_street_svf_map(segments_gdf_world, points_gdf_world, building_footprints_world, map_path)
 
     # Additional robust min-max map (brown->sand, kept as a separate output).
     minmax_map_path = output_dir / "street_svf_map_minmax.png"
     create_street_svf_map_minmax(
-        segments_gdf,
-        building_footprints,
+        segments_gdf_world,
+        building_footprints_world,
         minmax_map_path,
         dtm_path=dtm_path,
-        clip_percentile=95.0
+        clip_percentile=95.0,
+        show_isolines=False,
     )
     
     # Statistics plots
-    create_statistics_plots(segments_gdf, points_gdf, output_dir)
+    create_statistics_plots(segments_gdf_world, points_gdf_world, output_dir)
     
     # Print summary
     print("\n" + "=" * 60)

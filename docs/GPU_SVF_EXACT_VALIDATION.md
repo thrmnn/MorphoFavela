@@ -20,17 +20,17 @@ The exact kernel fixes those mismatches while still using GPU acceleration.
 Ground-truth CPU references:
 
 - `outputs/riodaspedras/svf_streets/street_svf_points.gpkg`
-- `outputs/vidigal/svf_streets/street_svf_points.gpkg`
+- `outputs/vidigal_tls/svf_streets/street_svf_points.gpkg`
 
 Validated exact-GPU outputs:
 
 - `outputs/riodaspedras/svf_streets_gpu_exact/street_svf_points.gpkg`
-- `outputs/vidigal/svf_streets_gpu_exact/street_svf_points.gpkg`
+- `outputs/vidigal_tls/svf_streets_gpu_exact/street_svf_points.gpkg`
 
 Comparison summary:
 
 - Rio das Pedras: correlation 1.0000, max abs diff 0.0065
-- Vidigal: correlation 1.0000, max abs diff 0.0000
+- Vidigal_TLS: correlation 1.0000, max abs diff 0.0000
 
 ## Final Production Run
 
@@ -63,14 +63,14 @@ python scripts/compute_svf_streets_gpu.py \
   --output-dir /home/theo/IVF/outputs/riodaspedras/svf_streets_gpu_exact
 ```
 
-### Vidigal (Exact GPU)
+### Vidigal_TLS (Exact GPU)
 
 ```bash
 python scripts/compute_svf_streets_gpu.py \
-  --stl /home/theo/IVF/data/vidigal/raw/full_scan.stl \
-  --roads /home/theo/IVF/data/vidigal/raw/roads_vidigal.shp \
-  --footprints /home/theo/IVF/data/vidigal/raw/vidigal_buildings.shp \
-  --area vidigal \
+  --stl /home/theo/IVF/data/vidigal_tls/raw/full_scan.stl \
+  --roads /home/theo/IVF/data/vidigal_tls/raw/roads_vidigal.shp \
+  --footprints /home/theo/IVF/data/vidigal_tls/raw/vidigal_buildings.shp \
+  --area vidigal_tls \
   --spacing 3.0 \
   --height 1.5 \
   --sky-patches 145 \
@@ -78,7 +78,7 @@ python scripts/compute_svf_streets_gpu.py \
   --gpu-batch-size 200 \
   --gpu-ray-chunk-size 1024 \
   --gpu-tri-chunk-size 4096 \
-  --output-dir /home/theo/IVF/outputs/vidigal/svf_streets_gpu_exact
+  --output-dir /home/theo/IVF/outputs/vidigal_tls/svf_streets_gpu_exact
 ```
 
 ### Rocinha (Exact GPU)

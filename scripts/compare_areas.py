@@ -2,7 +2,7 @@
 """
 Comparative Analysis: Formal vs Informal Settlements
 
-Compare Vidigal (informal) and Copacabana (formal) across all metrics.
+Compare Vidigal_TLS (informal) and Copacabana (formal) across all metrics.
 
 Usage:
     python scripts/compare_areas.py
@@ -28,7 +28,7 @@ SWISS_COLORS = {
     'primary': '#000000',      # Black
     'secondary': '#666666',    # Dark gray
     'accent': '#0066CC',       # Blue accent
-    'vidigal': '#E63946',      # Red for informal
+    'vidigal_tls': '#E63946',      # Red for informal
     'copacabana': '#0066CC',   # Blue for formal
     'background': '#FFFFFF',   # White
     'light_gray': '#F5F5F5',   # Light gray for backgrounds
@@ -528,7 +528,7 @@ def create_comparison_visualizations(vidigal_data: dict, copacabana_data: dict,
                 bins = np.linspace(min_val, max_val, 30)
                 
                 ax.hist(vid_vals, bins=bins, alpha=0.7, label='Vidigal (Informal)', 
-                       color=SWISS_COLORS['vidigal'], density=True, edgecolor='white', linewidth=0.5)
+                       color=SWISS_COLORS['vidigal_tls'], density=True, edgecolor='white', linewidth=0.5)
                 ax.hist(copa_vals, bins=bins, alpha=0.7, label='Copacabana (Formal)', 
                        color=SWISS_COLORS['copacabana'], density=True, edgecolor='white', linewidth=0.5)
                 
@@ -568,7 +568,7 @@ def create_comparison_visualizations(vidigal_data: dict, copacabana_data: dict,
         positions = np.arange(len(metrics_to_plot)) * 3
         bp1 = ax.boxplot([d[0] for d in data_to_plot], positions=positions - 0.4, widths=0.35, 
                          patch_artist=True, tick_labels=[l + '\n(Vidigal)' for l in labels],
-                         boxprops=dict(facecolor=SWISS_COLORS['vidigal'], alpha=0.8, edgecolor=SWISS_COLORS['text'], linewidth=0.8),
+                         boxprops=dict(facecolor=SWISS_COLORS['vidigal_tls'], alpha=0.8, edgecolor=SWISS_COLORS['text'], linewidth=0.8),
                          medianprops=dict(color=SWISS_COLORS['text'], linewidth=1.2),
                          whiskerprops=dict(color=SWISS_COLORS['secondary'], linewidth=0.8),
                          capprops=dict(color=SWISS_COLORS['secondary'], linewidth=0.8))
@@ -671,10 +671,10 @@ def create_comparison_visualizations(vidigal_data: dict, copacabana_data: dict,
                 bins = np.linspace(min_val, max_val, 50)
                 
                 ax.hist(vid_valid, bins=bins, alpha=0.7, label='Vidigal (Informal)', 
-                       color=SWISS_COLORS['vidigal'], density=True, edgecolor='white', linewidth=0.5)
+                       color=SWISS_COLORS['vidigal_tls'], density=True, edgecolor='white', linewidth=0.5)
                 ax.hist(copa_valid, bins=bins, alpha=0.7, label='Copacabana (Formal)', 
                        color=SWISS_COLORS['copacabana'], density=True, edgecolor='white', linewidth=0.5)
-                ax.axvline(np.nanmean(vid_valid), color=SWISS_COLORS['vidigal'], 
+                ax.axvline(np.nanmean(vid_valid), color=SWISS_COLORS['vidigal_tls'], 
                           linestyle='--', linewidth=2, alpha=0.8,
                           label=f'Vidigal mean: {np.nanmean(vid_valid):.3f}')
                 ax.axvline(np.nanmean(copa_valid), color=SWISS_COLORS['copacabana'], 
@@ -699,7 +699,7 @@ def create_comparison_visualizations(vidigal_data: dict, copacabana_data: dict,
     # Load existing maps that already include building footprints
     
     # SVF streets - load existing maps
-    vid_svf_map_path = get_area_analysis_dir('vidigal', 'svf_streets') / 'street_svf_map.png'
+    vid_svf_map_path = get_area_analysis_dir('vidigal_tls', 'svf_streets') / 'street_svf_map.png'
     copa_svf_map_path = get_area_analysis_dir('copacabana', 'svf_streets') / 'street_svf_map.png'
     
     if vid_svf_map_path.exists() and copa_svf_map_path.exists():
@@ -864,10 +864,10 @@ def create_comparison_visualizations(vidigal_data: dict, copacabana_data: dict,
                     bins = np.linspace(min_val, max_val, 30)
                     
                     ax.hist(vid_vals, bins=bins, alpha=0.7, label='Vidigal (Informal)', 
-                           color=SWISS_COLORS['vidigal'], density=True, edgecolor='white', linewidth=0.5)
+                           color=SWISS_COLORS['vidigal_tls'], density=True, edgecolor='white', linewidth=0.5)
                     ax.hist(copa_vals, bins=bins, alpha=0.7, label='Copacabana (Formal)', 
                            color=SWISS_COLORS['copacabana'], density=True, edgecolor='white', linewidth=0.5)
-                    ax.axvline(np.mean(vid_vals), color=SWISS_COLORS['vidigal'], 
+                    ax.axvline(np.mean(vid_vals), color=SWISS_COLORS['vidigal_tls'], 
                               linestyle='--', linewidth=2, alpha=0.8,
                               label=f'Vidigal mean: {np.mean(vid_vals):.2f}')
                     ax.axvline(np.mean(copa_vals), color=SWISS_COLORS['copacabana'], 
@@ -898,7 +898,7 @@ def create_comparison_visualizations(vidigal_data: dict, copacabana_data: dict,
                     
                     bp = ax.boxplot([vid_vals, copa_vals], tick_labels=['Vidigal\n(Informal)', 'Copacabana\n(Formal)'],
                                    patch_artist=True)
-                    bp['boxes'][0].set_facecolor(SWISS_COLORS['vidigal'])
+                    bp['boxes'][0].set_facecolor(SWISS_COLORS['vidigal_tls'])
                     bp['boxes'][0].set_alpha(0.6)
                     bp['boxes'][1].set_facecolor(SWISS_COLORS['copacabana'])
                     bp['boxes'][1].set_alpha(0.6)
@@ -937,10 +937,10 @@ def create_comparison_visualizations(vidigal_data: dict, copacabana_data: dict,
             bins = np.linspace(min_val, max_val, 30)
             
             ax.hist(vid_vals, bins=bins, alpha=0.7, label='Vidigal (Informal)', 
-                   color=SWISS_COLORS['vidigal'], density=True, edgecolor='white', linewidth=0.5)
+                   color=SWISS_COLORS['vidigal_tls'], density=True, edgecolor='white', linewidth=0.5)
             ax.hist(copa_vals, bins=bins, alpha=0.7, label='Copacabana (Formal)', 
                    color=SWISS_COLORS['copacabana'], density=True, edgecolor='white', linewidth=0.5)
-            ax.axvline(np.mean(vid_vals), color=SWISS_COLORS['vidigal'], 
+            ax.axvline(np.mean(vid_vals), color=SWISS_COLORS['vidigal_tls'], 
                       linestyle='--', linewidth=2, alpha=0.8,
                       label=f'Vidigal mean: {np.mean(vid_vals):.3f}')
             ax.axvline(np.mean(copa_vals), color=SWISS_COLORS['copacabana'], 
@@ -1049,7 +1049,7 @@ def generate_pdf_report(vidigal_data: dict, copacabana_data: dict,
         # Vidigal
         ax.text(0.1, current_y, 'Vidigal (Informal):', 
                transform=ax.transAxes, fontsize=10, fontweight='bold',
-               color=SWISS_COLORS['vidigal'], family='sans-serif',
+               color=SWISS_COLORS['vidigal_tls'], family='sans-serif',
                verticalalignment='top')
         current_y -= line_height * 1.2
         ax.text(0.15, current_y, f'Buildings: {vidigal_data["building_count"]}', 
@@ -1327,7 +1327,7 @@ def main():
     (output_dir / 'metrics').mkdir(exist_ok=True)
     
     # Load data
-    vidigal_data = load_area_data('vidigal')
+    vidigal_data = load_area_data('vidigal_tls')
     copacabana_data = load_area_data('copacabana')
     
     # Compare morphometric metrics

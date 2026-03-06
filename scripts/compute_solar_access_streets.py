@@ -9,11 +9,11 @@ experience along street networks.
 
 Usage:
     python scripts/compute_solar_access_streets.py \
-        --stl data/vidigal/raw/full_scan.stl \
-        --roads data/vidigal/raw/roads_vidigal.shp \
+        --stl data/vidigal_tls/raw/full_scan.stl \
+        --roads data/vidigal_tls/raw/roads_vidigal.shp \
         --spacing 3.0 \
         --height 1.5 \
-        --area vidigal
+        --area vidigal_tls
 """
 
 import numpy as np

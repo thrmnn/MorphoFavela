@@ -405,7 +405,7 @@ def main() -> None:
         - Hotspot maps (if --hotspots flag used)
     """
     parser = argparse.ArgumentParser(description="Morphology risk visualization")
-    parser.add_argument("--area", type=str, required=True, help="Area name (vidigal, riodaspedras)")
+    parser.add_argument("--area", type=str, required=True, help="Area name (vidigal_tls, riodaspedras)")
     parser.add_argument("--input", type=str, default=None, help="Input morphology GPKG path")
     parser.add_argument("--output", type=str, default=None, help="Output directory")
     parser.add_argument("--grid-size", type=float, default=50.0, help="Grid aggregation size (m)")

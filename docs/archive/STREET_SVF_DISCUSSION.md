@@ -3,7 +3,7 @@
 ## Current Situation
 
 **Road Network Data:**
-- **File**: `data/vidigal/raw/roads_vidigal.shp`
+- **File**: `data/vidigal_tls/raw/roads_vidigal.shp`
 - **Type**: LineString geometries (58 road segments)
 - **Total length**: ~1,905 meters
 - **CRS**: EPSG:31983 (UTM Zone 23S)
@@ -177,7 +177,7 @@ svf_values = compute_svf(observer_points, sky_patches, full_mesh, evaluation_hei
 ### 5. Output Structure
 
 ```
-outputs/vidigal/svf_streets/
+outputs/vidigal_tls/svf_streets/
 ├── street_svf_points.gpkg       # Point-level SVF
 ├── street_svf_segments.gpkg     # Aggregated segment statistics
 ├── street_svf_map.png           # Colored line map
@@ -244,13 +244,13 @@ outputs/vidigal/svf_streets/
 **Command:**
 ```bash
 python scripts/compute_svf_streets.py \
-    --stl data/vidigal/raw/full_scan.stl \
-    --footprints data/vidigal/raw/vidigal_buildings.shp \
-    --roads data/vidigal/raw/roads_vidigal.shp \
-    --dtm data/vidigal/raw/vidigal_dtm_cropped.tif \
+    --stl data/vidigal_tls/raw/full_scan.stl \
+    --footprints data/vidigal_tls/raw/vidigal_buildings.shp \
+    --roads data/vidigal_tls/raw/roads_vidigal.shp \
+    --dtm data/vidigal_tls/raw/vidigal_dtm_cropped.tif \
     --spacing 3.0 \
     --height 1.5 \
-    --output-dir outputs/vidigal/svf_streets
+    --output-dir outputs/vidigal_tls/svf_streets
 ```
 
 ---
@@ -282,7 +282,7 @@ python scripts/compute_svf_streets.py \
 1. ✅ **Approach selected** - Option 1 (point sampling) implemented
 2. ✅ **Parameters finalized** - 3m spacing, 1.5m evaluation height (pedestrian eye level)
 3. ✅ **Script created** - `compute_svf_streets.py` implemented and tested
-4. ✅ **Validated** - Tested on Vidigal road network (58 segments, 692 sample points)
+4. ✅ **Validated** - Tested on Vidigal_TLS road network (58 segments, 692 sample points)
 5. ✅ **Integrated** - Added to `run_area_analyses.py` automation
 
 ---

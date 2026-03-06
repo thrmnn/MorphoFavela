@@ -43,7 +43,7 @@ def generate_summary_stats(gdf: gpd.GeoDataFrame, metrics: list[str]) -> pd.Data
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Calculate extended morphology metrics")
-    parser.add_argument("--area", type=str, default=None, help="Area name (vidigal, riodaspedras)")
+    parser.add_argument("--area", type=str, default=None, help="Area name (vidigal_tls, riodaspedras)")
     parser.add_argument("--input", type=str, default=None, help="Input footprints file path")
     parser.add_argument("--output", type=str, default=None, help="Output directory")
     parser.add_argument("--streets", type=str, default=None, help="Optional streets file path for facade ratio")

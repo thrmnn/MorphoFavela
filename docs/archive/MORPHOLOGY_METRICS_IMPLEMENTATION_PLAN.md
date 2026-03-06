@@ -1,12 +1,12 @@
 # Complete Morphology Metrics Implementation Plan
 
 ## Overview
-This document outlines the complete, autonomous implementation plan for adding 25 morphological indicators from Morphometrics.md to the analysis pipeline. All metrics will be implemented, tested, and validated on RioDasPedras and Vidigal.
+This document outlines the complete, autonomous implementation plan for adding 25 morphological indicators from Morphometrics.md to the analysis pipeline. All metrics will be implemented, tested, and validated on RioDasPedras and Vidigal_TLS.
 
 ## Branch Information
 - **Branch**: `feature/morphology-metrics`
 - **Status**: Ready for Implementation
-- **Test Areas**: RioDasPedras (informal), Vidigal (informal)
+- **Test Areas**: RioDasPedras (informal), Vidigal_TLS (informal)
 
 ---
 
@@ -157,7 +157,7 @@ tests/
    - Check for NaN/inf values
    - Generate visualizations
 
-28. **Run on Vidigal**
+28. **Run on Vidigal_TLS**
    - Compute all metrics
    - Validate ranges
    - Compare distributions with RioDasPedras
@@ -172,7 +172,7 @@ tests/
 
 30. **Statistical Visualizations**
    - Histograms for each metric
-   - Box plots (RioDasPedras vs Vidigal)
+   - Box plots (RioDasPedras vs Vidigal_TLS)
    - Correlation matrices
    - Scatter plots (metric relationships)
 
@@ -234,7 +234,7 @@ tests/
   - Check for NaN/inf
   - Spatial consistency checks
 
-- **Vidigal**: ~X buildings
+- **Vidigal_TLS**: ~X buildings
   - Same validation as RioDasPedras
   - Compare distributions
 
@@ -250,7 +250,7 @@ tests/
 ### Functional
 - [ ] All 25 metrics implemented
 - [ ] All metrics computed for RioDasPedras
-- [ ] All metrics computed for Vidigal
+- [ ] All metrics computed for Vidigal_TLS
 - [ ] No computational errors
 - [ ] All values within expected ranges
 
@@ -275,7 +275,7 @@ tests/
 3. Create `scripts/calculate_morphology_metrics.py`
 4. Create unit tests
 5. Run on RioDasPedras
-6. Run on Vidigal
+6. Run on Vidigal_TLS
 7. Generate visualizations
 8. Update documentation
 9. Commit all changes

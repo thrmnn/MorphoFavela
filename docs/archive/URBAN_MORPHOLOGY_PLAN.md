@@ -288,7 +288,7 @@ Computes urban morphology metrics for environmental analysis:
 - Street orientation entropy
 
 Usage:
-    python scripts/compute_urban_morphology.py --area vidigal
+    python scripts/compute_urban_morphology.py --area vidigal_tls
     python scripts/compute_urban_morphology.py --area copacabana --grid-size 50.0
 """
 
@@ -336,7 +336,7 @@ def main():
     )
     parser.add_argument('--area', type=str, required=True,
                        choices=SUPPORTED_AREAS,
-                       help='Area name (vidigal, copacabana)')
+                       help='Area name (vidigal_tls, copacabana)')
     parser.add_argument('--grid-size', type=float, default=50.0,
                        help='Analysis unit grid size in meters (default: 50.0)')
     parser.add_argument('--output-dir', type=str, default=None,
@@ -421,7 +421,7 @@ if not run_command(cmd, "Urban Morphology Metrics"):
 Add morphology comparison function:
 
 ```python
-def compare_morphology_metrics(vidigal_data: dict, copacabana_data: dict) -> dict:
+def compare_morphology_metrics(vidigal_tls_data: dict, copacabana_data: dict) -> dict:
     """Compare morphology metrics between areas."""
     # Load morphology data
     # Compare distributions of lambda_p, lambda_f, sigma_h, entropy_h
@@ -449,8 +449,8 @@ Cluster analysis units into morphological typologies using K-means or hierarchic
 
 **Usage**:
 ```bash
-python scripts/compute_typology_clustering.py --area vidigal --n-clusters 5
-python scripts/compute_typology_clustering.py --areas vidigal copacabana --method hierarchical
+python scripts/compute_typology_clustering.py --area vidigal_tls --n-clusters 5
+python scripts/compute_typology_clustering.py --areas vidigal_tls copacabana --method hierarchical
 ```
 
 ---

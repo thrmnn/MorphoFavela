@@ -8,9 +8,9 @@ This provides street-level analysis of building code compliance.
 
 Usage:
     python scripts/analyze_sky_exposure_streets.py \
-        --stl data/vidigal/raw/full_scan.stl \
-        --roads data/vidigal/raw/roads_vidigal.shp \
-        --footprints data/vidigal/raw/vidigal_buildings.shp \
+        --stl data/vidigal_tls/raw/full_scan.stl \
+        --roads data/vidigal_tls/raw/roads_vidigal.shp \
+        --footprints data/vidigal_tls/raw/vidigal_buildings.shp \
         --ruleset rio
 """
 
@@ -1323,7 +1323,7 @@ def main():
     parser.add_argument('--spacing', type=float, default=3.0, help='Distance between sample points (meters, default: 3.0)')
     parser.add_argument('--search-radius', type=float, default=75.0, help='Search radius for nearby buildings (meters, default: 75.0)')
     parser.add_argument('--output-dir', type=str, default=None, help='Output directory')
-    parser.add_argument('--area', type=str, default=None, help='Area name (e.g., vidigal, copacabana) for automatic path resolution')
+    parser.add_argument('--area', type=str, default=None, help='Area name (e.g., vidigal_tls, copacabana) for automatic path resolution')
     
     args = parser.parse_args()
     

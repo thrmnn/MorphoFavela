@@ -151,29 +151,21 @@ def main():
     roads_gdf = gpd.read_file(roads_path)
     logger.info(f"  Loaded {len(roads_gdf)} road segments")
     
-    # Handle coordinate system transformation (same as CPU version)
+    # Handle coordinate system transformation
+    # CRITICAL: Use roads center for transformation to ensure streets align perfectly with STL
+    # Buildings will use the same transformation to maintain alignment
     terrain_bounds = terrain.bounds
     stl_center_x = (terrain_bounds[0] + terrain_bounds[1]) / 2
     stl_center_y = (terrain_bounds[2] + terrain_bounds[3]) / 2
     
-    if args.footprints:
-        footprints_path = Path(args.footprints)
-        if footprints_path.exists():
-            original_footprints = gpd.read_file(str(footprints_path))
-            footprints_center_x = (original_footprints.total_bounds[0] + original_footprints.total_bounds[2]) / 2
-            footprints_center_y = (original_footprints.total_bounds[1] + original_footprints.total_bounds[3]) / 2
-            dx = stl_center_x - footprints_center_x
-            dy = stl_center_y - footprints_center_y
-        else:
-            roads_center_x = (roads_gdf.total_bounds[0] + roads_gdf.total_bounds[2]) / 2
-            roads_center_y = (roads_gdf.total_bounds[1] + roads_gdf.total_bounds[3]) / 2
-            dx = stl_center_x - roads_center_x
-            dy = stl_center_y - roads_center_y
-    else:
-        roads_center_x = (roads_gdf.total_bounds[0] + roads_gdf.total_bounds[2]) / 2
-        roads_center_y = (roads_gdf.total_bounds[1] + roads_gdf.total_bounds[3]) / 2
-        dx = stl_center_x - roads_center_x
-        dy = stl_center_y - roads_center_y
+    # Always use roads center for transformation (since we're analyzing streets)
+    # This ensures streets are perfectly centered at (0,0) in STL coordinates
+    roads_center_x = (roads_gdf.total_bounds[0] + roads_gdf.total_bounds[2]) / 2
+    roads_center_y = (roads_gdf.total_bounds[1] + roads_gdf.total_bounds[3]) / 2
+    dx = stl_center_x - roads_center_x
+    dy = stl_center_y - roads_center_y
+    
+    logger.info(f"  Using roads center for transformation: ({roads_center_x:.2f}, {roads_center_y:.2f})")
     
     # Apply transformation to roads
     logger.info(f"  Transforming roads to match STL coordinate system")
@@ -181,6 +173,9 @@ def main():
     roads_gdf.geometry = roads_gdf.geometry.translate(xoff=dx, yoff=dy)
     
     # Load and filter building footprints (same as CPU version)
+    # IMPORTANT: We need to use the SAME transformation (dx, dy) for buildings as we used for roads
+    # to ensure perfect alignment. load_building_footprints calculates its own transformation,
+    # so we'll load buildings separately and apply our transformation.
     building_footprints = None
     isolated_buildings = None
     area_filtered_buildings = None
@@ -188,13 +183,24 @@ def main():
     if args.footprints:
         footprints_path = Path(args.footprints)
         if footprints_path.exists():
-            from src.svf_utils import load_building_footprints
-            building_footprints, isolated_buildings, area_filtered_buildings = load_building_footprints(
-                footprints_path,
-                terrain_bounds=terrain.bounds,
-                buffer_distance=0.0,
-                area=args.area
+            from src.svf_utils import filter_buildings
+            # Load original footprints
+            original_footprints = gpd.read_file(str(footprints_path))
+            
+            # Apply filtering (same as load_building_footprints does)
+            filtered_footprints, isolated_buildings, area_filtered_buildings = filter_buildings(
+                original_footprints, area=args.area
             )
+            
+            # Apply the SAME transformation we used for roads
+            building_footprints = filtered_footprints.copy()
+            building_footprints.geometry = building_footprints.geometry.translate(xoff=dx, yoff=dy)
+            if len(isolated_buildings) > 0:
+                isolated_buildings.geometry = isolated_buildings.geometry.translate(xoff=dx, yoff=dy)
+            if len(area_filtered_buildings) > 0:
+                area_filtered_buildings.geometry = area_filtered_buildings.geometry.translate(xoff=dx, yoff=dy)
+            
+            logger.info(f"  Loaded and transformed {len(building_footprints)} building footprints using same transformation as roads")
             
             if building_footprints is not None and len(building_footprints) > 0 and args.building_buffer > 0:
                 from shapely.ops import unary_union
@@ -322,37 +328,53 @@ def main():
     # Aggregate to segment level
     segments_gdf = aggregate_segment_statistics(points_gdf, svf_values, filtered_roads_gdf)
     
+    # Translate results back to source (world) coordinates before saving.
+    # Streets were shifted into STL-local space for ray casting.
+    points_gdf_world = points_gdf.copy()
+    points_gdf_world.geometry = points_gdf_world.geometry.translate(xoff=-dx, yoff=-dy)
+
+    segments_gdf_world = segments_gdf.copy()
+    segments_gdf_world.geometry = segments_gdf_world.geometry.translate(xoff=-dx, yoff=-dy)
+    
+    # Also translate building footprints back to world coordinates for visualization
+    # (they were transformed to local coordinates by load_building_footprints)
+    building_footprints_world = None
+    if building_footprints is not None:
+        building_footprints_world = building_footprints.copy()
+        building_footprints_world.geometry = building_footprints_world.geometry.translate(xoff=-dx, yoff=-dy)
+
     # Save results
     logger.info("Saving results...")
     
     points_output = output_dir / "street_svf_points.gpkg"
-    points_gdf.to_file(points_output, driver='GPKG')
+    points_gdf_world.to_file(points_output, driver='GPKG')
     logger.info(f"  Saved point-level results to {points_output}")
     
     segments_output = output_dir / "street_svf_segments.gpkg"
-    segments_gdf.to_file(segments_output, driver='GPKG')
+    segments_gdf_world.to_file(segments_output, driver='GPKG')
     logger.info(f"  Saved segment-level results to {segments_output}")
     
     csv_output = output_dir / "street_svf_statistics.csv"
-    segments_gdf.drop(columns=['geometry']).to_csv(csv_output, index=False)
+    segments_gdf_world.drop(columns=['geometry']).to_csv(csv_output, index=False)
     logger.info(f"  Saved statistics to {csv_output}")
     
     # Visualizations
     logger.info("Generating visualizations...")
     
     map_path = output_dir / "street_svf_map.png"
-    create_street_svf_map(segments_gdf, points_gdf, building_footprints, map_path)
+    create_street_svf_map(segments_gdf_world, points_gdf_world, building_footprints_world, map_path)
 
     minmax_map_path = output_dir / "street_svf_map_minmax.png"
     create_street_svf_map_minmax(
-        segments_gdf,
-        building_footprints,
+        segments_gdf_world,
+        building_footprints_world,
         minmax_map_path,
         dtm_path=dtm_path,
-        clip_percentile=95.0
+        clip_percentile=95.0,
+        show_isolines=False,
     )
     
-    create_statistics_plots(segments_gdf, points_gdf, output_dir)
+    create_statistics_plots(segments_gdf_world, points_gdf_world, output_dir)
     
     # Print summary
     print("\n" + "=" * 60)

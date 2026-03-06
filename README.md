@@ -70,12 +70,12 @@ This should be done at the start of every new session before running any scripts
    
    **Extended morphology metrics (25 indicators):**
    ```bash
-   python scripts/calculate_morphology_metrics.py --area vidigal
+   python scripts/calculate_morphology_metrics.py --area vidigal_tls
    ```
    
    **Morphology risk mapping (spatial risk hotspots):**
    ```bash
-   python scripts/analyze_morphology_risk.py --area vidigal --hotspots --streets data/vidigal/raw/roads_vidigal.shp
+   python scripts/analyze_morphology_risk.py --area vidigal_tls --hotspots --streets data/vidigal_tls/raw/roads_vidigal.shp
    ```
    
    **Sky View Factor (SVF) computation:**
@@ -85,7 +85,7 @@ This should be done at the start of every new session before running any scripts
    
    **Street-level SVF computation:**
    ```bash
-   python scripts/compute_svf_streets.py --stl data/vidigal/raw/full_scan.stl --roads data/vidigal/raw/roads_vidigal.shp --dtm data/vidigal/raw/vidigal_dtm_cropped.tif --footprints data/vidigal/raw/vidigal_buildings.shp --spacing 3.0 --height 1.5
+   python scripts/compute_svf_streets.py --stl data/vidigal_tls/raw/full_scan.stl --roads data/vidigal_tls/raw/roads_vidigal.shp --dtm data/vidigal_tls/raw/vidigal_dtm_cropped.tif --footprints data/vidigal_tls/raw/vidigal_buildings.shp --spacing 3.0 --height 1.5
    ```
    
    **Solar Access computation:**
@@ -96,37 +96,37 @@ This should be done at the start of every new session before running any scripts
    **Sky Exposure Plane Exceedance analysis (unified):**
    ```bash
    # Building-level only (no roads required)
-   python scripts/analyze_sky_exposure_streets.py --stl data/vidigal/raw/full_scan.stl --footprints data/vidigal/raw/vidigal_buildings.shp --ruleset rio --area vidigal
+   python scripts/analyze_sky_exposure_streets.py --stl data/vidigal_tls/raw/full_scan.stl --footprints data/vidigal_tls/raw/vidigal_buildings.shp --ruleset rio --area vidigal_tls
    
    # Building-level + Street-level (with road network)
-   python scripts/analyze_sky_exposure_streets.py --stl data/vidigal/raw/full_scan.stl --roads data/vidigal/raw/roads_vidigal.shp --footprints data/vidigal/raw/vidigal_buildings.shp --ruleset rio --area vidigal --spacing 5.0
+   python scripts/analyze_sky_exposure_streets.py --stl data/vidigal_tls/raw/full_scan.stl --roads data/vidigal_tls/raw/roads_vidigal.shp --footprints data/vidigal_tls/raw/vidigal_buildings.shp --ruleset rio --area vidigal_tls --spacing 5.0
    ```
-
+   
    **Sectional Porosity computation:**
    ```bash
    python scripts/compute_sectional_porosity.py --footprints data/raw/vidigal_buildings.shp --grid-spacing 2.0 --height 1.5 --buffer 0.25
    ```
-
+   
    **Occupancy Density Proxy computation:**
    ```bash
    python scripts/compute_occupancy_density.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-size 50.0
    ```
-
+   
    **Morphological Environmental Deprivation Index (Unit-level):**
    ```bash
    python scripts/compute_deprivation_index.py --units outputs/density/density_proxy.gpkg --solar outputs/solar/solar_access.npy --svf outputs/svf/svf.npy --porosity outputs/porosity/porosity.npy --density outputs/density/density_proxy.gpkg
    ```
-
+   
    **Morphological Environmental Deprivation Index (Raster-based):**
    ```bash
    python scripts/compute_deprivation_index_raster.py --solar outputs/solar/solar_access.npy --svf outputs/svf/svf.npy --porosity outputs/porosity/porosity.npy --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --units outputs/density/density_proxy.gpkg
    ```
-
+   
    **Comparative Analysis (Formal vs Informal):**
    ```bash
    python scripts/compare_areas.py
    ```
-   Generates comprehensive PDF report comparing Vidigal and Copacabana across all metrics with statistical tests and visualizations.
+   Generates comprehensive PDF report comparing Vidigal_TLS and Copacabana across all metrics with statistical tests and visualizations.
 
 3. **Check results:**
    - `outputs/buildings_with_metrics.gpkg` - Enhanced dataset
@@ -323,7 +323,7 @@ IVF/
 
 ## Filtering Pipeline
 
-**Note**: Filtering is only applied to **informal settlements** (e.g., Vidigal). **Formal settlements** (e.g., Copacabana) skip all filtering to preserve the complete dataset.
+**Note**: Filtering is only applied to **informal settlements** (e.g., Vidigal_TLS). **Formal settlements** (e.g., Copacabana) skip all filtering to preserve the complete dataset.
 
 For informal areas, the pipeline applies filters in the following order:
 
@@ -366,10 +366,10 @@ python scripts/compute_solar_access.py --stl data/raw/full_scan.stl --footprints
 ### Sky Exposure Plane Exceedance Analysis (Unified)
 ```bash
 # Building-level only
-python scripts/analyze_sky_exposure_streets.py --stl data/vidigal/raw/full_scan.stl --footprints data/vidigal/raw/vidigal_buildings.shp --ruleset rio --area vidigal
+python scripts/analyze_sky_exposure_streets.py --stl data/vidigal_tls/raw/full_scan.stl --footprints data/vidigal_tls/raw/vidigal_buildings.shp --ruleset rio --area vidigal_tls
 
 # Building-level + Street-level (with road network)
-python scripts/analyze_sky_exposure_streets.py --stl data/vidigal/raw/full_scan.stl --roads data/vidigal/raw/roads_vidigal.shp --footprints data/vidigal/raw/vidigal_buildings.shp --ruleset rio --area vidigal --spacing 5.0
+python scripts/analyze_sky_exposure_streets.py --stl data/vidigal_tls/raw/full_scan.stl --roads data/vidigal_tls/raw/roads_vidigal.shp --footprints data/vidigal_tls/raw/vidigal_buildings.shp --ruleset rio --area vidigal_tls --spacing 5.0
 ```
 
 ### Sectional Porosity Computation

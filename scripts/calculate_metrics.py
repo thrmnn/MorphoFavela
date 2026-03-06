@@ -69,7 +69,7 @@ def main():
     """Run basic metrics calculation pipeline."""
     
     parser = argparse.ArgumentParser(description='Calculate basic morphometric metrics')
-    parser.add_argument('--area', type=str, default=None, help='Area name (vidigal, copacabana)')
+    parser.add_argument('--area', type=str, default=None, help='Area name (vidigal_tls, copacabana)')
     parser.add_argument('--input', type=str, default=None, help='Input footprints file path')
     parser.add_argument('--output', type=str, default=None, help='Output directory')
     parser.add_argument('--include-morphology', action='store_true', help='Compute extended morphology metrics')
