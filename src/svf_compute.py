@@ -13,6 +13,14 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
+# Optional dependency: PyViewFactor (exact view factor / SVF computations)
+try:  # pragma: no cover - import guard
+    import pyviewfactor as pvf  # type: ignore[import]
+    PYVIEWFACTOR_AVAILABLE = True
+except Exception:  # pragma: no cover - import guard
+    pvf = None  # type: ignore[assignment]
+    PYVIEWFACTOR_AVAILABLE = False
+
 # Try to import GPU dependencies
 try:
     import torch
@@ -183,6 +191,126 @@ def compute_svf_cpu(
     return np.array(svf_values)
 
 
+def compute_svf_pyvf(
+    ground_points: np.ndarray,
+    sky_patches: np.ndarray,
+    full_mesh: pv.PolyData,
+    evaluation_height: float,
+) -> np.ndarray:
+    """
+    Compute SVF using the experimental PyViewFactor backend.
+
+    This uses PyViewFactor to approximate SVF at each observer point by:
+    - Representing the observer as a small horizontal patch (receiver)
+    - Treating all above-ground mesh faces as emitting facets (obstructions)
+    - Computing view factors from the patch to each obstruction facet
+    - Approximating SVF ≈ 1 - sum(view_factors_to_obstructions)
+
+    This separation allows us to:
+    - Keep tests explicitly targeting the PyViewFactor backend
+    - Swap in a real pvf-based implementation later without touching callers
+    """
+    if not PYVIEWFACTOR_AVAILABLE:
+        raise RuntimeError(
+            "PyViewFactor backend requested but pyviewfactor is not installed. "
+            "Install it in the IVF conda environment to use this backend."
+        )
+
+    logger.info("compute_svf_pyvf: computing SVF using PyViewFactor (experimental backend)")
+
+    # Extract mesh faces and filter to above-ground obstructions
+    points = full_mesh.points
+    faces = full_mesh.faces
+
+    if len(faces) == 0:
+        # No faces at all → no obstructions
+        return np.ones(len(ground_points), dtype=np.float64)
+
+    ground_z = np.min(points[:, 2])
+    z_tol = 1e-3
+
+    obstruction_polys: list[np.ndarray] = []
+    idx = 0
+    n_faces = len(faces)
+    while idx < n_faces:
+        n_verts = faces[idx]
+        idx += 1
+        vert_ids = faces[idx : idx + n_verts]
+        idx += n_verts
+        poly = points[vert_ids]
+        # Skip ground plane (approximately at ground_z)
+        if np.max(poly[:, 2]) <= ground_z + z_tol:
+            continue
+        obstruction_polys.append(poly.astype(np.float64))
+
+    if not obstruction_polys:
+        # No above-ground obstructions → full sky
+        return np.ones(len(ground_points), dtype=np.float64)
+
+    # Build emitter facet arrays for PyViewFactor (shared across all observers)
+    max_n2 = max(poly.shape[0] for poly in obstruction_polys)
+    n_obstructions = len(obstruction_polys)
+
+    pts2_arr = np.zeros((n_obstructions, max_n2, 3), dtype=np.float64)
+    nverts2 = np.zeros((n_obstructions,), dtype=np.int32)
+    for i, poly in enumerate(obstruction_polys):
+        n = poly.shape[0]
+        pts2_arr[i, :n, :] = poly
+        nverts2[i] = n
+
+    # Prepare output array
+    svf_values = np.zeros(len(ground_points), dtype=np.float64)
+
+    # Patch size around each observer (meters)
+    patch_size = 1.0
+    half = patch_size / 2.0
+
+    for i, gp in enumerate(ground_points):
+        # Observer point at evaluation height
+        obs = np.array(gp, dtype=np.float64)
+        obs[2] += evaluation_height
+
+        # Small horizontal quad centered at observer
+        p1 = np.array(
+            [
+                [obs[0] - half, obs[1] - half, obs[2]],
+                [obs[0] + half, obs[1] - half, obs[2]],
+                [obs[0] + half, obs[1] + half, obs[2]],
+                [obs[0] - half, obs[1] + half, obs[2]],
+            ],
+            dtype=np.float64,
+        )
+
+        # Receiver array: same patch repeated for each obstruction facet
+        pts1_arr = np.repeat(p1[None, ...], n_obstructions, axis=0)
+        nverts1 = np.full((n_obstructions,), 4, dtype=np.int32)
+        const_arr = np.zeros((n_obstructions,), dtype=np.float64)
+
+        try:
+            vf_vals = pvf.batch_compute_viewfactors(
+                pts1_arr, nverts1, pts2_arr, nverts2, const_arr, verbose=False
+            )
+            # Sum of view factors to all obstructions
+            F_tot = float(np.sum(vf_vals))
+            svf = 1.0 - F_tot
+            # Clamp to [0, 1] to guard against numerical noise
+            svf_values[i] = max(0.0, min(1.0, svf))
+        except Exception as e:  # pragma: no cover - defensive guard
+            logger.warning(
+                "PyViewFactor computation failed at point %d, falling back to CPU SVF. Error: %s",
+                i,
+                e,
+            )
+            svf_values[i] = compute_svf_cpu(
+                ground_points=ground_points[i : i + 1],
+                sky_patches=sky_patches,
+                full_mesh=full_mesh,
+                evaluation_height=evaluation_height,
+            )[0]
+
+    return svf_values
+
+
 def compute_svf(
     ground_points: np.ndarray,
     sky_patches: np.ndarray,
@@ -193,12 +321,17 @@ def compute_svf(
     max_ray_length: float = 1000.0,
     ray_chunk_size: int = 1024,
     tri_chunk_size: int = 4096,
+    backend: str = "auto",
 ) -> np.ndarray:
     """
     Compute SVF for each ground point with automatic CPU/GPU selection.
     
     This is the unified interface that automatically detects GPU availability
     and routes to the appropriate implementation.
+
+    The `backend` argument controls which algorithm to use:
+    - ``\"auto\"`` (default): existing CPU/GPU ray-tracing implementation
+    - ``\"pyviewfactor\"``: use PyViewFactor-based implementation (when available)
     
     Args:
         ground_points: Array of shape (N, 3) with ground point coordinates
@@ -210,22 +343,36 @@ def compute_svf(
         max_ray_length: Maximum ray length (meters, GPU only)
         ray_chunk_size: Number of rays to intersect in each chunk (GPU only)
         tri_chunk_size: Number of triangles to intersect in each chunk (GPU only)
+        backend: \"auto\" (default) for existing implementation, or \"pyviewfactor\"
         
     Returns:
         Array of SVF values (0-1) for each ground point
     """
+    # Backend selection
+    backend = backend.lower()
+
+    # PyViewFactor backend (experimental – currently delegates to CPU implementation)
+    if backend == "pyviewfactor":
+        return compute_svf_pyvf(
+            ground_points=ground_points,
+            sky_patches=sky_patches,
+            full_mesh=full_mesh,
+            evaluation_height=evaluation_height,
+        )
+
+    # Default: existing CPU/GPU implementation
     # Auto-detect GPU if not specified
     if use_gpu is None:
         use_gpu = GPU_COMPUTE_AVAILABLE
-    
+
     # Use GPU if requested and available
     if use_gpu and GPU_COMPUTE_AVAILABLE:
         logger.info("Using GPU-accelerated SVF computation")
-        
+
         # Convert mesh to PyTorch3D format
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         pytorch3d_mesh = pv_mesh_to_pytorch3d(full_mesh, device=device)
-        
+
         # Prepare observer points and sky patches
         observer_points_tensor = prepare_observer_points(
             ground_points,
@@ -233,7 +380,7 @@ def compute_svf(
             device=device
         )
         sky_patches_tensor = prepare_sky_patches(sky_patches, device=device)
-        
+
         # Compute SVF on GPU
         svf_tensor = compute_svf_gpu_batch(
             observer_points_tensor,
@@ -245,21 +392,20 @@ def compute_svf(
             ray_chunk_size=ray_chunk_size,
             tri_chunk_size=tri_chunk_size,
         )
-        
+
         # Convert back to numpy
         return svf_tensor.cpu().numpy()
-    
-    else:
-        # Use CPU implementation
-        if use_gpu and not GPU_COMPUTE_AVAILABLE:
-            logger.warning("GPU requested but not available, falling back to CPU")
-        
-        return compute_svf_cpu(
-            ground_points,
-            sky_patches,
-            full_mesh,
-            evaluation_height
-        )
+
+    # Fallback: CPU implementation
+    if use_gpu and not GPU_COMPUTE_AVAILABLE:
+        logger.warning("GPU requested but not available, falling back to CPU")
+
+    return compute_svf_cpu(
+        ground_points,
+        sky_patches,
+        full_mesh,
+        evaluation_height
+    )
 
 
 def get_compute_backend() -> str:

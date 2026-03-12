@@ -28,7 +28,8 @@ import torch
 class TestEmptyScene:
     """Test SVF computation on empty scene (no obstructions)."""
     
-    def test_empty_scene_cpu(self):
+    @pytest.mark.parametrize("backend", ["auto", "pyviewfactor"])
+    def test_empty_scene_cpu(self, backend):
         """Test CPU computation on empty scene."""
         mesh = create_empty_scene()
         sky_patches, _ = generate_sky_patches(145)
@@ -44,7 +45,8 @@ class TestEmptyScene:
             test_points,
             sky_patches,
             mesh,
-            evaluation_height=1.5
+            evaluation_height=1.5,
+            backend=backend,
         )
         
         # All points should have SVF ≈ 1.0 (no obstructions)
@@ -87,7 +89,8 @@ class TestEmptyScene:
 class TestSingleBuilding:
     """Test SVF computation with single building."""
     
-    def test_point_far_from_building_cpu(self):
+    @pytest.mark.parametrize("backend", ["auto", "pyviewfactor"])
+    def test_point_far_from_building_cpu(self, backend):
         """Test point far from building should have high SVF."""
         mesh = create_single_building_scene(
             building_size=(10, 10, 20),
@@ -102,7 +105,8 @@ class TestSingleBuilding:
             test_points,
             sky_patches,
             mesh,
-            evaluation_height=1.5
+            evaluation_height=1.5,
+            backend=backend,
         )
         
         assert_svf_valid(svf_values)
@@ -110,7 +114,8 @@ class TestSingleBuilding:
         assert svf_values[0] > 0.8, \
             f"Point far from building should have high SVF, got {svf_values[0]:.3f}"
     
-    def test_point_under_building_cpu(self):
+    @pytest.mark.parametrize("backend", ["auto", "pyviewfactor"])
+    def test_point_under_building_cpu(self, backend):
         """Test point directly under building should have low SVF."""
         mesh = create_single_building_scene(
             building_size=(10, 10, 20),
@@ -125,7 +130,8 @@ class TestSingleBuilding:
             test_points,
             sky_patches,
             mesh,
-            evaluation_height=1.5
+            evaluation_height=1.5,
+            backend=backend,
         )
         
         assert_svf_valid(svf_values)
@@ -133,7 +139,8 @@ class TestSingleBuilding:
         assert svf_values[0] < 0.1, \
             f"Point under building should have low SVF, got {svf_values[0]:.3f}"
     
-    def test_point_at_building_edge_cpu(self):
+    @pytest.mark.parametrize("backend", ["auto", "pyviewfactor"])
+    def test_point_at_building_edge_cpu(self, backend):
         """Test point at building edge should have partial SVF."""
         mesh = create_single_building_scene(
             building_size=(10, 10, 20),
@@ -148,7 +155,8 @@ class TestSingleBuilding:
             test_points,
             sky_patches,
             mesh,
-            evaluation_height=1.5
+            evaluation_height=1.5,
+            backend=backend,
         )
         
         assert_svf_valid(svf_values)
@@ -198,7 +206,8 @@ class TestSingleBuilding:
 class TestTwoBuildings:
     """Test SVF computation with two buildings."""
     
-    def test_point_between_buildings_cpu(self):
+    @pytest.mark.parametrize("backend", ["auto", "pyviewfactor"])
+    def test_point_between_buildings_cpu(self, backend):
         """Test point between two buildings."""
         mesh = create_two_buildings_scene(
             building1_center=(-15, 0),
@@ -213,7 +222,8 @@ class TestTwoBuildings:
             test_points,
             sky_patches,
             mesh,
-            evaluation_height=1.5
+            evaluation_height=1.5,
+            backend=backend,
         )
         
         assert_svf_valid(svf_values)

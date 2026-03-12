@@ -234,9 +234,11 @@ def main():
     parser.add_argument('--building-buffer', type=float, default=None, help='Only compute SVF for points within this distance of buildings (meters). Reduces computation by focusing on relevant areas.')
     parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/svf)')
     parser.add_argument('--debug-only', action='store_true', help='Only generate debug plot, skip SVF computation')
-    parser.add_argument('--area', type=str, default=None, help='Area name (vidigal_tls, copacabana, riodaspedras) - used to determine if filtering should be applied')
+    parser.add_argument('--area', type=str, default=None, help='Area name (vidigal, vidigal_tls, copacabana, riodaspedras) - used to determine if filtering should be applied')
     parser.add_argument('--use-gpu', action='store_true', default=None, help='Use GPU acceleration if available (auto-detected by default)')
     parser.add_argument('--no-gpu', action='store_true', help='Force CPU computation even if GPU is available')
+    parser.add_argument('--backend', type=str, default='auto', choices=['auto', 'pyviewfactor'],
+                        help='SVF backend to use: "auto" (CPU/GPU, default) or "pyviewfactor"')
     
     args = parser.parse_args()
     
@@ -269,12 +271,17 @@ def main():
     print(f"Evaluation height: {args.height}m")
     print(f"Sky patches: {args.sky_patches}")
     backend = get_compute_backend()
-    if use_gpu is None:
-        print(f"Compute backend: {backend} (auto-detected)")
-    elif use_gpu:
-        print(f"Compute backend: GPU (requested)")
+    if args.backend == "pyviewfactor":
+        print("SVF backend: PyViewFactor (experimental)")
+        # PyViewFactor path currently runs on CPU; ignore GPU flags in this mode
+        use_gpu = False
     else:
-        print(f"Compute backend: CPU (forced)")
+        if use_gpu is None:
+            print(f"Compute backend: {backend} (auto-detected)")
+        elif use_gpu:
+            print(f"Compute backend: GPU (requested)")
+        else:
+            print(f"Compute backend: CPU (forced)")
     print("=" * 60)
     
     # Load mesh
@@ -335,7 +342,14 @@ def main():
     sky_patches, _ = generate_sky_patches(args.sky_patches)
     
     # Compute SVF (only for ground points)
-    svf_values = compute_svf(ground_points, sky_patches, mesh, args.height, use_gpu=use_gpu)
+    svf_values = compute_svf(
+        ground_points,
+        sky_patches,
+        mesh,
+        args.height,
+        use_gpu=use_gpu,
+        backend=args.backend,
+    )
     
     # Save and plot results
     save_and_plot_results(
