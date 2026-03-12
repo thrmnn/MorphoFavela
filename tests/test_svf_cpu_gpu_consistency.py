@@ -12,9 +12,8 @@ import sys
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.compute_svf import generate_sky_patches, compute_svf
-from src.svf_gpu_compute import compute_svf_gpu
-from src.svf_gpu_utils import pv_mesh_to_pytorch3d, prepare_observer_points, prepare_sky_patches
+from src.svf_compute import generate_sky_patches, compute_svf
+# GPU utilities no longer needed - using unified interface
 from tests.utils.test_helpers import (
     create_empty_scene,
     create_single_building_scene,
@@ -46,22 +45,18 @@ class TestCPUGPUConsistency:
             test_points,
             sky_patches,
             mesh,
-            evaluation_height=1.5
+            evaluation_height=1.5,
+            use_gpu=False
         )
         
-        # GPU computation
-        device = torch.device('cuda')
-        pytorch3d_mesh = pv_mesh_to_pytorch3d(mesh, device=device)
-        observer_points = prepare_observer_points(test_points, 1.5, device=device)
-        sky_patches_torch = prepare_sky_patches(sky_patches, device=device)
-        
-        gpu_svf = compute_svf_gpu(
-            observer_points,
-            sky_patches_torch,
-            pytorch3d_mesh,
-            batch_size=100
+        # GPU computation (using unified interface)
+        gpu_svf = compute_svf(
+            test_points,
+            sky_patches,
+            mesh,
+            evaluation_height=1.5,
+            use_gpu=True
         )
-        gpu_svf = gpu_svf.cpu().numpy()
         
         # Compare results (slightly relaxed tolerance for different implementations)
         stats = compare_cpu_gpu_results(
@@ -90,22 +85,18 @@ class TestCPUGPUConsistency:
             test_points,
             sky_patches,
             mesh,
-            evaluation_height=1.5
+            evaluation_height=1.5,
+            use_gpu=False
         )
         
-        # GPU computation
-        device = torch.device('cuda')
-        pytorch3d_mesh = pv_mesh_to_pytorch3d(mesh, device=device)
-        observer_points = prepare_observer_points(test_points, 1.5, device=device)
-        sky_patches_torch = prepare_sky_patches(sky_patches, device=device)
-        
-        gpu_svf = compute_svf_gpu(
-            observer_points,
-            sky_patches_torch,
-            pytorch3d_mesh,
-            batch_size=100
+        # GPU computation (using unified interface)
+        gpu_svf = compute_svf(
+            test_points,
+            sky_patches,
+            mesh,
+            evaluation_height=1.5,
+            use_gpu=True
         )
-        gpu_svf = gpu_svf.cpu().numpy()
         
         # Compare results (slightly relaxed tolerance for different implementations)
         stats = compare_cpu_gpu_results(
@@ -131,22 +122,18 @@ class TestCPUGPUConsistency:
             test_points,
             sky_patches,
             mesh,
-            evaluation_height=1.5
+            evaluation_height=1.5,
+            use_gpu=False
         )
         
-        # GPU computation
-        device = torch.device('cuda')
-        pytorch3d_mesh = pv_mesh_to_pytorch3d(mesh, device=device)
-        observer_points = prepare_observer_points(test_points, 1.5, device=device)
-        sky_patches_torch = prepare_sky_patches(sky_patches, device=device)
-        
-        gpu_svf = compute_svf_gpu(
-            observer_points,
-            sky_patches_torch,
-            pytorch3d_mesh,
-            batch_size=100
+        # GPU computation (using unified interface)
+        gpu_svf = compute_svf(
+            test_points,
+            sky_patches,
+            mesh,
+            evaluation_height=1.5,
+            use_gpu=True
         )
-        gpu_svf = gpu_svf.cpu().numpy()
         
         # Compare results (slightly relaxed tolerance for different implementations)
         stats = compare_cpu_gpu_results(
@@ -172,22 +159,18 @@ class TestCPUGPUConsistency:
             test_points,
             sky_patches,
             mesh,
-            evaluation_height=1.5
+            evaluation_height=1.5,
+            use_gpu=False
         )
         
-        # GPU computation
-        device = torch.device('cuda')
-        pytorch3d_mesh = pv_mesh_to_pytorch3d(mesh, device=device)
-        observer_points = prepare_observer_points(test_points, 1.5, device=device)
-        sky_patches_torch = prepare_sky_patches(sky_patches, device=device)
-        
-        gpu_svf = compute_svf_gpu(
-            observer_points,
-            sky_patches_torch,
-            pytorch3d_mesh,
-            batch_size=100
+        # GPU computation (using unified interface)
+        gpu_svf = compute_svf(
+            test_points,
+            sky_patches,
+            mesh,
+            evaluation_height=1.5,
+            use_gpu=True
         )
-        gpu_svf = gpu_svf.cpu().numpy()
         
         # Compare results (slightly relaxed tolerance for different implementations)
         stats = compare_cpu_gpu_results(
@@ -219,22 +202,18 @@ class TestParameterSensitivity:
             test_points,
             sky_patches,
             mesh,
-            evaluation_height=1.5
+            evaluation_height=1.5,
+            use_gpu=False
         )
         
-        # GPU computation
-        device = torch.device('cuda')
-        pytorch3d_mesh = pv_mesh_to_pytorch3d(mesh, device=device)
-        observer_points = prepare_observer_points(test_points, 1.5, device=device)
-        sky_patches_torch = prepare_sky_patches(sky_patches, device=device)
-        
-        gpu_svf = compute_svf_gpu(
-            observer_points,
-            sky_patches_torch,
-            pytorch3d_mesh,
-            batch_size=100
+        # GPU computation (using unified interface)
+        gpu_svf = compute_svf(
+            test_points,
+            sky_patches,
+            mesh,
+            evaluation_height=1.5,
+            use_gpu=True
         )
-        gpu_svf = gpu_svf.cpu().numpy()
         
         # Compare results (slightly relaxed tolerance for different patch counts)
         stats = compare_cpu_gpu_results(
@@ -265,18 +244,14 @@ class TestParameterSensitivity:
         )
         
         # GPU computation
-        device = torch.device('cuda')
-        pytorch3d_mesh = pv_mesh_to_pytorch3d(mesh, device=device)
-        observer_points = prepare_observer_points(test_points, height, device=device)
-        sky_patches_torch = prepare_sky_patches(sky_patches, device=device)
-        
-        gpu_svf = compute_svf_gpu(
-            observer_points,
-            sky_patches_torch,
-            pytorch3d_mesh,
-            batch_size=100
+        # GPU computation (using unified interface)
+        gpu_svf = compute_svf(
+            test_points,
+            sky_patches,
+            mesh,
+            evaluation_height=height,
+            use_gpu=True
         )
-        gpu_svf = gpu_svf.cpu().numpy()
         
         # Compare results (slightly relaxed tolerance for different implementations)
         stats = compare_cpu_gpu_results(
@@ -298,27 +273,24 @@ class TestParameterSensitivity:
             height=0.0
         )
         
-        device = torch.device('cuda')
-        pytorch3d_mesh = pv_mesh_to_pytorch3d(mesh, device=device)
-        observer_points = prepare_observer_points(test_points, 1.5, device=device)
-        sky_patches_torch = prepare_sky_patches(sky_patches, device=device)
-        
-        # Compute with different batch sizes
-        gpu_svf_1 = compute_svf_gpu(
-            observer_points,
-            sky_patches_torch,
-            pytorch3d_mesh,
-            batch_size=batch_size
+        # Compute with different batch sizes (using unified interface)
+        gpu_svf_1 = compute_svf(
+            test_points,
+            sky_patches,
+            mesh,
+            evaluation_height=1.5,
+            use_gpu=True,
+            gpu_batch_size=batch_size
         )
-        gpu_svf_1 = gpu_svf_1.cpu().numpy()
         
-        gpu_svf_2 = compute_svf_gpu(
-            observer_points,
-            sky_patches_torch,
-            pytorch3d_mesh,
-            batch_size=batch_size * 2  # Different batch size
+        gpu_svf_2 = compute_svf(
+            test_points,
+            sky_patches,
+            mesh,
+            evaluation_height=1.5,
+            use_gpu=True,
+            gpu_batch_size=batch_size * 2  # Different batch size
         )
-        gpu_svf_2 = gpu_svf_2.cpu().numpy()
         
         # Results should be identical regardless of batch size
         assert np.allclose(gpu_svf_1, gpu_svf_2, atol=1e-5), \
@@ -351,22 +323,18 @@ class TestEdgeCases:
             test_points,
             sky_patches,
             mesh,
-            evaluation_height=1.5
+            evaluation_height=1.5,
+            use_gpu=False
         )
         
-        # GPU computation
-        device = torch.device('cuda')
-        pytorch3d_mesh = pv_mesh_to_pytorch3d(mesh, device=device)
-        observer_points = prepare_observer_points(test_points, 1.5, device=device)
-        sky_patches_torch = prepare_sky_patches(sky_patches, device=device)
-        
-        gpu_svf = compute_svf_gpu(
-            observer_points,
-            sky_patches_torch,
-            pytorch3d_mesh,
-            batch_size=100
+        # GPU computation (using unified interface)
+        gpu_svf = compute_svf(
+            test_points,
+            sky_patches,
+            mesh,
+            evaluation_height=1.5,
+            use_gpu=True
         )
-        gpu_svf = gpu_svf.cpu().numpy()
         
         # Compare results (slightly relaxed tolerance for edge cases)
         stats = compare_cpu_gpu_results(
@@ -396,22 +364,18 @@ class TestEdgeCases:
             test_points,
             sky_patches,
             mesh,
-            evaluation_height=1.5
+            evaluation_height=1.5,
+            use_gpu=False
         )
         
-        # GPU computation
-        device = torch.device('cuda')
-        pytorch3d_mesh = pv_mesh_to_pytorch3d(mesh, device=device)
-        observer_points = prepare_observer_points(test_points, 1.5, device=device)
-        sky_patches_torch = prepare_sky_patches(sky_patches, device=device)
-        
-        gpu_svf = compute_svf_gpu(
-            observer_points,
-            sky_patches_torch,
-            pytorch3d_mesh,
-            batch_size=100
+        # GPU computation (using unified interface)
+        gpu_svf = compute_svf(
+            test_points,
+            sky_patches,
+            mesh,
+            evaluation_height=1.5,
+            use_gpu=True
         )
-        gpu_svf = gpu_svf.cpu().numpy()
         
         # Compare results (may have slightly higher differences near boundaries)
         stats = compare_cpu_gpu_results(

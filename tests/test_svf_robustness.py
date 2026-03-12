@@ -13,7 +13,7 @@ import sys
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.compute_svf import generate_sky_patches, compute_svf
+from src.svf_compute import generate_sky_patches, compute_svf
 from src.svf_gpu_compute import compute_svf_gpu
 from src.svf_gpu_utils import pv_mesh_to_pytorch3d, prepare_observer_points, prepare_sky_patches
 from tests.utils.test_helpers import (

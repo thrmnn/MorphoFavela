@@ -33,9 +33,10 @@ from src.svf_utils import (
     generate_ground_points
 )
 from src.config import is_informal_area
+from src.svf_compute import generate_sky_patches, compute_svf, get_compute_backend
 
 
-def generate_sky_patches(num_patches: int, radius: float = 1000.0) -> tuple:
+def generate_sky_patches_legacy(num_patches: int, radius: float = 1000.0) -> tuple:
     """
     Discretize the upper hemisphere into equal-area sky patches.
     
@@ -102,80 +103,7 @@ def generate_sky_patches(num_patches: int, radius: float = 1000.0) -> tuple:
     return patch_centroids, patch_meshes
 
 
-def compute_svf(
-    ground_points: np.ndarray,
-    sky_patches: np.ndarray,
-    full_mesh: pv.PolyData,
-    evaluation_height: float
-) -> np.ndarray:
-    """
-    Compute SVF for each ground point.
-    
-    For each grid point and each sky patch:
-    1. Cast a ray toward the patch centroid
-    2. Use PyVista ray intersection to test obstruction
-    3. Compute SVF as: number of visible patches / total patches
-    
-    Args:
-        ground_points: Array of shape (N, 3) with ground point coordinates
-        sky_patches: Array of shape (M, 3) with sky patch centroids
-        full_mesh: Full scene mesh (terrain + buildings)
-        evaluation_height: Height above ground for evaluation (meters)
-        
-    Returns:
-        Array of SVF values (0-1) for each ground point
-    """
-    print(f"Computing SVF for {len(ground_points)} points...")
-    print(f"  Evaluation height: {evaluation_height}m")
-    print(f"  Sky patches: {len(sky_patches)}")
-    
-    svf_values = []
-    
-    # Create observer points (ground points + evaluation height)
-    # Ensure float dtype to avoid casting errors
-    observer_points = ground_points.astype(np.float64).copy()
-    observer_points[:, 2] += evaluation_height
-    
-    # Compute SVF for each observer point
-    pbar = tqdm(total=len(observer_points), desc="Computing SVF", unit="points")
-    
-    for i, observer in enumerate(observer_points):
-        visible_patches = 0
-        
-        for patch_centroid in sky_patches:
-            # Ray direction from observer to patch centroid
-            ray_direction = patch_centroid - observer
-            ray_length = np.linalg.norm(ray_direction)
-            ray_direction = ray_direction / ray_length  # Normalize
-            
-            # Cast ray and check for intersection
-            # PyVista ray intersection
-            ray_end = observer + ray_direction * ray_length
-            intersection, cell_id = full_mesh.ray_trace(observer, ray_end)
-            
-            # If no intersection, patch is visible
-            # If intersection exists, the ray hit something before reaching the sky
-            if len(intersection) == 0:
-                visible_patches += 1
-            # else: ray was blocked, patch is not visible
-        
-        # SVF = visible patches / total patches
-        svf = visible_patches / len(sky_patches)
-        svf_values.append(svf)
-        
-        # Update progress bar with current statistics
-        if len(svf_values) > 0:
-            current_mean = np.mean(svf_values)
-            pbar.set_postfix({
-                'mean_svf': f'{current_mean:.3f}',
-                'current': f'{svf:.3f}'
-            })
-        
-        pbar.update(1)
-    
-    pbar.close()
-    
-    return np.array(svf_values)
+# compute_svf is now imported from src.svf_compute
 
 
 def save_and_plot_results(
@@ -307,8 +235,18 @@ def main():
     parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/svf)')
     parser.add_argument('--debug-only', action='store_true', help='Only generate debug plot, skip SVF computation')
     parser.add_argument('--area', type=str, default=None, help='Area name (vidigal_tls, copacabana, riodaspedras) - used to determine if filtering should be applied')
+    parser.add_argument('--use-gpu', action='store_true', default=None, help='Use GPU acceleration if available (auto-detected by default)')
+    parser.add_argument('--no-gpu', action='store_true', help='Force CPU computation even if GPU is available')
     
     args = parser.parse_args()
+    
+    # Determine GPU usage
+    use_gpu = None
+    if args.no_gpu:
+        use_gpu = False
+    elif args.use_gpu:
+        use_gpu = True
+    # else: use_gpu = None (auto-detect)
     
     # Setup paths
     stl_path = Path(args.stl)
@@ -330,6 +268,13 @@ def main():
     print(f"Grid spacing: {args.grid_spacing}m")
     print(f"Evaluation height: {args.height}m")
     print(f"Sky patches: {args.sky_patches}")
+    backend = get_compute_backend()
+    if use_gpu is None:
+        print(f"Compute backend: {backend} (auto-detected)")
+    elif use_gpu:
+        print(f"Compute backend: GPU (requested)")
+    else:
+        print(f"Compute backend: CPU (forced)")
     print("=" * 60)
     
     # Load mesh
@@ -390,7 +335,7 @@ def main():
     sky_patches, _ = generate_sky_patches(args.sky_patches)
     
     # Compute SVF (only for ground points)
-    svf_values = compute_svf(ground_points, sky_patches, mesh, args.height)
+    svf_values = compute_svf(ground_points, sky_patches, mesh, args.height, use_gpu=use_gpu)
     
     # Save and plot results
     save_and_plot_results(

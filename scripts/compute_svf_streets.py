@@ -42,79 +42,7 @@ from src.svf_utils import (
     load_mesh,
     extract_terrain_surface
 )
-from scripts.compute_svf import generate_sky_patches
-
-# Import compute_svf function - defined in compute_svf.py
-def compute_svf(
-    ground_points: np.ndarray,
-    sky_patches: np.ndarray,
-    full_mesh: pv.PolyData,
-    evaluation_height: float
-) -> np.ndarray:
-    """
-    Compute SVF for each ground point (reused from compute_svf.py).
-    
-    For each point and each sky patch:
-    1. Cast a ray toward the patch centroid
-    2. Use PyVista ray intersection to test obstruction
-    3. Compute SVF as: number of visible patches / total patches
-    
-    Args:
-        ground_points: Array of shape (N, 3) with ground point coordinates
-        sky_patches: Array of shape (M, 3) with sky patch centroids
-        full_mesh: Full scene mesh (terrain + buildings)
-        evaluation_height: Height above ground for evaluation (meters)
-        
-    Returns:
-        Array of SVF values (0-1) for each ground point
-    """
-    logger.info(f"Computing SVF for {len(ground_points)} points...")
-    logger.info(f"  Evaluation height: {evaluation_height}m")
-    logger.info(f"  Sky patches: {len(sky_patches)}")
-    
-    svf_values = []
-    
-    # Create observer points (ground points + evaluation height)
-    observer_points = ground_points.copy()
-    observer_points[:, 2] += evaluation_height
-    
-    # Compute SVF for each observer point
-    pbar = tqdm(total=len(observer_points), desc="Computing SVF", unit="points")
-    
-    for i, observer in enumerate(observer_points):
-        visible_patches = 0
-        
-        for patch_centroid in sky_patches:
-            # Ray direction from observer to patch centroid
-            ray_direction = patch_centroid - observer
-            ray_length = np.linalg.norm(ray_direction)
-            ray_direction = ray_direction / ray_length  # Normalize
-            
-            # Cast ray and check for intersection
-            ray_end = observer + ray_direction * ray_length
-            intersection, cell_id = full_mesh.ray_trace(observer, ray_end)
-            
-            # If no intersection, patch is visible
-            if len(intersection) == 0:
-                visible_patches += 1
-        
-        # SVF = visible patches / total patches
-        svf = visible_patches / len(sky_patches)
-        svf_values.append(svf)
-        
-        # Update progress bar
-        if len(svf_values) > 0:
-            current_mean = np.mean(svf_values)
-            pbar.set_postfix({
-                'mean_svf': f'{current_mean:.3f}',
-                'current': f'{svf:.3f}'
-            })
-        
-        pbar.update(1)
-    
-    pbar.close()
-    
-    return np.array(svf_values)
+from src.svf_compute import generate_sky_patches, compute_svf, get_compute_backend
 
 import logging
 
@@ -297,6 +225,113 @@ def sample_street_points(
     return points_gdf
 
 
+def interpolate_svf_along_segments(
+    points_gdf: gpd.GeoDataFrame,
+    roads_gdf: gpd.GeoDataFrame,
+    interpolation_spacing: float = 0.5
+) -> gpd.GeoDataFrame:
+    """
+    Create continuous SVF representation by interpolating along each street segment.
+    
+    For each segment, interpolates SVF values between sampled points to create
+    a dense, continuous representation of SVF along the street.
+    
+    Args:
+        points_gdf: GeoDataFrame with sampled points and their SVF values
+        roads_gdf: GeoDataFrame with street segments
+        interpolation_spacing: Distance between interpolated points (meters, default: 0.5)
+    
+    Returns:
+        GeoDataFrame with dense interpolated points along streets with SVF values
+    """
+    from scipy.interpolate import interp1d
+    
+    logger.info(f"Interpolating SVF along segments with {interpolation_spacing}m spacing...")
+    
+    all_interpolated_points = []
+    all_metadata = []
+    
+    for idx, row in tqdm(roads_gdf.iterrows(), total=len(roads_gdf), desc="  Interpolating"):
+        line = row.geometry
+        
+        if not isinstance(line, LineString):
+            continue
+        
+        # Get all points for this segment
+        segment_points = points_gdf[points_gdf['segment_idx'] == idx].copy()
+        
+        if len(segment_points) == 0:
+            continue
+        
+        # Sort by distance_along
+        segment_points = segment_points.sort_values('distance_along')
+        
+        # Extract distances and SVF values
+        distances = segment_points['distance_along'].values
+        svf_values = segment_points['svf'].values
+        
+        # Generate dense points along the line
+        line_length = line.length
+        interp_distances = np.arange(0, line_length + interpolation_spacing, interpolation_spacing)
+        interp_distances = np.clip(interp_distances, 0, line_length)  # Ensure within bounds
+        
+        # Remove duplicates (in case of rounding)
+        interp_distances = np.unique(interp_distances)
+        
+        # Interpolate SVF values
+        if len(distances) == 1:
+            # Single point - use constant value
+            interp_svf = np.full(len(interp_distances), svf_values[0], dtype=float)
+        elif len(distances) == 2:
+            # Two points - linear interpolation
+            interp_func = interp1d(distances, svf_values, kind='linear', 
+                                   bounds_error=False, fill_value='extrapolate')
+            interp_svf = interp_func(interp_distances)
+        else:
+            # Multiple points - linear interpolation (preserves min/max, no overshoot)
+            interp_func = interp1d(distances, svf_values, kind='linear',
+                                   bounds_error=False, fill_value='extrapolate')
+            interp_svf = interp_func(interp_distances)
+        
+        # Ensure interp_svf is an array
+        interp_svf = np.atleast_1d(interp_svf)
+        
+        # Clamp SVF to valid range [0, 1]
+        interp_svf = np.clip(interp_svf, 0.0, 1.0)
+        
+        # Create points and metadata
+        for dist, svf_val in zip(interp_distances, interp_svf):
+            point_2d = line.interpolate(dist)
+            # Get elevation from original point if available, or use interpolation
+            # Find closest original point for elevation
+            closest_idx = np.argmin(np.abs(distances - dist))
+            closest_point = segment_points.iloc[closest_idx]
+            z = closest_point.geometry.z if hasattr(closest_point.geometry, 'z') else 0.0
+            
+            point_3d = Point(point_2d.x, point_2d.y, z)
+            all_interpolated_points.append(point_3d)
+            
+            all_metadata.append({
+                'segment_idx': idx,
+                'distance_along': dist,
+                'svf': float(svf_val),
+                'is_interpolated': True,
+                'street_name': row.get('nome', row.get('tipo_logra', f'Street_{idx}')),
+                'street_type': row.get('tipo_logra', 'Unknown'),
+                'hierarchy': row.get('hierarquia', None)
+            })
+    
+    # Create GeoDataFrame
+    interpolated_gdf = gpd.GeoDataFrame(
+        all_metadata,
+        geometry=all_interpolated_points,
+        crs=points_gdf.crs
+    )
+    
+    logger.info(f"  Generated {len(interpolated_gdf)} interpolated points")
+    return interpolated_gdf
+
+
 def aggregate_segment_statistics(
     points_gdf: gpd.GeoDataFrame,
     svf_values: np.ndarray,
@@ -354,6 +389,141 @@ def aggregate_segment_statistics(
     return segments_gdf
 
 
+def create_3d_alignment_debug(
+    mesh: pv.PolyData,
+    terrain: pv.PolyData,
+    roads_gdf: gpd.GeoDataFrame,
+    building_footprints: gpd.GeoDataFrame = None,
+    output_path: Path = None
+):
+    """
+    Create a 3D visualization showing STL mesh, building footprints, and roads for alignment debugging.
+    
+    Args:
+        mesh: Full STL mesh (georeferenced)
+        terrain: Terrain surface mesh
+        roads_gdf: Road network GeoDataFrame
+        building_footprints: Building footprints GeoDataFrame
+        output_path: Path to save the visualization
+    """
+    import pyvista as pv
+    
+    # Create plotter
+    plotter = pv.Plotter(off_screen=True, window_size=[1920, 1080])
+    
+    # Add terrain surface (semi-transparent)
+    terrain_actor = plotter.add_mesh(
+        terrain,
+        color='lightgray',
+        opacity=0.6,
+        show_edges=False,
+        label='Terrain'
+    )
+    
+    # Add full mesh (buildings) - extract non-terrain faces
+    # We'll use a simple approach: show all faces with higher opacity
+    buildings_mesh = mesh.copy()
+    # Remove terrain faces by checking normals
+    buildings_mesh = buildings_mesh.compute_normals(point_normals=False, cell_normals=True)
+    # Select faces that are NOT upward-facing (terrain)
+    building_mask = buildings_mesh.cell_normals[:, 2] <= 0.5
+    if building_mask.any():
+        buildings_only = buildings_mesh.extract_cells(building_mask)
+        plotter.add_mesh(
+            buildings_only,
+            color='tan',
+            opacity=0.8,
+            show_edges=False,
+            label='Buildings (STL)'
+        )
+    
+    # Add building footprints as extruded polygons
+    if building_footprints is not None and len(building_footprints) > 0:
+        # Sample a subset for visualization (too many can be slow)
+        n_buildings = min(100, len(building_footprints))
+        sample_buildings = building_footprints.sample(n=n_buildings) if len(building_footprints) > n_buildings else building_footprints
+        
+        for idx, row in sample_buildings.iterrows():
+            geom = row.geometry
+            if geom.geom_type == 'Polygon':
+                # Get exterior coordinates
+                coords = np.array(geom.exterior.coords)
+                if len(coords) >= 3:
+                    # Get base Z from terrain (use first point's elevation)
+                    z_base = 0.0  # Simplified - could sample from terrain
+                    z_top = 5.0  # 5m height for visualization
+                    
+                    # Create polygon points (X, Y, Z_base)
+                    points_2d = coords[:, :2]  # X, Y only
+                    # Create PyVista polygon from 2D points
+                    try:
+                        # Create a simple polygon mesh
+                        poly_points = np.column_stack([points_2d, np.full(len(points_2d), z_base)])
+                        # Create faces (triangulate if needed)
+                        if len(poly_points) >= 3:
+                            # Simple approach: create a surface from the polygon
+                            # Use PyVista's built-in polygon creation
+                            poly = pv.Polygon(points_2d)
+                            # Extrude upward
+                            extruded = poly.extrude((0, 0, z_top - z_base))
+                            if extruded.n_points > 0:
+                                plotter.add_mesh(
+                                    extruded,
+                                    color='red',
+                                    opacity=0.5,
+                                    show_edges=True,
+                                    edge_color='darkred',
+                                    line_width=1
+                                )
+                    except Exception as e:
+                        logger.warning(f"  Failed to visualize building {idx}: {e}")
+                        continue
+    
+    # Add roads as lines elevated above terrain
+    for idx, row in roads_gdf.iterrows():
+        geom = row.geometry
+        if geom.geom_type == 'LineString':
+            coords = np.array(geom.coords)
+            if len(coords) > 0:
+                # Create line in 3D (elevate slightly above terrain)
+                z_offset = 0.5  # 0.5m above terrain
+                coords_3d = np.column_stack([coords[:, 0], coords[:, 1], np.full(len(coords), z_offset)])
+                line = pv.Spline(coords_3d)
+                plotter.add_mesh(
+                    line,
+                    color='blue',
+                    line_width=3,
+                    label='Roads' if idx == roads_gdf.index[0] else None
+                )
+    
+    # Set camera to show overview
+    plotter.camera.position = (
+        (mesh.bounds[1] + mesh.bounds[0]) / 2 + 200,
+        (mesh.bounds[3] + mesh.bounds[2]) / 2 + 200,
+        mesh.bounds[5] + 100
+    )
+    plotter.camera.focal_point = (
+        (mesh.bounds[1] + mesh.bounds[0]) / 2,
+        (mesh.bounds[3] + mesh.bounds[2]) / 2,
+        (mesh.bounds[4] + mesh.bounds[5]) / 2
+    )
+    plotter.camera.up = (0, 0, 1)
+    plotter.camera.zoom(0.8)
+    
+    # Add axes
+    plotter.add_axes()
+    
+    # Add legend
+    plotter.add_legend()
+    
+    # Save screenshot
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plotter.screenshot(str(output_path))
+    plotter.close()
+    
+    logger.info(f"  Saved 3D debug visualization to {output_path}")
+
+
 def plot_street_debug(
     roads_gdf: gpd.GeoDataFrame,
     points_gdf: gpd.GeoDataFrame,
@@ -367,7 +537,8 @@ def plot_street_debug(
     building_buffer_geom = None,
     filtered_roads_gdf: gpd.GeoDataFrame = None,
     original_roads_count: int = None,
-    intersection_info: gpd.GeoDataFrame = None
+    intersection_info: gpd.GeoDataFrame = None,
+    covered_roads: gpd.GeoDataFrame = None
 ):
     """
     Create a debug plot showing street centerlines, sample points, and building footprints.
@@ -431,29 +602,55 @@ def plot_street_debug(
                                        alpha=0.3, linestyle=':', 
                                        label=f'Filtered-out streets (n={len(filtered_out_roads)})')
     
-    # Plot redirected roads (if any) in purple
+    # Plot filtered street centerlines (blue) - first so redirected roads appear on top
+    if filtered_roads_gdf is not None:
+        # Exclude redirected roads from filtered roads to avoid overlap
+        if intersection_info is not None and len(intersection_info) > 0:
+            redirected_indices = set(intersection_info['road_idx'].values)
+            filtered_non_redirected = filtered_roads_gdf[~filtered_roads_gdf.index.isin(redirected_indices)]
+            if len(filtered_non_redirected) > 0:
+                filtered_non_redirected.plot(ax=ax, color='blue', linewidth=0.8, alpha=0.6, 
+                                           label=f'Filtered street centerlines (n={len(filtered_non_redirected)})')
+        else:
+            filtered_roads_gdf.plot(ax=ax, color='blue', linewidth=0.8, alpha=0.6, 
+                                   label=f'Filtered street centerlines (n={len(filtered_roads_gdf)})')
+    else:
+        # Exclude redirected roads from regular roads
+        if intersection_info is not None and len(intersection_info) > 0:
+            redirected_indices = set(intersection_info['road_idx'].values)
+            non_redirected = roads_gdf[~roads_gdf.index.isin(redirected_indices)]
+            if len(non_redirected) > 0:
+                non_redirected.plot(ax=ax, color='blue', linewidth=0.8, alpha=0.6, 
+                                  label=f'Street centerlines (n={len(non_redirected)})')
+        else:
+            roads_gdf.plot(ax=ax, color='blue', linewidth=0.8, alpha=0.6, 
+                          label=f'Street centerlines (n={len(roads_gdf)})')
+    
+    # Plot covered roads (roads that still intersect buildings) in dark red
+    if covered_roads is not None and len(covered_roads) > 0:
+        covered_indices = covered_roads['road_idx'].values
+        covered_roads_geom = roads_gdf.loc[covered_indices]
+        if len(covered_roads_geom) > 0:
+            covered_roads_geom.plot(ax=ax, color='darkred', linewidth=1.0, alpha=0.8, 
+                                   linestyle=':', zorder=9,
+                                   label=f'Covered roads (SVF=0, n={len(covered_roads_geom)})')
+    
+    # Plot redirected roads (if any) in purple - on top so they're visible
     if intersection_info is not None and len(intersection_info) > 0:
         redirected_indices = intersection_info['road_idx'].values
-        redirected_roads = roads_gdf.loc[redirected_indices]
-        if len(redirected_roads) > 0:
-            redirected_roads.plot(ax=ax, color='purple', linewidth=2.5, alpha=0.8, 
-                                 linestyle='--', label=f'Redirected roads (n={len(redirected_roads)})')
+        # Exclude covered roads from redirected roads visualization
+        if covered_roads is not None and len(covered_roads) > 0:
+            covered_indices_set = set(covered_roads['road_idx'].values)
+            redirected_indices = [idx for idx in redirected_indices if idx not in covered_indices_set]
+        
+        if len(redirected_indices) > 0:
+            redirected_roads = roads_gdf.loc[redirected_indices]
+            if len(redirected_roads) > 0:
+                redirected_roads.plot(ax=ax, color='purple', linewidth=1.2, alpha=0.9, 
+                                     linestyle='--', zorder=10,
+                                     label=f'Redirected roads (n={len(redirected_roads)})')
     
-    # Plot filtered street centerlines (blue)
-    if filtered_roads_gdf is not None:
-        filtered_roads_gdf.plot(ax=ax, color='blue', linewidth=2, alpha=0.7, 
-                               label=f'Filtered street centerlines (n={len(filtered_roads_gdf)})')
-    else:
-        roads_gdf.plot(ax=ax, color='blue', linewidth=2, alpha=0.7, 
-                      label=f'Street centerlines (n={len(roads_gdf)})')
-    
-    # Plot sample points along streets
-    if len(points_gdf) > 0:
-        # Extract 2D coordinates for plotting
-        points_2d = np.array([[geom.x, geom.y] for geom in points_gdf.geometry])
-        ax.scatter(points_2d[:, 0], points_2d[:, 1], c='green', s=8, alpha=0.8, 
-                  edgecolors='darkgreen', linewidths=0.3,
-                  label=f'Sample points (n={len(points_gdf)})')
+    # Points removed from debug visualization as requested
     
     # Add statistics text
     stats_text = []
@@ -484,6 +681,8 @@ def plot_street_debug(
         stats_text.append(f"Isolated: {len(isolated_buildings):,} buildings")
     if intersection_info is not None and len(intersection_info) > 0:
         stats_text.append(f"Redirected roads: {len(intersection_info):,}")
+    if covered_roads is not None and len(covered_roads) > 0:
+        stats_text.append(f"Covered roads (SVF=0): {len(covered_roads):,}")
     
     if stats_text:
         stats_str = "\n".join(stats_text)
@@ -504,9 +703,9 @@ def plot_street_debug(
     if MAX_FILTER_AREA is not None:
         title += f'\n(Area filter: >{MAX_FILTER_AREA}m² excluded)'
     title += f'\n(Cluster filter: {BUILDING_CLUSTER_BUFFER}m buffer)'
-    title += '\nBlue = Filtered streets, Purple dashed = Redirected roads, Gray dotted = Filtered-out streets'
-    title += '\nGreen = Sample points, Red = Main cluster, Yellow = Area-filtered, Gray = Isolated'
-    title += '\nOrange dashed = Buffer zone'
+    title += '\nBlue = Filtered streets, Purple dashed = Redirected roads, Dark red dotted = Covered (SVF=0)'
+    title += '\nGray dotted = Filtered-out streets, Red = Main cluster, Yellow = Area-filtered'
+    title += '\nGray = Isolated, Orange dashed = Buffer zone'
     
     ax.set_title(title, fontsize=14, fontweight='bold')
     ax.set_aspect('equal')
@@ -524,7 +723,9 @@ def create_street_svf_map(
     segments_gdf: gpd.GeoDataFrame,
     points_gdf: gpd.GeoDataFrame = None,
     building_footprints: gpd.GeoDataFrame = None,
-    output_path: Path = None
+    output_path: Path = None,
+    covered_roads: gpd.GeoDataFrame = None,
+    roads_gdf: gpd.GeoDataFrame = None
 ):
     """
     Create a map showing streets colored by SVF values.
@@ -545,31 +746,87 @@ def create_street_svf_map(
     
     # Plot building footprints as background (if available)
     if building_footprints is not None and not building_footprints.empty:
+        logger.info(f"  Plotting {len(building_footprints)} building footprints")
+        # Ensure buildings are in the same CRS as segments
+        if building_footprints.crs != segments_gdf.crs:
+            building_footprints = building_footprints.to_crs(segments_gdf.crs)
         building_footprints.plot(
-            ax=ax, facecolor='lightgrey', edgecolor='black', 
-            linewidth=0.5, alpha=0.5, label='Buildings'
+            ax=ax, facecolor='lightgrey', edgecolor='darkgrey', 
+            linewidth=0.3, alpha=0.8, label='Buildings', zorder=1
         )
+    else:
+        logger.warning("  No building footprints to plot")
     
-    # Use actual SVF range for better visualization (not fixed 0-1)
-    svf_values = segments_gdf['svf_mean'].values
-    svf_min = float(svf_values.min())
-    svf_max = float(svf_values.max())
+    # Plot covered roads first (in dark red) so they're visible
+    if covered_roads is not None and len(covered_roads) > 0 and roads_gdf is not None:
+        covered_indices = covered_roads['road_idx'].values
+        covered_segments = segments_gdf[segments_gdf['segment_idx'].isin(covered_indices)]
+        if len(covered_segments) > 0:
+            covered_segments.plot(ax=ax, color='darkred', linewidth=3, alpha=0.9, 
+                                 linestyle=':', zorder=10,
+                                 label=f'Covered roads (SVF=0, n={len(covered_segments)})')
     
-    # Plot street segments colored by mean SVF
-    segments_gdf.plot(
-        ax=ax, column='svf_mean', cmap='RdYlGn',
-        vmin=svf_min, vmax=svf_max, linewidth=3, legend=True,
-        legend_kwds={'label': f'Mean SVF ({svf_min:.3f}-{svf_max:.3f})', 'shrink': 0.8},
-        label='Street segments'
-    )
+    # Plot street segments colored by mean SVF with fixed 0-1 range
+    # Exclude covered roads from the main plot
+    if covered_roads is not None and len(covered_roads) > 0:
+        covered_indices = set(covered_roads['road_idx'].values)
+        non_covered_segments = segments_gdf[~segments_gdf['segment_idx'].isin(covered_indices)]
+    else:
+        non_covered_segments = segments_gdf
     
-    # Optionally plot points (for detailed view)
-    if points_gdf is not None and len(points_gdf) < 1000:  # Only if not too many points
-        points_svf_min = float(points_gdf['svf'].min())
-        points_svf_max = float(points_gdf['svf'].max())
-        points_gdf.plot(
-            ax=ax, column='svf', cmap='RdYlGn',
-            vmin=points_svf_min, vmax=points_svf_max, markersize=2, alpha=0.6, zorder=10
+    # Use interpolated points for continuous visualization if available
+    # Check if points_gdf has interpolated points (look for is_interpolated column or use all points)
+    use_interpolated = points_gdf is not None and 'is_interpolated' in points_gdf.columns
+    
+    if use_interpolated and len(points_gdf) > 0:
+        # Plot interpolated points colored by SVF for continuous gradient visualization
+        # Exclude covered roads from main plot
+        if covered_roads is not None and len(covered_roads) > 0:
+            covered_indices = set(covered_roads['road_idx'].values)
+            non_covered_points = points_gdf[~points_gdf['segment_idx'].isin(covered_indices)]
+        else:
+            non_covered_points = points_gdf
+        
+        if len(non_covered_points) > 0:
+            # Create small line segments from interpolated points for smooth visualization
+            # Group by segment and create line segments between consecutive points
+            from shapely.geometry import LineString as ShapelyLineString
+            
+            line_segments = []
+            line_svf_values = []
+            
+            for seg_idx in non_covered_points['segment_idx'].unique():
+                seg_points = non_covered_points[non_covered_points['segment_idx'] == seg_idx].sort_values('distance_along')
+                if len(seg_points) < 2:
+                    continue
+                
+                for i in range(len(seg_points) - 1):
+                    p1 = seg_points.iloc[i].geometry
+                    p2 = seg_points.iloc[i+1].geometry
+                    line_seg = ShapelyLineString([(p1.x, p1.y), (p2.x, p2.y)])
+                    line_segments.append(line_seg)
+                    # Use average SVF of the two points for the segment
+                    line_svf_values.append((seg_points.iloc[i]['svf'] + seg_points.iloc[i+1]['svf']) / 2.0)
+            
+            if len(line_segments) > 0:
+                line_segments_gdf = gpd.GeoDataFrame(
+                    {'svf': line_svf_values},
+                    geometry=line_segments,
+                    crs=points_gdf.crs
+                )
+                line_segments_gdf.plot(
+                    ax=ax, column='svf', cmap='RdYlGn',
+                    vmin=0.0, vmax=1.0, linewidth=2.0, alpha=0.75, legend=True,
+                    legend_kwds={'label': 'SVF (0.0-1.0)', 'shrink': 0.8},
+                    zorder=2
+                )
+    elif len(non_covered_segments) > 0:
+        # Fallback to segment-based visualization
+        non_covered_segments.plot(
+            ax=ax, column='svf_mean', cmap='RdYlGn',
+            vmin=0.0, vmax=1.0, linewidth=3, legend=True,
+            legend_kwds={'label': 'Mean SVF (0.0-1.0)', 'shrink': 0.8},
+            label='Street segments', zorder=3
         )
     
     ax.set_xlabel('X (meters)', fontsize=12)
@@ -724,7 +981,7 @@ def create_street_svf_map_minmax(
     # This prevents DTM-driven over-zoom into a much larger surrounding area.
     bounds_to_merge = [plot_segments.total_bounds]
     if building_footprints is not None and not building_footprints.empty:
-        bounds_to_merge = [aligned_footprints.total_bounds, plot_segments.total_bounds]
+        bounds_to_merge = [building_footprints.total_bounds, plot_segments.total_bounds]
 
     merged = np.array(bounds_to_merge, dtype=float)
     minx = float(np.min(merged[:, 0]))
@@ -875,8 +1132,8 @@ def main():
         description='Compute Sky View Factor along street centerlines',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument('--stl', type=str, required=True, help='Path to STL file')
-    parser.add_argument('--roads', type=str, required=True, help='Path to road network shapefile')
+    parser.add_argument('--stl', type=str, required=False, help='Path to STL file (auto-resolved if --area provided)')
+    parser.add_argument('--roads', type=str, required=False, help='Path to road network shapefile (auto-resolved if --area provided)')
     parser.add_argument('--footprints', type=str, default=None, help='Path to building footprints (optional, for visualization)')
     parser.add_argument('--dtm', type=str, default=None, help='Path to DTM raster (optional, preferred for elevation)')
     parser.add_argument('--spacing', type=float, default=3.0, help='Distance between sample points (meters, default: 3.0)')
@@ -885,17 +1142,75 @@ def main():
     parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/svf_street)')
     parser.add_argument('--area', type=str, default=None, help='Area name (e.g., vidigal_tls, copacabana) for automatic path resolution')
     parser.add_argument('--building-buffer', type=float, default=30.0, help='Buffer distance from buildings to filter streets (meters, default: 30.0)')
+    parser.add_argument('--redirect-roads', action='store_true', default=False, help='Redirect roads to avoid building intersections (default: False)')
+    parser.add_argument('--set-covered-svf-zero', action='store_true', default=False, help='Set SVF=0 for roads that cannot be redirected (default: False)')
     parser.add_argument('--debug-only', action='store_true', help='Only generate debug plot and exit, do not compute SVF')
+    parser.add_argument('--use-gpu', action='store_true', default=None, help='Use GPU acceleration if available (auto-detected by default)')
+    parser.add_argument('--no-gpu', action='store_true', help='Force CPU computation even if GPU is available')
     
     args = parser.parse_args()
     
+    # Determine GPU usage
+    use_gpu = None
+    if args.no_gpu:
+        use_gpu = False
+    elif args.use_gpu:
+        use_gpu = True
+    # else: use_gpu = None (auto-detect)
+    
     # Setup paths
-    stl_path = Path(args.stl)
+    if args.area:
+        # Auto-resolve paths from area name
+        from src.config import get_area_data_dir
+        area_data_dir = get_area_data_dir(args.area)
+        
+        # Find STL file
+        if args.stl:
+            stl_path = Path(args.stl)
+        else:
+            stl_candidates = list(area_data_dir.glob("*.stl"))
+            if not stl_candidates:
+                logger.error(f"No STL file found in {area_data_dir}")
+                sys.exit(1)
+            stl_path = stl_candidates[0]
+            logger.info(f"Auto-resolved STL file: {stl_path}")
+        
+        # Find roads file
+        if args.roads:
+            roads_path = Path(args.roads)
+        else:
+            # Try common road file patterns
+            road_patterns = ["*roads*.shp", "*roads*.gpkg", "*street*.shp", "*street*.gpkg"]
+            roads_candidates = []
+            for pattern in road_patterns:
+                roads_candidates.extend(list(area_data_dir.glob(pattern)))
+            if not roads_candidates:
+                logger.error(f"No road network file found in {area_data_dir}")
+                sys.exit(1)
+            roads_path = roads_candidates[0]
+            logger.info(f"Auto-resolved roads file: {roads_path}")
+        
+        # Auto-resolve DTM if not provided
+        if not args.dtm:
+            dtm_patterns = ["*dtm*.tif", "*dtm*.tiff", "*DTM*.tif", "*DTM*.tiff", "*dem*.tif", "*DEM*.tif"]
+            dtm_candidates = []
+            for pattern in dtm_patterns:
+                dtm_candidates.extend(list(area_data_dir.glob(pattern)))
+            if dtm_candidates:
+                args.dtm = str(dtm_candidates[0])
+                logger.info(f"Auto-resolved DTM file: {args.dtm}")
+    else:
+        # Require explicit paths if no area specified
+        if not args.stl or not args.roads:
+            logger.error("Either --area must be provided, or both --stl and --roads must be specified")
+            sys.exit(1)
+        stl_path = Path(args.stl)
+        roads_path = Path(args.roads)
+    
     if not stl_path.exists():
         logger.error(f"STL file not found: {stl_path}")
         sys.exit(1)
     
-    roads_path = Path(args.roads)
     if not roads_path.exists():
         logger.error(f"Road network file not found: {roads_path}")
         sys.exit(1)
@@ -926,69 +1241,101 @@ def main():
     print(f"Output directory: {output_dir}")
     print("=" * 60)
     
-    # Load mesh and terrain
+    # Load mesh and terrain (in local coordinates)
     mesh = load_mesh(stl_path)
     terrain = extract_terrain_surface(mesh)
     
-    # Load road network
+    # Get STL bounds (in local coordinates)
+    terrain_bounds = terrain.bounds  # (x_min, x_max, y_min, y_max, z_min, z_max)
+    stl_bounds = terrain_bounds
+    
+    # Setup DTM path (required for georeferencing)
+    dtm_path = Path(args.dtm) if args.dtm else None
+    if not dtm_path or not dtm_path.exists():
+        logger.error("DTM is required for STL georeferencing. Please provide --dtm argument or use --area for auto-resolution.")
+        sys.exit(1)
+    
+    logger.info("Georeferencing STL using DTM bounds...")
+    from src.data_alignment_utils import georeference_stl_using_dtm
+    
+    # Calculate translation to transform STL FROM local TO world coordinates (X, Y, Z)
+    dx, dy, dz, dtm_bounds = georeference_stl_using_dtm(
+        stl_bounds=stl_bounds,
+        dtm_path=dtm_path
+    )
+    
+    # Transform STL mesh vertices to world coordinates
+    logger.info(f"  Transforming STL mesh to world coordinates...")
+    mesh.points[:, 0] += dx  # Transform X coordinates
+    mesh.points[:, 1] += dy  # Transform Y coordinates
+    mesh.points[:, 2] += dz  # Transform Z coordinates (align with DTM elevation)
+    
+    # Re-extract terrain after transformation (to ensure it's correct)
+    logger.info(f"  Re-extracting terrain surface after transformation...")
+    terrain = extract_terrain_surface(mesh)
+    
+    # Get transformed STL bounds (now in world coordinates)
+    transformed_stl_bounds = (
+        stl_bounds[0] + dx, stl_bounds[1] + dx,
+        stl_bounds[2] + dy, stl_bounds[3] + dy,
+        stl_bounds[4] + dz, stl_bounds[5] + dz
+    )
+    logger.info(f"  STL bounds (world): ({transformed_stl_bounds[0]:.2f}, {transformed_stl_bounds[2]:.2f}) to ({transformed_stl_bounds[1]:.2f}, {transformed_stl_bounds[3]:.2f})")
+    
+    # Load road network (already in world coordinates, no transformation needed)
     logger.info(f"Loading road network from {roads_path}...")
     roads_gdf = gpd.read_file(roads_path)
     logger.info(f"  Loaded {len(roads_gdf)} road segments")
-    logger.info(f"  Original CRS: {roads_gdf.crs}")
+    logger.info(f"  CRS: {roads_gdf.crs}")
     logger.info(f"  Road bounds: {roads_gdf.total_bounds}")
     
-    # Handle coordinate system transformation
-    # Calculate transformation using the SAME reference point as buildings for alignment
-    terrain_bounds = terrain.bounds
-    stl_center_x = (terrain_bounds[0] + terrain_bounds[1]) / 2
-    stl_center_y = (terrain_bounds[2] + terrain_bounds[3]) / 2
+    # Validate alignment: check that STL and roads overlap
+    road_bounds = roads_gdf.total_bounds
+    overlap_x = min(transformed_stl_bounds[1], road_bounds[2]) - max(transformed_stl_bounds[0], road_bounds[0])
+    overlap_y = min(transformed_stl_bounds[3], road_bounds[3]) - max(transformed_stl_bounds[2], road_bounds[1])
     
-    # If building footprints are provided, use their ORIGINAL center (before filtering)
-    # to calculate transformation, ensuring perfect alignment
-    if args.footprints:
-        footprints_path = Path(args.footprints)
-        if footprints_path.exists():
-            # Load original footprints (before filtering) to get their center
-            original_footprints = gpd.read_file(str(footprints_path))
-            footprints_center_x = (original_footprints.total_bounds[0] + original_footprints.total_bounds[2]) / 2
-            footprints_center_y = (original_footprints.total_bounds[1] + original_footprints.total_bounds[3]) / 2
-            dx = stl_center_x - footprints_center_x
-            dy = stl_center_y - footprints_center_y
-            logger.info(f"  Using building footprints center for transformation alignment")
-        else:
-            # Fallback to roads center if footprints not found
-            roads_center_x = (roads_gdf.total_bounds[0] + roads_gdf.total_bounds[2]) / 2
-            roads_center_y = (roads_gdf.total_bounds[1] + roads_gdf.total_bounds[3]) / 2
-            dx = stl_center_x - roads_center_x
-            dy = stl_center_y - roads_center_y
+    if overlap_x < 0 or overlap_y < 0:
+        logger.warning(f"  Warning: STL and roads may not overlap after georeferencing")
+        logger.warning(f"    STL bounds: ({transformed_stl_bounds[0]:.2f}, {transformed_stl_bounds[2]:.2f}) to ({transformed_stl_bounds[1]:.2f}, {transformed_stl_bounds[3]:.2f})")
+        logger.warning(f"    Road bounds: ({road_bounds[0]:.2f}, {road_bounds[1]:.2f}) to ({road_bounds[2]:.2f}, {road_bounds[3]:.2f})")
     else:
-        # Use roads center if no footprints provided
-        roads_center_x = (roads_gdf.total_bounds[0] + roads_gdf.total_bounds[2]) / 2
-        roads_center_y = (roads_gdf.total_bounds[1] + roads_gdf.total_bounds[3]) / 2
-        dx = stl_center_x - roads_center_x
-        dy = stl_center_y - roads_center_y
-    
-    # Apply transformation to roads
-    logger.info(f"  Transforming roads to match STL coordinate system")
-    logger.info(f"  Applying translation: dx={dx:.1f}, dy={dy:.1f}")
-    roads_gdf.geometry = roads_gdf.geometry.translate(xoff=dx, yoff=dy)
-    logger.info(f"  Transformed road bounds: {roads_gdf.total_bounds}")
+        logger.info(f"  Alignment validated: STL and roads overlap ({overlap_x:.2f}m x {overlap_y:.2f}m)")
     
     # Now load building footprints (they will use the same transformation)
     building_footprints = None
     isolated_buildings = None
     area_filtered_buildings = None
     building_buffer_geom = None
+    
+    # Auto-resolve footprints path if --area is provided
+    if args.area and not args.footprints:
+        from src.config import get_area_data_dir
+        area_data_dir = get_area_data_dir(args.area)
+        # Try common building footprint file patterns
+        footprint_patterns = ["*buildings*.shp", "*buildings*.gpkg", "*footprints*.shp", "*footprints*.gpkg"]
+        footprints_candidates = []
+        for pattern in footprint_patterns:
+            footprints_candidates.extend(list(area_data_dir.glob(pattern)))
+        if footprints_candidates:
+            args.footprints = str(footprints_candidates[0])
+            logger.info(f"Auto-resolved footprints file: {args.footprints}")
+    
     if args.footprints:
         footprints_path = Path(args.footprints)
         if footprints_path.exists():
-            from src.svf_utils import load_building_footprints
-            building_footprints, isolated_buildings, area_filtered_buildings = load_building_footprints(
-                footprints_path,
-                terrain_bounds=terrain.bounds,
-                buffer_distance=0.0,  # No buffer needed for visualization
-                area=args.area
+            # Load buildings directly (they're already in world coordinates, don't transform)
+            from src.svf_utils import filter_buildings
+            buildings_raw = gpd.read_file(str(footprints_path))
+            logger.info(f"  Loaded {len(buildings_raw)} building footprints")
+            logger.info(f"  Building CRS: {buildings_raw.crs}")
+            logger.info(f"  Building bounds: {buildings_raw.total_bounds}")
+            
+            # Apply filtering (but don't transform - they're already georeferenced)
+            building_footprints, isolated_buildings, area_filtered_buildings = filter_buildings(
+                buildings_raw, area=args.area
             )
+            
+            logger.info(f"  Prepared {len(building_footprints)} building footprints (main cluster)")
             
             # Create buffer geometry for street filtering
             if building_footprints is not None and len(building_footprints) > 0 and args.building_buffer > 0:
@@ -1008,8 +1355,11 @@ def main():
                 building_buffer_geom = building_union.buffer(args.building_buffer)
                 logger.info(f"  Created building buffer zone ({args.building_buffer}m) for street filtering")
             
-            # Redirect roads to avoid building intersections (preprocessing step)
-            if building_footprints is not None and len(building_footprints) > 0:
+            # Redirect roads to avoid building intersections (OPTIONAL preprocessing step)
+            intersection_info = None
+            intersections_after = None
+            
+            if args.redirect_roads and building_footprints is not None and len(building_footprints) > 0:
                 from src.data_alignment_utils import redirect_roads, detect_road_building_intersections
                 
                 # Detect intersections before redirection
@@ -1017,7 +1367,7 @@ def main():
                 
                 if len(intersections_before) > 0:
                     logger.warning(f"  Found {len(intersections_before)} road segments intersecting buildings")
-                    logger.info(f"  Redirecting roads to avoid collisions...")
+                    logger.info(f"  Redirecting roads to avoid collisions (--redirect-roads enabled)...")
                     
                     # Redirect roads (using parallel offset method)
                     roads_gdf, intersection_info = redirect_roads(
@@ -1033,13 +1383,29 @@ def main():
                         logger.info(f"  Successfully redirected all {len(intersection_info)} intersecting roads")
                     else:
                         logger.warning(f"  {len(intersections_after)} roads still intersect after redirection")
+                        if args.set_covered_svf_zero:
+                            logger.info(f"  These roads will be treated as covered (SVF=0, --set-covered-svf-zero enabled)")
+                        else:
+                            logger.info(f"  These roads will be processed normally (use --set-covered-svf-zero to set SVF=0)")
                 else:
                     intersection_info = gpd.GeoDataFrame(columns=['road_idx'], crs=roads_gdf.crs)
+                    intersections_after = gpd.GeoDataFrame(columns=['road_idx'], crs=roads_gdf.crs)
                     logger.info(f"  No road-building intersections detected")
+            elif building_footprints is not None and len(building_footprints) > 0:
+                # Check for intersections but don't redirect (unless flag is set)
+                from src.data_alignment_utils import detect_road_building_intersections
+                intersections_before = detect_road_building_intersections(roads_gdf, building_footprints)
+                if len(intersections_before) > 0:
+                    logger.info(f"  Found {len(intersections_before)} road segments intersecting buildings")
+                    logger.info(f"  Use --redirect-roads to redirect them, or --set-covered-svf-zero to set SVF=0")
+                intersection_info = None
+                intersections_after = None
             else:
                 intersection_info = None
+                intersections_after = None
     else:
         intersection_info = None
+        intersections_after = None
     
     # Filter streets to only keep those within building buffer
     # Use a stricter criterion: require at least 50% of the street segment to be within the buffer
@@ -1091,12 +1457,17 @@ def main():
     )
     
     # Remove points with invalid elevation
-    valid_mask = ~points_gdf.geometry.apply(lambda p: np.isnan(p.z))
+    import numpy as np  # Ensure np is available
+    def _check_nan_z(p):
+        if hasattr(p, 'z'):
+            return np.isnan(p.z)
+        return True
+    valid_mask = ~points_gdf.geometry.apply(_check_nan_z)
     if not valid_mask.all():
         logger.warning(f"  Removed {np.sum(~valid_mask)} points with invalid elevation")
         points_gdf = points_gdf[valid_mask].copy()
     
-    # Create debug plot
+    # Create 2D debug plot
     debug_plot_path = output_dir / "street_debug.png"
     plot_street_debug(
         roads_gdf, points_gdf, 
@@ -1111,6 +1482,17 @@ def main():
         building_buffer_geom=building_buffer_geom,
         filtered_roads_gdf=filtered_roads_gdf,
         original_roads_count=original_roads_count
+    )
+    
+    # Create 3D debug visualization showing STL mesh, buildings, and roads
+    debug_3d_path = output_dir / "street_debug_3d.png"
+    logger.info(f"Creating 3D debug visualization: {debug_3d_path}")
+    create_3d_alignment_debug(
+        mesh=mesh,
+        terrain=terrain,
+        roads_gdf=roads_gdf,
+        building_footprints=building_footprints,
+        output_path=debug_3d_path
     )
     
     # If debug-only mode, stop here
@@ -1135,30 +1517,64 @@ def main():
     # Generate sky patches
     sky_patches, _ = generate_sky_patches(args.sky_patches)
     
-    # Compute SVF
-    svf_values = compute_svf(street_points_3d, sky_patches, mesh, args.height)
+    # Compute SVF (with automatic GPU detection)
+    svf_values = compute_svf(street_points_3d, sky_patches, mesh, args.height, use_gpu=use_gpu)
     
     # Add SVF values to points GeoDataFrame
     points_gdf = points_gdf.copy()
     points_gdf['svf'] = svf_values
     
-    # Aggregate to segment level (use filtered roads for aggregation)
-    segments_gdf = aggregate_segment_statistics(points_gdf, svf_values, filtered_roads_gdf)
+    # Set SVF to 0 for roads that still intersect buildings (OPTIONAL, only if flag is set)
+    if args.set_covered_svf_zero and intersections_after is not None and len(intersections_after) > 0:
+        covered_road_indices = set(intersections_after['road_idx'].values)
+        covered_mask = points_gdf['segment_idx'].isin(covered_road_indices)
+        n_covered_points = covered_mask.sum()
+        if n_covered_points > 0:
+            points_gdf.loc[covered_mask, 'svf'] = 0.0
+            logger.info(f"  Set SVF=0 for {n_covered_points} points on {len(covered_road_indices)} covered roads (--set-covered-svf-zero enabled)")
+    elif intersections_after is not None and len(intersections_after) > 0:
+        covered_road_indices = set(intersections_after['road_idx'].values)
+        n_covered_points = (points_gdf['segment_idx'].isin(covered_road_indices)).sum()
+        if n_covered_points > 0:
+            logger.info(f"  {n_covered_points} points on {len(covered_road_indices)} roads still intersect buildings")
+            logger.info(f"  Use --set-covered-svf-zero to set their SVF=0")
     
-    # Translate results back to source (world) coordinates before saving.
-    # Streets were shifted into STL-local space for ray casting.
+    # Create continuous SVF representation by interpolating along segments
+    logger.info("Creating continuous SVF representation...")
+    interpolated_points_gdf = interpolate_svf_along_segments(
+        points_gdf, filtered_roads_gdf, interpolation_spacing=0.5
+    )
+    
+    # Set SVF to 0 for interpolated points on covered roads (OPTIONAL, only if flag is set)
+    if args.set_covered_svf_zero and intersections_after is not None and len(intersections_after) > 0:
+        covered_road_indices = set(intersections_after['road_idx'].values)
+        covered_interp_mask = interpolated_points_gdf['segment_idx'].isin(covered_road_indices)
+        if covered_interp_mask.any():
+            interpolated_points_gdf.loc[covered_interp_mask, 'svf'] = 0.0
+    
+    # Aggregate to segment level using interpolated points for more accurate statistics
+    segments_gdf = aggregate_segment_statistics(
+        interpolated_points_gdf, interpolated_points_gdf['svf'].values, filtered_roads_gdf
+    )
+    
+    # Set SVF to 0 for segments that are completely covered (OPTIONAL, only if flag is set)
+    if args.set_covered_svf_zero and intersections_after is not None and len(intersections_after) > 0:
+        covered_road_indices = set(intersections_after['road_idx'].values)
+        covered_segment_mask = segments_gdf['segment_idx'].isin(covered_road_indices)
+        if covered_segment_mask.any():
+            # Set mean SVF to 0 for covered segments
+            segments_gdf.loc[covered_segment_mask, 'svf_mean'] = 0.0
+            segments_gdf.loc[covered_segment_mask, 'svf_min'] = 0.0
+            segments_gdf.loc[covered_segment_mask, 'svf_max'] = 0.0
+            segments_gdf.loc[covered_segment_mask, 'svf_std'] = 0.0
+            logger.info(f"  Set segment-level SVF=0 for {covered_segment_mask.sum()} covered road segments (--set-covered-svf-zero enabled)")
+    
+    # All data is already in world coordinates (STL was georeferenced, roads/buildings were never transformed)
+    # No back-transformation needed
     points_gdf_world = points_gdf.copy()
-    points_gdf_world.geometry = points_gdf_world.geometry.translate(xoff=-dx, yoff=-dy)
-
+    interpolated_points_gdf_world = interpolated_points_gdf.copy()
     segments_gdf_world = segments_gdf.copy()
-    segments_gdf_world.geometry = segments_gdf_world.geometry.translate(xoff=-dx, yoff=-dy)
-    
-    # Also translate building footprints back to world coordinates for visualization
-    # (they were transformed to local coordinates by load_building_footprints)
-    building_footprints_world = None
-    if building_footprints is not None:
-        building_footprints_world = building_footprints.copy()
-        building_footprints_world.geometry = building_footprints_world.geometry.translate(xoff=-dx, yoff=-dy)
+    building_footprints_world = building_footprints.copy() if building_footprints is not None else None
 
     # Save results
     logger.info("Saving results...")
@@ -1167,6 +1583,11 @@ def main():
     points_output = output_dir / "street_svf_points.gpkg"
     points_gdf_world.to_file(points_output, driver='GPKG')
     logger.info(f"  Saved point-level results to {points_output}")
+    
+    # Save interpolated points (continuous representation)
+    interpolated_output = output_dir / "street_svf_points_interpolated.gpkg"
+    interpolated_points_gdf_world.to_file(interpolated_output, driver='GPKG')
+    logger.info(f"  Saved interpolated point-level results to {interpolated_output}")
     
     # Segment-level output
     segments_output = output_dir / "street_svf_segments.gpkg"
@@ -1183,7 +1604,22 @@ def main():
     
     # Street SVF map (use world coordinates for buildings)
     map_path = output_dir / "street_svf_map.png"
-    create_street_svf_map(segments_gdf_world, points_gdf_world, building_footprints_world, map_path)
+    # Translate covered roads info to world coordinates if needed (only if flag is set)
+    covered_roads_world = None
+    if args.set_covered_svf_zero and intersections_after is not None and len(intersections_after) > 0:
+        covered_roads_world = intersections_after.copy()
+    
+    # Debug: Check if buildings are available
+    if building_footprints_world is not None:
+        logger.info(f"  Building footprints for visualization: {len(building_footprints_world)} buildings")
+    else:
+        logger.warning("  No building footprints available for visualization")
+    
+    create_street_svf_map(
+        segments_gdf_world, interpolated_points_gdf_world, building_footprints_world, map_path,
+        covered_roads=covered_roads_world,
+        roads_gdf=filtered_roads_gdf if 'filtered_roads_gdf' in locals() else None
+    )
 
     # Additional robust min-max map (brown->sand, kept as a separate output).
     minmax_map_path = output_dir / "street_svf_map_minmax.png"

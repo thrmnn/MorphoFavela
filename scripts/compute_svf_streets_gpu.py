@@ -36,14 +36,7 @@ from src.svf_utils import (
     load_mesh,
     extract_terrain_surface
 )
-from scripts.compute_svf import generate_sky_patches
-from src.svf_gpu_utils import (
-    pv_mesh_to_pytorch3d,
-    prepare_observer_points,
-    prepare_sky_patches,
-    check_gpu_availability
-)
-from src.svf_gpu_compute import compute_svf_gpu
+from src.svf_compute import generate_sky_patches, compute_svf, get_compute_backend
 
 # Import CPU version as fallback
 from scripts.compute_svf_streets import (
@@ -318,42 +311,17 @@ def main():
     # Generate sky patches
     sky_patches, _ = generate_sky_patches(args.sky_patches)
     
-    # Compute SVF using GPU or CPU
-    if use_gpu:
-        try:
-            # Convert mesh to PyTorch3D format
-            logger.info("Converting mesh to PyTorch3D format...")
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            pytorch3d_mesh = pv_mesh_to_pytorch3d(mesh, device=device)
-            
-            # Prepare data for GPU
-            observer_points_torch = prepare_observer_points(
-                street_points_3d, args.height, device=device
-            )
-            sky_patches_torch = prepare_sky_patches(sky_patches, device=device)
-            
-            # Compute SVF on GPU
-            logger.info("Computing SVF on GPU...")
-            svf_values = compute_svf_gpu(
-                observer_points_torch,
-                sky_patches_torch,
-                pytorch3d_mesh,
-                batch_size=args.gpu_batch_size,
-                num_samples_per_ray=args.gpu_samples_per_ray,
-                ray_chunk_size=args.gpu_ray_chunk_size,
-                tri_chunk_size=args.gpu_tri_chunk_size,
-            )
-            
-            # Convert back to numpy
-            svf_values = svf_values.cpu().numpy()
-            
-        except Exception as e:
-            logger.error(f"GPU computation failed: {e}")
-            logger.info("Falling back to CPU computation...")
-            svf_values = compute_svf_cpu(street_points_3d, sky_patches, mesh, args.height)
-    else:
-        # Use CPU computation
-        svf_values = compute_svf_cpu(street_points_3d, sky_patches, mesh, args.height)
+    # Compute SVF using unified interface (auto-detects GPU)
+    svf_values = compute_svf(
+        street_points_3d,
+        sky_patches,
+        mesh,
+        args.height,
+        use_gpu=use_gpu,
+        gpu_batch_size=args.gpu_batch_size if hasattr(args, 'gpu_batch_size') else 1000,
+        ray_chunk_size=args.gpu_ray_chunk_size if hasattr(args, 'gpu_ray_chunk_size') else 1024,
+        tri_chunk_size=args.gpu_tri_chunk_size if hasattr(args, 'gpu_tri_chunk_size') else 4096,
+    )
     
     # Add SVF values to points GeoDataFrame
     points_gdf = points_gdf.copy()

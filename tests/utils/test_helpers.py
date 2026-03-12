@@ -4,10 +4,17 @@ Test utilities for SVF algorithm testing.
 
 import numpy as np
 import pyvista as pv
-import torch
 from pathlib import Path
 from typing import Tuple, Optional
 import json
+
+# Optional GPU imports
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    torch = None
+    TORCH_AVAILABLE = False
 
 
 def create_empty_scene() -> pv.PolyData:

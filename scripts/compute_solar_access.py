@@ -317,6 +317,7 @@ def main():
     parser.add_argument('--grid-spacing', type=float, default=5.0, help='Grid spacing in meters')
     parser.add_argument('--height', type=float, default=0.5, help='Evaluation height above ground (meters)')
     parser.add_argument('--buffer-distance', type=float, default=0.25, help='Buffer distance for building footprints (meters)')
+    parser.add_argument('--building-buffer', type=float, default=None, help='Only compute solar access for points within this distance of buildings (meters). Reduces computation by focusing on relevant areas.')
     parser.add_argument('--output-dir', type=str, default=None, help='Output directory (default: outputs/solar)')
     parser.add_argument('--latitude', type=float, default=-22.9519, help='Site latitude (degrees, default: Rio de Janeiro)')
     parser.add_argument('--longitude', type=float, default=-43.2105, help='Site longitude (degrees, default: Rio de Janeiro)')
@@ -344,6 +345,8 @@ def main():
         print(f"Building footprints: {args.footprints}")
     print(f"Grid spacing: {args.grid_spacing}m")
     print(f"Evaluation height: {args.height}m")
+    if args.building_buffer:
+        print(f"Building buffer: {args.building_buffer}m (only points near buildings)")
     print(f"Location: ({args.latitude:.4f}°, {args.longitude:.4f}°)")
     print(f"Time step: {args.timestep} minutes")
     print(f"Threshold: {args.threshold} hours")
@@ -357,6 +360,8 @@ def main():
     
     # Load and prepare building footprints if provided
     building_footprints = None
+    isolated_footprints = None
+    area_filtered_footprints = None
     if args.footprints:
         footprints_path = Path(args.footprints)
         if not footprints_path.exists():
@@ -364,7 +369,8 @@ def main():
             print("  Continuing without building mask...")
         else:
             # Load and transform building footprints to match terrain coordinate system
-            building_footprints = load_building_footprints(
+            # Returns tuple: (buffered_footprints, isolated_footprints, area_filtered_footprints)
+            building_footprints, isolated_footprints, area_filtered_footprints = load_building_footprints(
                 footprints_path,
                 terrain_bounds=terrain.bounds,
                 buffer_distance=args.buffer_distance
@@ -372,13 +378,20 @@ def main():
     
     # Generate ground points (with mask applied if available)
     # Reuses the exact same ground mask logic from SVF computation
+    # Function returns: (projected_points, x_coords, y_coords, ground_mask, building_buffer_geom)
     if args.footprints and building_footprints is not None:
-        ground_points, grid_x_coords, grid_y_coords, original_mask = generate_ground_points(
-            terrain, args.grid_spacing, building_footprints=building_footprints, output_dir=output_dir
+        ground_points, grid_x_coords, grid_y_coords, original_mask, _ = generate_ground_points(
+            terrain, args.grid_spacing, 
+            building_footprints=building_footprints, 
+            output_dir=output_dir,
+            building_buffer=args.building_buffer,
+            isolated_buildings=isolated_footprints,
+            area_filtered_buildings=area_filtered_footprints
         )
     else:
-        ground_points, grid_x_coords, grid_y_coords, original_mask = generate_ground_points(
-            terrain, args.grid_spacing
+        ground_points, grid_x_coords, grid_y_coords, original_mask, _ = generate_ground_points(
+            terrain, args.grid_spacing,
+            building_buffer=args.building_buffer
         )
     
     print(f"\nTotal grid points: {len(original_mask)}")

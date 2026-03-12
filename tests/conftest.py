@@ -5,8 +5,15 @@ Pytest configuration and shared fixtures for SVF tests.
 import numpy as np
 import pyvista as pv
 import pytest
-import torch
 from pathlib import Path
+
+# Optional GPU imports
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    torch = None
+    TORCH_AVAILABLE = False
 
 
 @pytest.fixture
@@ -207,7 +214,7 @@ def test_points():
 @pytest.fixture
 def sky_patches_36():
     """Generate 36 sky patches."""
-    from scripts.compute_svf import generate_sky_patches
+    from src.svf_compute import generate_sky_patches
     patches, _ = generate_sky_patches(36)
     return patches
 
@@ -215,7 +222,7 @@ def sky_patches_36():
 @pytest.fixture
 def sky_patches_145():
     """Generate 145 sky patches."""
-    from scripts.compute_svf import generate_sky_patches
+    from src.svf_compute import generate_sky_patches
     patches, _ = generate_sky_patches(145)
     return patches
 
@@ -223,10 +230,18 @@ def sky_patches_145():
 @pytest.fixture
 def gpu_available():
     """Check if GPU is available."""
+    if not TORCH_AVAILABLE:
+        return False
     return torch.cuda.is_available()
 
 
 @pytest.fixture
 def device(gpu_available):
     """Get appropriate device for tests."""
-    return torch.device("cuda" if gpu_available else "cpu")
+    if TORCH_AVAILABLE:
+        return torch.device("cuda" if gpu_available else "cpu")
+    else:
+        # Return a mock device object if torch is not available
+        class MockDevice:
+            type = "cpu"
+        return MockDevice()

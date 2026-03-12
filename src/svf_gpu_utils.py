@@ -104,12 +104,12 @@ def pv_mesh_to_pytorch3d(
         
         # Remap face indices
         if len(faces_old) > 0:
-        faces = old_to_new[faces_old]
-        
-        # Remove faces that reference invalid vertices (shouldn't happen after filtering)
-        invalid_face_mask = (faces < 0).any(axis=1)
-        if invalid_face_mask.any():
-            faces = faces[~invalid_face_mask]
+            faces = old_to_new[faces_old]
+            
+            # Remove faces that reference invalid vertices (shouldn't happen after filtering)
+            invalid_face_mask = (faces < 0).any(axis=1)
+            if invalid_face_mask.any():
+                faces = faces[~invalid_face_mask]
         else:
             faces = np.empty((0, 3), dtype=np.int64)
         
