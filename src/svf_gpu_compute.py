@@ -26,10 +26,10 @@ def compute_svf_gpu(
 ) -> torch.Tensor:
     """
     Compute SVF using GPU-accelerated batch ray-casting.
-    
+
     Uses exact segment-triangle intersection (Moller-Trumbore) on GPU.
     The computation is chunked over rays and triangles for memory stability.
-    
+
     Args:
         observer_points: Tensor of shape (N, 3) with observer positions
         sky_patches: Tensor of shape (M, 3) with sky patch centroids
@@ -39,7 +39,7 @@ def compute_svf_gpu(
         num_samples_per_ray: Kept for backward compatibility (unused in exact mode)
         ray_chunk_size: Number of rays to intersect in each kernel chunk
         tri_chunk_size: Number of triangles to intersect in each kernel chunk
-    
+
     Returns:
         Tensor of shape (N,) with SVF values
     """
@@ -67,9 +67,9 @@ def compute_svf_gpu_batch(
 ) -> torch.Tensor:
     """
     Compute SVF using GPU-accelerated batch ray-casting.
-    
+
     Uses exact segment-triangle intersections.
-    
+
     Args:
         observer_points: Tensor of shape (N, 3) with observer positions
         sky_patches: Tensor of shape (M, 3) with sky patch centroids
@@ -79,31 +79,33 @@ def compute_svf_gpu_batch(
         num_samples_per_ray: Kept for backward compatibility (unused in exact mode)
         ray_chunk_size: Number of rays to intersect in each chunk
         tri_chunk_size: Number of triangles to intersect in each chunk
-    
+
     Returns:
         Tensor of shape (N,) with SVF values
     """
     device = observer_points.device
     n_points = observer_points.shape[0]
     n_patches = sky_patches.shape[0]
-    
-    logger.info(f"Computing SVF on GPU for {n_points} points with {n_patches} sky patches")
+
+    logger.info(
+        f"Computing SVF on GPU for {n_points} points with {n_patches} sky patches"
+    )
     logger.info(f"  Device: {device}")
     logger.info(f"  Batch size: {batch_size}")
     logger.info("  Intersection: exact ray-triangle")
     logger.info(f"  Ray chunk size: {ray_chunk_size}")
     logger.info(f"  Triangle chunk size: {tri_chunk_size}")
     logger.info(f"  Total rays to process: {n_points * n_patches}")
-    
+
     svf_values = torch.zeros(n_points, device=device, dtype=torch.float32)
     mesh_triangles = _prepare_mesh_triangles(mesh)
-    
+
     # Process observer points in batches to manage memory
     with torch.no_grad():
         for i in tqdm(range(0, n_points, batch_size), desc="Computing SVF (GPU)"):
             batch_end = min(i + batch_size, n_points)
             batch_observers = observer_points[i:batch_end]
-            
+
             # Compute SVF for this batch
             batch_svf = _compute_batch_svf(
                 batch_observers,
@@ -113,9 +115,9 @@ def compute_svf_gpu_batch(
                 ray_chunk_size,
                 tri_chunk_size,
             )
-            
+
             svf_values[i:batch_end] = batch_svf
-    
+
     return svf_values
 
 
@@ -129,7 +131,7 @@ def _compute_batch_svf(
 ) -> torch.Tensor:
     """
     Compute SVF for a batch of observers using exact segment-triangle intersection.
-    
+
     Args:
         observers: Tensor of shape (B, 3) with observer positions
         sky_patches: Tensor of shape (M, 3) with sky patch centroids
@@ -137,7 +139,7 @@ def _compute_batch_svf(
         max_ray_length: Maximum ray length
         ray_chunk_size: Number of rays to intersect in each chunk
         tri_chunk_size: Number of triangles to intersect in each chunk
-    
+
     Returns:
         Tensor of shape (B,) with SVF values
     """
@@ -153,7 +155,9 @@ def _compute_batch_svf(
     if max_ray_length is not None and max_ray_length > 0:
         ray_lengths = torch.clamp(ray_lengths, max=max_ray_length)
 
-    ray_directions = ray_vectors / (torch.linalg.norm(ray_vectors, dim=-1, keepdim=True) + 1e-8)
+    ray_directions = ray_vectors / (
+        torch.linalg.norm(ray_vectors, dim=-1, keepdim=True) + 1e-8
+    )
 
     ray_origins_flat = observers_exp.reshape(-1, 3)
     ray_dirs_flat = ray_directions.reshape(-1, 3)
@@ -252,21 +256,19 @@ def _rays_blocked_by_mesh_exact(
 
 
 def _check_points_visible(
-    points: torch.Tensor,
-    mesh: Meshes,
-    threshold: float = 0.5
+    points: torch.Tensor, mesh: Meshes, threshold: float = 0.5
 ) -> torch.Tensor:
     """
     Check if points are visible (not inside/on mesh surface).
-    
+
     Uses PyTorch3D's point-to-mesh face distance for accurate computation.
     This is more accurate than distance-to-vertices but slower.
-    
+
     Args:
         points: Tensor of shape (N, 3) with points to check
         mesh: PyTorch3D Meshes object
         threshold: Distance threshold (meters) for considering point blocked
-    
+
     Returns:
         Boolean tensor of shape (N,) indicating visibility (True = visible)
     """
@@ -274,32 +276,37 @@ def _check_points_visible(
         from pytorch3d.loss import point_mesh_face_distance
     except ImportError:
         # Fallback to vertex distance if PyTorch3D function not available
-        logger.warning("point_mesh_face_distance not available, using vertex distance (less accurate)")
+        logger.warning(
+            "point_mesh_face_distance not available, using vertex distance (less accurate)"
+        )
         return _check_points_visible_vertex_approx(points, mesh, threshold)
-    
+
     # Get mesh vertices and faces
     verts = mesh.verts_list()[0]  # (V, 3)
     _faces = mesh.faces_list()[0]  # (F, 3)
-    
+
     # OPTIMIZATION: Use bounding box pre-filtering
     mesh_min = verts.min(dim=0)[0]  # (3,)
     mesh_max = verts.max(dim=0)[0]  # (3,)
-    
+
     # Quick check: points far outside bounding box are definitely visible
     expanded_min = mesh_min - threshold
     expanded_max = mesh_max + threshold
-    
+
     outside_mask = (
-        (points[:, 0] < expanded_min[0]) | (points[:, 0] > expanded_max[0]) |
-        (points[:, 1] < expanded_min[1]) | (points[:, 1] > expanded_max[1]) |
-        (points[:, 2] < expanded_min[2]) | (points[:, 2] > expanded_max[2])
+        (points[:, 0] < expanded_min[0])
+        | (points[:, 0] > expanded_max[0])
+        | (points[:, 1] < expanded_min[1])
+        | (points[:, 1] > expanded_max[1])
+        | (points[:, 2] < expanded_min[2])
+        | (points[:, 2] > expanded_max[2])
     )
-    
+
     visible = outside_mask.clone()
-    
+
     # Only check points inside/near bounding box
     points_to_check = points[~outside_mask]
-    
+
     if len(points_to_check) > 0:
         # Use PyTorch3D's point-to-mesh face distance
         # This computes distance to mesh surface (triangles), not just vertices
@@ -307,35 +314,33 @@ def _check_points_visible(
         chunk_size = 5000
         min_distances = torch.full(
             (len(points_to_check),),
-            float('inf'),
+            float("inf"),
             device=points.device,
-            dtype=points.dtype
+            dtype=points.dtype,
         )
-        
+
         for i in range(0, len(points_to_check), chunk_size):
             chunk_end = min(i + chunk_size, len(points_to_check))
             points_chunk = points_to_check[i:chunk_end]
-            
+
             # Compute distance to mesh faces
             # point_mesh_face_distance returns squared distances
             distances_sq = point_mesh_face_distance(mesh, points_chunk.unsqueeze(0))
             distances = torch.sqrt(distances_sq)  # Convert to actual distances
-            
+
             min_distances[i:chunk_end] = distances.squeeze(0)
-        
+
         # Points are visible if distance > threshold
         visible[~outside_mask] = min_distances > threshold
     else:
         # All points are outside bounding box - all visible
         pass
-    
+
     return visible
 
 
 def _check_points_visible_vertex_approx(
-    points: torch.Tensor,
-    mesh: Meshes,
-    threshold: float = 0.5
+    points: torch.Tensor, mesh: Meshes, threshold: float = 0.5
 ) -> torch.Tensor:
     """
     Fallback: Check visibility using distance to vertices (less accurate).
@@ -343,37 +348,40 @@ def _check_points_visible_vertex_approx(
     verts = mesh.verts_list()[0]
     mesh_min = verts.min(dim=0)[0]
     mesh_max = verts.max(dim=0)[0]
-    
+
     expanded_min = mesh_min - threshold
     expanded_max = mesh_max + threshold
-    
+
     outside_mask = (
-        (points[:, 0] < expanded_min[0]) | (points[:, 0] > expanded_max[0]) |
-        (points[:, 1] < expanded_min[1]) | (points[:, 1] > expanded_max[1]) |
-        (points[:, 2] < expanded_min[2]) | (points[:, 2] > expanded_max[2])
+        (points[:, 0] < expanded_min[0])
+        | (points[:, 0] > expanded_max[0])
+        | (points[:, 1] < expanded_min[1])
+        | (points[:, 1] > expanded_max[1])
+        | (points[:, 2] < expanded_min[2])
+        | (points[:, 2] > expanded_max[2])
     )
-    
+
     visible = outside_mask.clone()
     points_to_check = points[~outside_mask]
-    
+
     if len(points_to_check) > 0:
         chunk_size = min(10000, len(verts))
         if len(verts) > chunk_size:
             min_distances = torch.full(
                 (len(points_to_check),),
-                float('inf'),
+                float("inf"),
                 device=points.device,
-                dtype=points.dtype
+                dtype=points.dtype,
             )
             for i in range(0, len(verts), chunk_size):
-                verts_chunk = verts[i:i+chunk_size]
+                verts_chunk = verts[i : i + chunk_size]
                 distances_chunk = torch.cdist(points_to_check, verts_chunk)
                 min_distances_chunk = distances_chunk.min(dim=1)[0]
                 min_distances = torch.minimum(min_distances, min_distances_chunk)
         else:
             distances = torch.cdist(points_to_check, verts)
             min_distances = distances.min(dim=1)[0]
-        
+
         visible[~outside_mask] = min_distances > threshold
-    
+
     return visible

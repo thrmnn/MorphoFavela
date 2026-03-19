@@ -34,7 +34,9 @@ def load_dtm(dtm_path: Path) -> Tuple[np.ndarray, rasterio.Affine, object, tuple
 
     valid = dtm_array[np.isfinite(dtm_array)]
     if len(valid) > 0:
-        logger.info(f"  Shape {dtm_array.shape}, elevation {np.nanmin(valid):.1f}-{np.nanmax(valid):.1f}m")
+        logger.info(
+            f"  Shape {dtm_array.shape}, elevation {np.nanmin(valid):.1f}-{np.nanmax(valid):.1f}m"
+        )
     else:
         logger.warning("  No valid elevation values in DTM!")
 
@@ -92,8 +94,12 @@ def build_terrain_mesh(
     if subsample > 1:
         dtm_array = dtm_array[::subsample, ::subsample]
         transform = rasterio.Affine(
-            transform.a * subsample, transform.b, transform.c,
-            transform.d, transform.e * subsample, transform.f,
+            transform.a * subsample,
+            transform.b,
+            transform.c,
+            transform.d,
+            transform.e * subsample,
+            transform.f,
         )
 
     height, width = dtm_array.shape
@@ -123,7 +129,9 @@ def build_terrain_mesh(
     grid = pv.StructuredGrid(x_coords, y_coords, z_coords)
     terrain_mesh = grid.extract_surface()
 
-    logger.info(f"  Terrain mesh: {terrain_mesh.n_points} pts, {terrain_mesh.n_cells} cells")
+    logger.info(
+        f"  Terrain mesh: {terrain_mesh.n_points} pts, {terrain_mesh.n_cells} cells"
+    )
     return terrain_mesh
 
 
@@ -208,7 +216,9 @@ def build_building_meshes(
 
     # Validate required fields
     if height_field not in gdf.columns:
-        raise ValueError(f"Height field '{height_field}' not in columns: {list(gdf.columns)}")
+        raise ValueError(
+            f"Height field '{height_field}' not in columns: {list(gdf.columns)}"
+        )
     if base_field not in gdf.columns and not use_dtm_for_base:
         logger.warning(f"Base field '{base_field}' missing -- will sample from DTM")
         use_dtm_for_base = True
@@ -322,17 +332,23 @@ def build_scene(
         # Still need terrain + gdf for downstream
         terrain = build_terrain_mesh(dtm_path, subsample=dtm_subsample)
         _, gdf = build_building_meshes(
-            footprints_path, dtm_path,
-            height_field=height_field, base_field=base_field,
-            use_dtm_for_base=use_dtm_for_base, area=area,
+            footprints_path,
+            dtm_path,
+            height_field=height_field,
+            base_field=base_field,
+            use_dtm_for_base=use_dtm_for_base,
+            area=area,
         )
         return full_scene, terrain, gdf
 
     terrain = build_terrain_mesh(dtm_path, subsample=dtm_subsample)
     buildings, gdf = build_building_meshes(
-        footprints_path, dtm_path,
-        height_field=height_field, base_field=base_field,
-        use_dtm_for_base=use_dtm_for_base, area=area,
+        footprints_path,
+        dtm_path,
+        height_field=height_field,
+        base_field=base_field,
+        use_dtm_for_base=use_dtm_for_base,
+        area=area,
     )
 
     if buildings is not None:

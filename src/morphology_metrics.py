@@ -8,7 +8,13 @@ from typing import Iterable, List, Optional, Tuple
 
 import geopandas as gpd
 import numpy as np
-from shapely.geometry import GeometryCollection, MultiPoint, MultiPolygon, Point, Polygon
+from shapely.geometry import (
+    GeometryCollection,
+    MultiPoint,
+    MultiPolygon,
+    Point,
+    Polygon,
+)
 from shapely.ops import unary_union, voronoi_diagram
 from shapely.strtree import STRtree
 
@@ -44,7 +50,9 @@ def _safe_area(geom) -> float:
     return geom.area
 
 
-def _minimum_rotated_rectangle_axes(geom: Polygon | MultiPolygon) -> Tuple[float, float, float]:
+def _minimum_rotated_rectangle_axes(
+    geom: Polygon | MultiPolygon,
+) -> Tuple[float, float, float]:
     """
     Return (L_major, L_minor, angle_rad) from the minimum rotated rectangle.
     Angle is the orientation of the major axis.
@@ -120,7 +128,9 @@ def _interior_angles(geom: Polygon | MultiPolygon) -> List[float]:
     return angles
 
 
-def _shared_wall_length(geom_a: Polygon | MultiPolygon, geom_b: Polygon | MultiPolygon) -> float:
+def _shared_wall_length(
+    geom_a: Polygon | MultiPolygon, geom_b: Polygon | MultiPolygon
+) -> float:
     if geom_a is None or geom_b is None:
         return 0.0
     if geom_a.is_empty or geom_b.is_empty:
@@ -129,7 +139,9 @@ def _shared_wall_length(geom_a: Polygon | MultiPolygon, geom_b: Polygon | MultiP
     return _safe_length(inter)
 
 
-def _build_neighbor_indices(geoms: Iterable[Polygon | MultiPolygon]) -> Tuple[List[List[int]], np.ndarray]:
+def _build_neighbor_indices(
+    geoms: Iterable[Polygon | MultiPolygon],
+) -> Tuple[List[List[int]], np.ndarray]:
     """
     Build neighbor indices and shared wall lengths.
 
@@ -164,6 +176,7 @@ def _mean_distance_between_buildings(centroids: np.ndarray) -> float:
         return np.nan
     try:
         from scipy.spatial.distance import pdist
+
         dists = pdist(centroids)
         return (2.0 * dists.sum()) / (n * n)
     except Exception:
@@ -178,9 +191,7 @@ def _mean_distance_between_buildings(centroids: np.ndarray) -> float:
 
 
 def _build_voronoi_cells(
-    centroids: np.ndarray,
-    envelope: Polygon | None,
-    buffer_distance: float
+    centroids: np.ndarray, envelope: Polygon | None, buffer_distance: float
 ) -> List[Polygon]:
     if len(centroids) == 0:
         return []
@@ -189,12 +200,14 @@ def _build_voronoi_cells(
         coords = np.array([[p.x, p.y] for p in points])
         minx, miny = coords.min(axis=0)
         maxx, maxy = coords.max(axis=0)
-        envelope = Polygon([
-            (minx - buffer_distance, miny - buffer_distance),
-            (maxx + buffer_distance, miny - buffer_distance),
-            (maxx + buffer_distance, maxy + buffer_distance),
-            (minx - buffer_distance, maxy + buffer_distance),
-        ])
+        envelope = Polygon(
+            [
+                (minx - buffer_distance, miny - buffer_distance),
+                (maxx + buffer_distance, miny - buffer_distance),
+                (maxx + buffer_distance, maxy + buffer_distance),
+                (minx - buffer_distance, maxy + buffer_distance),
+            ]
+        )
 
     vor = voronoi_diagram(MultiPoint(points), envelope=envelope, edges=False)
     if isinstance(vor, (Polygon, MultiPolygon)):
@@ -206,7 +219,9 @@ def _build_voronoi_cells(
     return cells
 
 
-def _assign_voronoi_cells_to_points(cells: List[Polygon], centroids: np.ndarray) -> List[Optional[Polygon]]:
+def _assign_voronoi_cells_to_points(
+    cells: List[Polygon], centroids: np.ndarray
+) -> List[Optional[Polygon]]:
     if not cells:
         return [None] * len(centroids)
     tree = STRtree(cells)
@@ -247,7 +262,7 @@ def calculate_morphology_metrics(
     gdf["perimeter"] = gdf.geometry.length
 
     # Major/minor axes + orientation
-    axes = [ _minimum_rotated_rectangle_axes(geom) for geom in geoms ]
+    axes = [_minimum_rotated_rectangle_axes(geom) for geom in geoms]
     gdf["L_major"] = [a[0] for a in axes]
     gdf["L_minor"] = [a[1] for a in axes]
     gdf["orientation"] = [a[2] for a in axes]
@@ -255,17 +270,20 @@ def calculate_morphology_metrics(
 
     # Shape/compactness metrics
     gdf["shape_index"] = np.where(
-        gdf["area"] > 0,
-        gdf["perimeter"] / np.sqrt(gdf["area"]),
-        np.nan
+        gdf["area"] > 0, gdf["perimeter"] / np.sqrt(gdf["area"]), np.nan
     )
     gdf["compactness_weighted_axis"] = np.where(
         (gdf["L_minor"] > 0) & (gdf["perimeter"] > 0),
-        (gdf["L_major"] / gdf["L_minor"]) * (4 * math.pi * gdf["area"] / (gdf["perimeter"] ** 2)),
-        np.nan
+        (gdf["L_major"] / gdf["L_minor"])
+        * (4 * math.pi * gdf["area"] / (gdf["perimeter"] ** 2)),
+        np.nan,
     )
     gdf["convexity"] = gdf.geometry.apply(
-        lambda geom: _safe_area(geom) / _safe_area(geom.convex_hull) if _safe_area(geom.convex_hull) > 0 else np.nan
+        lambda geom: (
+            _safe_area(geom) / _safe_area(geom.convex_hull)
+            if _safe_area(geom.convex_hull) > 0
+            else np.nan
+        )
     )
 
     # Shared walls + adjacency
@@ -279,14 +297,19 @@ def calculate_morphology_metrics(
 
     # Equivalent rectangular index (min bounding rectangle area)
     gdf["equivalent_rectangular_index"] = gdf.geometry.apply(
-        lambda geom: _safe_area(geom) / _safe_area(_largest_polygon(geom).minimum_rotated_rectangle) if _largest_polygon(geom) is not None else np.nan
+        lambda geom: (
+            _safe_area(geom)
+            / _safe_area(_largest_polygon(geom).minimum_rotated_rectangle)
+            if _largest_polygon(geom) is not None
+            else np.nan
+        )
     )
 
     # Rectangularity
     gdf["rectangularity"] = np.where(
         (gdf["L_major"] > 0) & (gdf["L_minor"] > 0),
         gdf["area"] / (gdf["L_major"] * gdf["L_minor"]),
-        np.nan
+        np.nan,
     )
 
     # Squareness
@@ -302,12 +325,10 @@ def calculate_morphology_metrics(
     gdf["square_compactness"] = np.where(
         gdf["longest_axis_length"] > 0,
         gdf["area"] / (gdf["longest_axis_length"] ** 2),
-        np.nan
+        np.nan,
     )
     gdf["elongation"] = np.where(
-        gdf["L_minor"] > 0,
-        gdf["L_major"] / gdf["L_minor"],
-        np.nan
+        gdf["L_minor"] > 0, gdf["L_major"] / gdf["L_minor"], np.nan
     )
 
     # Spatial distribution metrics
@@ -326,7 +347,9 @@ def calculate_morphology_metrics(
     # Tessellation metrics (Voronoi)
     cells = _build_voronoi_cells(centroids, site_boundary, voronoi_buffer)
     assignments = _assign_voronoi_cells_to_points(cells, centroids)
-    gdf["tessellation_area"] = [ _safe_area(cell) if cell is not None else np.nan for cell in assignments ]
+    gdf["tessellation_area"] = [
+        _safe_area(cell) if cell is not None else np.nan for cell in assignments
+    ]
 
     # Cell alignment (CA)
     cell_angles = []
@@ -338,7 +361,9 @@ def calculate_morphology_metrics(
             cell_angles.append(angle)
     cell_angles_arr = np.array([a for a in cell_angles if not np.isnan(a)])
     if len(cell_angles_arr) > 0:
-        mean_angle = math.atan2(np.sin(cell_angles_arr).mean(), np.cos(cell_angles_arr).mean())
+        mean_angle = math.atan2(
+            np.sin(cell_angles_arr).mean(), np.cos(cell_angles_arr).mean()
+        )
         ca = np.mean(np.cos(cell_angles_arr - mean_angle))
     else:
         ca = np.nan
@@ -370,7 +395,8 @@ def calculate_morphology_metrics(
     # Compactness-weighted axis of each tessellation (CWT)
     gdf["cwt"] = [
         (_minimum_rotated_rectangle_axes(cell)[0] / math.sqrt(_safe_area(cell)))
-        if cell is not None and _safe_area(cell) > 0 else np.nan
+        if cell is not None and _safe_area(cell) > 0
+        else np.nan
         for cell in assignments
     ]
 
@@ -378,7 +404,7 @@ def calculate_morphology_metrics(
     gdf["fractal_dimension"] = np.where(
         (gdf["perimeter"] > 0) & (gdf["area"] > 0),
         (2 * np.log(gdf["perimeter"])) / np.log(gdf["area"]),
-        np.nan
+        np.nan,
     )
 
     # Average weighted distance (d_w)
@@ -400,6 +426,7 @@ def calculate_morphology_metrics(
     # Facade ratio (optional, requires streets)
     if streets is not None and not streets.empty:
         street_buffer_geom = streets.geometry.buffer(street_buffer).unary_union
+
         def _facade_ratio(geom):
             if geom is None or geom.is_empty:
                 return np.nan
@@ -409,9 +436,9 @@ def calculate_morphology_metrics(
             if perim == 0:
                 return np.nan
             return facade_len / perim
+
         gdf["facade_ratio"] = gdf.geometry.apply(_facade_ratio)
     else:
         gdf["facade_ratio"] = np.nan
 
     return gdf
-

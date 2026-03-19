@@ -8,14 +8,18 @@ import pytest
 class TestGridSampling:
     def test_grid_points_count(self, area_name, area_paths, area_scene):
         from src.svf_v2.sampling import sample_grid_points
+
         dtm_path = area_paths[0]
         _, _, gdf = area_scene
-        pts = sample_grid_points(dtm_path, gdf, grid_spacing=20.0, pedestrian_height=1.5)
+        pts = sample_grid_points(
+            dtm_path, gdf, grid_spacing=20.0, pedestrian_height=1.5
+        )
         assert len(pts) > 50, f"Too few grid points: {len(pts)}"
         assert pts.shape[1] == 3
 
     def test_grid_z_finite(self, area_paths, area_scene):
         from src.svf_v2.sampling import sample_grid_points
+
         dtm_path = area_paths[0]
         _, _, gdf = area_scene
         pts = sample_grid_points(dtm_path, gdf, grid_spacing=20.0)
@@ -24,6 +28,7 @@ class TestGridSampling:
     def test_grid_z_within_dtm_range(self, area_paths, area_scene):
         from src.svf_v2.sampling import sample_grid_points
         import rasterio
+
         dtm_path = area_paths[0]
         _, _, gdf = area_scene
         pts = sample_grid_points(dtm_path, gdf, grid_spacing=20.0)
@@ -63,6 +68,7 @@ class TestGridSampling:
 class TestStreetSampling:
     def test_street_points_count(self, area_paths):
         from src.svf_v2.sampling import sample_street_points
+
         _, _, roads_path = area_paths
         dtm_path = area_paths[0]
         gdf = sample_street_points(roads_path, dtm_path, spacing=5.0)
@@ -73,6 +79,7 @@ class TestStreetSampling:
 
     def test_street_z_finite(self, area_paths):
         from src.svf_v2.sampling import sample_street_points
+
         _, _, roads_path = area_paths
         dtm_path = area_paths[0]
         gdf = sample_street_points(roads_path, dtm_path, spacing=10.0)
@@ -83,10 +90,14 @@ class TestStreetSampling:
 class TestFacadeSampling:
     def test_facade_points_count(self, area_paths, area_scene):
         from src.svf_v2.sampling import sample_facade_points
+
         dtm_path = area_paths[0]
         _, _, gdf = area_scene
         facade_gdf = sample_facade_points(
-            gdf, dtm_path, vertical_spacing=5.0, horizontal_spacing=5.0,
+            gdf,
+            dtm_path,
+            vertical_spacing=5.0,
+            horizontal_spacing=5.0,
         )
         assert len(facade_gdf) > 0, "No facade sample points"
         assert "normal_x" in facade_gdf.columns
@@ -94,13 +105,18 @@ class TestFacadeSampling:
 
     def test_facade_normals_unit_length(self, area_paths, area_scene):
         from src.svf_v2.sampling import sample_facade_points
+
         dtm_path = area_paths[0]
         _, _, gdf = area_scene
         facade_gdf = sample_facade_points(
-            gdf, dtm_path, vertical_spacing=5.0, horizontal_spacing=5.0,
+            gdf,
+            dtm_path,
+            vertical_spacing=5.0,
+            horizontal_spacing=5.0,
         )
         nx = facade_gdf["normal_x"].values
         ny = facade_gdf["normal_y"].values
         norms = np.sqrt(nx**2 + ny**2)
-        np.testing.assert_allclose(norms, 1.0, atol=0.01,
-                                   err_msg="Facade normals are not unit vectors")
+        np.testing.assert_allclose(
+            norms, 1.0, atol=0.01, err_msg="Facade normals are not unit vectors"
+        )

@@ -39,20 +39,26 @@ def compute_facade_svf(
     Returns:
         Input GeoDataFrame with an added ``svf`` column.
     """
-    observer_points = np.column_stack([
-        facade_gdf["x"].values,
-        facade_gdf["y"].values,
-        facade_gdf["z"].values,
-    ])
-    normals = np.column_stack([
-        facade_gdf["normal_x"].values,
-        facade_gdf["normal_y"].values,
-        facade_gdf["normal_z"].values,
-    ])
+    observer_points = np.column_stack(
+        [
+            facade_gdf["x"].values,
+            facade_gdf["y"].values,
+            facade_gdf["z"].values,
+        ]
+    )
+    normals = np.column_stack(
+        [
+            facade_gdf["normal_x"].values,
+            facade_gdf["normal_y"].values,
+            facade_gdf["normal_z"].values,
+        ]
+    )
 
     sky_dirs = generate_sky_directions(n_sky_patches)
     svf = compute_svf_raycasting(
-        observer_points, scene_mesh, sky_dirs,
+        observer_points,
+        scene_mesh,
+        sky_dirs,
         max_ray_length=max_ray_length,
         normals=normals,
     )
@@ -119,7 +125,9 @@ def compute_facade_solar_potential(
     elevation_factor = np.sin(np.radians(mean_el))
 
     facade_gdf = facade_gdf.copy()
-    facade_gdf["solar_potential"] = facade_gdf["svf"] * orientation_factor * elevation_factor
+    facade_gdf["solar_potential"] = (
+        facade_gdf["svf"] * orientation_factor * elevation_factor
+    )
 
     # Normalise to [0, 1]
     max_val = facade_gdf["solar_potential"].max()

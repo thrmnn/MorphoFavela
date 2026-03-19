@@ -23,6 +23,7 @@ def _ensure_dir(path: Path) -> Path:
 # Grid results
 # ---------------------------------------------------------------------------
 
+
 def save_grid_results(
     points: np.ndarray,
     svf: np.ndarray,
@@ -54,7 +55,9 @@ def save_grid_results(
 
     # CSV
     csv_path = out / "svf_grid.csv"
-    gdf.assign(x=points[:, 0], y=points[:, 1]).drop(columns="geometry").to_csv(csv_path, index=False)
+    gdf.assign(x=points[:, 0], y=points[:, 1]).drop(columns="geometry").to_csv(
+        csv_path, index=False
+    )
 
     # GeoTIFF (interpolated raster)
     _rasterise_svf(points, svf, crs, out / "svf_grid.tif", grid_spacing)
@@ -104,9 +107,16 @@ def _rasterise_svf(
     transform = from_bounds(xmin, ymin, xmax, ymax, cols, rows)
 
     with rasterio.open(
-        str(output_path), "w", driver="GTiff",
-        height=rows, width=cols, count=1, dtype="float32",
-        crs=crs, transform=transform, nodata=np.nan,
+        str(output_path),
+        "w",
+        driver="GTiff",
+        height=rows,
+        width=cols,
+        count=1,
+        dtype="float32",
+        crs=crs,
+        transform=transform,
+        nodata=np.nan,
     ) as dst:
         dst.write(grid_z.astype(np.float32), 1)
 
@@ -117,8 +127,14 @@ def _plot_svf_heatmap(points: np.ndarray, svf: np.ndarray, output_path: Path):
     """Simple scatter-plot heatmap of SVF values."""
     fig, ax = plt.subplots(figsize=(12, 10))
     sc = ax.scatter(
-        points[:, 0], points[:, 1], c=svf, cmap="RdYlGn", s=2,
-        vmin=0, vmax=1, alpha=0.8,
+        points[:, 0],
+        points[:, 1],
+        c=svf,
+        cmap="RdYlGn",
+        s=2,
+        vmin=0,
+        vmax=1,
+        alpha=0.8,
     )
     plt.colorbar(sc, ax=ax, label="SVF")
     ax.set_aspect("equal")
@@ -134,6 +150,7 @@ def _plot_svf_heatmap(points: np.ndarray, svf: np.ndarray, output_path: Path):
 # ---------------------------------------------------------------------------
 # Street results
 # ---------------------------------------------------------------------------
+
 
 def save_street_results(
     street_gdf: gpd.GeoDataFrame,
@@ -157,10 +174,19 @@ def save_street_results(
 
     # Per-segment aggregation
     if "street_id" in street_gdf.columns and roads_gdf is not None:
-        seg_stats = street_gdf.groupby("street_id")["svf"].agg(
-            ["mean", "median", "min", "max", "count"]
-        ).reset_index()
-        seg_stats.columns = ["street_id", "svf_mean", "svf_median", "svf_min", "svf_max", "n_points"]
+        seg_stats = (
+            street_gdf.groupby("street_id")["svf"]
+            .agg(["mean", "median", "min", "max", "count"])
+            .reset_index()
+        )
+        seg_stats.columns = [
+            "street_id",
+            "svf_mean",
+            "svf_median",
+            "svf_min",
+            "svf_max",
+            "n_points",
+        ]
 
         # Join with road geometry
         roads_copy = roads_gdf.copy().reset_index(drop=True)
@@ -185,8 +211,13 @@ def _plot_street_svf(
     if roads_gdf is not None:
         roads_gdf.plot(ax=ax, color="lightgray", linewidth=0.5)
     gdf.plot(
-        ax=ax, column="svf", cmap="RdYlGn", markersize=4,
-        vmin=0, vmax=1, legend=True,
+        ax=ax,
+        column="svf",
+        cmap="RdYlGn",
+        markersize=4,
+        vmin=0,
+        vmax=1,
+        legend=True,
         legend_kwds={"label": "SVF", "shrink": 0.6},
     )
     ax.set_aspect("equal")
@@ -200,6 +231,7 @@ def _plot_street_svf(
 # ---------------------------------------------------------------------------
 # Facade results
 # ---------------------------------------------------------------------------
+
 
 def save_facade_results(
     facade_gdf: gpd.GeoDataFrame,
@@ -224,16 +256,27 @@ def save_facade_results(
 
     # Per-building summary
     if "building_id" in facade_gdf.columns and footprints_gdf is not None:
-        bldg_stats = facade_gdf.groupby("building_id")["svf"].agg(
-            ["mean", "median", "min", "max", "count"]
-        ).reset_index()
-        bldg_stats.columns = ["building_id", "svf_mean", "svf_median", "svf_min", "svf_max", "n_points"]
+        bldg_stats = (
+            facade_gdf.groupby("building_id")["svf"]
+            .agg(["mean", "median", "min", "max", "count"])
+            .reset_index()
+        )
+        bldg_stats.columns = [
+            "building_id",
+            "svf_mean",
+            "svf_median",
+            "svf_min",
+            "svf_max",
+            "n_points",
+        ]
 
         # Include solar potential if available
         if "solar_potential" in facade_gdf.columns:
-            sp_stats = facade_gdf.groupby("building_id")["solar_potential"].agg(
-                ["mean", "max"]
-            ).reset_index()
+            sp_stats = (
+                facade_gdf.groupby("building_id")["solar_potential"]
+                .agg(["mean", "max"])
+                .reset_index()
+            )
             sp_stats.columns = ["building_id", "solar_mean", "solar_max"]
             bldg_stats = bldg_stats.merge(sp_stats, on="building_id")
 
@@ -257,8 +300,16 @@ def _plot_facade_by_orientation(gdf: gpd.GeoDataFrame, output_path: Path):
         return
     fig, ax = plt.subplots(figsize=(10, 6), subplot_kw={"projection": "polar"})
     az_rad = np.radians(gdf["facade_azimuth"].values)
-    sc = ax.scatter(az_rad, gdf["svf"].values, c=gdf["svf"].values,
-                    cmap="RdYlGn", s=1, alpha=0.3, vmin=0, vmax=1)
+    sc = ax.scatter(
+        az_rad,
+        gdf["svf"].values,
+        c=gdf["svf"].values,
+        cmap="RdYlGn",
+        s=1,
+        alpha=0.3,
+        vmin=0,
+        vmax=1,
+    )
     ax.set_theta_zero_location("N")
     ax.set_theta_direction(-1)
     ax.set_title("Facade SVF by Orientation")
@@ -274,9 +325,14 @@ def _plot_facade_by_height(gdf: gpd.GeoDataFrame, output_path: Path):
         return
     fig, ax = plt.subplots(figsize=(10, 6))
     sc = ax.scatter(
-        gdf["height_above_ground"].values, gdf["svf"].values,
-        c=gdf["facade_azimuth"].values if "facade_azimuth" in gdf.columns else "steelblue",
-        cmap="hsv", s=1, alpha=0.3,
+        gdf["height_above_ground"].values,
+        gdf["svf"].values,
+        c=gdf["facade_azimuth"].values
+        if "facade_azimuth" in gdf.columns
+        else "steelblue",
+        cmap="hsv",
+        s=1,
+        alpha=0.3,
     )
     ax.set_xlabel("Height above ground (m)")
     ax.set_ylabel("SVF")
@@ -293,6 +349,7 @@ def _plot_facade_by_height(gdf: gpd.GeoDataFrame, output_path: Path):
 # ---------------------------------------------------------------------------
 # 3D scene export (visual inspection)
 # ---------------------------------------------------------------------------
+
 
 def save_scene_stl(
     scene_mesh: pv.PolyData,
@@ -327,6 +384,7 @@ def save_scene_vtk(
 # Alignment check plots (visual inspection)
 # ---------------------------------------------------------------------------
 
+
 def plot_alignment_check(
     footprints_gdf: gpd.GeoDataFrame,
     output_path: Path,
@@ -346,8 +404,12 @@ def plot_alignment_check(
     for ax_idx, ax in enumerate(axes):
         # Buildings
         footprints_gdf.plot(
-            ax=ax, facecolor="lightgrey", edgecolor="black",
-            linewidth=0.3, alpha=0.6, label="Buildings",
+            ax=ax,
+            facecolor="lightgrey",
+            edgecolor="black",
+            linewidth=0.3,
+            alpha=0.6,
+            label="Buildings",
         )
 
         # Roads
@@ -357,7 +419,9 @@ def plot_alignment_check(
         # Sample points (cap at 5000 for render speed)
         if sample_points is not None and len(sample_points) > 0:
             pts = sample_points[:5000]
-            ax.scatter(pts[:, 0], pts[:, 1], c="red", s=1, alpha=0.5, label="Sample pts")
+            ax.scatter(
+                pts[:, 0], pts[:, 1], c="red", s=1, alpha=0.5, label="Sample pts"
+            )
 
         ax.set_aspect("equal")
         ax.set_xlabel("X (m)")

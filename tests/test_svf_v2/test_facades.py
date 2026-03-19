@@ -56,9 +56,9 @@ class TestFacadeSVF:
         terrain = pv.StructuredGrid(xx, yy, zz).extract_surface()
 
         walls = [
-            _make_box_building(4, 4, 6, 16, 0, 15),   # west wall
+            _make_box_building(4, 4, 6, 16, 0, 15),  # west wall
             _make_box_building(14, 4, 16, 16, 0, 15),  # east wall
-            _make_box_building(4, 4, 16, 6, 0, 15),    # south wall
+            _make_box_building(4, 4, 16, 6, 0, 15),  # south wall
             _make_box_building(4, 14, 16, 16, 0, 15),  # north wall
         ]
         scene = terrain

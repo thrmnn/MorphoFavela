@@ -8,6 +8,7 @@ import pytest
 class TestSTLExportPerArea:
     def test_stl_export(self, area_name, area_scene, tmp_path):
         from src.svf_v2.io import save_scene_stl
+
         scene_mesh, _, _ = area_scene
         stl_path = save_scene_stl(scene_mesh, tmp_path / f"{area_name}.stl")
         assert stl_path.exists()
@@ -17,6 +18,7 @@ class TestSTLExportPerArea:
 
     def test_vtk_export(self, area_name, area_scene, tmp_path):
         from src.svf_v2.io import save_scene_vtk
+
         scene_mesh, _, _ = area_scene
         vtk_path = save_scene_vtk(scene_mesh, tmp_path / f"{area_name}.vtk")
         assert vtk_path.exists()
@@ -41,7 +43,8 @@ class TestAlignmentPlotPerArea:
                 roads_gdf = roads_gdf.to_crs(src.crs)
 
         png_path = plot_alignment_check(
-            gdf, tmp_path / f"{area_name}_align.png",
+            gdf,
+            tmp_path / f"{area_name}_align.png",
             roads_gdf=roads_gdf,
             title=f"{area_name}",
         )
@@ -63,8 +66,9 @@ class TestSceneBBoxVsDTM:
         mesh_bounds = scene_mesh.bounds  # xmin, xmax, ymin, ymax, zmin, zmax
         tol = 200  # metres tolerance (subsampled terrain may shrink slightly)
 
-        assert mesh_bounds[0] >= dtm_bounds.left - tol, \
+        assert mesh_bounds[0] >= dtm_bounds.left - tol, (
             f"Mesh xmin {mesh_bounds[0]} far from DTM left {dtm_bounds.left}"
+        )
         assert mesh_bounds[1] <= dtm_bounds.right + tol
         assert mesh_bounds[2] >= dtm_bounds.bottom - tol
         assert mesh_bounds[3] <= dtm_bounds.top + tol

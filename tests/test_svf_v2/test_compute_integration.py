@@ -37,11 +37,13 @@ class TestSVFStreets:
             pytest.skip("No street points for this area")
 
         subset = street_gdf.head(10)
-        observers = np.column_stack([
-            np.array([p.x for p in subset.geometry]),
-            np.array([p.y for p in subset.geometry]),
-            subset["z_observer"].values,
-        ])
+        observers = np.column_stack(
+            [
+                np.array([p.x for p in subset.geometry]),
+                np.array([p.y for p in subset.geometry]),
+                subset["z_observer"].values,
+            ]
+        )
 
         svf = compute_svf(observers, scene_mesh, backend="raycasting", n_sky_patches=20)
         assert len(svf) == len(subset)
@@ -59,7 +61,10 @@ class TestSVFFacades:
         scene_mesh, _, gdf = area_scene
 
         facade_gdf = sample_facade_points(
-            gdf, dtm_path, vertical_spacing=5.0, horizontal_spacing=5.0,
+            gdf,
+            dtm_path,
+            vertical_spacing=5.0,
+            horizontal_spacing=5.0,
         )
         if len(facade_gdf) == 0:
             pytest.skip("No facade points for this area")

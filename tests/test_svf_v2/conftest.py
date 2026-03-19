@@ -20,6 +20,7 @@ def _area_data_available(area: str) -> bool:
     """Check if real data files exist for an area."""
     from src.svf_v2.paths import AREA_FILES
     from src.config import get_area_data_dir
+
     if area not in AREA_FILES:
         return False
     data_dir = get_area_data_dir(area)
@@ -38,6 +39,7 @@ def area_name(request):
 def area_paths(area_name):
     """Resolved (dtm_path, footprints_path, roads_path) for the area."""
     from src.svf_v2.paths import resolve_paths
+
     return resolve_paths(area_name)
 
 
@@ -54,10 +56,13 @@ def area_scene(area_name, area_paths, _scene_cache):
     if area_name in _scene_cache:
         return _scene_cache[area_name]
     from src.svf_v2.scene import build_scene
+
     dtm_path, footprints_path, _ = area_paths
     result = build_scene(
-        dtm_path, footprints_path,
-        area=area_name, dtm_subsample=4,
+        dtm_path,
+        footprints_path,
+        area=area_name,
+        dtm_subsample=4,
     )
     _scene_cache[area_name] = result
     return result
@@ -126,6 +131,7 @@ def building_footprints_gdf():
 def sky_directions_small():
     """Small set of sky directions for fast tests."""
     from src.svf_v2.compute import generate_sky_directions
+
     return generate_sky_directions(n_patches=20)
 
 
@@ -133,4 +139,5 @@ def sky_directions_small():
 def sky_directions_default():
     """Default 145-patch sky directions."""
     from src.svf_v2.compute import generate_sky_directions
+
     return generate_sky_directions(n_patches=145)

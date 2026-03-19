@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 # Optional: PyViewFactor
 try:
     import pyviewfactor as pvf
+
     PYVIEWFACTOR_AVAILABLE = True
 except Exception:
     pvf = None
@@ -21,6 +22,7 @@ except Exception:
 # Optional: GPU
 try:
     import torch
+
     GPU_AVAILABLE = torch.cuda.is_available()
 except ImportError:
     GPU_AVAILABLE = False
@@ -30,6 +32,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Sky hemisphere discretization
 # ---------------------------------------------------------------------------
+
 
 def generate_sky_directions(n_patches: int = 145) -> np.ndarray:
     """
@@ -64,6 +67,7 @@ def generate_sky_directions(n_patches: int = 145) -> np.ndarray:
 # ---------------------------------------------------------------------------
 # Ray-casting SVF (primary backend)
 # ---------------------------------------------------------------------------
+
 
 def compute_svf_raycasting(
     observer_points: np.ndarray,
@@ -121,7 +125,7 @@ def compute_svf_raycasting(
         svf[i] = visible / len(valid_dirs)
 
         if (i + 1) % 50 == 0 or i == n_obs - 1:
-            pbar.set_postfix(mean=f"{np.mean(svf[:i+1]):.3f}", cur=f"{svf[i]:.3f}")
+            pbar.set_postfix(mean=f"{np.mean(svf[: i + 1]):.3f}", cur=f"{svf[i]:.3f}")
         pbar.update(1)
 
     pbar.close()
@@ -131,6 +135,7 @@ def compute_svf_raycasting(
 # ---------------------------------------------------------------------------
 # GPU backend (optional) -- delegates to existing code
 # ---------------------------------------------------------------------------
+
 
 def compute_svf_gpu(
     observer_points: np.ndarray,
@@ -172,7 +177,9 @@ def compute_svf_gpu(
     obs_tensor = torch.tensor(shifted_points, dtype=torch.float32, device=device)
 
     svf_tensor = compute_svf_gpu_batch(
-        obs_tensor, sky_tensor, pytorch3d_mesh,
+        obs_tensor,
+        sky_tensor,
+        pytorch3d_mesh,
         batch_size=batch_size,
         max_ray_length=max_ray_length,
         num_samples_per_ray=100,
@@ -184,6 +191,7 @@ def compute_svf_gpu(
 # ---------------------------------------------------------------------------
 # PyViewFactor backend (optional / validation)
 # ---------------------------------------------------------------------------
+
 
 def compute_svf_pyviewfactor(
     observer_points: np.ndarray,
@@ -214,7 +222,9 @@ def compute_svf_pyviewfactor(
     # Keep only above-ground, non-degenerate faces
     keep = (areas > 1e-4) & (normals_z < 0.9)  # exclude near-horizontal ground
     obstruction_ids = np.where(keep)[0]
-    logger.info(f"PyViewFactor: {len(obstruction_ids)} obstruction faces (of {mesh.n_cells})")
+    logger.info(
+        f"PyViewFactor: {len(obstruction_ids)} obstruction faces (of {mesh.n_cells})"
+    )
 
     if len(obstruction_ids) == 0:
         return np.ones(n_obs)
@@ -225,12 +235,14 @@ def compute_svf_pyviewfactor(
         obs = observer_points[i]
 
         # Create small horizontal receiver quad
-        receiver_pts = np.array([
-            [obs[0] - half, obs[1] - half, obs[2]],
-            [obs[0] + half, obs[1] - half, obs[2]],
-            [obs[0] + half, obs[1] + half, obs[2]],
-            [obs[0] - half, obs[1] + half, obs[2]],
-        ])
+        receiver_pts = np.array(
+            [
+                [obs[0] - half, obs[1] - half, obs[2]],
+                [obs[0] + half, obs[1] - half, obs[2]],
+                [obs[0] + half, obs[1] + half, obs[2]],
+                [obs[0] - half, obs[1] + half, obs[2]],
+            ]
+        )
         receiver = pv.PolyData(receiver_pts, [4, 0, 1, 2, 3])
 
         total_vf = 0.0
@@ -251,6 +263,7 @@ def compute_svf_pyviewfactor(
 # ---------------------------------------------------------------------------
 # Unified interface
 # ---------------------------------------------------------------------------
+
 
 def compute_svf(
     observer_points: np.ndarray,
@@ -280,19 +293,24 @@ def compute_svf(
 
     if backend == "raycasting":
         return compute_svf_raycasting(
-            observer_points, scene_mesh, sky_dirs,
+            observer_points,
+            scene_mesh,
+            sky_dirs,
             max_ray_length=max_ray_length,
             normals=normals,
         )
     elif backend == "gpu":
         return compute_svf_gpu(
-            observer_points, scene_mesh, sky_dirs,
+            observer_points,
+            scene_mesh,
+            sky_dirs,
             max_ray_length=max_ray_length,
             **kwargs,
         )
     elif backend == "pyviewfactor":
         return compute_svf_pyviewfactor(
-            observer_points, scene_mesh,
+            observer_points,
+            scene_mesh,
             **kwargs,
         )
     else:

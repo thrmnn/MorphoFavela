@@ -95,16 +95,20 @@ class TestAlignmentPlot:
         from shapely.geometry import LineString
 
         fp_gdf = gpd.GeoDataFrame(
-            geometry=[box(0, 0, 5, 5)], crs="EPSG:31983",
+            geometry=[box(0, 0, 5, 5)],
+            crs="EPSG:31983",
         )
         roads_gdf = gpd.GeoDataFrame(
-            geometry=[LineString([(0, 2.5), (10, 2.5)])], crs="EPSG:31983",
+            geometry=[LineString([(0, 2.5), (10, 2.5)])],
+            crs="EPSG:31983",
         )
         pts = np.array([[1, 2.5, 0], [3, 2.5, 0], [7, 2.5, 0]])
 
         png_path = plot_alignment_check(
-            fp_gdf, tmp_path / "align2.png",
-            roads_gdf=roads_gdf, sample_points=pts,
+            fp_gdf,
+            tmp_path / "align2.png",
+            roads_gdf=roads_gdf,
+            sample_points=pts,
         )
         assert png_path.exists()
 
@@ -124,7 +128,8 @@ class TestSaveFacadeResults:
             crs="EPSG:31983",
         )
         fp_gdf = gpd.GeoDataFrame(
-            geometry=[box(0, 0, 2, 2)], crs="EPSG:31983",
+            geometry=[box(0, 0, 2, 2)],
+            crs="EPSG:31983",
         )
         save_facade_results(gdf, tmp_path, footprints_gdf=fp_gdf)
         assert (tmp_path / "svf_facades.gpkg").exists()

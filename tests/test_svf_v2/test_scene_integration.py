@@ -17,6 +17,7 @@ EXPECTED_BUILDINGS = {
 class TestBuildTerrainMesh:
     def test_terrain_has_points(self, area_paths):
         from src.svf_v2.scene import build_terrain_mesh
+
         dtm_path = area_paths[0]
         mesh = build_terrain_mesh(dtm_path, subsample=4)
         assert mesh.n_points > 0
@@ -24,6 +25,7 @@ class TestBuildTerrainMesh:
 
     def test_terrain_z_range(self, area_paths):
         from src.svf_v2.scene import build_terrain_mesh
+
         dtm_path = area_paths[0]
         mesh = build_terrain_mesh(dtm_path, subsample=4)
         zs = mesh.points[:, 2]
@@ -36,15 +38,19 @@ class TestBuildTerrainMesh:
 class TestBuildBuildingMeshes:
     def test_building_count(self, area_name, area_paths):
         from src.svf_v2.scene import build_building_meshes
+
         dtm_path, fp_path, _ = area_paths
         mesh, gdf = build_building_meshes(fp_path, dtm_path, area=area_name)
         lo, hi = EXPECTED_BUILDINGS.get(area_name, (1, 100000))
-        assert lo <= len(gdf) <= hi, f"{area_name}: {len(gdf)} buildings (expected {lo}-{hi})"
+        assert lo <= len(gdf) <= hi, (
+            f"{area_name}: {len(gdf)} buildings (expected {lo}-{hi})"
+        )
         assert mesh is not None, "Building mesh should not be None"
         assert mesh.n_points > 0
 
     def test_building_z_plausible(self, area_paths):
         from src.svf_v2.scene import build_building_meshes
+
         dtm_path, fp_path, _ = area_paths
         mesh, _ = build_building_meshes(fp_path, dtm_path)
         zs = mesh.points[:, 2]
@@ -56,8 +62,9 @@ class TestBuildBuildingMeshes:
 class TestBuildScene:
     def test_combined_larger_than_terrain(self, area_scene, area_paths):
         scene_mesh, terrain, gdf = area_scene
-        assert scene_mesh.n_points > terrain.n_points, \
+        assert scene_mesh.n_points > terrain.n_points, (
             "Combined scene should have more points than terrain alone"
+        )
 
     def test_scene_bbox_contains_footprints(self, area_scene):
         scene_mesh, _, gdf = area_scene

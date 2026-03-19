@@ -41,7 +41,9 @@ class TestRaycastingSVF:
         svf = compute_svf_raycasting(obs, single_building_scene, sky_directions_small)
         assert svf[0] < 0.9  # should be partially blocked
 
-    def test_far_from_building_high_svf(self, single_building_scene, sky_directions_small):
+    def test_far_from_building_high_svf(
+        self, single_building_scene, sky_directions_small
+    ):
         """Point far from building should have high SVF."""
         obs = np.array([[0.5, 0.5, 1.5]])
         svf = compute_svf_raycasting(obs, single_building_scene, sky_directions_small)
@@ -52,17 +54,22 @@ class TestRaycastingSVF:
         obs = np.array([[3.9, 5.0, 2.5]])  # just outside west wall
         normals = np.array([[-1.0, 0.0, 0.0]])  # facing west (away from building)
         svf = compute_svf_raycasting(
-            obs, single_building_scene, sky_directions_small, normals=normals,
+            obs,
+            single_building_scene,
+            sky_directions_small,
+            normals=normals,
         )
         # Should have good sky view facing away from building
         assert svf[0] > 0.3
 
     def test_multiple_points(self, empty_scene, sky_directions_small):
-        obs = np.array([
-            [2.0, 2.0, 1.5],
-            [5.0, 5.0, 1.5],
-            [8.0, 8.0, 1.5],
-        ])
+        obs = np.array(
+            [
+                [2.0, 2.0, 1.5],
+                [5.0, 5.0, 1.5],
+                [8.0, 8.0, 1.5],
+            ]
+        )
         svf = compute_svf_raycasting(obs, empty_scene, sky_directions_small)
         assert len(svf) == 3
         assert np.all((svf >= 0) & (svf <= 1))
@@ -95,8 +102,12 @@ class TestPyViewFactorSVF:
         # Point at the base of the building, surrounded by walls
         obs_inside = np.array([[5.0, 5.0, 0.1]])
         obs_outside = np.array([[0.5, 0.5, 1.5]])
-        svf_inside = compute_svf(obs_inside, single_building_scene, backend="pyviewfactor")
-        svf_outside = compute_svf(obs_outside, single_building_scene, backend="pyviewfactor")
+        svf_inside = compute_svf(
+            obs_inside, single_building_scene, backend="pyviewfactor"
+        )
+        svf_outside = compute_svf(
+            obs_outside, single_building_scene, backend="pyviewfactor"
+        )
         assert svf_inside[0] < svf_outside[0], (
             f"SVF inside building ({svf_inside[0]:.3f}) should be less than "
             f"SVF outside ({svf_outside[0]:.3f})"

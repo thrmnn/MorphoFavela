@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 # Grid sampling
 # ---------------------------------------------------------------------------
 
+
 def sample_grid_points(
     dtm_path: Path,
     footprints_gdf: gpd.GeoDataFrame,
@@ -59,7 +60,9 @@ def sample_grid_points(
         geometry=[Point(x, y) for x, y in zip(flat_x, flat_y)],
         crs=footprints_gdf.crs,
     )
-    joined = gpd.sjoin(pts_gdf, footprints_gdf[["geometry"]], how="left", predicate="within")
+    joined = gpd.sjoin(
+        pts_gdf, footprints_gdf[["geometry"]], how="left", predicate="within"
+    )
     # Deduplicate (point may touch multiple buildings)
     inside_mask = ~joined["index_right"].isna()
     if joined.index.duplicated().any():
@@ -82,7 +85,9 @@ def sample_grid_points(
         near_mask = pts_gdf2.geometry.within(buf).values
         flat_x = flat_x[near_mask]
         flat_y = flat_y[near_mask]
-        logger.info(f"  After proximity filter ({buffer_around_buildings}m): {len(flat_x)} points")
+        logger.info(
+            f"  After proximity filter ({buffer_around_buildings}m): {len(flat_x)} points"
+        )
 
     # Sample Z from DTM
     zs = sample_dtm_at_points(dtm_path, flat_x, flat_y)
@@ -99,6 +104,7 @@ def sample_grid_points(
 # ---------------------------------------------------------------------------
 # Street sampling
 # ---------------------------------------------------------------------------
+
 
 def _sample_points_along_line(line: LineString, spacing: float) -> list:
     """Return [(Point, distance_along), ...] at regular intervals."""
@@ -148,20 +154,26 @@ def sample_street_points(
         roads_gdf = roads_gdf.to_crs(dtm_crs)
 
     rows = []
-    for idx, row in tqdm(roads_gdf.iterrows(), total=len(roads_gdf), desc="Sampling streets"):
+    for idx, row in tqdm(
+        roads_gdf.iterrows(), total=len(roads_gdf), desc="Sampling streets"
+    ):
         geom = row.geometry
         if not isinstance(geom, LineString):
             continue
         for pt, dist in _sample_points_along_line(geom, spacing):
-            rows.append({
-                "geometry": pt,
-                "street_id": idx,
-                "distance_along": dist,
-            })
+            rows.append(
+                {
+                    "geometry": pt,
+                    "street_id": idx,
+                    "distance_along": dist,
+                }
+            )
 
     if not rows:
         logger.warning("No street sample points generated!")
-        return gpd.GeoDataFrame(columns=["geometry", "z", "z_observer", "street_id", "distance_along"])
+        return gpd.GeoDataFrame(
+            columns=["geometry", "z", "z_observer", "street_id", "distance_along"]
+        )
 
     gdf_pts = gpd.GeoDataFrame(rows, crs=roads_gdf.crs)
 
@@ -184,6 +196,7 @@ def sample_street_points(
 # ---------------------------------------------------------------------------
 # Facade sampling
 # ---------------------------------------------------------------------------
+
 
 def _outward_normal_2d(ax: float, ay: float, bx: float, by: float) -> np.ndarray:
     """
@@ -287,24 +300,34 @@ def sample_facade_points(
                         z_offset = (vi + 0.5) * (h / n_vert)
                         ez = base + z_offset
 
-                        rows.append({
-                            "geometry": Point(ex, ey),
-                            "x": ex,
-                            "y": ey,
-                            "z": ez,
-                            "normal_x": nx,
-                            "normal_y": ny,
-                            "normal_z": 0.0,
-                            "building_id": bldg_idx,
-                            "facade_azimuth": azimuth,
-                            "height_above_ground": z_offset,
-                        })
+                        rows.append(
+                            {
+                                "geometry": Point(ex, ey),
+                                "x": ex,
+                                "y": ey,
+                                "z": ez,
+                                "normal_x": nx,
+                                "normal_y": ny,
+                                "normal_z": 0.0,
+                                "building_id": bldg_idx,
+                                "facade_azimuth": azimuth,
+                                "height_above_ground": z_offset,
+                            }
+                        )
 
     if not rows:
         logger.warning("No facade sample points generated!")
         cols = [
-            "geometry", "x", "y", "z", "normal_x", "normal_y", "normal_z",
-            "building_id", "facade_azimuth", "height_above_ground",
+            "geometry",
+            "x",
+            "y",
+            "z",
+            "normal_x",
+            "normal_y",
+            "normal_z",
+            "building_id",
+            "facade_azimuth",
+            "height_above_ground",
         ]
         return gpd.GeoDataFrame(columns=cols, crs=footprints_gdf.crs)
 

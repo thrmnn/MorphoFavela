@@ -61,7 +61,8 @@ def resolve_paths(area: str) -> Tuple[Path, Path, Path]:
 def _find_file(directory: Path, pattern: str, suffix: str, label: str) -> Path:
     """Find a file matching pattern + suffix (case-insensitive)."""
     matches = [
-        p for p in directory.iterdir()
+        p
+        for p in directory.iterdir()
         if p.suffix.lower() == suffix.lower() and _imatches(p.stem, pattern)
     ]
     if len(matches) == 1:
@@ -78,4 +79,5 @@ def _find_file(directory: Path, pattern: str, suffix: str, label: str) -> Path:
 def _imatches(name: str, pattern: str) -> bool:
     """Case-insensitive glob-like match (supports leading/trailing *)."""
     import fnmatch
+
     return fnmatch.fnmatch(name.lower(), pattern.lower())
