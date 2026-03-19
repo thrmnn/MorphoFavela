@@ -2,7 +2,7 @@
 #SBATCH --job-name=ivf-svf
 #SBATCH --output=logs/svf_%j.out
 #SBATCH --error=logs/svf_%j.err
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 #SBATCH --mem=32G
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=8
@@ -24,9 +24,8 @@ set -euo pipefail
 # Configuration
 # ---------------------------------------------------------------------------
 
-# >>> Conda activation (uncomment and adjust) <<<
-# module load anaconda3/2024a
-# source activate ivf
+module load miniforge/25.11.0-0
+conda activate ivf
 
 DEFAULT_AREAS=("rocinha" "vidigal_tls" "vidigal")
 
