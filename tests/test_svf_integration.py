@@ -12,10 +12,10 @@ import sys
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.svf_compute import generate_sky_patches, compute_svf
-from src.svf_gpu_compute import compute_svf_gpu
-from src.svf_gpu_utils import pv_mesh_to_pytorch3d, prepare_observer_points, prepare_sky_patches
-from tests.utils.test_helpers import (
+from src.svf_compute import generate_sky_patches, compute_svf  # noqa: E402
+from src.svf_gpu_compute import compute_svf_gpu  # noqa: E402
+from src.svf_gpu_utils import pv_mesh_to_pytorch3d, prepare_observer_points, prepare_sky_patches  # noqa: E402
+from tests.utils.test_helpers import (  # noqa: E402
     create_single_building_scene,
     generate_test_points_grid,
     assert_svf_valid

@@ -5,7 +5,6 @@ Pytest configuration and shared fixtures for SVF tests.
 import numpy as np
 import pyvista as pv
 import pytest
-from pathlib import Path
 
 # Optional GPU imports
 try:
@@ -72,7 +71,7 @@ def single_building_mesh():
     Z = np.zeros_like(X)
     
     # Create building (box from -2 to 2 in x, y, height 5)
-    building_points = []
+    _building_points = []
     building_faces = []
     
     # Building base (z=0)

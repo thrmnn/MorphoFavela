@@ -3,7 +3,6 @@ Unit tests for SVF algorithm components.
 """
 
 import numpy as np
-import pytest
 import torch
 import pyvista as pv
 from pathlib import Path
@@ -13,14 +12,13 @@ import sys
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.svf_compute import generate_sky_patches
-from src.svf_gpu_utils import (
+from src.svf_compute import generate_sky_patches  # noqa: E402
+from src.svf_gpu_utils import (  # noqa: E402
     pv_mesh_to_pytorch3d,
     prepare_observer_points,
     prepare_sky_patches,
     check_gpu_availability
 )
-from tests.utils.test_helpers import assert_svf_valid
 
 
 class TestSkyPatchGeneration:

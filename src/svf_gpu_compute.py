@@ -90,7 +90,7 @@ def compute_svf_gpu_batch(
     logger.info(f"Computing SVF on GPU for {n_points} points with {n_patches} sky patches")
     logger.info(f"  Device: {device}")
     logger.info(f"  Batch size: {batch_size}")
-    logger.info(f"  Intersection: exact ray-triangle")
+    logger.info("  Intersection: exact ray-triangle")
     logger.info(f"  Ray chunk size: {ray_chunk_size}")
     logger.info(f"  Triangle chunk size: {tri_chunk_size}")
     logger.info(f"  Total rays to process: {n_points * n_patches}")
@@ -206,7 +206,7 @@ def _rays_blocked_by_mesh_exact(
         r1 = min(r0 + ray_chunk_size, n_rays)
         o = ray_origins[r0:r1]
         d = ray_dirs[r0:r1]
-        l = ray_lengths[r0:r1]
+        ray_len = ray_lengths[r0:r1]
         ray_hit = torch.zeros(r1 - r0, dtype=torch.bool, device=ray_origins.device)
 
         for t0 in range(0, n_tris, tri_chunk_size):
@@ -240,8 +240,8 @@ def _rays_blocked_by_mesh_exact(
             t_eps_min = eps * 10  # Minimum threshold for edge cases
             t_eps_max = eps * 50  # Maximum threshold (for very long rays)
             # Adaptive threshold based on ray length (longer rays need larger threshold)
-            t_eps = torch.clamp(l[:, None] * 1e-6, t_eps_min, t_eps_max)
-            t_mask = (t >= -t_eps) & (t <= (l[:, None] + t_eps))
+            t_eps = torch.clamp(ray_len[:, None] * 1e-6, t_eps_min, t_eps_max)
+            t_mask = (t >= -t_eps) & (t <= (ray_len[:, None] + t_eps))
 
             hits = det_mask & u_mask & v_mask & t_mask
             ray_hit |= hits.any(dim=1)
@@ -279,7 +279,7 @@ def _check_points_visible(
     
     # Get mesh vertices and faces
     verts = mesh.verts_list()[0]  # (V, 3)
-    faces = mesh.faces_list()[0]  # (F, 3)
+    _faces = mesh.faces_list()[0]  # (F, 3)
     
     # OPTIMIZATION: Use bounding box pre-filtering
     mesh_min = verts.min(dim=0)[0]  # (3,)

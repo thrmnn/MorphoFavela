@@ -13,7 +13,7 @@ from pathlib import Path
 from shapely.geometry import Point
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from src.config import MAX_FILTER_AREA, MAX_FILTER_HEIGHT, is_informal_area, BUILDING_CLUSTER_BUFFER
+from src.config import MAX_FILTER_AREA, is_informal_area, BUILDING_CLUSTER_BUFFER
 from shapely.ops import unary_union
 
 
@@ -90,13 +90,13 @@ def filter_buildings(
         apply_filtering = is_informal_area(area)
     
     if not apply_filtering:
-        print(f"  Formal area or no area specified: skipping building filters")
+        print("  Formal area or no area specified: skipping building filters")
         # Return all buildings as "filtered", empty isolated and area_filtered
         isolated = gpd.GeoDataFrame(geometry=[], crs=footprints.crs)
         area_filtered = gpd.GeoDataFrame(geometry=[], crs=footprints.crs)
         return footprints, isolated, area_filtered
     
-    print(f"  Applying building filters (informal area)...")
+    print("  Applying building filters (informal area)...")
     initial_count = len(footprints)
     
     # Calculate area if not already present
@@ -155,7 +155,7 @@ def filter_isolated_buildings(
         isolated = gpd.GeoDataFrame(geometry=[], crs=footprints.crs)
         return footprints, isolated
     
-    print(f"    Identifying main building cluster...")
+    print("    Identifying main building cluster...")
     initial_count = len(footprints)
     
     # Buffer buildings to account for gaps between them
@@ -173,7 +173,7 @@ def filter_isolated_buildings(
         components = [unified]
     
     if len(components) == 0:
-        print(f"    Warning: No components found, keeping all buildings")
+        print("    Warning: No components found, keeping all buildings")
         isolated = gpd.GeoDataFrame(geometry=[], crs=footprints.crs)
         return footprints, isolated
     
@@ -250,7 +250,7 @@ def load_building_footprints(
     # Returns (filtered_footprints, isolated_footprints, area_filtered_footprints)
     footprints, isolated_footprints, area_filtered_footprints = filter_buildings(footprints, area=area)
     
-    print(f"  Detected coordinate system mismatch - transforming to local coordinates")
+    print("  Detected coordinate system mismatch - transforming to local coordinates")
     print(f"  Applying translation: dx={dx:.1f}, dy={dy:.1f}")
     
     # Apply translation to filtered, isolated, and area-filtered footprints
@@ -318,7 +318,7 @@ def compute_ground_mask(grid_x: np.ndarray, grid_y: np.ndarray, building_footpri
         ground_mask = joined['index_right'].isna().values
     else:
         # Fallback: create mask by checking each point individually
-        print(f"  Warning: Join result size mismatch. Using point-in-polygon check...")
+        print("  Warning: Join result size mismatch. Using point-in-polygon check...")
         ground_mask = np.ones(len(grid_points_gdf), dtype=bool)
         for idx, point in enumerate(grid_points_gdf.geometry):
             if building_footprints.contains(point).any():
@@ -363,7 +363,7 @@ def plot_ground_mask_debug(
     print(f"Creating debug plot: {output_path}")
     
     # Import config to check filtering thresholds
-    from src.config import MAX_FILTER_AREA, MAX_FILTER_HEIGHT
+    from src.config import MAX_FILTER_AREA
     
     fig, ax = plt.subplots(figsize=(14, 12))
     
@@ -509,7 +509,7 @@ def generate_ground_points(
     if ground_mask is not None:
         if len(ground_mask) != len(grid_points_2d):
             print(f"  Warning: Mask size ({len(ground_mask)}) doesn't match grid size ({len(grid_points_2d)})")
-            print(f"  Recomputing mask on current grid...")
+            print("  Recomputing mask on current grid...")
             if building_footprints is not None:
                 ground_mask = compute_ground_mask(grid_x_flat, grid_y_flat, building_footprints)
             else:
@@ -522,7 +522,7 @@ def generate_ground_points(
             grid_x_flat = grid_x_flat[ground_mask]
             grid_y_flat = grid_y_flat[ground_mask]
         else:
-            print(f"  Error: Mask size still doesn't match after recomputation. Using all points.")
+            print("  Error: Mask size still doesn't match after recomputation. Using all points.")
             ground_mask = np.ones(len(grid_points_2d), dtype=bool)
     else:
         ground_mask = np.ones(len(grid_points_2d), dtype=bool)
@@ -542,7 +542,7 @@ def generate_ground_points(
             building_buffer_geom = unary_union(building_buffers.geometry.values)
         except Exception as e:
             print(f"  Warning: Could not create unified buffer geometry: {e}")
-            print(f"  Using individual building buffers...")
+            print("  Using individual building buffers...")
             # Fallback: use the first buffer (less efficient but works)
             building_buffer_geom = building_buffers.geometry.iloc[0]
             for geom in building_buffers.geometry.iloc[1:]:
@@ -563,7 +563,7 @@ def generate_ground_points(
         
         if num_near_buildings == 0:
             print(f"  WARNING: No points found within {building_buffer}m of buildings!")
-            print(f"  Continuing with all points...")
+            print("  Continuing with all points...")
         else:
             # Apply proximity filter
             grid_points_2d = grid_points_2d[proximity_mask]

@@ -21,13 +21,13 @@ def check_dependencies():
     }
     
     try:
-        import numpy
+        import numpy  # noqa: F401
         deps['numpy'] = True
     except ImportError:
         pass
     
     try:
-        import pyvista
+        import pyvista  # noqa: F401
         deps['pyvista'] = True
     except ImportError:
         pass
@@ -43,13 +43,13 @@ def check_dependencies():
         deps['cuda_available'] = False
     
     try:
-        import pytorch3d
+        import pytorch3d  # noqa: F401
         deps['pytorch3d'] = True
     except ImportError:
         pass
     
     try:
-        import pytest
+        import pytest  # noqa: F401
         deps['pytest'] = True
     except ImportError:
         pass

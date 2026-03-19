@@ -11,14 +11,13 @@ import numpy as np
 import geopandas as gpd
 import pyvista as pv
 from pathlib import Path
-from shapely.geometry import Point, LineString, Polygon
+from shapely.geometry import Point, LineString
 from shapely.ops import unary_union
-import warnings
 import logging
 
 try:
     import rasterio
-    from rasterio.crs import CRS
+    from rasterio.crs import CRS  # noqa: F401
     HAS_RASTERIO = True
 except ImportError:
     HAS_RASTERIO = False
@@ -97,7 +96,7 @@ def georeference_stl_using_dtm(
     # This ensures terrain aligns properly
     dz = dtm_z_min - stl_z_min
     
-    logger.info(f"Georeferencing STL using DTM bounds")
+    logger.info("Georeferencing STL using DTM bounds")
     logger.info(f"  DTM bounds: {dtm_bounds}")
     logger.info(f"  DTM center: ({dtm_center_x:.2f}, {dtm_center_y:.2f})")
     logger.info(f"  DTM elevation range: {dtm_z_min:.2f}m to {dtm_z_max:.2f}m")
@@ -363,7 +362,7 @@ def auto_correct_alignment(
             elif name == 'stl' and 'stl' in corrected:
                 # STL translation would need to be applied to mesh points
                 # This is handled in svf_utils.load_building_footprints
-                logger.info(f"  STL translation should be handled during mesh loading")
+                logger.info("  STL translation should be handled during mesh loading")
     
     return corrected
 
@@ -485,7 +484,7 @@ def redirect_road_parallel_offset(
                             offset_road = max(merged.geoms, key=lambda g: g.length)
                         else:
                             offset_road = merged
-                    except:
+                    except Exception:
                         # If merge fails, use longest segment
                         offset_road = max(offset_road.geoms, key=lambda g: g.length)
                 
@@ -507,7 +506,6 @@ def redirect_road_parallel_offset(
     
     # Try segment-based redirection: split road at intersections and redirect only intersecting segments
     try:
-        from shapely.ops import split
         from shapely.geometry import Point
         
         # Create buffer around intersecting buildings
@@ -534,7 +532,7 @@ def redirect_road_parallel_offset(
         logger.debug(f"  Segment-based redirection failed: {e}")
     
     # If all offsets fail, return original
-    logger.warning(f"  Could not redirect road - using original geometry")
+    logger.warning("  Could not redirect road - using original geometry")
     return road
 
 
@@ -626,7 +624,7 @@ def redirect_road_simple_reroute(
                                     else:
                                         # Fallback to direct connection
                                         connected_segments.append(connection)
-                                except:
+                                except Exception:
                                     connected_segments.append(connection)
                     
                     # Merge all segments
@@ -659,7 +657,7 @@ def redirect_road_simple_reroute(
             continue
     
     # If all attempts fail, return original
-    logger.warning(f"  Could not reroute road - using original geometry")
+    logger.warning("  Could not reroute road - using original geometry")
     return road
 
 

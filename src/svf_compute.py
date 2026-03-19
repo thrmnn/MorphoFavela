@@ -8,7 +8,7 @@ that automatically detects and uses GPU acceleration when available.
 import numpy as np
 import pyvista as pv
 import logging
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ if GPU_AVAILABLE:
             pv_mesh_to_pytorch3d,
             prepare_observer_points,
             prepare_sky_patches,
-            check_gpu_availability
+            check_gpu_availability  # noqa: F401
         )
         from src.svf_gpu_compute import compute_svf_gpu_batch
         GPU_COMPUTE_AVAILABLE = True

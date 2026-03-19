@@ -11,15 +11,14 @@ import geopandas as gpd
 import pyvista as pv
 from pathlib import Path
 import tempfile
-import shutil
-from shapely.geometry import Point, LineString, Polygon, box
+from shapely.geometry import LineString, box
 import sys
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data_alignment_utils import (
+from src.data_alignment_utils import (  # noqa: E402
     check_crs_alignment,
     auto_correct_alignment,
     detect_road_building_intersections,
@@ -29,7 +28,7 @@ from src.data_alignment_utils import (
 
 try:
     import rasterio
-    from rasterio.crs import CRS
+    from rasterio.crs import CRS  # noqa: F401
     from rasterio.transform import from_bounds
     HAS_RASTERIO = True
 except ImportError:

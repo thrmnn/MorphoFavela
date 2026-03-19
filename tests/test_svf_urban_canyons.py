@@ -26,8 +26,8 @@ except ImportError:
     torch = None
     GPU_AVAILABLE = False
 
-from src.svf_compute import generate_sky_patches, compute_svf
-from tests.utils.test_helpers import assert_svf_valid, compare_cpu_gpu_results
+from src.svf_compute import generate_sky_patches, compute_svf  # noqa: E402
+from tests.utils.test_helpers import assert_svf_valid, compare_cpu_gpu_results  # noqa: E402
 
 
 def create_street_canyon(
