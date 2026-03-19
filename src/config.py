@@ -132,3 +132,16 @@ DPI = 300
 FIGURE_SIZE = (12, 8)
 COLORMAP_HEIGHT = "viridis"
 COLORMAP_VOLUME = "plasma"
+
+# Zone-level morphology visualization
+LISA_COLORS = {
+    "HH": "#d7191c",
+    "HL": "#fdae61",
+    "LH": "#abd9e9",
+    "LL": "#2c7bb6",
+    "ns": "#d3d3d3",
+}
+COLORMAP_BCR = "YlOrRd"
+COLORMAP_FAR = "YlOrRd"
+COLORMAP_SIGMA_H = "viridis"
+COLORMAP_LAMBDA_F = "plasma"

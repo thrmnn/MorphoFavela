@@ -11,6 +11,14 @@ from typing import Optional
 from shapely.geometry import Point
 import logging
 
+from src.config import DPI
+from src.svf_v2.visualize import (
+    plot_svf_heatmap,
+    plot_street_svf,
+    plot_facade_by_orientation,
+    plot_facade_by_height,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,6 +38,7 @@ def save_grid_results(
     crs,
     output_dir: Path,
     grid_spacing: float = 2.0,
+    footprints_gdf: Optional[gpd.GeoDataFrame] = None,
 ):
     """
     Save grid SVF results as GeoPackage, GeoTIFF, and CSV.
@@ -40,6 +49,7 @@ def save_grid_results(
         crs: Coordinate reference system.
         output_dir: Directory for outputs.
         grid_spacing: Grid cell size (used for rasterisation).
+        footprints_gdf: Building footprints for context on heatmap.
     """
     out = _ensure_dir(output_dir)
 
@@ -63,7 +73,7 @@ def save_grid_results(
     _rasterise_svf(points, svf, crs, out / "svf_grid.tif", grid_spacing)
 
     # Heatmap plot
-    _plot_svf_heatmap(points, svf, out / "svf_heatmap.png")
+    plot_svf_heatmap(points, svf, out / "svf_heatmap.png", footprints_gdf=footprints_gdf)
 
 
 def _rasterise_svf(
@@ -123,30 +133,6 @@ def _rasterise_svf(
     logger.info(f"  Saved {output_path} ({cols}x{rows})")
 
 
-def _plot_svf_heatmap(points: np.ndarray, svf: np.ndarray, output_path: Path):
-    """Simple scatter-plot heatmap of SVF values."""
-    fig, ax = plt.subplots(figsize=(12, 10))
-    sc = ax.scatter(
-        points[:, 0],
-        points[:, 1],
-        c=svf,
-        cmap="RdYlGn",
-        s=2,
-        vmin=0,
-        vmax=1,
-        alpha=0.8,
-    )
-    plt.colorbar(sc, ax=ax, label="SVF")
-    ax.set_aspect("equal")
-    ax.set_title("Sky View Factor (Grid)")
-    ax.set_xlabel("X (m)")
-    ax.set_ylabel("Y (m)")
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches="tight")
-    plt.close()
-    logger.info(f"  Saved {output_path}")
-
-
 # ---------------------------------------------------------------------------
 # Street results
 # ---------------------------------------------------------------------------
@@ -156,6 +142,7 @@ def save_street_results(
     street_gdf: gpd.GeoDataFrame,
     output_dir: Path,
     roads_gdf: Optional[gpd.GeoDataFrame] = None,
+    footprints_gdf: Optional[gpd.GeoDataFrame] = None,
 ):
     """
     Save street SVF results.
@@ -164,6 +151,7 @@ def save_street_results(
         street_gdf: GeoDataFrame with ``svf`` column and ``street_id``.
         output_dir: Directory for outputs.
         roads_gdf: Original road lines (for segment aggregation).
+        footprints_gdf: Building footprints for context on map.
     """
     out = _ensure_dir(output_dir)
 
@@ -199,33 +187,12 @@ def save_street_results(
         logger.info(f"  Saved {seg_path} ({len(seg_gdf)} segments)")
 
     # Map plot
-    _plot_street_svf(street_gdf, out / "svf_streets_map.png", roads_gdf=roads_gdf)
-
-
-def _plot_street_svf(
-    gdf: gpd.GeoDataFrame,
-    output_path: Path,
-    roads_gdf: Optional[gpd.GeoDataFrame] = None,
-):
-    fig, ax = plt.subplots(figsize=(12, 10))
-    if roads_gdf is not None:
-        roads_gdf.plot(ax=ax, color="lightgray", linewidth=0.5)
-    gdf.plot(
-        ax=ax,
-        column="svf",
-        cmap="RdYlGn",
-        markersize=4,
-        vmin=0,
-        vmax=1,
-        legend=True,
-        legend_kwds={"label": "SVF", "shrink": 0.6},
+    plot_street_svf(
+        street_gdf,
+        out / "svf_streets_map.png",
+        roads_gdf=roads_gdf,
+        footprints_gdf=footprints_gdf,
     )
-    ax.set_aspect("equal")
-    ax.set_title("Street SVF")
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches="tight")
-    plt.close()
-    logger.info(f"  Saved {output_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -291,59 +258,8 @@ def save_facade_results(
         logger.info(f"  Saved {summary_path} ({len(summary_gdf)} buildings)")
 
     # Plots
-    _plot_facade_by_orientation(facade_gdf, out / "svf_facades_orientation.png")
-    _plot_facade_by_height(facade_gdf, out / "svf_facades_height.png")
-
-
-def _plot_facade_by_orientation(gdf: gpd.GeoDataFrame, output_path: Path):
-    if "svf" not in gdf.columns or "facade_azimuth" not in gdf.columns:
-        return
-    fig, ax = plt.subplots(figsize=(10, 6), subplot_kw={"projection": "polar"})
-    az_rad = np.radians(gdf["facade_azimuth"].values)
-    sc = ax.scatter(
-        az_rad,
-        gdf["svf"].values,
-        c=gdf["svf"].values,
-        cmap="RdYlGn",
-        s=1,
-        alpha=0.3,
-        vmin=0,
-        vmax=1,
-    )
-    ax.set_theta_zero_location("N")
-    ax.set_theta_direction(-1)
-    ax.set_title("Facade SVF by Orientation")
-    plt.colorbar(sc, ax=ax, label="SVF", shrink=0.6)
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches="tight")
-    plt.close()
-    logger.info(f"  Saved {output_path}")
-
-
-def _plot_facade_by_height(gdf: gpd.GeoDataFrame, output_path: Path):
-    if "svf" not in gdf.columns or "height_above_ground" not in gdf.columns:
-        return
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sc = ax.scatter(
-        gdf["height_above_ground"].values,
-        gdf["svf"].values,
-        c=gdf["facade_azimuth"].values
-        if "facade_azimuth" in gdf.columns
-        else "steelblue",
-        cmap="hsv",
-        s=1,
-        alpha=0.3,
-    )
-    ax.set_xlabel("Height above ground (m)")
-    ax.set_ylabel("SVF")
-    ax.set_title("Facade SVF vs Height")
-    ax.set_ylim(0, 1)
-    if "facade_azimuth" in gdf.columns:
-        plt.colorbar(sc, ax=ax, label="Azimuth")
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches="tight")
-    plt.close()
-    logger.info(f"  Saved {output_path}")
+    plot_facade_by_orientation(facade_gdf, out / "svf_facades_orientation.png")
+    plot_facade_by_height(facade_gdf, out / "svf_facades_height.png")
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +357,7 @@ def plot_alignment_check(
             ax.set_title(f"{title} (200m zoom at centroid)")
 
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
     plt.close()
     logger.info(f"  Saved {output_path}")
     return output_path
@@ -480,7 +396,7 @@ def plot_road_z_check(
     ax.set_title(title)
 
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
     plt.close()
     logger.info(f"  Saved {output_path}")
     return output_path

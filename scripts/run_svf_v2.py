@@ -71,6 +71,7 @@ def run_grid(
 
 def run_streets(
     scene_mesh, roads_path, dtm_path, output_dir, args,
+    footprints_gdf=None,
 ):
     logger.info("=" * 60)
     logger.info("STREET SVF")
@@ -113,7 +114,7 @@ def run_streets(
         if roads_gdf.crs != src.crs:
             roads_gdf = roads_gdf.to_crs(src.crs)
 
-    save_street_results(street_gdf, output_dir, roads_gdf=roads_gdf)
+    save_street_results(street_gdf, output_dir, roads_gdf=roads_gdf, footprints_gdf=footprints_gdf)
 
     # Visual: road Z check
     if not args.skip_visual:
@@ -230,7 +231,7 @@ def main():
         if mode == "grid":
             run_grid(scene_mesh, terrain, footprints_gdf, dtm_path, output_dir, args)
         elif mode == "streets":
-            run_streets(scene_mesh, roads_path, dtm_path, output_dir, args)
+            run_streets(scene_mesh, roads_path, dtm_path, output_dir, args, footprints_gdf=footprints_gdf)
         elif mode == "facades":
             run_facades(scene_mesh, footprints_gdf, dtm_path, output_dir, args)
 

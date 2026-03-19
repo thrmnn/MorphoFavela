@@ -20,8 +20,10 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import get_area_data_dir, get_area_output_dir
+from src.metrics import calculate_basic_metrics
 from src.spatial_analysis import compute_global_morans_i, compute_lisa
 from src.urban_morphology import compute_zone_metrics, create_analysis_zones
+from src.visualize_morphology import plot_lisa_clusters_panel, plot_zone_metrics_panel
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,6 +69,11 @@ def main() -> None:
         default=36,
         help="Number of orientation bins for street entropy",
     )
+    parser.add_argument(
+        "--skip-plots",
+        action="store_true",
+        help="Skip visualization output",
+    )
     args = parser.parse_args()
 
     # ------------------------------------------------------------------ paths
@@ -98,6 +105,10 @@ def main() -> None:
     logger.info("Loading buildings from %s", buildings_path)
     buildings = gpd.read_file(buildings_path)
     logger.info("Loaded %d buildings.", len(buildings))
+
+    # Derive height, area, volume etc. from raw base+altura columns
+    buildings = calculate_basic_metrics(buildings)
+    logger.info("After height preprocessing: %d valid buildings.", len(buildings))
 
     # --------------------------------------------------------------- streets
     streets_path = _find_shapefile(data_dir, "*road*.shp")
@@ -205,6 +216,20 @@ def main() -> None:
         logger.info("Saved LISA clusters to %s", lisa_path)
     else:
         logger.warning("No LISA results to save.")
+
+    # -------------------------------------------------------- visualizations
+    if not args.skip_plots:
+        maps_dir = output_dir / "maps"
+        maps_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.info("Generating zone metrics panel...")
+        plot_zone_metrics_panel(zone_metrics, maps_dir / "zone_metrics_panel.png")
+
+        if lisa_frames:
+            logger.info("Generating LISA cluster maps...")
+            plot_lisa_clusters_panel(lisa_combined, maps_dir)
+    else:
+        logger.info("Skipping plots (--skip-plots).")
 
     logger.info("Done.")
 

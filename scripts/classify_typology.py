@@ -26,6 +26,11 @@ from src.typology import (
     find_optimal_k,
     normalize_features,
 )
+from src.visualize_morphology import (
+    plot_cluster_profiles,
+    plot_elbow_silhouette,
+    plot_typology_map,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,6 +62,11 @@ def main() -> None:
         nargs="+",
         default=DEFAULT_FEATURES,
         help="Feature columns to use for clustering",
+    )
+    parser.add_argument(
+        "--skip-plots",
+        action="store_true",
+        help="Skip visualization output",
     )
     args = parser.parse_args()
 
@@ -155,6 +165,23 @@ def main() -> None:
                 indent=2,
             )
         logger.info("Saved k specification to %s", optimal_k_path)
+
+    # -------------------------------------------------------- visualizations
+    if not args.skip_plots:
+        maps_dir = output_dir / "maps"
+        maps_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.info("Generating typology map...")
+        plot_typology_map(classified, maps_dir / "typology_clusters.png")
+
+        logger.info("Generating cluster profiles chart...")
+        plot_cluster_profiles(profiles, maps_dir / "cluster_profiles.png", features=args.features)
+
+        if optimal_k_result is not None:
+            logger.info("Generating elbow/silhouette plot...")
+            plot_elbow_silhouette(optimal_k_result, maps_dir / "elbow_silhouette.png")
+    else:
+        logger.info("Skipping plots (--skip-plots).")
 
     logger.info("Done.")
 
