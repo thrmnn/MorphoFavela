@@ -5,11 +5,11 @@ Pytest configuration and shared fixtures for SVF tests.
 import numpy as np
 import pyvista as pv
 import pytest
-from pathlib import Path
 
 # Optional GPU imports
 try:
     import torch
+
     TORCH_AVAILABLE = True
 except ImportError:
     torch = None
@@ -42,22 +42,21 @@ def empty_mesh():
     y = np.linspace(-10, 10, 21)
     X, Y = np.meshgrid(x, y)
     Z = np.zeros_like(X)
-    
+
     # Create PyVista mesh
     points = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
     faces = []
-    
+
     # Create triangular faces
     n = len(x)
     for i in range(n - 1):
         for j in range(n - 1):
             # Two triangles per quad
             idx = i * n + j
-            faces.extend([
-                [3, idx, idx + 1, idx + n],
-                [3, idx + 1, idx + n + 1, idx + n]
-            ])
-    
+            faces.extend(
+                [[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]]
+            )
+
     mesh = pv.PolyData(points, faces)
     return mesh
 
@@ -70,41 +69,30 @@ def single_building_mesh():
     y = np.linspace(-20, 20, 41)
     X, Y = np.meshgrid(x, y)
     Z = np.zeros_like(X)
-    
+
     # Create building (box from -2 to 2 in x, y, height 5)
-    building_points = []
+    _building_points = []
     building_faces = []
-    
+
     # Building base (z=0)
-    base_corners = [
-        [-2, -2, 0],
-        [2, -2, 0],
-        [2, 2, 0],
-        [-2, 2, 0]
-    ]
-    
+    base_corners = [[-2, -2, 0], [2, -2, 0], [2, 2, 0], [-2, 2, 0]]
+
     # Building top (z=5)
-    top_corners = [
-        [-2, -2, 5],
-        [2, -2, 5],
-        [2, 2, 5],
-        [-2, 2, 5]
-    ]
-    
+    top_corners = [[-2, -2, 5], [2, -2, 5], [2, 2, 5], [-2, 2, 5]]
+
     # Combine terrain and building
     terrain_points = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
-    
+
     # Create terrain mesh
     n = len(x)
     terrain_faces = []
     for i in range(n - 1):
         for j in range(n - 1):
             idx = i * n + j
-            terrain_faces.extend([
-                [3, idx, idx + 1, idx + n],
-                [3, idx + 1, idx + n + 1, idx + n]
-            ])
-    
+            terrain_faces.extend(
+                [[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]]
+            )
+
     # Create building mesh (box with 6 faces)
     building_verts = base_corners + top_corners
     building_face_indices = [
@@ -113,20 +101,20 @@ def single_building_mesh():
         [4, 0, 4, 5, 1],  # front
         [4, 2, 6, 7, 3],  # back
         [4, 0, 3, 7, 4],  # left
-        [4, 1, 5, 6, 2]   # right
+        [4, 1, 5, 6, 2],  # right
     ]
-    
+
     # Offset building indices by terrain point count
     n_terrain = len(terrain_points)
     building_faces = []
     for face in building_face_indices:
         offset_face = [face[0]] + [v + n_terrain for v in face[1:]]
         building_faces.append(offset_face)
-    
+
     # Combine
     all_points = np.vstack([terrain_points, np.array(building_verts)])
     all_faces = terrain_faces + building_faces
-    
+
     mesh = pv.PolyData(all_points, all_faces)
     return mesh
 
@@ -139,60 +127,96 @@ def two_buildings_mesh():
     y = np.linspace(-30, 30, 61)
     X, Y = np.meshgrid(x, y)
     Z = np.zeros_like(X)
-    
+
     terrain_points = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
-    
+
     # Building 1: from -5 to -1 in x, -2 to 2 in y, height 5
     # Building 2: from 1 to 5 in x, -2 to 2 in y, height 5
-    
+
     building_verts = []
     # Building 1 base
-    building_verts.extend([
-        [-5, -2, 0], [1, -2, 0], [1, 2, 0], [-5, 2, 0]  # Actually make it -5 to -1
-    ])
+    building_verts.extend(
+        [
+            [-5, -2, 0],
+            [1, -2, 0],
+            [1, 2, 0],
+            [-5, 2, 0],  # Actually make it -5 to -1
+        ]
+    )
     # Building 1 top
-    building_verts.extend([
-        [-5, -2, 5], [1, -2, 5], [1, 2, 5], [-5, 2, 5]
-    ])
+    building_verts.extend([[-5, -2, 5], [1, -2, 5], [1, 2, 5], [-5, 2, 5]])
     # Building 2 base
-    building_verts.extend([
-        [-1, -2, 0], [5, -2, 0], [5, 2, 0], [-1, 2, 0]
-    ])
+    building_verts.extend([[-1, -2, 0], [5, -2, 0], [5, 2, 0], [-1, 2, 0]])
     # Building 2 top
-    building_verts.extend([
-        [-1, -2, 5], [5, -2, 5], [5, 2, 5], [-1, 2, 5]
-    ])
-    
+    building_verts.extend([[-1, -2, 5], [5, -2, 5], [5, 2, 5], [-1, 2, 5]])
+
     # Create terrain mesh
     n = len(x)
     terrain_faces = []
     for i in range(n - 1):
         for j in range(n - 1):
             idx = i * n + j
-            terrain_faces.extend([
-                [3, idx, idx + 1, idx + n],
-                [3, idx + 1, idx + n + 1, idx + n]
-            ])
-    
+            terrain_faces.extend(
+                [[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]]
+            )
+
     # Create building meshes
     n_terrain = len(terrain_points)
     building_faces = []
-    
+
     # Building 1 (indices 0-7)
     for base_idx in range(2):
         offset = base_idx * 8
-        building_faces.extend([
-            [4, n_terrain + offset + 0, n_terrain + offset + 1, n_terrain + offset + 2, n_terrain + offset + 3],  # bottom
-            [4, n_terrain + offset + 4, n_terrain + offset + 7, n_terrain + offset + 6, n_terrain + offset + 5],  # top
-            [4, n_terrain + offset + 0, n_terrain + offset + 4, n_terrain + offset + 5, n_terrain + offset + 1],  # front
-            [4, n_terrain + offset + 2, n_terrain + offset + 6, n_terrain + offset + 7, n_terrain + offset + 3],  # back
-            [4, n_terrain + offset + 0, n_terrain + offset + 3, n_terrain + offset + 7, n_terrain + offset + 4],  # left
-            [4, n_terrain + offset + 1, n_terrain + offset + 5, n_terrain + offset + 6, n_terrain + offset + 2]   # right
-        ])
-    
+        building_faces.extend(
+            [
+                [
+                    4,
+                    n_terrain + offset + 0,
+                    n_terrain + offset + 1,
+                    n_terrain + offset + 2,
+                    n_terrain + offset + 3,
+                ],  # bottom
+                [
+                    4,
+                    n_terrain + offset + 4,
+                    n_terrain + offset + 7,
+                    n_terrain + offset + 6,
+                    n_terrain + offset + 5,
+                ],  # top
+                [
+                    4,
+                    n_terrain + offset + 0,
+                    n_terrain + offset + 4,
+                    n_terrain + offset + 5,
+                    n_terrain + offset + 1,
+                ],  # front
+                [
+                    4,
+                    n_terrain + offset + 2,
+                    n_terrain + offset + 6,
+                    n_terrain + offset + 7,
+                    n_terrain + offset + 3,
+                ],  # back
+                [
+                    4,
+                    n_terrain + offset + 0,
+                    n_terrain + offset + 3,
+                    n_terrain + offset + 7,
+                    n_terrain + offset + 4,
+                ],  # left
+                [
+                    4,
+                    n_terrain + offset + 1,
+                    n_terrain + offset + 5,
+                    n_terrain + offset + 6,
+                    n_terrain + offset + 2,
+                ],  # right
+            ]
+        )
+
     all_points = np.vstack([terrain_points, np.array(building_verts)])
     all_faces = terrain_faces + building_faces
-    
+
     mesh = pv.PolyData(all_points, all_faces)
     return mesh
 
@@ -201,13 +225,15 @@ def two_buildings_mesh():
 def test_points():
     """Generate test points for SVF computation."""
     # Points at various locations
-    points = np.array([
-        [0, 0, 0],      # Origin
-        [10, 10, 0],   # Far from center
-        [-10, -10, 0], # Far in opposite direction
-        [0, 0, 0],     # Under building (for single_building_mesh)
-        [5, 5, 0],     # Mid-distance
-    ])
+    points = np.array(
+        [
+            [0, 0, 0],  # Origin
+            [10, 10, 0],  # Far from center
+            [-10, -10, 0],  # Far in opposite direction
+            [0, 0, 0],  # Under building (for single_building_mesh)
+            [5, 5, 0],  # Mid-distance
+        ]
+    )
     return points
 
 
@@ -215,6 +241,7 @@ def test_points():
 def sky_patches_36():
     """Generate 36 sky patches."""
     from src.svf_compute import generate_sky_patches
+
     patches, _ = generate_sky_patches(36)
     return patches
 
@@ -223,6 +250,7 @@ def sky_patches_36():
 def sky_patches_145():
     """Generate 145 sky patches."""
     from src.svf_compute import generate_sky_patches
+
     patches, _ = generate_sky_patches(145)
     return patches
 
@@ -244,4 +272,5 @@ def device(gpu_available):
         # Return a mock device object if torch is not available
         class MockDevice:
             type = "cpu"
+
         return MockDevice()

@@ -1,2 +1,1 @@
 """Favela morphometric analysis package."""
-
