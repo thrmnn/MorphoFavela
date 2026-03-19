@@ -5,6 +5,7 @@ import pytest
 
 from src.svf_v2.compute import (
     generate_sky_directions,
+    compute_svf,
     compute_svf_raycasting,
 )
 
@@ -65,3 +66,45 @@ class TestRaycastingSVF:
         svf = compute_svf_raycasting(obs, empty_scene, sky_directions_small)
         assert len(svf) == 3
         assert np.all((svf >= 0) & (svf <= 1))
+
+
+class TestPyViewFactorSVF:
+    """Tests for the PyViewFactor SVF backend."""
+
+    def test_empty_scene_full_sky(self, empty_scene):
+        """Flat terrain, no buildings -> SVF should be high.
+
+        The pyviewfactor backend computes view factors to mesh faces, so even
+        a flat terrain will contribute some obstruction (the ground plane
+        itself subtends solid angle below the observer).  We therefore check
+        that SVF > 0.65 rather than ~1.0.
+        """
+        pytest.importorskip("pyviewfactor")
+        obs = np.array([[5.0, 5.0, 1.5]])
+        svf = compute_svf(obs, empty_scene, backend="pyviewfactor")
+        assert svf[0] > 0.65, f"Expected SVF > 0.65 for open sky, got {svf[0]:.3f}"
+
+    def test_under_building_low_svf(self, single_building_scene):
+        """Point inside a box building should have lower SVF than outside.
+
+        The pyviewfactor backend filters out near-horizontal ground faces, so
+        from inside the box the wall faces contribute obstruction.  We check
+        that SVF is meaningfully lower than the far-from-building case.
+        """
+        pytest.importorskip("pyviewfactor")
+        # Point at the base of the building, surrounded by walls
+        obs_inside = np.array([[5.0, 5.0, 0.1]])
+        obs_outside = np.array([[0.5, 0.5, 1.5]])
+        svf_inside = compute_svf(obs_inside, single_building_scene, backend="pyviewfactor")
+        svf_outside = compute_svf(obs_outside, single_building_scene, backend="pyviewfactor")
+        assert svf_inside[0] < svf_outside[0], (
+            f"SVF inside building ({svf_inside[0]:.3f}) should be less than "
+            f"SVF outside ({svf_outside[0]:.3f})"
+        )
+
+    def test_far_from_building_high_svf(self, single_building_scene):
+        """Point far from buildings -> SVF > 0.7."""
+        pytest.importorskip("pyviewfactor")
+        obs = np.array([[0.5, 0.5, 1.5]])
+        svf = compute_svf(obs, single_building_scene, backend="pyviewfactor")
+        assert svf[0] > 0.7, f"Expected SVF > 0.7 far from building, got {svf[0]:.3f}"
