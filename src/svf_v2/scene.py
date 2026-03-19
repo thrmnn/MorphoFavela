@@ -273,9 +273,7 @@ def build_building_meshes(
     if not meshes:
         return None, gdf
 
-    combined = meshes[0]
-    for m in meshes[1:]:
-        combined = combined + m
+    combined = pv.merge(meshes)
 
     return combined, gdf
 
@@ -326,19 +324,24 @@ def build_scene(
     Returns:
         (full_scene, terrain_mesh, footprints_gdf)
     """
-    if cache_vtk and cache_vtk.exists():
+    # Derive sibling cache paths for terrain and footprints
+    if cache_vtk:
+        _terrain_vtk = cache_vtk.parent / f"{cache_vtk.stem}_terrain.vtk"
+        _footprints_gpkg = cache_vtk.parent / f"{cache_vtk.stem}_footprints.gpkg"
+    else:
+        _terrain_vtk = None
+        _footprints_gpkg = None
+
+    if (
+        cache_vtk
+        and cache_vtk.exists()
+        and _terrain_vtk.exists()
+        and _footprints_gpkg.exists()
+    ):
         logger.info(f"Loading cached scene from {cache_vtk}")
         full_scene = pv.read(str(cache_vtk))
-        # Still need terrain + gdf for downstream
-        terrain = build_terrain_mesh(dtm_path, subsample=dtm_subsample)
-        _, gdf = build_building_meshes(
-            footprints_path,
-            dtm_path,
-            height_field=height_field,
-            base_field=base_field,
-            use_dtm_for_base=use_dtm_for_base,
-            area=area,
-        )
+        terrain = pv.read(str(_terrain_vtk))
+        gdf = gpd.read_file(str(_footprints_gpkg))
         return full_scene, terrain, gdf
 
     terrain = build_terrain_mesh(dtm_path, subsample=dtm_subsample)
@@ -361,6 +364,8 @@ def build_scene(
     if cache_vtk:
         cache_vtk.parent.mkdir(parents=True, exist_ok=True)
         full_scene.save(str(cache_vtk))
+        terrain.save(str(_terrain_vtk))
+        gdf.to_file(str(_footprints_gpkg), driver="GPKG")
         logger.info(f"  Cached scene to {cache_vtk}")
 
     return full_scene, terrain, gdf

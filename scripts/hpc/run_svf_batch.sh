@@ -30,9 +30,13 @@ set -euo pipefail
 # Configuration -- edit these to match your cluster
 # ---------------------------------------------------------------------------
 
-# Conda / virtualenv activation (uncomment ONE of these and set the path)
+# Conda / virtualenv activation (uncomment and adjust for your cluster)
+# MIT ORCD example:
+# module load anaconda3/2024a
+# source activate ivf
+#
+# Generic conda:
 # source /path/to/conda/etc/profile.d/conda.sh && conda activate ivf
-# source /path/to/venv/bin/activate
 
 # Default areas to process when no argument is given
 DEFAULT_AREAS=("rocinha" "vidigal_tls")

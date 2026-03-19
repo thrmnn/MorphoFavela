@@ -53,12 +53,15 @@ def run_grid(
     )
     logger.info(f"Grid sampling: {len(observers)} points ({time.time()-t0:.1f}s)")
 
+    checkpoint_path = output_dir / ".svf_checkpoint_grid.npz" if args.checkpoint else None
     t0 = time.time()
     svf = compute_svf(
         observers, scene_mesh,
         backend=args.backend,
         n_sky_patches=args.sky_patches,
         max_ray_length=args.max_ray_length,
+        n_jobs=args.n_jobs,
+        checkpoint_path=checkpoint_path,
     )
     logger.info(f"Grid SVF computed in {time.time()-t0:.1f}s")
     logger.info(f"  SVF stats: mean={svf.mean():.3f}, min={svf.min():.3f}, max={svf.max():.3f}")
@@ -95,12 +98,15 @@ def run_streets(
         street_gdf["z_observer"].values,
     ])
 
+    checkpoint_path = output_dir / ".svf_checkpoint_streets.npz" if args.checkpoint else None
     t0 = time.time()
     svf = compute_svf(
         observers, scene_mesh,
         backend=args.backend,
         n_sky_patches=args.sky_patches,
         max_ray_length=args.max_ray_length,
+        n_jobs=args.n_jobs,
+        checkpoint_path=checkpoint_path,
     )
     street_gdf["svf"] = svf
     logger.info(f"Street SVF computed in {time.time()-t0:.1f}s")
@@ -175,6 +181,8 @@ def main():
     parser.add_argument("--sky-patches", type=int, default=145)
     parser.add_argument("--backend", default="raycasting", choices=["raycasting", "gpu", "pyviewfactor"])
     parser.add_argument("--max-ray-length", type=float, default=500.0)
+    parser.add_argument("--n-jobs", type=int, default=1,
+                        help="Number of parallel workers for raycasting (1=sequential, -1=all cores)")
     parser.add_argument("--buffer", type=float, default=None,
                         help="Only compute grid SVF within this distance of buildings (m)")
     parser.add_argument("--dtm-subsample", type=int, default=1)
@@ -182,6 +190,10 @@ def main():
     parser.add_argument("--height-field", default="altura", help="Building extrusion height field")
     parser.add_argument("--skip-visual", action="store_true",
                         help="Skip visual inspection outputs (STL, alignment plots)")
+    parser.add_argument("--checkpoint", action="store_true", default=True,
+                        help="Enable checkpoint/resume for long raycasting runs (default: enabled)")
+    parser.add_argument("--no-checkpoint", action="store_false", dest="checkpoint",
+                        help="Disable checkpoint/resume")
     args = parser.parse_args()
 
     dtm_path, footprints_path, roads_path = resolve_paths(args.area)
