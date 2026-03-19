@@ -12,7 +12,7 @@ OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 # Area-based data organization
 # Areas: vidigal (informal), vidigal_tls (informal), copacabana (formal), riodaspedras (informal),
-# rocinha (informal), maré (informal)
+# rocinha (informal), maré (informal), cidade_de_deus (informal), complexo_do_alemao (informal)
 SUPPORTED_AREAS = [
     "vidigal",
     "vidigal_tls",
@@ -20,6 +20,8 @@ SUPPORTED_AREAS = [
     "riodaspedras",
     "rocinha",
     "maré",
+    "cidade_de_deus",
+    "complexo_do_alemao",
 ]
 
 # Area classification: formal vs informal
@@ -30,6 +32,8 @@ INFORMAL_AREAS = [
     "riodaspedras",
     "rocinha",
     "maré",
+    "cidade_de_deus",
+    "complexo_do_alemao",
 ]  # Informal settlements (with filtering)
 
 
@@ -97,6 +101,9 @@ ANALYSIS_TYPES = {
     "deprivation": "deprivation",  # Deprivation index (unit-level)
     "deprivation_raster": "deprivation_raster",  # Deprivation index (raster-based)
     "maps": "maps",  # General maps/visualizations
+    "urban_morphology": "urban_morphology",  # Zone-level urban morphology metrics
+    "spatial_analysis": "spatial_analysis",  # Spatial autocorrelation (Moran's I, LISA)
+    "typology": "typology",  # Settlement typology classification
 }
 
 # Analysis parameters

@@ -26,6 +26,21 @@ AREA_FILES = {
         "footprints": "riodaspedras_buildings.shp",
         "roads": "roads_riodaspedras.shp",
     },
+    "rocinha": {
+        "dtm": "rocinha_dtm.tif",
+        "footprints": "rocinha_buildings.shp",
+        "roads": "roads_rocinha.shp",
+    },
+    "cidade_de_deus": {
+        "dtm": "cidade_de_deus_dtm.tif",
+        "footprints": "cidade_de_deus_buildings.shp",
+        "roads": "roads_cidade_de_deus.shp",
+    },
+    "complexo_do_alemao": {
+        "dtm": "complexo_do_alemao_dtm.tif",
+        "footprints": "complexo_do_alemao_buildings.shp",
+        "roads": "roads_complexo_do_alemao.shp",
+    },
 }
 
 
