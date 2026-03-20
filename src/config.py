@@ -144,8 +144,8 @@ LISA_COLORS = {
 }
 COLORMAP_BCR = "YlOrRd"
 COLORMAP_FAR = "YlOrRd"
-COLORMAP_SIGMA_H = "viridis"
-COLORMAP_LAMBDA_F = "plasma"
+COLORMAP_SIGMA_H = "YlOrBr"
+COLORMAP_LAMBDA_F = "OrRd"
 
 # SVF & cartographic visualization
 SVF_CMAP = "cividis"

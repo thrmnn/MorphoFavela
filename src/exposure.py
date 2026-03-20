@@ -388,11 +388,14 @@ def compute_exposure_index(
 
 # Default panel layout: (column, colormap, title)
 _EXPOSURE_PANEL_DEFAULTS = [
-    ("solar_deficit", "YlOrRd", "Solar Deficit"),
-    ("svf_deficit", "YlOrRd", "SVF Deficit"),
-    ("density_ratio", "YlOrRd", "Volumetric Density"),
-    ("exposure_index", "RdYlGn_r", "Composite Exposure Index"),
+    ("solar_deficit", "OrRd", "Solar Deficit"),
+    ("svf_deficit", "OrRd", "SVF Deficit"),
+    ("density_ratio", "OrRd", "Volumetric Density"),
+    ("exposure_index", "YlOrRd", "Composite Exposure Index"),
 ]
+
+# Panel labels following Nature style
+_PANEL_LABELS = ["a", "b", "c", "d", "e", "f", "g", "h"]
 
 
 def plot_exposure_panel(
@@ -422,16 +425,26 @@ def plot_exposure_panel(
     Path
         *output_path* on success.
     """
+    from src.cartography import apply_publication_style
+
     if metrics_to_plot is None:
         metrics_to_plot = _EXPOSURE_PANEL_DEFAULTS
 
+    apply_publication_style()
+
     # Clip zones to boundary if provided
-    plot_gdf = zones_gdf
+    plot_gdf = zones_gdf.copy()
     if boundary_gdf is not None:
         try:
             plot_gdf = gpd.clip(zones_gdf, boundary_gdf)
         except Exception:
-            plot_gdf = zones_gdf
+            plot_gdf = zones_gdf.copy()
+
+    # Drop zones with all-NaN metrics to avoid drawing empty cells
+    metric_cols = [col for col, _, _ in metrics_to_plot if col in plot_gdf.columns]
+    if metric_cols:
+        has_any_data = plot_gdf[metric_cols].notna().any(axis=1)
+        plot_gdf = plot_gdf.loc[has_any_data].copy()
 
     # Filter to available columns
     available = [(col, cmap, title) for col, cmap, title in metrics_to_plot if col in plot_gdf.columns]
@@ -442,45 +455,76 @@ def plot_exposure_panel(
     n = len(available)
     ncols = 2
     nrows = (n + 1) // 2
-    fig, axes = plt.subplots(nrows, ncols, figsize=(12, 5 * nrows))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(14, 6 * nrows))
     axes = np.atleast_1d(axes).flatten()
 
     for idx, (col, cmap, title) in enumerate(available):
         ax = axes[idx]
 
-        # Building underlay
+        # Building underlay (drawn first, below zones)
         if footprints_gdf is not None and len(footprints_gdf) > 0:
             footprints_gdf.plot(
                 ax=ax,
-                facecolor="#d0d0d0",
-                edgecolor="#999999",
+                facecolor="#e0e0e0",
+                edgecolor="#bbbbbb",
                 linewidth=0.2,
-                alpha=0.5,
+                alpha=0.4,
                 zorder=0,
             )
 
-        data = plot_gdf[col].replace([np.inf, -np.inf], np.nan).dropna()
+        # Only plot zones that have data for this column
+        col_valid = plot_gdf[col].replace([np.inf, -np.inf], np.nan)
+        valid_mask = col_valid.notna()
+        plot_subset = plot_gdf.loc[valid_mask].copy()
+
+        data = col_valid.dropna()
         if len(data) > 0:
             vmin = float(data.quantile(0.02))
             vmax = float(data.quantile(0.98))
+            if vmin == vmax:
+                vmax = vmin + 0.1
         else:
             vmin, vmax = 0.0, 1.0
 
-        plot_gdf.plot(
+        plot_subset.plot(
             column=col,
             ax=ax,
             cmap=cmap,
             legend=True,
-            legend_kwds={"label": col, "shrink": 0.7},
+            legend_kwds={
+                "label": title,
+                "shrink": 0.65,
+                "pad": 0.02,
+                "orientation": "horizontal",
+                "fraction": 0.04,
+                "aspect": 30,
+            },
             vmin=vmin,
             vmax=vmax,
-            missing_kwds={"color": "white", "edgecolor": "lightgray"},
+            edgecolor="#888888",
+            linewidth=0.3,
+            alpha=0.85,
+            zorder=2,
         )
+
+        # Style the colorbar
+        for child_ax in fig.axes:
+            if child_ax not in axes and child_ax not in fig.axes[:len(axes)]:
+                child_ax.tick_params(labelsize=7)
 
         if boundary_gdf is not None:
             add_settlement_boundary(ax, boundary_gdf)
 
         ax.set_title(title, fontsize=12, fontweight="bold")
+
+        # Panel label (a, b, c, d)
+        if idx < len(_PANEL_LABELS):
+            ax.text(
+                0.02, 0.98, _PANEL_LABELS[idx],
+                transform=ax.transAxes, fontsize=13, fontweight="bold",
+                va="top", ha="left", zorder=20,
+            )
+
         add_scale_bar(ax)
         add_north_arrow(ax)
         ax.set_axis_off()
@@ -488,7 +532,7 @@ def plot_exposure_panel(
     for ax in axes[len(available):]:
         ax.set_visible(False)
 
-    plt.tight_layout()
+    fig.tight_layout(h_pad=2, w_pad=2)
     _ensure_dir(output_path)
     plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
     plt.close()
@@ -575,6 +619,11 @@ def plot_exposure_bivariate(
     if boundary_gdf is not None:
         try:
             gdf = gpd.clip(gdf, boundary_gdf)
+            # Drop slivers created by clipping (< 10% of median zone area)
+            areas = gdf.geometry.area
+            median_area = areas.median()
+            if median_area > 0:
+                gdf = gdf.loc[areas >= median_area * 0.1].copy()
         except Exception:
             pass
 
@@ -607,27 +656,50 @@ def plot_exposure_bivariate(
     colors = [cmap.colors[int(c)] for c in gdf_valid["_biv_class"].values]
 
     # --- Plot ---
+    from src.cartography import apply_publication_style
+    apply_publication_style()
+
     fig, (ax_map, ax_legend) = plt.subplots(
         1, 2, figsize=(14, 8), gridspec_kw={"width_ratios": [5, 1]}
     )
+
+    # Fill boundary as white background to mask empty areas
+    if boundary_gdf is not None and len(boundary_gdf) > 0:
+        boundary_gdf.plot(
+            ax=ax_map,
+            facecolor="white",
+            edgecolor="none",
+            zorder=0,
+        )
 
     # Building underlay
     if footprints_gdf is not None and len(footprints_gdf) > 0:
         footprints_gdf.plot(
             ax=ax_map,
-            facecolor="#d0d0d0",
-            edgecolor="#999999",
+            facecolor="#e0e0e0",
+            edgecolor="#bbbbbb",
             linewidth=0.2,
-            alpha=0.5,
-            zorder=0,
+            alpha=0.4,
+            zorder=1,
         )
 
-    gdf_valid.plot(ax=ax_map, color=colors, edgecolor="gray", linewidth=0.2, zorder=2)
+    gdf_valid.plot(ax=ax_map, color=colors, edgecolor="#777777", linewidth=0.3, zorder=2)
 
     if boundary_gdf is not None:
         add_settlement_boundary(ax_map, boundary_gdf)
 
-    ax_map.set_title(f"{y_col}  vs  {x_col}", fontsize=12, fontweight="bold")
+    # Human-readable column labels
+    _col_labels = {
+        "solar_deficit": "Solar Deficit",
+        "svf_deficit": "SVF Deficit",
+        "density_ratio": "Volumetric Density",
+        "exposure_index": "Exposure Index",
+        "mean_solar": "Mean Solar Hours",
+        "mean_svf": "Mean SVF",
+    }
+    x_label = _col_labels.get(x_col, x_col)
+    y_label = _col_labels.get(y_col, y_col)
+    ax_map.set_title(f"{y_label}  vs  {x_label}", fontsize=12, fontweight="bold")
     add_scale_bar(ax_map)
     add_north_arrow(ax_map)
     ax_map.set_axis_off()
@@ -641,8 +713,8 @@ def plot_exposure_bivariate(
         extent=[0, n_classes, 0, n_classes],
         interpolation="nearest",
     )
-    ax_legend.set_xlabel(x_col, fontsize=9)
-    ax_legend.set_ylabel(y_col, fontsize=9)
+    ax_legend.set_xlabel(x_label, fontsize=9)
+    ax_legend.set_ylabel(y_label, fontsize=9)
     ax_legend.set_xticks([0.5, n_classes - 0.5])
     ax_legend.set_xticklabels(["Low", "High"], fontsize=8)
     ax_legend.set_yticks([0.5, n_classes - 0.5])

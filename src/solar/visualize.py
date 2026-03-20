@@ -894,11 +894,13 @@ def plot_solar_dashboard(
         svf_clean = svf_clean[mask]
         solar_clean = solar_clean[mask]
 
+        from matplotlib.colors import LogNorm as _LogNorm
         hb = ax_scatter.hexbin(
             svf_clean, solar_clean,
             gridsize=35,
-            cmap="magma_r",
+            cmap="YlOrBr",
             mincnt=1,
+            norm=_LogNorm(vmin=1, vmax=max(10, len(svf_clean) // 20)),
             zorder=2,
         )
         cb = plt.colorbar(hb, ax=ax_scatter, shrink=0.7, pad=0.02)
@@ -1135,27 +1137,28 @@ def plot_solar_vs_svf(
 
     _set_nature_style()
     fig, ax = plt.subplots(figsize=(10, 8))
-    ax.set_facecolor("#fafafa")
+    ax.set_facecolor("#f8f8f5")
 
-    # Hexbin with Reds -- low counts are light pink (visible against grey bg),
-    # high counts are deep red for strong density contrast
+    # Hexbin with warm cmap + log normalisation for visible low-density bins
+    from matplotlib.colors import LogNorm
     hb = ax.hexbin(
         svf, solar,
         gridsize=40,
-        cmap="Reds",
+        cmap="YlOrBr",
         mincnt=1,
+        norm=LogNorm(vmin=1, vmax=max(10, len(svf) // 20)),
         zorder=2,
     )
     cb = plt.colorbar(hb, ax=ax, shrink=0.7, pad=0.02)
     cb.set_label("Point count", fontsize=_NC_CBAR_LABEL_SIZE)
     cb.ax.tick_params(labelsize=_NC_TICK_SIZE)
 
-    # Linear regression -- white/cyan line visible against warm hexbin
+    # Linear regression -- dark navy line with high contrast against warm hexbin
     coeffs = np.polyfit(svf, solar, 1)
     x_line = np.linspace(0, 1, 100)
     ax.plot(
         x_line, np.polyval(coeffs, x_line),
-        color="#00bcd4", linewidth=3, linestyle="-", zorder=3,
+        color="#1a237e", linewidth=2.5, linestyle="-", zorder=3,
         label="Linear fit",
     )
 
@@ -1614,23 +1617,26 @@ def plot_solar_seasonal_comparison_hero(
         fontfamily="sans-serif",
     )
 
-    # Shared colorbar at bottom
-    sm = plt.cm.ScalarMappable(
-        cmap="YlOrRd",
-        norm=mcolors.Normalize(vmin=vmin, vmax=vmax),
-    )
-    sm.set_array([])
-    cbar_ax = fig.add_axes([0.25, 0.04, 0.5, 0.015])
-    cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
-    cbar.set_label(
-        "Hours of Direct Sunlight",
-        fontsize=13, color="white", labelpad=6,
-    )
-    cbar.ax.tick_params(colors="white", labelsize=10)
-    cbar.outline.set_edgecolor("#555555")
-    cbar.outline.set_linewidth(0.5)
+    # Separate colorbars for each panel (different colormaps)
+    for idx, (ax, col, cmap, subtitle) in enumerate(panels):
+        sm = plt.cm.ScalarMappable(
+            cmap=cmap,
+            norm=mcolors.Normalize(vmin=vmin, vmax=vmax),
+        )
+        sm.set_array([])
+        # Position: centered under each panel
+        left = 0.06 + idx * 0.48
+        cbar_ax = fig.add_axes([left, 0.04, 0.40, 0.012])
+        cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
+        cbar.set_label(
+            "Hours of Direct Sunlight",
+            fontsize=10, color="white", labelpad=4,
+        )
+        cbar.ax.tick_params(colors="white", labelsize=9)
+        cbar.outline.set_edgecolor("#555555")
+        cbar.outline.set_linewidth(0.5)
 
-    fig.subplots_adjust(left=0.02, right=0.98, top=0.90, bottom=0.08, wspace=0.05)
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.90, bottom=0.09, wspace=0.05)
 
     output_path = Path(output_path)
     _ensure_dir(output_path)

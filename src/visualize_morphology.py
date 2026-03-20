@@ -98,10 +98,18 @@ def plot_zone_metrics_panel(
         logger.warning("No metric columns found for zone panel — skipping.")
         return output_path
 
+    # Drop zones with all-NaN metrics to avoid drawing empty cells
+    metric_cols = [col for col, _, _ in available]
+    if metric_cols:
+        has_any_data = plot_gdf[metric_cols].notna().any(axis=1)
+        plot_gdf = plot_gdf.loc[has_any_data].copy()
+
+    _panel_labels = ["a", "b", "c", "d", "e", "f", "g", "h"]
+
     n = len(available)
     ncols = 2
     nrows = (n + 1) // 2
-    fig, axes = plt.subplots(nrows, ncols, figsize=(12, 5 * nrows))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(14, 6 * nrows))
     axes = np.atleast_1d(axes).flatten()
 
     for idx, (col, cmap, title) in enumerate(available):
@@ -111,34 +119,61 @@ def plot_zone_metrics_panel(
         if footprints_gdf is not None and len(footprints_gdf) > 0:
             footprints_gdf.plot(
                 ax=ax,
-                facecolor="#d0d0d0",
-                edgecolor="#999999",
+                facecolor="#e0e0e0",
+                edgecolor="#bbbbbb",
                 linewidth=0.2,
-                alpha=0.5,
+                alpha=0.4,
                 zorder=0,
             )
 
-        data = plot_gdf[col].replace([np.inf, -np.inf], np.nan).dropna()
+        # Only plot zones with valid data for this column
+        col_valid = plot_gdf[col].replace([np.inf, -np.inf], np.nan)
+        valid_mask = col_valid.notna()
+        plot_subset = plot_gdf.loc[valid_mask].copy()
+
+        data = col_valid.dropna()
         if len(data) > 0:
-            vmin = data.quantile(0.02)
-            vmax = data.quantile(0.98)
+            vmin = float(data.quantile(0.02))
+            vmax = float(data.quantile(0.98))
+            if vmin == vmax:
+                vmax = vmin + 0.1
         else:
             vmin, vmax = 0, 1
-        plot_gdf.plot(
+
+        plot_subset.plot(
             column=col,
             ax=ax,
             cmap=cmap,
             legend=True,
-            legend_kwds={"label": col, "shrink": 0.7},
+            legend_kwds={
+                "label": title,
+                "shrink": 0.65,
+                "pad": 0.02,
+                "orientation": "horizontal",
+                "fraction": 0.04,
+                "aspect": 30,
+            },
             vmin=vmin,
             vmax=vmax,
-            missing_kwds={"color": "white", "edgecolor": "lightgray"},
+            edgecolor="#888888",
+            linewidth=0.3,
+            alpha=0.85,
+            zorder=2,
         )
 
         if boundary_gdf is not None:
             add_settlement_boundary(ax, boundary_gdf)
 
         ax.set_title(title, fontsize=12, fontweight="bold")
+
+        # Panel label
+        if idx < len(_panel_labels):
+            ax.text(
+                0.02, 0.98, _panel_labels[idx],
+                transform=ax.transAxes, fontsize=13, fontweight="bold",
+                va="top", ha="left", zorder=20,
+            )
+
         add_scale_bar(ax)
         add_north_arrow(ax)
         ax.set_axis_off()
@@ -146,7 +181,7 @@ def plot_zone_metrics_panel(
     for ax in axes[len(available) :]:
         ax.set_visible(False)
 
-    plt.tight_layout()
+    fig.tight_layout(h_pad=2, w_pad=2)
     _ensure_dir(output_path)
     plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
     plt.close()
