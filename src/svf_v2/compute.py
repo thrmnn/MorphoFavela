@@ -435,46 +435,16 @@ def compute_svf_gpu(
     **kwargs,
 ) -> np.ndarray:
     """
-    Compute SVF on GPU using existing Moller-Trumbore backend.
+    Compute SVF on GPU.
 
-    UTM coordinates exceed float32 precision, so we subtract the scene
-    centroid before GPU computation and add it back after.
+    .. note:: The v1 GPU modules (``svf_gpu_utils``, ``svf_gpu_compute``)
+       have been retired.  This stub remains so the ``backend="gpu"``
+       code-path raises a clear error instead of an import failure.
     """
-    if not GPU_AVAILABLE:
-        raise RuntimeError("GPU not available")
-
-    from src.svf_gpu_utils import pv_mesh_to_pytorch3d, check_gpu_availability
-    from src.svf_gpu_compute import compute_svf_gpu_batch
-
-    device = torch.device("cuda")
-    check_gpu_availability()
-
-    # Centre-shift for float32 precision
-    centroid = scene_mesh.center
-    shifted_points = observer_points - centroid
-    shifted_mesh = scene_mesh.copy()
-    shifted_mesh.points = shifted_mesh.points - centroid
-
-    pytorch3d_mesh = pv_mesh_to_pytorch3d(shifted_mesh, device=device)
-
-    # Sky directions are unit vectors (relative), no shift needed
-    # Convert directions to "sky patch centroids" at max_ray_length
-    sky_pts = sky_directions * max_ray_length
-    sky_tensor = torch.tensor(sky_pts, dtype=torch.float32, device=device)
-
-    # Observer points as tensor
-    obs_tensor = torch.tensor(shifted_points, dtype=torch.float32, device=device)
-
-    svf_tensor = compute_svf_gpu_batch(
-        obs_tensor,
-        sky_tensor,
-        pytorch3d_mesh,
-        batch_size=batch_size,
-        max_ray_length=max_ray_length,
-        num_samples_per_ray=100,
-        **kwargs,
+    raise NotImplementedError(
+        "GPU backend not yet ported to v2. "
+        "Use backend='raycast' (CPU, parallelised) instead."
     )
-    return svf_tensor.cpu().numpy()
 
 
 # ---------------------------------------------------------------------------
