@@ -101,19 +101,19 @@
 ### Current Status
 - **Script**: `scripts/analyze_sky_exposure_streets.py`
 - **Input**: STL mesh, building footprints, optional road network shapefile
-- **Method**: 
+- **Method**:
   - **Building-level**: Ruleset-based envelope calculation per building, percentage exceedance
   - **Street-level**: Point sampling along streets, pedestrian perspective (1.5m height), ruleset-based envelope calculation
-- **Rulesets**: 
-  - **Rio de Janeiro**: Base height from first ventilated floor, setback = max(2.5m, H/5), envelope = base + (distance × 5)
-  - **São Paulo**: 10m threshold, setback = max(3.0m, (H-6)/10) for H > 10m, envelope = 10 + (distance × 10)
-- **Output**: 
+- **Rulesets**:
+  - **Rio de Janeiro**: Base height from first ventilated floor, setback = max(2.5m, H/5), envelope = base + (distance x 5)
+  - **São Paulo**: 10m threshold, setback = max(3.0m, (H-6)/10) for H > 10m, envelope = 10 + (distance x 10)
+- **Output**:
   - Building exceedance map (percentage per building)
   - Street exceedance maps (points, segments, colored by exceedance)
   - Section views (high, mean, low exceedance points)
   - Statistics (building and street-level)
 - **Purpose**: Building code compliance evaluation and environmental performance assessment
-- **Note**: Legacy `analyze_sky_exposure.py` (45° fixed envelope) is deprecated
+- **Note**: Legacy `analyze_sky_exposure.py` (45 deg fixed envelope) is deprecated
 
 ---
 
@@ -188,7 +188,7 @@
 
 ---
 
-## Phase 3: Multi-Area Comparative Analysis 🚧 IN PROGRESS
+## Phase 3: Multi-Area Comparative Analysis ✅ COMPLETE
 
 ### Phase 3.0: Data Organization Structure ✅ COMPLETE
 
@@ -219,7 +219,7 @@
 #### Current Status
 - **Script**: `scripts/compare_areas.py`
 - **Output**: Comprehensive PDF report with statistics, visualizations, and findings
-- **Features**: 
+- **Features**:
   - Morphometric metrics comparison with statistical tests
   - Environmental performance comparison (SVF, solar, porosity, deprivation)
   - Area-normalized statistics accounting for different study area sizes
@@ -239,40 +239,88 @@
 - [ ] Spatial autocorrelation analysis
 - [ ] Building adjacency analysis
 - [ ] Fractal dimension calculation
-- [ ] Urban form typology classification
 
 ---
 
-## Phase 4: Urban Morphology Metrics 🆕 PLANNED
+## Phase 3.5: SVF v2 Engine ✅ COMPLETE
 
-### Overview
-Add comprehensive urban morphology metrics for environmental analysis, including plan area density, frontal area density, height variability, street orientation entropy, and morphological typology clustering.
+### Completed Features
+- [x] Modular SVF engine (`src/svf_v2/`) with world-coordinate computation
+- [x] 3D scene construction from DTM and building footprints (`src/svf_v2/scene.py`)
+- [x] Joblib-based parallel raycasting (`src/svf_v2/compute.py`, `n_jobs` parameter)
+- [x] Checkpoint/resume support for long-running computations
+- [x] Scene optimization for faster mesh operations
+- [x] Facade sampling module (`src/svf_v2/facades.py`)
+- [x] I/O utilities and path management (`src/svf_v2/io.py`, `src/svf_v2/paths.py`)
+- [x] SVF visualization module (`src/svf_v2/visualize.py`)
+- [x] Legacy SVF code removed from active use (archived)
+- [x] HPC deployment scripts (`scripts/hpc/`)
 
-### Planned Features
-- [ ] Plan area density (λp) - footprint area / total area per analysis unit
-- [ ] Frontal area density (λf) - building frontal area perpendicular to wind
-- [ ] Height variability (σh) - standard deviation of building heights per unit
-- [ ] Street orientation entropy (H) - Shannon entropy of street directions
-- [ ] Zone flagging (SVF < 0.3, λf > 0.4)
-- [ ] Morphological typology clustering (K-means/hierarchical)
-- [ ] Integration with comparative analysis framework
+### Current Status
+- **Engine**: `src/svf_v2/` - complete rewrite with modular architecture
+- **Parallelization**: joblib with configurable `n_jobs` (default 1, -1 for all cores)
+- **Checkpointing**: Auto-save every N points, resume from last checkpoint on restart
+- **HPC**: Batch scripts for SLURM-based clusters (`scripts/hpc/run_svf_batch.sh`, `run_full_pipeline.sh`)
+- **Script**: `scripts/run_svf_v2.py`
 
-### New Files to Create
-- `src/urban_morphology.py` - Core module with metric computation functions
-- `scripts/compute_urban_morphology.py` - Main script for running the analysis
-- `scripts/compute_typology_clustering.py` - Clustering on morphology features
+---
 
-### Implementation Phases
-1. **Core Functions**: Plan density, height variability
-2. **Complex Metrics**: Frontal density, entropy
-3. **Main Script**: Visualizations, integration
-4. **Zone Flagging**: Threshold-based flags
-5. **Typology Clustering**: K-means/hierarchical analysis
-6. **Comparative Analysis**: Multi-area comparison
+## Phase 4: Urban Morphology Metrics ✅ COMPLETE
 
-### Status
-- **Planning**: Complete - see `URBAN_MORPHOLOGY_PLAN.md` for detailed design
-- **Implementation**: Not started
+### Completed Features
+- [x] Plan area density (lambda_p) - footprint area / total area per analysis unit
+- [x] Frontal area density (lambda_f) - building frontal area perpendicular to wind
+- [x] Height variability (sigma_h) - standard deviation of building heights per unit
+- [x] Street orientation entropy (H) - Shannon entropy of street directions
+- [x] Zone flagging (SVF < 0.3, lambda_f > 0.4)
+- [x] Morphological typology clustering (K-means/hierarchical) (`src/typology.py`)
+- [x] Spatial analysis utilities (`src/spatial_analysis.py`)
+- [x] Morphology visualization module (`src/visualize_morphology.py`)
+- [x] Cartography module for publication-quality maps (`src/cartography.py`)
+
+### Modules
+- `src/urban_morphology.py` - Core metric computation functions
+- `src/typology.py` - Clustering and typology classification
+- `src/spatial_analysis.py` - Spatial statistics and analysis utilities
+- `src/visualize_morphology.py` - Morphology-specific visualizations
+- `src/cartography.py` - Publication-quality cartographic output
+- `scripts/compute_urban_morphology.py` - Main analysis script
+- `scripts/classify_typology.py` - Typology clustering script
+
+### Tests
+- `tests/test_urban_morphology.py`
+- `tests/test_typology.py`
+- `tests/test_visualize_morphology.py`
+- `tests/test_spatial_analysis.py`
+- `tests/test_cartography.py`
+
+---
+
+## Phase 4.5: Solar Access Package ✅ COMPLETE
+
+### Completed Features
+- [x] Full solar irradiance models (`src/solar/irradiance.py`)
+- [x] Sun position calculation (`src/solar/sun.py`)
+- [x] Seasonal analysis across solstices and equinoxes (`src/solar/seasonal.py`)
+- [x] Ray-casting solar computation (`src/solar/compute.py`)
+- [x] Solar I/O utilities (`src/solar/io.py`)
+- [x] Publication-quality solar visualizations (`src/solar/visualize.py`)
+- [x] Exposure module for sky exposure analysis (`src/exposure.py`)
+
+### Modules
+- `src/solar/` - Complete solar access package
+  - `compute.py` - Ray-casting solar access computation
+  - `irradiance.py` - Direct/diffuse irradiance models
+  - `sun.py` - Sun position and path calculations
+  - `seasonal.py` - Multi-season analysis (solstices, equinoxes)
+  - `visualize.py` - Solar visualization (heatmaps, sun path diagrams)
+  - `io.py` - Solar data I/O
+- `src/exposure.py` - Sky exposure plane analysis
+
+### Tests
+- `tests/test_solar/` - Comprehensive test suite
+  - `test_compute.py`, `test_irradiance.py`, `test_seasonal.py`, `test_sun.py`, `test_visualize.py`
+- `tests/test_exposure.py`
 
 ---
 
@@ -281,76 +329,58 @@ Add comprehensive urban morphology metrics for environmental analysis, including
 ### Planned Features
 - [ ] Thermal comfort modeling
 - [ ] Wind flow analysis
-- [ ] Solar radiation mapping
-- [ ] Integration with SVF results
+- [ ] Integration with morphology and solar results
 - [ ] Policy recommendations generation
 
 ---
 
 ## Next Steps & Priorities
 
-### High Priority - Code Quality & Robustness
+### High Priority
 
-#### Performance Optimization
-- [ ] **Parallelize SVF/solar access computation** - Ray-casting operations can be parallelized across grid points
-- [ ] **Optimize pixel-level occupancy pressure** - Vectorize building volume computation where possible
-- [ ] **Cache intermediate results** - Building volumes, ground masks, and resampled rasters
-- [ ] **Profile and benchmark** - Identify bottlenecks in raster-based deprivation index computation
-- **Priority**: High - Current computation can be slow for large datasets
+#### Tregenza 145 Equal-Area Patches (In Progress)
+- [ ] Replace uniform hemisphere discretization with Tregenza 145-patch scheme
+- [ ] Validate against benchmark SVF tools (RayMan, SOLWEIG)
+- Work branch: `feature/tregenza-patches`
 
-#### Error Handling & Validation
-- [ ] **Validate raster alignment** - Check CRS consistency and spatial bounds before processing
-- [ ] **Handle edge cases** - Empty rasters, mismatched bounds, missing data gracefully
-- [ ] **Improve error messages** - Provide actionable guidance when errors occur
-- [ ] **Input validation** - Comprehensive checks for all input files and parameters
-- **Priority**: High - Prevents runtime failures and improves user experience
+#### Makefile (In Progress)
+- [ ] Build automation for common workflows (compute, test, lint)
+- Work branch: `chore/cleanup-and-makefile`
 
-#### Testing
-- [ ] **Unit tests** - Core functions (metrics calculation, deficit computation, aggregation)
-- [ ] **Integration tests** - Full pipeline end-to-end tests
-- [ ] **Test data fixtures** - Small representative datasets for testing
-- [ ] **Regression tests** - Ensure outputs remain consistent across code changes
-- **Priority**: Medium-High - Ensures reliability and maintainability
+#### Validation
+- [ ] Benchmark SVF results against RayMan, SOLWEIG, or other reference tools
+- [ ] Cross-validate solar irradiance against measured data or pvlib baselines
 
-### Medium Priority - Functionality Enhancements
+### Medium Priority
+
+#### CI Expansion
+- [ ] Extend CI beyond svf_v2 tests to cover morphology, solar, and exposure modules
+- [ ] Add integration tests for full pipeline
 
 #### Configuration Management
-- [ ] **Centralize parameters** - All thresholds, percentiles, and classification parameters in one place
-- [ ] **Configuration file support** - YAML/JSON config files for easy parameter adjustment
-- [ ] **Command-line argument validation** - Better validation and defaults
-- **Priority**: Medium - Improves usability and reproducibility
+- [ ] Centralize parameters in YAML/JSON config files
+- [ ] Command-line argument validation improvements
 
 #### Output Enhancements
-- [ ] **GeoTIFF export** - Export rasters with CRS metadata for GIS integration
-- [ ] **Interactive visualizations** - Plotly/Folium maps for exploration
-- [ ] **Summary report generation** - PDF/HTML reports with key findings
-- [ ] **Standardized output formats** - Consistent naming and structure across all scripts
-- **Priority**: Medium - Improves usability and integration with other tools
+- [ ] GeoTIFF export with CRS metadata for GIS integration
+- [ ] Interactive visualizations (Plotly/Folium)
 
-#### Documentation
-- [ ] **Methodology documentation** - Detailed explanation of how each metric is computed
-- [ ] **Tutorial notebooks** - Step-by-step examples for each analysis
-- [ ] **API documentation** - Sphinx-generated documentation for all functions
-- [ ] **Example datasets** - Sample data for users to test the pipeline
-- **Priority**: Medium - Improves accessibility for new users
+### Lower Priority
 
-### Lower Priority - Advanced Features
-
-#### Advanced Morphometric Analysis (Phase 3)
+#### Advanced Morphometric Analysis (Phase 3.2)
 - [ ] Neighborhood-level metrics (BCR, FAR)
 - [ ] Spatial autocorrelation analysis
 - [ ] Building adjacency analysis
 - [ ] Fractal dimension calculation
-- [ ] Multi-site comparison framework
-- **Priority**: Low - Future research direction
 
-#### Environmental Performance Modeling (Phase 4)
+#### Environmental Performance Modeling (Phase 5)
 - [ ] Thermal comfort modeling
 - [ ] Wind flow analysis
-- [ ] Solar radiation mapping
-- [ ] Integration with SVF results
-- [ ] Policy recommendations generation
-- **Priority**: Low - Requires domain expertise and additional data
+
+#### Documentation
+- [ ] API documentation (Sphinx)
+- [ ] Tutorial notebooks
+- [ ] Methodology documentation
 
 ---
 
@@ -358,16 +388,18 @@ Add comprehensive urban morphology metrics for environmental analysis, including
 
 ### Code Quality
 - [x] Add progress bars for long operations (tqdm implemented)
-- [ ] Add unit tests
+- [x] Parallelize SVF computation (joblib)
+- [x] Checkpoint/resume for long computations
+- [x] Scene optimization for mesh operations
+- [x] Remove legacy SVF code
+- [ ] Expand unit test coverage across all modules
 - [ ] Improve error messages
-- [ ] Optimize performance for large datasets
 
 ### Documentation
 - [x] Basic README and ROADMAP documentation
 - [ ] API documentation
 - [ ] Tutorial notebooks
 - [ ] Methodology documentation
-- [ ] Example datasets
 
 ---
 
@@ -390,7 +422,7 @@ Add comprehensive urban morphology metrics for environmental analysis, including
 - Shared utilities for code reuse
 - **Status**: All Phase 2 analyses complete and production-ready
 
-### v3.0.0 (Current - January 2025)
+### v3.0.0 (January 2025)
 - Multi-area data organization structure
 - Area-based filtering policy (formal vs informal)
 - Comparative analysis framework (`compare_areas.py`)
@@ -398,47 +430,35 @@ Add comprehensive urban morphology metrics for environmental analysis, including
 - Statistical comparison tools (Mann-Whitney U tests)
 - Area-normalized spatial comparisons
 - Aspect ratio preservation in visualizations
-- **Status**: Phase 3 complete - ready for formal vs informal settlement research
+- **Status**: Phase 3 complete
 
-### v3.1.0 (Planned)
-- Performance optimizations (parallelization, caching)
-- Enhanced error handling and validation
-- GeoTIFF export with CRS metadata
-- Configuration file support
-- Basic unit tests
+### v3.5.0 (February 2025)
+- SVF v2 engine with modular architecture (`src/svf_v2/`)
+- Joblib parallel raycasting with configurable worker count
+- Checkpoint/resume for long-running SVF computations
+- Optimized scene construction from DTM + footprints
+- HPC deployment scripts for SLURM clusters (`scripts/hpc/`)
+- SVF visualization module
+- Legacy SVF code archived
+- **Status**: SVF v2 engine production-ready
 
-### v2.2.0 (Planned)
-- Interactive visualizations
-- Summary report generation
-- Methodology documentation
-- Tutorial notebooks
+### v4.0.0 (March 2025)
+- Urban morphology metrics: plan area density, frontal area density, height variability, street orientation entropy
+- Zone flagging for environmental risk areas
+- Morphological typology clustering (K-means/hierarchical)
+- Spatial analysis utilities
+- Cartography module for publication-quality maps
+- Solar access package with irradiance models, seasonal analysis, sun position
+- Exposure module for sky exposure plane analysis
+- Publication-quality solar visualizations
+- Comprehensive test suites for morphology, typology, solar, spatial analysis, cartography, and exposure
+- **Status**: Phase 4 + 4.5 complete
 
 ---
 
-## Immediate Action Items (Current Focus)
-
-### Phase 3: Multi-Area Setup (This Week)
-1. **Migrate Vidigal_TLS data** - Move existing data from `data/raw/` to `data/vidigal_tls/raw/`
-2. **Add Copacabana data** - Place STL mesh and building footprints in `data/copacabana/raw/`
-3. **Verify data structure** - Ensure all files are properly organized following naming conventions
-4. **Test area-based paths** - Verify `get_area_data_dir()` and `get_area_output_dir()` work correctly
-
-### Next Phase: Comparative Analysis (Next 1-2 Weeks)
-5. **Update scripts for area parameter** - Add `--area` flag to support area-specific processing
-6. **Create comparative analysis script** - Framework for side-by-side comparisons
-7. **Generate comparison visualizations** - Compare formal vs informal morphometric patterns
-
-### Future Improvements (After Phase 3.1)
-8. **Performance profiling** - Identify bottlenecks in raster-based deprivation index computation
-9. **Add GeoTIFF export** - Include CRS metadata for GIS integration
-10. **Configuration file** - Create `config.yaml` for all analysis parameters
-11. **Basic unit tests** - Start with metrics calculation and deficit computation functions
-
 ## Notes
 
-- SVF computation is computationally intensive - parallelization is a high priority
-- Raster-based deprivation index works with native resolutions but may need optimization for very large datasets
-- All Phase 2 analyses are complete and production-ready
-- Focus should shift to optimization, robustness, and usability improvements
-
-
+- Tregenza 145-patch scheme will improve SVF accuracy and comparability with standard tools
+- Validation against benchmark tools is needed before publication
+- All Phase 2, 3, 3.5, 4, and 4.5 analyses are complete and production-ready
+- Current focus: Tregenza patches, Makefile, and validation
