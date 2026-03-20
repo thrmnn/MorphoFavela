@@ -237,23 +237,6 @@ def test_points():
     return points
 
 
-@pytest.fixture
-def sky_patches_36():
-    """Generate 36 sky patches."""
-    from src.svf_compute import generate_sky_patches
-
-    patches, _ = generate_sky_patches(36)
-    return patches
-
-
-@pytest.fixture
-def sky_patches_145():
-    """Generate 145 sky patches."""
-    from src.svf_compute import generate_sky_patches
-
-    patches, _ = generate_sky_patches(145)
-    return patches
-
 
 @pytest.fixture
 def gpu_available():
