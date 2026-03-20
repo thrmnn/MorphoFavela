@@ -104,6 +104,7 @@ ANALYSIS_TYPES = {
     "urban_morphology": "urban_morphology",  # Zone-level urban morphology metrics
     "spatial_analysis": "spatial_analysis",  # Spatial autocorrelation (Moran's I, LISA)
     "typology": "typology",  # Settlement typology classification
+    "exposure": "exposure",  # Environmental exposure index (zone-level)
 }
 
 # Analysis parameters

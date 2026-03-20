@@ -64,6 +64,10 @@ def _minimum_rotated_rectangle_axes(
     if mrr is None or mrr.is_empty:
         return (np.nan, np.nan, np.nan)
 
+    # Degenerate polygons may produce a Point or LineString instead of a Polygon
+    if not isinstance(mrr, Polygon):
+        return (0.0, 0.0, 0.0)
+
     coords = list(mrr.exterior.coords)
     if len(coords) < 4:
         return (np.nan, np.nan, np.nan)
@@ -248,10 +252,75 @@ def calculate_morphology_metrics(
     voronoi_buffer: float = 50.0,
     weight_mode: str = "adjacent",
 ) -> gpd.GeoDataFrame:
-    """
-    Calculate morphology metrics for building footprints.
+    """Calculate morphology metrics for building footprints.
+
+    Computes 25+ morphometric indicators covering shape, compactness,
+    adjacency, tessellation, and spatial distribution for each building.
+
+    Args:
+        buildings: GeoDataFrame with building footprint geometries.
+            Geometries must be Polygon or MultiPolygon; degenerate,
+            empty, or invalid geometries are filtered out automatically.
+        streets: Optional GeoDataFrame of street centre-lines used
+            to compute the facade ratio metric. If *None*, the
+            ``facade_ratio`` column is filled with NaN.
+        street_buffer: Buffer distance (m) applied to street geometries
+            when computing facade ratio.
+        site_boundary: Optional Polygon defining the study-area
+            boundary. Used for covered-area ratio and as the Voronoi
+            diagram envelope. If *None*, the convex hull of all
+            building footprints is used.
+        voronoi_buffer: Buffer distance (m) added around the site
+            boundary when constructing Voronoi tessellation cells.
+        weight_mode: Neighbour weighting strategy for the
+            average-weighted-distance metric. Currently only
+            ``'adjacent'`` is supported.
+
+    Returns:
+        GeoDataFrame with the original columns plus the following
+        metric columns (NaN where a metric cannot be computed):
+
+        *Shape / axes*:
+            area, perimeter, L_major, L_minor, orientation,
+            longest_axis_length
+
+        *Compactness*:
+            shape_index, compactness_weighted_axis, convexity,
+            equivalent_rectangular_index, rectangularity,
+            square_compactness, elongation, squareness
+
+        *Adjacency*:
+            shared_walls, perimeter_wall, building_adjacency, num_corners
+
+        *Tessellation*:
+            tessellation_area, cell_alignment, tessellation_neighbors, cwt
+
+        *Spatial distribution*:
+            mean_distance_between_buildings, covered_area_ratio,
+            fractal_dimension, average_weighted_distance, facade_ratio
     """
     gdf = buildings.copy()
+    if gdf.empty:
+        return gdf
+
+    # --- Filter degenerate / invalid geometries --------------------------
+    _n_before = len(gdf)
+    valid_mask = (
+        ~gdf.geometry.is_empty
+        & gdf.geometry.is_valid
+        & (gdf.geometry.area >= 1e-6)
+    )
+    n_filtered = int((~valid_mask).sum())
+    if n_filtered > 0:
+        logger.warning(
+            "Filtered %d degenerate/invalid geometries (empty, invalid, "
+            "or area < 1e-6 m²); %d buildings remain",
+            n_filtered,
+            int(valid_mask.sum()),
+        )
+        gdf = gdf.loc[valid_mask].copy()
+        gdf = gdf.reset_index(drop=True)
+
     if gdf.empty:
         return gdf
 

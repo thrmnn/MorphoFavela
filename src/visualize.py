@@ -7,6 +7,7 @@ from pathlib import Path
 import logging
 import math
 
+from src.cartography import add_north_arrow, add_scale_bar
 from src.config import DPI, FIGURE_SIZE, COLORMAP_HEIGHT, COLORMAP_VOLUME
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,7 @@ def create_thematic_maps(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
             gdf.plot(
                 column="inter_building_distance",
                 ax=ax3,
-                cmap="RdYlGn_r",
+                cmap="cividis",
                 legend=True,
                 legend_kwds={"label": "Distance (m)"},
                 vmin=vmin,
@@ -74,12 +75,17 @@ def create_thematic_maps(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
             gdf.plot(
                 column="inter_building_distance",
                 ax=ax3,
-                cmap="RdYlGn_r",
+                cmap="cividis",
                 legend=True,
                 legend_kwds={"label": "Distance (m)"},
             )
         ax3.set_title("Inter-Building Distance")
         ax3.set_axis_off()
+
+    # Cartographic elements on every panel
+    for ax in axes:
+        add_scale_bar(ax)
+        add_north_arrow(ax)
 
     plt.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -191,7 +197,7 @@ def create_multi_panel_summary(gdf: gpd.GeoDataFrame, output_path: Path) -> None
             gdf.plot(
                 column="inter_building_distance",
                 ax=ax5,
-                cmap="RdYlGn_r",
+                cmap="cividis",
                 legend=True,
                 legend_kwds={"label": "Distance (m)"},
                 vmin=vmin,
@@ -206,12 +212,18 @@ def create_multi_panel_summary(gdf: gpd.GeoDataFrame, output_path: Path) -> None
             gdf.plot(
                 column="inter_building_distance",
                 ax=ax5,
-                cmap="RdYlGn_r",
+                cmap="cividis",
                 legend=True,
                 legend_kwds={"label": "Distance (m)"},
             )
             ax5.set_title("Inter-Building Distance", fontsize=12, fontweight="bold")
         ax5.set_axis_off()
+
+    # Cartographic elements on every panel
+    for row in axes:
+        for ax in row:
+            add_scale_bar(ax)
+            add_north_arrow(ax)
 
     plt.suptitle(
         "Morphometric Analysis Summary", fontsize=16, fontweight="bold", y=0.98
@@ -430,7 +442,7 @@ def create_scatter_plots(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
     # Inter-building distance plots (if available)
     if has_inter_dist:
         # Inter-building distance vs Area
-        ax5 = axes[1, 0]
+        ax5 = axes[0, 2]
         ax5.scatter(
             gdf["area"],
             gdf["inter_building_distance"],
