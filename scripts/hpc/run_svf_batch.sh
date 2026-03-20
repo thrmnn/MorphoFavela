@@ -18,16 +18,25 @@
 #   sbatch scripts/hpc/run_svf_batch.sh vidigal_tls facades    # single area+mode
 # ==========================================================================
 
+# ---------------------------------------------------------------------------
+# Setup — must happen BEFORE set -e so module sourcing doesn't kill the script
+# ---------------------------------------------------------------------------
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+cd "${PROJECT_ROOT}"
+mkdir -p logs
+
+source /etc/profile.d/modules.sh 2>/dev/null || source /usr/share/modules/init/bash 2>/dev/null || true
+module load miniforge/25.11.0-0
+eval "$(conda shell.bash hook)"
+conda activate ivf
+
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-
-# Source module system (not always in PATH on all partitions)
-source /etc/profile.d/modules.sh 2>/dev/null || source /usr/share/modules/init/bash 2>/dev/null || true
-module load miniforge/25.11.0-0
-conda activate ivf
 
 DEFAULT_AREAS=("rocinha" "vidigal_tls" "vidigal")
 
@@ -36,13 +45,6 @@ STREET_SPACING="1.5"
 SKY_PATCHES="145"
 N_JOBS="${SLURM_CPUS_PER_TASK:-$(nproc)}"
 MODE="${2:-streets}"
-
-# ---------------------------------------------------------------------------
-# Setup
-# ---------------------------------------------------------------------------
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${PROJECT_ROOT}"
 mkdir -p logs
 

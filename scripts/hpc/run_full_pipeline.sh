@@ -23,16 +23,26 @@
 #   sbatch scripts/hpc/run_full_pipeline.sh "rocinha vidigal"   # specific areas
 # ==========================================================================
 
+# ---------------------------------------------------------------------------
+# Setup — must happen BEFORE set -e so module sourcing doesn't kill the script
+# ---------------------------------------------------------------------------
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+cd "${PROJECT_ROOT}"
+mkdir -p logs
+
+# Source module system and activate environment
+source /etc/profile.d/modules.sh 2>/dev/null || source /usr/share/modules/init/bash 2>/dev/null || true
+module load miniforge/25.11.0-0
+eval "$(conda shell.bash hook)"
+conda activate ivf
+
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-
-# Source module system (not always in PATH on all partitions)
-source /etc/profile.d/modules.sh 2>/dev/null || source /usr/share/modules/init/bash 2>/dev/null || true
-module load miniforge/25.11.0-0
-conda activate ivf
 
 DEFAULT_AREAS=("rocinha" "vidigal_tls" "vidigal")
 
@@ -45,15 +55,6 @@ N_JOBS="${SLURM_CPUS_PER_TASK:-$(nproc)}"
 # Morphology parameters
 CELL_SIZE="50"
 FLOOR_HEIGHT="3.0"
-
-# ---------------------------------------------------------------------------
-# Setup
-# ---------------------------------------------------------------------------
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-cd "${PROJECT_ROOT}"
-mkdir -p logs
 
 # Parse areas from argument or use defaults
 if [[ $# -ge 1 ]]; then
