@@ -41,8 +41,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Nature Cities style constants
 # ---------------------------------------------------------------------------
-_NC_TITLE_SIZE = 11
-_NC_SUPTITLE_SIZE = 13
+_NC_TITLE_SIZE = 12
+_NC_SUPTITLE_SIZE = 14
 _NC_LABEL_SIZE = 10
 _NC_TICK_SIZE = 8
 _NC_LEGEND_SIZE = 8
@@ -141,7 +141,7 @@ def _light_buildings(ax, footprints_gdf, alpha=_BLD_ALPHA):
 def _add_boundary(ax, boundary_gdf):
     """Add settlement boundary if available."""
     if boundary_gdf is not None and len(boundary_gdf) > 0:
-        add_settlement_boundary(ax, boundary_gdf)
+        add_settlement_boundary(ax, boundary_gdf, edgecolor="#333333", linestyle="--")
 
 
 def _add_panel_label(ax, label, fontsize=12):
@@ -237,8 +237,27 @@ def plot_solar_access(
     add_north_arrow(ax)
     format_utm_axes(ax)
 
-    ax.set_title(title, fontsize=_NC_TITLE_SIZE, fontweight="bold", pad=10)
+    ax.set_title(title, fontsize=14, fontweight="bold", pad=10)
     ax.set_aspect("equal")
+
+    # Key statistics annotation
+    n_pts = len(gdf)
+    vals = gdf[column].dropna().values
+    mean_v = float(np.mean(vals)) if len(vals) > 0 else 0
+    std_v = float(np.std(vals)) if len(vals) > 0 else 0
+    pct_shaded = 100.0 * np.sum(vals == 0) / n_pts if n_pts > 0 else 0
+    stats_text = (
+        f"n={n_pts:,} | mean={mean_v:.2f}h | "
+        f"\u03c3={std_v:.2f}h | {pct_shaded:.1f}% fully shaded"
+    )
+    ax.text(
+        0.02, 0.02, stats_text,
+        transform=ax.transAxes,
+        fontsize=8, va="bottom", ha="left",
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="white",
+                  edgecolor="#cccccc", alpha=0.85),
+        zorder=15,
+    )
 
     output_path = Path(output_path)
     _ensure_dir(output_path)
@@ -323,7 +342,7 @@ def plot_solar_seasonal_panel(
             cmap=SOLAR_CMAP,
             vmin=vmin,
             vmax=vmax,
-            markersize=3,
+            markersize=7,
             legend=False,
             zorder=3,
         )
@@ -363,7 +382,7 @@ def plot_solar_seasonal_panel(
         ha="center", fontsize=_NC_TICK_SIZE, color="#555555", style="italic",
     )
 
-    fig.subplots_adjust(top=0.93, bottom=0.10, hspace=0.15, wspace=0.08)
+    fig.subplots_adjust(top=0.93, bottom=0.10, hspace=0.22, wspace=0.15)
 
     output_path = Path(output_path)
     _ensure_dir(output_path)
@@ -415,8 +434,16 @@ def plot_solar_irradiance_map(
     _set_nature_style()
     fig, ax = plt.subplots(figsize=(12, 10))
 
-    # Light building underlay
-    _light_buildings(ax, footprints_gdf)
+    # Very light cream underlay so dark purple/black inferno points remain visible
+    if footprints_gdf is not None and len(footprints_gdf) > 0:
+        footprints_gdf.plot(
+            ax=ax,
+            facecolor="#f5f0e0",
+            edgecolor="#d5d0c0",
+            linewidth=_BLD_LW,
+            alpha=0.35,
+            zorder=1,
+        )
 
     vals = gdf[column].dropna().values
 
@@ -438,7 +465,7 @@ def plot_solar_irradiance_map(
         cmap=IRRADIANCE_CMAP,
         vmin=vmin,
         vmax=vmax,
-        markersize=5,
+        markersize=6,
         legend=True,
         legend_kwds={
             "label": display_unit,
@@ -460,7 +487,7 @@ def plot_solar_irradiance_map(
 
     ax.set_title(
         "Mean Daily Solar Irradiance",
-        fontsize=_NC_TITLE_SIZE, fontweight="bold", pad=10,
+        fontsize=14, fontweight="bold", pad=10,
     )
     ax.set_aspect("equal")
 
@@ -543,7 +570,7 @@ def plot_solar_distribution(
             bins=bins,
             color="#f58231",
             edgecolor="white",
-            linewidth=0.5,
+            linewidth=0.8,
             alpha=0.75,
             label="Solar hours > 0",
             zorder=2,
@@ -566,7 +593,7 @@ def plot_solar_distribution(
             except Exception:
                 pass
 
-    # Annotated bar for zero spike (red)
+    # Annotated bar for zero spike (red) -- no legend entry; annotation arrow explains it
     if n_zero > 0:
         bar_width = (val_max * 1.05) / 60 if val_max > 0 else 0.1
         ax.bar(
@@ -578,7 +605,6 @@ def plot_solar_distribution(
             linewidth=0.5,
             alpha=0.85,
             zorder=4,
-            label="Fully shaded (0 h)",
         )
         ax.annotate(
             f"{pct_zero:.0f}% fully shaded\n(n = {n_zero:,})",
@@ -626,10 +652,12 @@ def plot_solar_distribution(
     ax.set_ylabel("Count", fontsize=_NC_LABEL_SIZE)
     ax.set_title(
         title or "Distribution of Street-Level Solar Access",
-        fontsize=_NC_TITLE_SIZE, fontweight="bold",
+        fontsize=14, fontweight="bold",
     )
     ax.legend(fontsize=_NC_LEGEND_SIZE, loc="upper right", frameon=False)
     ax.tick_params(axis="both", labelsize=_NC_TICK_SIZE)
+    ax.grid(True, axis="y", color=_NC_GRID_COLOR, linewidth=0.5, zorder=0)
+    ax.set_axisbelow(True)
 
     plt.tight_layout()
     output_path = Path(output_path)
@@ -697,7 +725,7 @@ def plot_solar_dashboard(
     std_val = float(np.std(solar))
 
     _set_nature_style()
-    fig, axes = plt.subplots(2, 2, figsize=(16, 14))
+    fig, axes = plt.subplots(2, 2, figsize=(16, 16))
     ax_map, ax_hist = axes[0]
     ax_season, ax_scatter = axes[1]
 
@@ -793,6 +821,8 @@ def plot_solar_dashboard(
         "Distribution", fontsize=_NC_TITLE_SIZE, fontweight="bold",
     )
     ax_hist.tick_params(axis="both", labelsize=_NC_TICK_SIZE)
+    ax_hist.grid(True, axis="y", color=_NC_GRID_COLOR, linewidth=0.5, zorder=0)
+    ax_hist.set_axisbelow(True)
     _add_panel_label(ax_hist, "b")
 
     # ----------------------------------------------------------------
@@ -833,8 +863,11 @@ def plot_solar_dashboard(
         for idx, d in enumerate(box_data):
             med = float(np.median(d))
             ax_season.text(
-                idx + 1, med + 0.3, f"{med:.1f}",
-                ha="center", fontsize=7, color="#333333",
+                idx + 1, med, f"{med:.1f}",
+                ha="center", va="center", fontsize=8, fontweight="bold",
+                color="white",
+                bbox=dict(boxstyle="round,pad=0.15", facecolor="#555555",
+                          edgecolor="none", alpha=0.75),
             )
     else:
         ax_season.text(
@@ -864,7 +897,7 @@ def plot_solar_dashboard(
         hb = ax_scatter.hexbin(
             svf_clean, solar_clean,
             gridsize=35,
-            cmap="magma",
+            cmap="magma_r",
             mincnt=1,
             zorder=2,
         )
@@ -878,7 +911,7 @@ def plot_solar_dashboard(
             x_line = np.linspace(0, 1, 100)
             ax_scatter.plot(
                 x_line, np.polyval(coeffs, x_line),
-                color="red", linewidth=2, linestyle="-", zorder=3,
+                color="#1a237e", linewidth=2.5, linestyle="-", zorder=3,
             )
             ss_res = np.sum((solar_clean - np.polyval(coeffs, svf_clean)) ** 2)
             ss_tot = np.sum((solar_clean - np.mean(solar_clean)) ** 2)
@@ -973,9 +1006,9 @@ def plot_solar_sun_path(
     )
     ax.set_rlim(0, 90)
     ax.set_rlabel_position(135)
-    ax.set_rticks([0, 15, 30, 45, 60, 75, 90])
+    ax.set_rticks([15, 30, 45, 60, 75, 90])
     ax.set_yticklabels(
-        ["90\u00b0", "75\u00b0", "60\u00b0", "45\u00b0", "30\u00b0", "15\u00b0", "0\u00b0"],
+        ["75\u00b0", "60\u00b0", "45\u00b0", "30\u00b0", "15\u00b0", "0\u00b0"],
         fontsize=7,
     )
 
@@ -1021,19 +1054,22 @@ def plot_solar_sun_path(
             actual_hour = 5 + h_idx  # hour_start + index
             ax.plot(th, rh, "o", color=color, markersize=4, zorder=4)
 
-            # Label every 2 hours
-            if actual_hour % 2 == 0:
+            # Label every 2 hours -- only on winter (idx 0) and summer (idx 1)
+            # to avoid overlapping text on equinox tracks
+            if actual_hour % 2 == 0 and idx < 2:
+                # Offset labels to avoid overlap with marker
+                y_offset = 6 if idx == 0 else -8
                 ax.annotate(
                     f"{actual_hour}h",
                     xy=(th, rh),
-                    xytext=(4, 4), textcoords="offset points",
+                    xytext=(4, y_offset), textcoords="offset points",
                     fontsize=6, color=color, fontweight="bold",
-                    ha="left", va="bottom",
+                    ha="left", va="bottom" if idx == 0 else "top",
                 )
 
     ax.set_title(
         f"Sun Path Diagram\n(lat = {latitude:.2f}\u00b0, lon = {longitude:.2f}\u00b0)",
-        fontsize=_NC_TITLE_SIZE, fontweight="bold", pad=20,
+        fontsize=14, fontweight="bold", pad=20,
     )
 
     # Legend inside plot, lower-left, smaller
@@ -1099,12 +1135,14 @@ def plot_solar_vs_svf(
 
     _set_nature_style()
     fig, ax = plt.subplots(figsize=(10, 8))
+    ax.set_facecolor("#fafafa")
 
-    # Hexbin with magma for better density contrast
+    # Hexbin with Reds -- low counts are light pink (visible against grey bg),
+    # high counts are deep red for strong density contrast
     hb = ax.hexbin(
         svf, solar,
         gridsize=40,
-        cmap="magma",
+        cmap="Reds",
         mincnt=1,
         zorder=2,
     )
@@ -1112,12 +1150,12 @@ def plot_solar_vs_svf(
     cb.set_label("Point count", fontsize=_NC_CBAR_LABEL_SIZE)
     cb.ax.tick_params(labelsize=_NC_TICK_SIZE)
 
-    # Linear regression
+    # Linear regression -- white/cyan line visible against warm hexbin
     coeffs = np.polyfit(svf, solar, 1)
     x_line = np.linspace(0, 1, 100)
     ax.plot(
         x_line, np.polyval(coeffs, x_line),
-        color="red", linewidth=2, linestyle="-", zorder=3,
+        color="#00bcd4", linewidth=3, linestyle="-", zorder=3,
         label="Linear fit",
     )
 
@@ -1150,10 +1188,12 @@ def plot_solar_vs_svf(
     ax.set_ylabel("Mean Solar Hours", fontsize=_NC_LABEL_SIZE)
     ax.set_title(
         "Relationship Between Sky View Factor and Solar Access",
-        fontsize=_NC_TITLE_SIZE, fontweight="bold",
+        fontsize=14, fontweight="bold",
     )
     ax.set_xlim(0, 1)
     ax.tick_params(axis="both", labelsize=_NC_TICK_SIZE)
+    ax.grid(True, color="#e8e8e8", linewidth=0.4, zorder=0)
+    ax.set_axisbelow(True)
 
     plt.tight_layout()
     output_path = Path(output_path)
@@ -1401,12 +1441,12 @@ def plot_solar_deprivation_hero(
         fontfamily="sans-serif",
     )
 
-    # Subtitle in light grey
+    # Subtitle in light grey -- slightly larger
     fig.text(
         0.5, 0.915,
         "Vidigal, Rio de Janeiro \u2014 Annual Mean (4 Reference Days)",
         ha="center", va="top",
-        fontsize=13, color="#aaaaaa",
+        fontsize=15, color="#aaaaaa",
         fontfamily="sans-serif",
         style="italic",
     )
@@ -1430,11 +1470,25 @@ def plot_solar_deprivation_hero(
     cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
     cbar.set_label(
         "Hours of Direct Sunlight",
-        fontsize=10, color="white", labelpad=6,
+        fontsize=12, color="white", labelpad=6,
     )
-    cbar.ax.tick_params(colors="white", labelsize=8)
+    cbar.ax.tick_params(colors="white", labelsize=11)
     cbar.outline.set_edgecolor("#555555")
     cbar.outline.set_linewidth(0.5)
+
+    # Key statistic overlay -- white text
+    solar_vals = gdf[column].dropna().values
+    n_pts = len(solar_vals)
+    pct_shadow = 100.0 * np.sum(solar_vals == 0) / n_pts if n_pts > 0 else 0
+    fig.text(
+        0.5, 0.86,
+        f"{pct_shadow:.0f}% of street surfaces in permanent shadow",
+        ha="center", va="top",
+        fontsize=16, fontweight="bold",
+        color="white", fontfamily="sans-serif",
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="#1a1a1a",
+                  edgecolor="#555555", alpha=0.7),
+    )
 
     fig.subplots_adjust(left=0.02, right=0.98, top=0.90, bottom=0.10)
 
@@ -1545,10 +1599,10 @@ def plot_solar_seasonal_comparison_hero(
         ax.set_axis_off()
         ax.set_aspect("equal")
 
-        # Panel subtitle
+        # Panel subtitle -- larger and bolder
         ax.set_title(
             subtitle,
-            fontsize=14, fontweight="bold", color="white", pad=10,
+            fontsize=18, fontweight="bold", color="white", pad=12,
         )
 
     # Main title
@@ -1570,9 +1624,9 @@ def plot_solar_seasonal_comparison_hero(
     cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
     cbar.set_label(
         "Hours of Direct Sunlight",
-        fontsize=11, color="white", labelpad=6,
+        fontsize=13, color="white", labelpad=6,
     )
-    cbar.ax.tick_params(colors="white", labelsize=8)
+    cbar.ax.tick_params(colors="white", labelsize=10)
     cbar.outline.set_edgecolor("#555555")
     cbar.outline.set_linewidth(0.5)
 
