@@ -78,14 +78,9 @@ This should be done at the start of every new session before running any scripts
    python scripts/analyze_morphology_risk.py --area vidigal_tls --hotspots --streets data/vidigal_tls/raw/roads_vidigal.shp
    ```
    
-   **Sky View Factor (SVF) computation:**
+   **Sky View Factor (SVF v2) computation:**
    ```bash
-   python scripts/compute_svf.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --sky-patches 145
-   ```
-   
-   **Street-level SVF computation:**
-   ```bash
-   python scripts/compute_svf_streets.py --stl data/vidigal_tls/raw/full_scan.stl --roads data/vidigal_tls/raw/roads_vidigal.shp --dtm data/vidigal_tls/raw/vidigal_dtm_cropped.tif --footprints data/vidigal_tls/raw/vidigal_buildings.shp --spacing 3.0 --height 1.5
+   python scripts/run_svf_v2.py --area vidigal_tls --spacing 2.0
    ```
    
    **Solar Access computation:**
@@ -301,19 +296,27 @@ IVF/
 │   ├── __init__.py
 │   ├── config.py            # Configuration settings
 │   ├── metrics.py           # Metrics calculation & validation
+│   ├── morphology_metrics.py # Extended morphology (25 indicators)
+│   ├── spatial_analysis.py  # Spatial statistics (Moran's I, LISA, Gi*)
+│   ├── urban_morphology.py  # Zone-level morphology (BCR, FAR, lambda_f)
+│   ├── typology.py          # Settlement typology classification
 │   ├── visualize.py         # Visualization functions
-│   └── svf_utils.py         # Shared utilities for SVF and solar access
+│   ├── svf_utils.py         # Shared utilities for SVF and solar access
+│   └── svf_v2/              # SVF v2 modular implementation
 │
 ├── scripts/                 # Executable scripts
+│   ├── run_svf_v2.py       # SVF v2 computation (main entry point)
 │   ├── calculate_metrics.py # Basic morphometric analysis
-│   ├── compute_svf.py      # Sky View Factor computation
+│   ├── compute_urban_morphology.py  # Zone-level urban morphology
+│   ├── classify_typology.py # Settlement typology classification
+│   ├── compare_areas.py     # Formal vs informal comparison
 │   ├── compute_solar_access.py  # Solar access computation
-│   ├── analyze_sky_exposure_streets.py  # Unified sky exposure exceedance (building + street-level)
-│   ├── analyze_sky_exposure.py  # [DEPRECATED] Legacy sky exposure analysis
-│   ├── compute_sectional_porosity.py  # Sectional porosity computation
-│   ├── compute_occupancy_density.py  # Occupancy density proxy computation
+│   ├── analyze_sky_exposure_streets.py  # Sky exposure exceedance
+│   ├── compute_sectional_porosity.py  # Sectional porosity
+│   ├── compute_occupancy_density.py  # Occupancy density proxy
 │   ├── compute_deprivation_index.py  # Unit-level deprivation index
-│   └── compute_deprivation_index_raster.py  # Raster-based deprivation index
+│   ├── compute_deprivation_index_raster.py  # Raster-based deprivation
+│   └── archive/             # Legacy scripts (superseded by v2)
 │
 └── outputs/                 # NOT tracked in git
     ├── buildings_with_metrics.gpkg
@@ -353,9 +356,9 @@ For informal areas, the pipeline applies filters in the following order:
 python scripts/calculate_metrics.py
 ```
 
-### SVF Computation
+### SVF Computation (v2)
 ```bash
-python scripts/compute_svf.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --sky-patches 145
+python scripts/run_svf_v2.py --area vidigal_tls --spacing 2.0
 ```
 
 ### Solar Access Computation

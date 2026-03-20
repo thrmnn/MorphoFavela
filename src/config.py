@@ -12,7 +12,7 @@ OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 # Area-based data organization
 # Areas: vidigal (informal), vidigal_tls (informal), copacabana (formal), riodaspedras (informal),
-# rocinha (informal), maré (informal)
+# rocinha (informal), maré (informal), cidade_de_deus (informal), complexo_do_alemao (informal)
 SUPPORTED_AREAS = [
     "vidigal",
     "vidigal_tls",
@@ -20,6 +20,8 @@ SUPPORTED_AREAS = [
     "riodaspedras",
     "rocinha",
     "maré",
+    "cidade_de_deus",
+    "complexo_do_alemao",
 ]
 
 # Area classification: formal vs informal
@@ -30,6 +32,8 @@ INFORMAL_AREAS = [
     "riodaspedras",
     "rocinha",
     "maré",
+    "cidade_de_deus",
+    "complexo_do_alemao",
 ]  # Informal settlements (with filtering)
 
 
@@ -97,6 +101,10 @@ ANALYSIS_TYPES = {
     "deprivation": "deprivation",  # Deprivation index (unit-level)
     "deprivation_raster": "deprivation_raster",  # Deprivation index (raster-based)
     "maps": "maps",  # General maps/visualizations
+    "urban_morphology": "urban_morphology",  # Zone-level urban morphology metrics
+    "spatial_analysis": "spatial_analysis",  # Spatial autocorrelation (Moran's I, LISA)
+    "typology": "typology",  # Settlement typology classification
+    "exposure": "exposure",  # Environmental exposure index (zone-level)
 }
 
 # Analysis parameters
@@ -125,3 +133,23 @@ DPI = 300
 FIGURE_SIZE = (12, 8)
 COLORMAP_HEIGHT = "viridis"
 COLORMAP_VOLUME = "plasma"
+
+# Zone-level morphology visualization
+LISA_COLORS = {
+    "HH": "#d7191c",
+    "HL": "#fdae61",
+    "LH": "#abd9e9",
+    "LL": "#2c7bb6",
+    "ns": "#d3d3d3",
+}
+COLORMAP_BCR = "YlOrRd"
+COLORMAP_FAR = "YlOrRd"
+COLORMAP_SIGMA_H = "YlOrBr"
+COLORMAP_LAMBDA_F = "OrRd"
+
+# SVF & cartographic visualization
+SVF_CMAP = "cividis"
+BUILDING_CMAP = "Greys"
+CONTOUR_COLOR = "#8B7355"
+CONTOUR_INTERVAL = 10  # meters
+BACKGROUND_COLOR = "#ffffff"

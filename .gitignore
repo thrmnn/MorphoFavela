@@ -8,6 +8,8 @@ venv/
 env/
 ENV/
 *.egg-info/
+.pytest_cache/
+.ruff_cache/
 
 # Data and outputs (not tracked)
 data/
@@ -29,4 +31,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# HPC / SLURM artifacts
+slurm-*.out
+*.o[0-9]*
+*.e[0-9]*
 

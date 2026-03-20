@@ -1313,6 +1313,165 @@ def generate_pdf_report(vidigal_data: dict, copacabana_data: dict,
     logger.info(f"PDF report saved to {pdf_path}")
 
 
+def compare_zone_metrics(area1_data: dict, area2_data: dict) -> list[dict] | None:
+    """Compare zone-level urban morphology metrics between two areas.
+
+    Loads ``zone_metrics.gpkg`` from each area's ``urban_morphology`` analysis
+    directory and performs Mann-Whitney U tests with Cohen's d effect sizes for
+    key zone-level metrics (bcr, far, sigma_h, lambda_f).
+
+    Returns a list of dicts (one per metric) or *None* if files are missing.
+    """
+    area1_name = area1_data["area"]
+    area2_name = area2_data["area"]
+
+    zone1_path = get_area_analysis_dir(area1_name, "urban_morphology") / "zone_metrics.gpkg"
+    zone2_path = get_area_analysis_dir(area2_name, "urban_morphology") / "zone_metrics.gpkg"
+
+    if not zone1_path.exists() or not zone2_path.exists():
+        logger.warning(
+            "Zone metrics not found for one or both areas (%s, %s) -- skipping.",
+            zone1_path,
+            zone2_path,
+        )
+        return None
+
+    gdf1 = gpd.read_file(zone1_path)
+    gdf2 = gpd.read_file(zone2_path)
+    logger.info("Loaded zone metrics: %s (%d zones), %s (%d zones)",
+                area1_name, len(gdf1), area2_name, len(gdf2))
+
+    metrics = ["bcr", "far", "sigma_h", "lambda_f"]
+    results: list[dict] = []
+
+    for metric in metrics:
+        if metric not in gdf1.columns or metric not in gdf2.columns:
+            logger.warning("Column '%s' missing in zone metrics -- skipping.", metric)
+            continue
+
+        vals1 = gdf1[metric].dropna().values
+        vals2 = gdf2[metric].dropna().values
+
+        if len(vals1) == 0 or len(vals2) == 0:
+            continue
+
+        row: dict = {
+            "metric": metric,
+            "area1_name": area1_name,
+            "area1_mean": float(np.mean(vals1)),
+            "area1_std": float(np.std(vals1, ddof=1)) if len(vals1) > 1 else 0.0,
+            "area2_name": area2_name,
+            "area2_mean": float(np.mean(vals2)),
+            "area2_std": float(np.std(vals2, ddof=1)) if len(vals2) > 1 else 0.0,
+        }
+
+        try:
+            u_stat, p_value = stats.mannwhitneyu(vals1, vals2, alternative="two-sided")
+            effect_size = calculate_effect_size(vals1, vals2)
+            row["u_stat"] = float(u_stat)
+            row["p_value"] = float(p_value)
+            row["effect_size"] = float(effect_size)
+            row["significant"] = bool(p_value < 0.05)
+        except Exception:
+            row["u_stat"] = np.nan
+            row["p_value"] = np.nan
+            row["effect_size"] = np.nan
+            row["significant"] = False
+
+        results.append(row)
+
+    return results if results else None
+
+
+def compare_moran_summary(area1_data: dict, area2_data: dict) -> pd.DataFrame | None:
+    """Combine Moran's I summaries from two areas into a single DataFrame.
+
+    Loads ``moran_summary.csv`` from each area's ``urban_morphology`` analysis
+    directory and returns a combined table with columns:
+    ``metric``, ``area``, ``morans_I``, ``p_value``, ``z_score``.
+
+    Returns *None* if either file is missing.
+    """
+    area1_name = area1_data["area"]
+    area2_name = area2_data["area"]
+
+    moran1_path = get_area_analysis_dir(area1_name, "urban_morphology") / "moran_summary.csv"
+    moran2_path = get_area_analysis_dir(area2_name, "urban_morphology") / "moran_summary.csv"
+
+    if not moran1_path.exists() or not moran2_path.exists():
+        logger.warning(
+            "Moran summary not found for one or both areas (%s, %s) -- skipping.",
+            moran1_path,
+            moran2_path,
+        )
+        return None
+
+    df1 = pd.read_csv(moran1_path)
+    df2 = pd.read_csv(moran2_path)
+
+    rows: list[dict] = []
+    for df, area_name in [(df1, area1_name), (df2, area2_name)]:
+        for _, r in df.iterrows():
+            rows.append({
+                "metric": r.get("column", r.get("metric", "")),
+                "area": area_name,
+                "morans_I": r.get("I", np.nan),
+                "p_value": r.get("p_value", np.nan),
+                "z_score": r.get("z_score", np.nan),
+            })
+
+    combined = pd.DataFrame(rows)
+    logger.info("Combined Moran summary: %d rows from %s and %s.",
+                len(combined), area1_name, area2_name)
+    return combined
+
+
+def compare_cluster_composition(areas: list[dict]) -> pd.DataFrame | None:
+    """Compute cluster composition (% of zones per cluster) for each area.
+
+    Loads ``typology_clusters.gpkg`` from ``outputs/comparative/typology/`` and
+    computes the percentage of zones in each cluster per area.
+
+    Returns a DataFrame with areas as rows and cluster labels as columns, or
+    *None* if the file does not exist.
+    """
+    clusters_path = get_comparative_analysis_dir() / "typology" / "typology_clusters.gpkg"
+
+    if not clusters_path.exists():
+        logger.warning("Typology clusters file not found: %s -- skipping.", clusters_path)
+        return None
+
+    gdf = gpd.read_file(clusters_path)
+    logger.info("Loaded typology clusters: %d zones.", len(gdf))
+
+    if "cluster" not in gdf.columns:
+        logger.warning("'cluster' column not found in typology clusters -- skipping.")
+        return None
+
+    # Determine area column name (try common variants)
+    area_col = None
+    for candidate in ["area", "area_name", "settlement"]:
+        if candidate in gdf.columns:
+            area_col = candidate
+            break
+
+    if area_col is None:
+        logger.warning("No area identifier column found in typology clusters -- skipping.")
+        return None
+
+    # Compute cross-tabulation (counts), then normalise to percentages per area
+    ct = pd.crosstab(gdf[area_col], gdf["cluster"])
+    composition = ct.div(ct.sum(axis=1), axis=0) * 100.0
+
+    # Rename columns to string labels
+    composition.columns = [f"cluster_{c}" for c in composition.columns]
+    composition.index.name = "area"
+    composition = composition.reset_index()
+
+    logger.info("Cluster composition computed for %d areas.", len(composition))
+    return composition
+
+
 def main():
     """Main comparison workflow."""
     logger.info("=" * 60)
@@ -1354,6 +1513,41 @@ def main():
     if street_deprivation_comp:
         street_comparisons['deprivation_streets'] = street_deprivation_comp
     
+    # ---- Zone-level urban morphology comparisons ----
+    try:
+        zone_metrics_result = compare_zone_metrics(vidigal_data, copacabana_data)
+        if zone_metrics_result is not None:
+            zone_df = pd.DataFrame(zone_metrics_result)
+            zone_df.to_csv(output_dir / 'tables' / 'comparison_zone_metrics.csv', index=False)
+            logger.info("Saved zone metrics comparison to %s",
+                        output_dir / 'tables' / 'comparison_zone_metrics.csv')
+        else:
+            logger.warning("Zone metrics comparison returned no results -- skipping CSV.")
+    except Exception:
+        logger.exception("Failed to compare zone metrics -- skipping.")
+
+    try:
+        moran_result = compare_moran_summary(vidigal_data, copacabana_data)
+        if moran_result is not None:
+            moran_result.to_csv(output_dir / 'tables' / 'comparison_moran_summary.csv', index=False)
+            logger.info("Saved Moran summary comparison to %s",
+                        output_dir / 'tables' / 'comparison_moran_summary.csv')
+        else:
+            logger.warning("Moran summary comparison returned no results -- skipping CSV.")
+    except Exception:
+        logger.exception("Failed to compare Moran summaries -- skipping.")
+
+    try:
+        cluster_result = compare_cluster_composition([vidigal_data, copacabana_data])
+        if cluster_result is not None:
+            cluster_result.to_csv(output_dir / 'tables' / 'comparison_cluster_composition.csv', index=False)
+            logger.info("Saved cluster composition to %s",
+                        output_dir / 'tables' / 'comparison_cluster_composition.csv')
+        else:
+            logger.warning("Cluster composition returned no results -- skipping CSV.")
+    except Exception:
+        logger.exception("Failed to compare cluster composition -- skipping.")
+
     # Save raster comparisons
     if raster_comparisons:
         raster_df = pd.DataFrame(list(raster_comparisons.values()))
