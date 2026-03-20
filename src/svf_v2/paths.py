@@ -5,7 +5,7 @@ Explicit registry of file names per area, with a glob fallback for unknown areas
 """
 
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 from src.config import get_area_data_dir
 
@@ -20,6 +20,7 @@ AREA_FILES = {
         "dtm": "DTM_Vidigal.tif",
         "footprints": "Vidigal_buildings.shp",
         "roads": "Vidigal_roads.shp",
+        "boundary": "Vidigal_Limit.shp",
     },
     "riodaspedras": {
         "dtm": "riodaspedras_dtm.tif",
@@ -71,6 +72,30 @@ def resolve_paths(area: str) -> Tuple[Path, Path, Path]:
     fp = _find_file(data_dir, "*building*", ".shp", "footprints")
     rd = _find_file(data_dir, "*road*", ".shp", "roads")
     return dtm, fp, rd
+
+
+def resolve_boundary(area: str) -> Optional[Path]:
+    """Resolve boundary shapefile path for a given area.
+
+    Returns None (non-fatal) if no boundary file is registered or found.
+    """
+    data_dir = get_area_data_dir(area)
+
+    if area in AREA_FILES and "boundary" in AREA_FILES[area]:
+        path = data_dir / AREA_FILES[area]["boundary"]
+        return path if path.exists() else None
+
+    # Fallback: look for *limit* or *boundary* shapefiles
+    for pattern in ("*limit*", "*boundary*"):
+        matches = [
+            p
+            for p in data_dir.iterdir()
+            if p.suffix.lower() == ".shp" and _imatches(p.stem, pattern)
+        ]
+        if matches:
+            return matches[0]
+
+    return None
 
 
 def _find_file(directory: Path, pattern: str, suffix: str, label: str) -> Path:

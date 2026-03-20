@@ -17,6 +17,15 @@ import numpy as np
 from matplotlib.lines import Line2D
 from scipy.stats import gaussian_kde
 
+from src.cartography import (
+    add_north_arrow,
+    add_scale_bar,
+    add_settlement_boundary,
+    add_terrain_contours,
+    format_utm_axes,
+    get_svf_cmap,
+    style_buildings_by_height,
+)
 from src.config import DPI, FIGURE_SIZE
 
 logger = logging.getLogger(__name__)
@@ -37,20 +46,13 @@ def plot_svf_heatmap(
     fig, ax = plt.subplots(figsize=(12, 10))
 
     if footprints_gdf is not None and len(footprints_gdf) > 0:
-        footprints_gdf.plot(
-            ax=ax,
-            facecolor="#2d2d2d",
-            edgecolor="#555555",
-            linewidth=0.3,
-            alpha=0.7,
-            zorder=1,
-        )
+        style_buildings_by_height(ax, footprints_gdf)
 
     sc = ax.scatter(
         points[:, 0],
         points[:, 1],
         c=svf,
-        cmap="RdYlGn",
+        cmap=get_svf_cmap(),
         s=2,
         vmin=0,
         vmax=1,
@@ -60,9 +62,10 @@ def plot_svf_heatmap(
     plt.colorbar(sc, ax=ax, label="SVF")
     ax.set_aspect("equal")
     ax.set_title("Sky View Factor (Grid)")
-    ax.set_xlabel("X (m)")
-    ax.set_ylabel("Y (m)")
-    ax.set_facecolor("#f0f0f0")
+    add_scale_bar(ax)
+    add_north_arrow(ax)
+    format_utm_axes(ax)
+    ax.set_facecolor("white")
     plt.tight_layout()
     plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
     plt.close()
@@ -74,40 +77,90 @@ def plot_street_svf(
     output_path: Path,
     roads_gdf: Optional[gpd.GeoDataFrame] = None,
     footprints_gdf: Optional[gpd.GeoDataFrame] = None,
+    segments_gdf: Optional[gpd.GeoDataFrame] = None,
+    boundary_gdf: Optional[gpd.GeoDataFrame] = None,
+    dtm_path=None,
+    mode: str = "auto",
 ):
-    """Street SVF scatter map with building footprints for spatial context."""
+    """Street SVF map with building footprints and cartographic elements.
+
+    Parameters
+    ----------
+    gdf : GeoDataFrame
+        Point-level SVF data with ``svf`` column.
+    output_path : Path
+        Where to save the figure.
+    roads_gdf, footprints_gdf : GeoDataFrame, optional
+        Context layers.
+    segments_gdf : GeoDataFrame, optional
+        Line geometries with ``svf_mean`` column for segment rendering.
+    boundary_gdf : GeoDataFrame, optional
+        Settlement boundary overlay.
+    dtm_path : str or Path, optional
+        DTM raster for terrain contours.
+    mode : str
+        'points' — always scatter; 'segments' — always line;
+        'auto' — segments if available, else points.
+    """
+    cmap = get_svf_cmap()
+    use_segments = (
+        segments_gdf is not None
+        and len(segments_gdf) > 0
+        and "svf_mean" in segments_gdf.columns
+        and mode != "points"
+    )
+
     fig, ax = plt.subplots(figsize=(12, 10))
 
-    # Building footprints as dark context layer
-    if footprints_gdf is not None and len(footprints_gdf) > 0:
-        footprints_gdf.plot(
-            ax=ax,
-            facecolor="#2d2d2d",
-            edgecolor="#555555",
-            linewidth=0.3,
-            alpha=0.7,
-            zorder=1,
-        )
+    # Terrain contours (lowest layer)
+    if dtm_path is not None:
+        add_terrain_contours(ax, dtm_path)
 
-    # Road centrelines
-    if roads_gdf is not None:
+    # Building footprints
+    if footprints_gdf is not None and len(footprints_gdf) > 0:
+        style_buildings_by_height(ax, footprints_gdf)
+
+    # Road centrelines (subtle)
+    if roads_gdf is not None and not use_segments:
         roads_gdf.plot(ax=ax, color="#aaaaaa", linewidth=0.5, zorder=2)
 
-    # SVF points on top
-    gdf.plot(
-        ax=ax,
-        column="svf",
-        cmap="RdYlGn",
-        markersize=4,
-        vmin=0,
-        vmax=1,
-        legend=True,
-        legend_kwds={"label": "SVF", "shrink": 0.6},
-        zorder=3,
-    )
+    # Main SVF layer
+    if use_segments:
+        segments_gdf.plot(
+            ax=ax,
+            column="svf_mean",
+            cmap=cmap,
+            linewidth=2.5,
+            vmin=0,
+            vmax=1,
+            legend=True,
+            legend_kwds={"label": "SVF (segment mean)", "shrink": 0.6},
+            zorder=3,
+        )
+        ax.set_title("Street SVF — Segment Mean")
+    else:
+        gdf.plot(
+            ax=ax,
+            column="svf",
+            cmap=cmap,
+            markersize=4,
+            vmin=0,
+            vmax=1,
+            legend=True,
+            legend_kwds={"label": "SVF", "shrink": 0.6},
+            zorder=3,
+        )
+        ax.set_title("Street SVF")
+
+    # Settlement boundary
+    if boundary_gdf is not None:
+        add_settlement_boundary(ax, boundary_gdf)
+
     ax.set_aspect("equal")
-    ax.set_title("Street SVF")
-    ax.set_facecolor("#f0f0f0")
+    add_scale_bar(ax)
+    add_north_arrow(ax)
+    format_utm_axes(ax)
+    ax.set_facecolor("white")
     plt.tight_layout()
     plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
     plt.close()
@@ -124,7 +177,7 @@ def plot_facade_by_orientation(gdf: gpd.GeoDataFrame, output_path: Path):
         az_rad,
         gdf["svf"].values,
         c=gdf["svf"].values,
-        cmap="RdYlGn",
+        cmap=get_svf_cmap(),
         s=1,
         alpha=0.3,
         vmin=0,
@@ -132,6 +185,8 @@ def plot_facade_by_orientation(gdf: gpd.GeoDataFrame, output_path: Path):
     )
     ax.set_theta_zero_location("N")
     ax.set_theta_direction(-1)
+    ax.set_thetagrids([0, 45, 90, 135, 180, 225, 270, 315],
+                      labels=["N", "NE", "E", "SE", "S", "SW", "W", "NW"])
     ax.set_title("Facade SVF by Orientation")
     plt.colorbar(sc, ax=ax, label="SVF", shrink=0.6)
     plt.tight_layout()
@@ -141,7 +196,7 @@ def plot_facade_by_orientation(gdf: gpd.GeoDataFrame, output_path: Path):
 
 
 def plot_facade_by_height(gdf: gpd.GeoDataFrame, output_path: Path):
-    """Scatter of facade SVF vs height above ground."""
+    """Scatter of facade SVF vs height above ground with LOWESS trend."""
     if "svf" not in gdf.columns or "height_above_ground" not in gdf.columns:
         return
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -161,10 +216,295 @@ def plot_facade_by_height(gdf: gpd.GeoDataFrame, output_path: Path):
     ax.set_ylim(0, 1)
     if "facade_azimuth" in gdf.columns:
         plt.colorbar(sc, ax=ax, label="Azimuth")
+
+    # LOWESS trend line
+    try:
+        from statsmodels.nonparametric.smoothers_lowess import lowess
+
+        h = gdf["height_above_ground"].values
+        s = gdf["svf"].values
+        mask = np.isfinite(h) & np.isfinite(s)
+        if mask.sum() > 20:
+            result = lowess(s[mask], h[mask], frac=0.3, return_sorted=True)
+            ax.plot(result[:, 0], result[:, 1], color="red", linewidth=2,
+                    label="LOWESS trend", zorder=5)
+            ax.legend(fontsize=8)
+    except ImportError:
+        pass
+
     plt.tight_layout()
     plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
     plt.close()
     logger.info("  Saved %s", output_path)
+
+
+# ---------------------------------------------------------------------------
+# Distribution plot (bimodal-aware)
+# ---------------------------------------------------------------------------
+
+
+def plot_svf_distribution(
+    gdf: gpd.GeoDataFrame,
+    output_path: Path,
+    svf_col: str = "svf",
+    title: str | None = None,
+) -> Path:
+    """Bimodal-aware SVF distribution plot.
+
+    Handles the common spike at SVF=0 by separating it as an annotated bar,
+    then showing a histogram + KDE for the non-zero portion.
+
+    Parameters
+    ----------
+    gdf : GeoDataFrame
+        Must contain *svf_col*.
+    output_path : Path
+        Where to save the figure.
+    svf_col : str
+        Column with SVF values.
+    title : str, optional
+        Figure title. Defaults to 'SVF Distribution'.
+
+    Returns
+    -------
+    Path
+        *output_path* on success.
+    """
+    svf = gdf[svf_col].dropna().values
+    n_total = len(svf)
+    if n_total == 0:
+        logger.warning("No SVF data for distribution plot — skipping.")
+        return output_path
+
+    # Separate zero and non-zero
+    n_zero = int(np.sum(svf == 0.0))
+    pct_zero = 100.0 * n_zero / n_total
+    svf_nonzero = svf[svf > 0.0]
+    n_open = int(np.sum(svf > 0.9))
+    pct_open = 100.0 * n_open / n_total
+
+    mean_val = float(np.mean(svf))
+    median_val = float(np.median(svf))
+    std_val = float(np.std(svf))
+    q25, q75 = float(np.percentile(svf, 25)), float(np.percentile(svf, 75))
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Main histogram for non-zero values
+    if len(svf_nonzero) > 0:
+        bins = np.linspace(0.01, 1.0, 31)
+        ax.hist(
+            svf_nonzero,
+            bins=bins,
+            color="#4363d8",
+            edgecolor="white",
+            alpha=0.75,
+            label="SVF > 0",
+            zorder=2,
+        )
+
+        # KDE overlay
+        if len(svf_nonzero) > 5:
+            try:
+                kde = gaussian_kde(svf_nonzero, bw_method="scott")
+                xs = np.linspace(0.01, 1.0, 200)
+                # Scale KDE to histogram height
+                bin_width = bins[1] - bins[0]
+                ax.plot(
+                    xs,
+                    kde(xs) * len(svf_nonzero) * bin_width,
+                    color="#e6194b",
+                    linewidth=2,
+                    label="KDE",
+                    zorder=3,
+                )
+            except Exception:
+                pass
+
+    # Annotated bar for SVF=0 spike
+    if n_zero > 0:
+        bar_width = 0.01
+        ax.bar(
+            0.0,
+            n_zero,
+            width=bar_width,
+            color="#d32f2f",
+            edgecolor="white",
+            alpha=0.85,
+            zorder=4,
+        )
+        ax.annotate(
+            f"{pct_zero:.0f}% occluded\n(SVF=0, n={n_zero})",
+            xy=(0.0, n_zero),
+            xytext=(0.08, n_zero * 0.9),
+            fontsize=8,
+            arrowprops=dict(arrowstyle="->", color="#d32f2f"),
+            color="#d32f2f",
+            fontweight="bold",
+        )
+
+    # Annotate open-sky fraction
+    if n_open > 0:
+        ax.annotate(
+            f"{pct_open:.1f}% open sky\n(SVF>0.9, n={n_open})",
+            xy=(0.95, 0.92),
+            xycoords="axes fraction",
+            fontsize=8,
+            ha="right",
+            color="#2e7d32",
+            fontweight="bold",
+        )
+
+    # Mean/median lines
+    ax.axvline(mean_val, color="red", linestyle="--", linewidth=1.5, label=f"Mean={mean_val:.2f}")
+    ax.axvline(
+        median_val, color="orange", linestyle="-.", linewidth=1.5, label=f"Median={median_val:.2f}"
+    )
+
+    # Stats box
+    stats_text = (
+        f"n = {n_total}\n"
+        f"\u03bc = {mean_val:.3f}\n"
+        f"med = {median_val:.3f}\n"
+        f"\u03c3 = {std_val:.3f}\n"
+        f"IQR = [{q25:.2f}, {q75:.2f}]\n"
+        f"occluded = {pct_zero:.1f}%\n"
+        f"open = {pct_open:.1f}%"
+    )
+    ax.text(
+        0.98,
+        0.70,
+        stats_text,
+        transform=ax.transAxes,
+        fontsize=8,
+        verticalalignment="top",
+        horizontalalignment="right",
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="white", alpha=0.85),
+    )
+
+    ax.set_xlabel("SVF")
+    ax.set_ylabel("Count")
+    ax.set_title(title or "SVF Distribution")
+    ax.legend(fontsize=8, loc="upper center")
+    ax.set_xlim(-0.03, 1.03)
+
+    plt.tight_layout()
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
+    plt.close()
+    logger.info("  Saved %s", output_path)
+    return output_path
+
+
+# ---------------------------------------------------------------------------
+# Interactive Folium map
+# ---------------------------------------------------------------------------
+
+
+def plot_svf_interactive(
+    gdf: gpd.GeoDataFrame,
+    output_path: Path,
+    segments_gdf: Optional[gpd.GeoDataFrame] = None,
+    footprints_gdf: Optional[gpd.GeoDataFrame] = None,
+    svf_col: str = "svf",
+) -> Path:
+    """Create an interactive Folium map of SVF results.
+
+    Parameters
+    ----------
+    gdf : GeoDataFrame
+        Point-level SVF data.
+    output_path : Path
+        Where to save the HTML file.
+    segments_gdf : GeoDataFrame, optional
+        Segment lines with ``svf_mean`` for coloured line rendering.
+    footprints_gdf : GeoDataFrame, optional
+        Building footprints as semi-transparent overlay.
+    svf_col : str
+        SVF column name in *gdf*.
+
+    Returns
+    -------
+    Path
+        *output_path* on success.
+    """
+    try:
+        import folium
+        from branca.colormap import LinearColormap
+    except ImportError:
+        logger.warning("folium not installed — skipping interactive map")
+        return output_path
+
+    # Reproject to 4326
+    gdf_4326 = gdf.to_crs(epsg=4326)
+    center = [gdf_4326.geometry.y.mean(), gdf_4326.geometry.x.mean()]
+
+    m = folium.Map(location=center, zoom_start=16, tiles="OpenStreetMap")
+
+    # Try adding satellite tiles
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri",
+        name="Satellite",
+        overlay=False,
+    ).add_to(m)
+
+    # Build a cividis colormap from matplotlib
+    cividis_mpl = plt.colormaps["cividis"]
+    cividis_colors = [
+        "#{:02x}{:02x}{:02x}".format(*[int(c * 255) for c in cividis_mpl(v)[:3]])
+        for v in np.linspace(0, 1, 10)
+    ]
+    colormap = LinearColormap(cividis_colors, vmin=0, vmax=1, caption="SVF")
+    colormap.add_to(m)
+
+    # Building footprints (toggleable)
+    if footprints_gdf is not None and len(footprints_gdf) > 0:
+        fp_4326 = footprints_gdf.to_crs(epsg=4326)
+        buildings_layer = folium.FeatureGroup(name="Buildings", show=True)
+        folium.GeoJson(
+            fp_4326,
+            style_function=lambda _: {
+                "fillColor": "#888888",
+                "color": "#555555",
+                "weight": 0.5,
+                "fillOpacity": 0.3,
+            },
+        ).add_to(buildings_layer)
+        buildings_layer.add_to(m)
+
+    # Segment lines coloured by svf_mean
+    if segments_gdf is not None and len(segments_gdf) > 0 and "svf_mean" in segments_gdf.columns:
+        seg_4326 = segments_gdf.to_crs(epsg=4326)
+        seg_layer = folium.FeatureGroup(name="SVF Segments", show=True)
+        for _, row in seg_4326.iterrows():
+            svf_val = float(row["svf_mean"])
+            color = "#{:02x}{:02x}{:02x}".format(
+                *[int(c * 255) for c in plt.colormaps["cividis"](svf_val)[:3]]
+            )
+            popup_text = (
+                f"SVF mean: {svf_val:.3f}<br>"
+                f"SVF median: {row.get('svf_median', 'N/A')}<br>"
+                f"Points: {row.get('n_points', 'N/A')}"
+            )
+            coords = [(c[1], c[0]) for c in row.geometry.coords]
+            folium.PolyLine(
+                coords,
+                color=color,
+                weight=4,
+                opacity=0.8,
+                popup=folium.Popup(popup_text, max_width=200),
+            ).add_to(seg_layer)
+        seg_layer.add_to(m)
+
+    folium.LayerControl().add_to(m)
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    m.save(str(output_path))
+    logger.info("  Saved %s", output_path)
+    return output_path
 
 
 # ---------------------------------------------------------------------------
@@ -379,7 +719,7 @@ def plot_svf_dashboard(
     street_gdf.plot(
         ax=ax_map,
         column="svf",
-        cmap="RdYlGn",
+        cmap=get_svf_cmap(),
         vmin=0,
         vmax=1,
         markersize=3,
@@ -388,9 +728,10 @@ def plot_svf_dashboard(
         zorder=2,
     )
     ax_map.set_title("Street SVF Map")
-    ax_map.set_xlabel("X")
-    ax_map.set_ylabel("Y")
     ax_map.set_aspect("equal")
+    add_scale_bar(ax_map)
+    add_north_arrow(ax_map)
+    format_utm_axes(ax_map, show_labels=False)
 
     # ---- Top-right: histogram ----
     ax_hist.hist(svf, bins=40, color="#4363d8", edgecolor="white", alpha=0.8)

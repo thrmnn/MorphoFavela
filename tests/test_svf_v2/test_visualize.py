@@ -3,9 +3,15 @@
 import geopandas as gpd
 import numpy as np
 import pytest
-from shapely.geometry import Point
+from shapely.geometry import LineString, Point
 
-from src.svf_v2.visualize import plot_svf_comparison, plot_svf_dashboard
+from src.svf_v2.visualize import (
+    plot_street_svf,
+    plot_svf_comparison,
+    plot_svf_dashboard,
+    plot_svf_distribution,
+    plot_svf_interactive,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -150,3 +156,131 @@ class TestPlotSvfDashboard:
         result = plot_svf_dashboard(street_gdf_no_segments, out)
         assert result == out
         assert out.exists()
+
+
+# ---------------------------------------------------------------------------
+# Tests – plot_street_svf (backward compatibility + new kwargs)
+# ---------------------------------------------------------------------------
+
+
+class TestPlotStreetSvf:
+    """Tests for the street SVF map function."""
+
+    def test_point_mode(self, tmp_path, informal_gdf):
+        out = tmp_path / "street_points.png"
+        plot_street_svf(informal_gdf, out, mode="points")
+        assert out.exists()
+        assert out.stat().st_size > 0
+
+    def test_segment_mode(self, tmp_path, street_gdf_with_segments):
+        from shapely.geometry import box as sbox
+
+        # Create fake segments GeoDataFrame
+        seg_gdf = gpd.GeoDataFrame(
+            {
+                "svf_mean": [0.3, 0.6, 0.9],
+                "geometry": [
+                    LineString([(0, 0), (500, 500)]),
+                    LineString([(500, 0), (0, 500)]),
+                    LineString([(0, 250), (500, 250)]),
+                ],
+            },
+            crs="EPSG:32723",
+        )
+        out = tmp_path / "street_segments.png"
+        plot_street_svf(
+            street_gdf_with_segments, out,
+            segments_gdf=seg_gdf, mode="segments",
+        )
+        assert out.exists()
+
+    def test_auto_mode_with_segments(self, tmp_path, informal_gdf):
+        seg_gdf = gpd.GeoDataFrame(
+            {
+                "svf_mean": [0.5],
+                "geometry": [LineString([(0, 0), (1000, 1000)])],
+            },
+            crs="EPSG:32723",
+        )
+        out = tmp_path / "street_auto.png"
+        plot_street_svf(informal_gdf, out, segments_gdf=seg_gdf, mode="auto")
+        assert out.exists()
+
+    def test_backward_compatible_call(self, tmp_path, informal_gdf):
+        """Old-style call with just gdf + path still works."""
+        out = tmp_path / "street_compat.png"
+        plot_street_svf(informal_gdf, out)
+        assert out.exists()
+
+
+# ---------------------------------------------------------------------------
+# Tests – plot_svf_distribution
+# ---------------------------------------------------------------------------
+
+
+class TestPlotSvfDistribution:
+    """Tests for the bimodal-aware distribution plot."""
+
+    def test_basic(self, tmp_path, informal_gdf):
+        out = tmp_path / "dist.png"
+        result = plot_svf_distribution(informal_gdf, out)
+        assert result == out
+        assert out.exists()
+        assert out.stat().st_size > 0
+
+    def test_with_zeros(self, tmp_path):
+        """Data with a spike at zero."""
+        rng = np.random.default_rng(99)
+        svf = np.concatenate([
+            np.zeros(50),
+            np.clip(rng.normal(0.5, 0.2, 150), 0.01, 1.0),
+        ])
+        gdf = gpd.GeoDataFrame(
+            {"svf": svf},
+            geometry=[Point(i, i) for i in range(200)],
+            crs="EPSG:32723",
+        )
+        out = tmp_path / "dist_zeros.png"
+        result = plot_svf_distribution(gdf, out)
+        assert result == out
+        assert out.exists()
+
+    def test_creates_parent_dirs(self, tmp_path, informal_gdf):
+        out = tmp_path / "sub" / "dir" / "dist.png"
+        result = plot_svf_distribution(informal_gdf, out)
+        assert result == out
+        assert out.exists()
+
+
+# ---------------------------------------------------------------------------
+# Tests – plot_svf_interactive
+# ---------------------------------------------------------------------------
+
+
+class TestPlotSvfInteractive:
+    """Tests for the Folium interactive map."""
+
+    def test_basic_html(self, tmp_path, informal_gdf):
+        out = tmp_path / "interactive.html"
+        result = plot_svf_interactive(informal_gdf, out)
+        assert result == out
+        # File may or may not exist depending on folium availability
+        if out.exists():
+            assert out.stat().st_size > 0
+
+    def test_with_segments(self, tmp_path, informal_gdf):
+        seg_gdf = gpd.GeoDataFrame(
+            {
+                "svf_mean": [0.4, 0.7],
+                "svf_median": [0.4, 0.7],
+                "n_points": [20, 30],
+                "geometry": [
+                    LineString([(0, 0), (500, 500)]),
+                    LineString([(500, 0), (0, 500)]),
+                ],
+            },
+            crs="EPSG:32723",
+        )
+        out = tmp_path / "interactive_seg.html"
+        result = plot_svf_interactive(informal_gdf, out, segments_gdf=seg_gdf)
+        assert result == out

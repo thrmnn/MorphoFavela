@@ -19,7 +19,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import get_area_output_dir
-from src.svf_v2.paths import resolve_paths
+from src.svf_v2.paths import resolve_boundary, resolve_paths
 from src.svf_v2.scene import build_scene
 from src.svf_v2.sampling import sample_grid_points, sample_street_points, sample_facade_points
 from src.svf_v2.compute import compute_svf
@@ -27,7 +27,7 @@ from src.svf_v2.facades import compute_facade_svf, compute_facade_solar_potentia
 from src.svf_v2.io import (
     save_grid_results, save_street_results, save_facade_results,
     save_scene_stl, save_scene_vtk,
-    plot_alignment_check, plot_road_z_check,
+    plot_alignment_check, plot_road_z_check, plot_offset_diagnostic,
 )
 
 logging.basicConfig(
@@ -85,12 +85,22 @@ def run_streets(
         roads_path, dtm_path,
         spacing=args.street_spacing,
         pedestrian_height=args.pedestrian_height,
+        footprints_gdf=footprints_gdf,
+        building_safety_margin=args.building_margin,
     )
     logger.info(f"Street sampling: {len(street_gdf)} points ({time.time()-t0:.1f}s)")
 
     if len(street_gdf) == 0:
         logger.warning("No street points -- skipping")
         return
+
+    # Offset diagnostic
+    if not args.skip_visual and "was_offset" in street_gdf.columns:
+        plot_offset_diagnostic(
+            street_gdf,
+            output_dir / "street_offset_vectors.png",
+            footprints_gdf=footprints_gdf,
+        )
 
     observers = np.column_stack([
         np.array([p.x for p in street_gdf.geometry]),
@@ -120,7 +130,21 @@ def run_streets(
         if roads_gdf.crs != src.crs:
             roads_gdf = roads_gdf.to_crs(src.crs)
 
-    save_street_results(street_gdf, output_dir, roads_gdf=roads_gdf, footprints_gdf=footprints_gdf)
+    # Load boundary if available
+    boundary_path = resolve_boundary(args.area)
+    boundary_gdf = None
+    if boundary_path:
+        boundary_gdf = geopandas.read_file(boundary_path)
+        with rio.open(dtm_path) as src:
+            if boundary_gdf.crs != src.crs:
+                boundary_gdf = boundary_gdf.to_crs(src.crs)
+        logger.info(f"Loaded boundary: {boundary_path}")
+
+    save_street_results(
+        street_gdf, output_dir,
+        roads_gdf=roads_gdf, footprints_gdf=footprints_gdf,
+        boundary_gdf=boundary_gdf, dtm_path=dtm_path,
+    )
 
     # Visual: road Z check
     if not args.skip_visual:
@@ -185,6 +209,8 @@ def main():
                         help="Number of parallel workers for raycasting (1=sequential, -1=all cores)")
     parser.add_argument("--buffer", type=float, default=None,
                         help="Only compute grid SVF within this distance of buildings (m)")
+    parser.add_argument("--building-margin", type=float, default=0.5,
+                        help="Safety margin (m) when offsetting street points outside buildings")
     parser.add_argument("--dtm-subsample", type=int, default=1)
     parser.add_argument("--base-field", default="base", help="Building base elevation field")
     parser.add_argument("--height-field", default="altura", help="Building extrusion height field")

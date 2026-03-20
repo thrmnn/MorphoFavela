@@ -15,6 +15,9 @@ from src.config import DPI
 from src.svf_v2.visualize import (
     plot_svf_heatmap,
     plot_street_svf,
+    plot_svf_distribution,
+    plot_svf_dashboard,
+    plot_svf_interactive,
     plot_facade_by_orientation,
     plot_facade_by_height,
 )
@@ -143,6 +146,8 @@ def save_street_results(
     output_dir: Path,
     roads_gdf: Optional[gpd.GeoDataFrame] = None,
     footprints_gdf: Optional[gpd.GeoDataFrame] = None,
+    boundary_gdf: Optional[gpd.GeoDataFrame] = None,
+    dtm_path=None,
 ):
     """
     Save street SVF results.
@@ -152,6 +157,8 @@ def save_street_results(
         output_dir: Directory for outputs.
         roads_gdf: Original road lines (for segment aggregation).
         footprints_gdf: Building footprints for context on map.
+        boundary_gdf: Settlement boundary for map overlay.
+        dtm_path: DTM raster path for terrain contours.
     """
     out = _ensure_dir(output_dir)
 
@@ -161,6 +168,7 @@ def save_street_results(
     logger.info(f"  Saved {gpkg_path} ({len(street_gdf)} points)")
 
     # Per-segment aggregation
+    seg_gdf = None
     if "street_id" in street_gdf.columns and roads_gdf is not None:
         seg_stats = (
             street_gdf.groupby("street_id")["svf"]
@@ -186,11 +194,45 @@ def save_street_results(
         seg_gdf.to_file(seg_path, driver="GPKG")
         logger.info(f"  Saved {seg_path} ({len(seg_gdf)} segments)")
 
-    # Map plot
+    # Point scatter map (backward compatible)
     plot_street_svf(
         street_gdf,
         out / "svf_streets_map.png",
         roads_gdf=roads_gdf,
+        footprints_gdf=footprints_gdf,
+        boundary_gdf=boundary_gdf,
+        dtm_path=dtm_path,
+        mode="points",
+    )
+
+    # Segment-colored map
+    if seg_gdf is not None:
+        plot_street_svf(
+            street_gdf,
+            out / "svf_streets_segments_map.png",
+            segments_gdf=seg_gdf,
+            footprints_gdf=footprints_gdf,
+            boundary_gdf=boundary_gdf,
+            dtm_path=dtm_path,
+            mode="segments",
+        )
+
+    # Distribution plot
+    plot_svf_distribution(street_gdf, out / "svf_distribution.png")
+
+    # Dashboard
+    plot_svf_dashboard(
+        street_gdf,
+        out / "svf_dashboard.png",
+        roads_gdf=roads_gdf,
+        title="SVF Dashboard",
+    )
+
+    # Interactive map
+    plot_svf_interactive(
+        street_gdf,
+        out / "svf_interactive.html",
+        segments_gdf=seg_gdf,
         footprints_gdf=footprints_gdf,
     )
 
@@ -355,6 +397,85 @@ def plot_alignment_check(
             ax.set_xlim(cx - zoom, cx + zoom)
             ax.set_ylim(cy - zoom, cy + zoom)
             ax.set_title(f"{title} (200m zoom at centroid)")
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
+    plt.close()
+    logger.info(f"  Saved {output_path}")
+    return output_path
+
+
+def plot_offset_diagnostic(
+    street_gdf: gpd.GeoDataFrame,
+    output_path: Path,
+    footprints_gdf: Optional[gpd.GeoDataFrame] = None,
+) -> Path:
+    """
+    Two-panel diagnostic showing building-offset vectors for street points.
+
+    Left: full extent — buildings grey, non-offset green, offset red with arrows.
+    Right: zoom to densest offset area.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    offset_mask = street_gdf["was_offset"].values.astype(bool)
+    n_offset = int(offset_mask.sum())
+    if n_offset == 0:
+        logger.info("  No offset points — skipping offset diagnostic plot")
+        return output_path
+
+    dists = street_gdf.loc[offset_mask, "offset_distance"]
+    mean_d = dists.mean()
+    max_d = dists.max()
+
+    fig, axes = plt.subplots(1, 2, figsize=(20, 10))
+
+    for ax_idx, ax in enumerate(axes):
+        # Buildings
+        if footprints_gdf is not None:
+            footprints_gdf.plot(
+                ax=ax, facecolor="lightgrey", edgecolor="black",
+                linewidth=0.3, alpha=0.6, label="Buildings",
+            )
+
+        # Non-offset points
+        non_offset = street_gdf[~offset_mask]
+        if len(non_offset) > 0:
+            xs = np.array([p.x for p in non_offset.geometry])
+            ys = np.array([p.y for p in non_offset.geometry])
+            ax.scatter(xs, ys, c="green", s=2, alpha=0.3, label="Not offset")
+
+        # Offset points with arrows
+        off = street_gdf[offset_mask]
+        ox = off["original_x"].values
+        oy = off["original_y"].values
+        nx = np.array([p.x for p in off.geometry])
+        ny = np.array([p.y for p in off.geometry])
+        ax.scatter(nx, ny, c="red", s=6, alpha=0.7, zorder=5, label="Offset")
+        ax.quiver(
+            ox, oy, nx - ox, ny - oy,
+            angles="xy", scale_units="xy", scale=1,
+            color="red", alpha=0.5, width=0.003, headwidth=3,
+        )
+
+        ax.set_aspect("equal")
+        ax.set_xlabel("X (m)")
+        ax.set_ylabel("Y (m)")
+
+        if ax_idx == 0:
+            ax.set_title(
+                f"Street Point Offsets (full extent)\n"
+                f"{n_offset} points offset (mean {mean_d:.2f}m, max {max_d:.2f}m)"
+            )
+            ax.legend(loc="upper right", fontsize=8)
+        else:
+            # Zoom to densest offset cluster
+            if len(nx) > 0:
+                cx, cy = np.median(nx), np.median(ny)
+                zoom = 50
+                ax.set_xlim(cx - zoom, cx + zoom)
+                ax.set_ylim(cy - zoom, cy + zoom)
+            ax.set_title("Zoom — densest offset area")
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=DPI, bbox_inches="tight")

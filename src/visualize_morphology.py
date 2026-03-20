@@ -19,6 +19,12 @@ import numpy as np
 import pandas as pd
 from matplotlib.patches import Patch
 
+from src.cartography import (
+    add_north_arrow,
+    add_scale_bar,
+    add_settlement_boundary,
+    style_buildings_by_height,
+)
 from src.config import (
     COLORMAP_BCR,
     COLORMAP_FAR,
@@ -52,6 +58,8 @@ def plot_zone_metrics_panel(
     gdf: gpd.GeoDataFrame,
     output_path: Path,
     metrics: list[tuple[str, str, str]] | None = None,
+    boundary_gdf: gpd.GeoDataFrame | None = None,
+    footprints_gdf: gpd.GeoDataFrame | None = None,
 ) -> Path:
     """2x2 choropleth grid of zone-level morphology metrics.
 
@@ -63,6 +71,10 @@ def plot_zone_metrics_panel(
         Where to save the figure.
     metrics : list of (column, cmap, title) tuples, optional
         Override the default panel layout.
+    boundary_gdf : GeoDataFrame, optional
+        Settlement boundary — zones are clipped to this boundary.
+    footprints_gdf : GeoDataFrame, optional
+        Building footprints as light grey underlay.
 
     Returns
     -------
@@ -72,8 +84,16 @@ def plot_zone_metrics_panel(
     if metrics is None:
         metrics = _PANEL_DEFAULTS
 
+    # Clip zones to boundary if provided
+    plot_gdf = gdf
+    if boundary_gdf is not None:
+        try:
+            plot_gdf = gpd.clip(gdf, boundary_gdf)
+        except Exception:
+            plot_gdf = gdf
+
     # Filter to available columns
-    available = [(col, cmap, title) for col, cmap, title in metrics if col in gdf.columns]
+    available = [(col, cmap, title) for col, cmap, title in metrics if col in plot_gdf.columns]
     if not available:
         logger.warning("No metric columns found for zone panel — skipping.")
         return output_path
@@ -86,13 +106,25 @@ def plot_zone_metrics_panel(
 
     for idx, (col, cmap, title) in enumerate(available):
         ax = axes[idx]
-        data = gdf[col].replace([np.inf, -np.inf], np.nan).dropna()
+
+        # Building underlay
+        if footprints_gdf is not None and len(footprints_gdf) > 0:
+            footprints_gdf.plot(
+                ax=ax,
+                facecolor="#d0d0d0",
+                edgecolor="#999999",
+                linewidth=0.2,
+                alpha=0.5,
+                zorder=0,
+            )
+
+        data = plot_gdf[col].replace([np.inf, -np.inf], np.nan).dropna()
         if len(data) > 0:
             vmin = data.quantile(0.02)
             vmax = data.quantile(0.98)
         else:
             vmin, vmax = 0, 1
-        gdf.plot(
+        plot_gdf.plot(
             column=col,
             ax=ax,
             cmap=cmap,
@@ -102,7 +134,13 @@ def plot_zone_metrics_panel(
             vmax=vmax,
             missing_kwds={"color": "white", "edgecolor": "lightgray"},
         )
+
+        if boundary_gdf is not None:
+            add_settlement_boundary(ax, boundary_gdf)
+
         ax.set_title(title, fontsize=12, fontweight="bold")
+        add_scale_bar(ax)
+        add_north_arrow(ax)
         ax.set_axis_off()
 
     for ax in axes[len(available) :]:
@@ -126,6 +164,8 @@ def plot_lisa_clusters(
     cluster_col: str,
     output_path: Path,
     title: str | None = None,
+    boundary_gdf: gpd.GeoDataFrame | None = None,
+    footprints_gdf: gpd.GeoDataFrame | None = None,
 ) -> Path:
     """Categorical choropleth of LISA cluster assignments.
 
@@ -139,6 +179,10 @@ def plot_lisa_clusters(
         Where to save the figure.
     title : str, optional
         Plot title (defaults to *cluster_col*).
+    boundary_gdf : GeoDataFrame, optional
+        Settlement boundary — zones are clipped to this boundary.
+    footprints_gdf : GeoDataFrame, optional
+        Building footprints underlay.
 
     Returns
     -------
@@ -149,14 +193,42 @@ def plot_lisa_clusters(
         logger.warning("Column '%s' not found — skipping LISA plot.", cluster_col)
         return output_path
 
+    # Clip to boundary
+    plot_gdf = gdf
+    if boundary_gdf is not None:
+        try:
+            plot_gdf = gpd.clip(gdf, boundary_gdf)
+        except Exception:
+            plot_gdf = gdf
+
     fig, ax = plt.subplots(1, 1, figsize=(10, 8))
 
-    # Map each zone to its LISA colour
-    colors = gdf[cluster_col].map(LISA_COLORS).fillna(LISA_COLORS["ns"])
-    gdf.plot(ax=ax, color=colors, edgecolor="gray", linewidth=0.2)
+    # Building underlay
+    if footprints_gdf is not None and len(footprints_gdf) > 0:
+        footprints_gdf.plot(
+            ax=ax,
+            facecolor="#d0d0d0",
+            edgecolor="#999999",
+            linewidth=0.2,
+            alpha=0.4,
+            zorder=0,
+        )
+
+    # Map each zone to its LISA colour — use alpha=0.6 for ns zones
+    colors = plot_gdf[cluster_col].map(LISA_COLORS).fillna(LISA_COLORS["ns"])
+    # Use semi-transparent fills so building fabric shows through ns zones
+    ns_mask = plot_gdf[cluster_col] == "ns"
+    if ns_mask.any():
+        plot_gdf[~ns_mask].plot(ax=ax, color=colors[~ns_mask], edgecolor="gray", linewidth=0.2, alpha=0.85, zorder=2)
+        plot_gdf[ns_mask].plot(ax=ax, color=colors[ns_mask], edgecolor="gray", linewidth=0.2, alpha=0.4, zorder=1)
+    else:
+        plot_gdf.plot(ax=ax, color=colors, edgecolor="gray", linewidth=0.2, zorder=2)
+
+    if boundary_gdf is not None:
+        add_settlement_boundary(ax, boundary_gdf)
 
     # Legend
-    present = gdf[cluster_col].unique()
+    present = plot_gdf[cluster_col].unique()
     legend_order = ["HH", "HL", "LH", "LL", "ns"]
     patches = [
         Patch(facecolor=LISA_COLORS[lab], edgecolor="gray", label=lab)
@@ -165,6 +237,8 @@ def plot_lisa_clusters(
     ]
     ax.legend(handles=patches, loc="lower right", fontsize=10)
     ax.set_title(title or cluster_col, fontsize=12, fontweight="bold")
+    add_scale_bar(ax)
+    add_north_arrow(ax)
     ax.set_axis_off()
 
     plt.tight_layout()

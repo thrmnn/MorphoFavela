@@ -96,6 +96,23 @@ class TestPlotZoneMetricsPanel:
         plot_zone_metrics_panel(gdf, out)
         # Should not raise; file may or may not be created
 
+    def test_with_boundary_clipping(self, zone_gdf, tmp_path):
+        boundary = gpd.GeoDataFrame(
+            geometry=[box(0, 0, 500, 50)], crs="EPSG:32723"
+        )
+        out = tmp_path / "panel_clipped.png"
+        plot_zone_metrics_panel(zone_gdf, out, boundary_gdf=boundary)
+        assert out.exists()
+
+    def test_with_footprints(self, zone_gdf, tmp_path):
+        buildings = gpd.GeoDataFrame(
+            geometry=[box(10, 10, 20, 20), box(30, 10, 40, 20)],
+            crs="EPSG:32723",
+        )
+        out = tmp_path / "panel_buildings.png"
+        plot_zone_metrics_panel(zone_gdf, out, footprints_gdf=buildings)
+        assert out.exists()
+
 
 class TestPlotLisaClusters:
     def test_creates_file(self, zone_gdf, tmp_path):
@@ -113,6 +130,24 @@ class TestPlotLisaClusters:
         assert len(paths) == 3  # bcr, far, sigma_h
         for p in paths:
             assert p.exists()
+
+    def test_with_boundary_clipping(self, zone_gdf, tmp_path):
+        boundary = gpd.GeoDataFrame(
+            geometry=[box(0, 0, 500, 50)], crs="EPSG:32723"
+        )
+        out = tmp_path / "lisa_clipped.png"
+        plot_lisa_clusters(zone_gdf, "lisa_cluster_bcr", out, boundary_gdf=boundary)
+        assert out.exists()
+
+    def test_with_footprints(self, zone_gdf, tmp_path):
+        buildings = gpd.GeoDataFrame(
+            geometry=[box(10, 10, 20, 20)], crs="EPSG:32723"
+        )
+        out = tmp_path / "lisa_buildings.png"
+        plot_lisa_clusters(
+            zone_gdf, "lisa_cluster_bcr", out, footprints_gdf=buildings
+        )
+        assert out.exists()
 
 
 class TestPlotTypologyMap:

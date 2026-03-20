@@ -145,3 +145,10 @@ COLORMAP_BCR = "YlOrRd"
 COLORMAP_FAR = "YlOrRd"
 COLORMAP_SIGMA_H = "viridis"
 COLORMAP_LAMBDA_F = "plasma"
+
+# SVF & cartographic visualization
+SVF_CMAP = "cividis"
+BUILDING_CMAP = "Greys"
+CONTOUR_COLOR = "#8B7355"
+CONTOUR_INTERVAL = 10  # meters
+BACKGROUND_COLOR = "#ffffff"
