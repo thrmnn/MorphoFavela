@@ -16,10 +16,13 @@ from src.solar.sun import DEFAULT_LATITUDE, DEFAULT_LONGITUDE
 from src.solar.visualize import (
     plot_solar_access,
     plot_solar_dashboard,
+    plot_solar_deprivation_hero,
     plot_solar_distribution,
     plot_solar_irradiance_map,
+    plot_solar_seasonal_comparison_hero,
     plot_solar_seasonal_panel,
     plot_solar_sun_path,
+    plot_solar_vs_svf,
 )
 
 logger = logging.getLogger(__name__)
@@ -110,7 +113,7 @@ def save_solar_results(
             gdf, out / "solar_access.png",
             footprints_gdf=footprints_gdf,
             column=primary_col,
-            title="Solar Access (Mean)",
+            boundary_gdf=boundary_gdf,
         )
 
     # ------------------------------------------------------------------
@@ -141,7 +144,7 @@ def save_solar_results(
         gdf, out / "solar_dashboard.png",
         footprints_gdf=footprints_gdf,
         roads_gdf=roads_gdf,
-        title="Solar Dashboard",
+        boundary_gdf=boundary_gdf,
     )
 
     # ------------------------------------------------------------------
@@ -151,6 +154,16 @@ def save_solar_results(
         plot_solar_irradiance_map(
             gdf, out / "solar_irradiance.png",
             footprints_gdf=footprints_gdf,
+            boundary_gdf=boundary_gdf,
+        )
+
+    # ------------------------------------------------------------------
+    # SVF vs Solar scatter (if SVF column present)
+    # ------------------------------------------------------------------
+    if "svf" in gdf.columns and primary_col in gdf.columns:
+        plot_solar_vs_svf(
+            gdf, out / "solar_vs_svf.png",
+            solar_col=primary_col,
         )
 
     # ------------------------------------------------------------------
