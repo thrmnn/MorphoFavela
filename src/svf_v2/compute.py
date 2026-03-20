@@ -1,5 +1,10 @@
 """
 SVF computation backends: ray-casting (primary), GPU, and PyViewFactor.
+
+Supports two sky hemisphere discretization schemes:
+  - ``"uniform"``: simple azimuth x elevation grid (legacy, biased)
+  - ``"tregenza"``: Tregenza 145-patch equal-area subdivision (standard
+    in building science; used by Radiance, DAYSIM, etc.)
 """
 
 import numpy as np
@@ -8,7 +13,7 @@ import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -45,6 +50,80 @@ except ImportError:
 # Sky hemisphere discretization
 # ---------------------------------------------------------------------------
 
+# Tregenza sky subdivision definition (CIE standard, Tregenza 1987).
+# Each row: (centre_elevation_deg, number_of_patches, azimuth_spacing_deg)
+# The 7 bands + 1 zenith cap yield 145 patches of approximately equal
+# solid angle (~0.0435 sr each; full hemisphere = 2*pi sr).
+TREGENZA_BANDS = [
+    (6.0, 30, 12.0),
+    (18.0, 30, 12.0),
+    (30.0, 24, 15.0),
+    (42.0, 24, 15.0),
+    (54.0, 18, 20.0),
+    (66.0, 12, 30.0),
+    (78.0, 6, 60.0),
+]
+# Zenith cap is a single patch at elevation 90 deg.
+
+
+def generate_tregenza_patches() -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Generate the Tregenza 145-patch sky subdivision.
+
+    Returns a tuple ``(directions, weights)`` where:
+      - *directions* is a 145x3 array of unit direction vectors (z >= 0).
+      - *weights* is a 145-length array of solid-angle weights (sr) that
+        sum to 2*pi (the solid angle of the hemisphere).
+
+    The solid angle of each patch in a band is computed analytically from
+    the band boundaries.  Band *k* spans from ``el_k - delta/2`` to
+    ``el_k + delta/2`` where ``delta = 12 deg`` (the uniform band width
+    in the Tregenza scheme).  The solid angle of a band ring is::
+
+        Omega_band = 2 * pi * (sin(el_hi) - sin(el_lo))
+
+    divided equally among the *n* patches in that band.  The zenith cap
+    covers from 84 deg to 90 deg.
+    """
+    band_width_deg = 12.0  # each band spans 12 degrees of elevation
+    dirs = []
+    weights = []
+
+    for el_centre_deg, n_patches, az_spacing_deg in TREGENZA_BANDS:
+        el_lo = np.radians(el_centre_deg - band_width_deg / 2.0)
+        el_hi = np.radians(el_centre_deg + band_width_deg / 2.0)
+        el_centre = np.radians(el_centre_deg)
+
+        # Solid angle of the full azimuthal band
+        band_omega = 2.0 * np.pi * (np.sin(el_hi) - np.sin(el_lo))
+        patch_omega = band_omega / n_patches
+
+        for j in range(n_patches):
+            az = np.radians(az_spacing_deg * (j + 0.5))
+            dx = np.cos(el_centre) * np.cos(az)
+            dy = np.cos(el_centre) * np.sin(az)
+            dz = np.sin(el_centre)
+            dirs.append([dx, dy, dz])
+            weights.append(patch_omega)
+
+    # Zenith cap: from 84 deg to 90 deg
+    el_lo_zenith = np.radians(84.0)
+    cap_omega = 2.0 * np.pi * (np.sin(np.pi / 2) - np.sin(el_lo_zenith))
+    dirs.append([0.0, 0.0, 1.0])
+    weights.append(cap_omega)
+
+    directions = np.array(dirs)
+    weights = np.array(weights)
+
+    assert len(directions) == 145, f"Expected 145 patches, got {len(directions)}"
+
+    logger.info(
+        f"Tregenza sky: {len(directions)} patches, "
+        f"total solid angle = {weights.sum():.4f} sr "
+        f"(2*pi = {2 * np.pi:.4f})"
+    )
+    return directions, weights
+
 
 def generate_sky_directions(n_patches: int = 145) -> np.ndarray:
     """
@@ -53,7 +132,7 @@ def generate_sky_directions(n_patches: int = 145) -> np.ndarray:
     Uses a simple azimuth x elevation grid that approximates *n_patches*
     directions.  Each direction is a unit vector; no solid-angle weighting
     is applied (for basic SVF this is acceptable; for high-accuracy work,
-    use equal-area Tregenza patches).
+    use equal-area Tregenza patches via ``generate_tregenza_patches``).
 
     Returns:
         Mx3 array of unit direction vectors (z >= 0).
@@ -72,7 +151,7 @@ def generate_sky_directions(n_patches: int = 145) -> np.ndarray:
             dirs.append([dx, dy, dz])
 
     dirs = np.array(dirs)
-    logger.info(f"Generated {len(dirs)} sky directions")
+    logger.info(f"Generated {len(dirs)} sky directions (uniform grid)")
     return dirs
 
 
@@ -81,7 +160,14 @@ def generate_sky_directions(n_patches: int = 145) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 
-def _svf_for_point_obb(origin, sky_directions, obb_tree, max_ray_length, normal=None):
+def _svf_for_point_obb(
+    origin,
+    sky_directions,
+    obb_tree,
+    max_ray_length,
+    normal=None,
+    sky_weights=None,
+):
     """Compute SVF for a single point using a pre-built VTK OBB tree.
 
     This avoids the PyVista wrapper overhead on each ``ray_trace`` call and
@@ -93,6 +179,7 @@ def _svf_for_point_obb(origin, sky_directions, obb_tree, max_ray_length, normal=
         obb_tree: Pre-built ``vtkOBBTree`` locator.
         max_ray_length: Maximum ray travel distance.
         normal: Optional length-3 surface normal for hemisphere filtering.
+        sky_weights: Optional M-length solid-angle weights.
 
     Returns:
         SVF value in [0, 1].
@@ -101,33 +188,58 @@ def _svf_for_point_obb(origin, sky_directions, obb_tree, max_ray_length, normal=
 
     if normal is not None:
         dots = sky_directions @ normal
-        valid_dirs = sky_directions[dots > 0]
+        mask = dots > 0
+        valid_dirs = sky_directions[mask]
+        valid_weights = sky_weights[mask] if sky_weights is not None else None
     else:
         valid_dirs = sky_directions
+        valid_weights = sky_weights
 
     if len(valid_dirs) == 0:
         return 0.0
 
-    visible = 0
     o = origin.tolist()
-    for d in valid_dirs:
-        end = (origin + d * max_ray_length).tolist()
-        pts = vtk.vtkPoints()
-        cell_ids = vtk.vtkIdList()
-        obb_tree.IntersectWithLine(o, end, pts, cell_ids)
-        if pts.GetNumberOfPoints() == 0:
-            visible += 1
 
-    return visible / len(valid_dirs)
+    if valid_weights is not None:
+        # Weighted SVF: sum of visible solid-angle weights / total weights
+        visible_weight = 0.0
+        total_weight = valid_weights.sum()
+        for j, d in enumerate(valid_dirs):
+            end = (origin + d * max_ray_length).tolist()
+            pts = vtk.vtkPoints()
+            cell_ids = vtk.vtkIdList()
+            obb_tree.IntersectWithLine(o, end, pts, cell_ids)
+            if pts.GetNumberOfPoints() == 0:
+                visible_weight += valid_weights[j]
+        return visible_weight / total_weight if total_weight > 0 else 0.0
+    else:
+        # Unweighted SVF: count ratio (legacy behaviour)
+        visible = 0
+        for d in valid_dirs:
+            end = (origin + d * max_ray_length).tolist()
+            pts = vtk.vtkPoints()
+            cell_ids = vtk.vtkIdList()
+            obb_tree.IntersectWithLine(o, end, pts, cell_ids)
+            if pts.GetNumberOfPoints() == 0:
+                visible += 1
+        return visible / len(valid_dirs)
 
 
 def _svf_for_point_multi_ray(
-    origin, sky_directions, tri_mesh, max_ray_length, normal=None
+    origin,
+    sky_directions,
+    tri_mesh,
+    max_ray_length,
+    normal=None,
+    sky_weights=None,
 ):
     """Compute SVF for a single point using ``multi_ray_trace`` (embree).
 
     Batches all M direction rays into a single vectorized call, which is
     significantly faster than looping in Python.
+
+    When *sky_weights* is provided, the SVF is computed as the ratio of
+    visible solid-angle weight to total tested solid-angle weight.
 
     Args:
         origin: Length-3 observer position.
@@ -135,15 +247,19 @@ def _svf_for_point_multi_ray(
         tri_mesh: Triangulated ``pv.PolyData`` scene mesh.
         max_ray_length: Maximum ray travel distance.
         normal: Optional length-3 surface normal for hemisphere filtering.
+        sky_weights: Optional M-length solid-angle weights.
 
     Returns:
         SVF value in [0, 1].
     """
     if normal is not None:
         dots = sky_directions @ normal
-        valid_dirs = sky_directions[dots > 0]
+        mask = dots > 0
+        valid_dirs = sky_directions[mask]
+        valid_weights = sky_weights[mask] if sky_weights is not None else None
     else:
         valid_dirs = sky_directions
+        valid_weights = sky_weights
 
     if len(valid_dirs) == 0:
         return 0.0
@@ -157,8 +273,21 @@ def _svf_for_point_multi_ray(
         origins, directions, first_point=True, retry=True
     )
 
-    n_hit = len(set(intersection_rays))
-    return (n_dirs - n_hit) / n_dirs
+    hit_set = set(intersection_rays)
+
+    if valid_weights is not None:
+        # Weighted SVF
+        total_weight = valid_weights.sum()
+        blocked_weight = sum(valid_weights[r] for r in hit_set)
+        return (
+            (total_weight - blocked_weight) / total_weight
+            if total_weight > 0
+            else 0.0
+        )
+    else:
+        # Unweighted SVF: count ratio (legacy behaviour)
+        n_hit = len(hit_set)
+        return (n_dirs - n_hit) / n_dirs
 
 
 def _build_obb_tree(mesh):
@@ -182,6 +311,7 @@ def _compute_chunk_obb(
     max_ray_length,
     normals,
     mesh_file,
+    sky_weights=None,
 ):
     """Worker function for joblib: compute SVF for a chunk of indices.
 
@@ -198,7 +328,12 @@ def _compute_chunk_obb(
     for k, i in enumerate(indices):
         normal = normals[i] if normals is not None else None
         svf_chunk[k] = _svf_for_point_obb(
-            observer_points[i], sky_directions, obb_tree, max_ray_length, normal
+            observer_points[i],
+            sky_directions,
+            obb_tree,
+            max_ray_length,
+            normal,
+            sky_weights=sky_weights,
         )
     return indices, svf_chunk
 
@@ -210,6 +345,7 @@ def _compute_chunk_multi_ray(
     max_ray_length,
     normals,
     mesh_file,
+    sky_weights=None,
 ):
     """Worker function for joblib using multi_ray_trace (embree).
 
@@ -222,7 +358,12 @@ def _compute_chunk_multi_ray(
     for k, i in enumerate(indices):
         normal = normals[i] if normals is not None else None
         svf_chunk[k] = _svf_for_point_multi_ray(
-            observer_points[i], sky_directions, tri_mesh, max_ray_length, normal
+            observer_points[i],
+            sky_directions,
+            tri_mesh,
+            max_ray_length,
+            normal,
+            sky_weights=sky_weights,
         )
     return indices, svf_chunk
 
@@ -233,6 +374,7 @@ def compute_svf_raycasting(
     sky_directions: np.ndarray,
     max_ray_length: float = 500.0,
     normals: Optional[np.ndarray] = None,
+    sky_weights: Optional[np.ndarray] = None,
     n_jobs: int = 1,
     checkpoint_path: Optional[Path] = None,
     checkpoint_interval: int = 500,
@@ -262,6 +404,10 @@ def compute_svf_raycasting(
         normals: Optional Nx3 surface normals (for facade points).
             If provided, only sky directions in the forward hemisphere
             of each point are tested.
+        sky_weights: Optional M-length array of solid-angle weights for
+            each sky direction.  When provided, the SVF is computed as
+            ``sum(visible_weights) / sum(all_tested_weights)`` instead
+            of the unweighted patch count ratio.
         n_jobs: Number of parallel workers.  ``1`` = sequential (default),
             ``-1`` = use all available cores.
         checkpoint_path: Optional path for checkpoint file (.npz).
@@ -322,6 +468,7 @@ def compute_svf_raycasting(
                     max_ray_length,
                     normals,
                     mesh_file,
+                    sky_weights=sky_weights,
                 )
                 for chunk in chunks
             )
@@ -390,6 +537,7 @@ def compute_svf_raycasting(
                 tri_mesh,
                 max_ray_length,
                 normal,
+                sky_weights=sky_weights,
             )
         else:
             svf[i] = _svf_for_point_obb(
@@ -398,6 +546,7 @@ def compute_svf_raycasting(
                 obb_tree,
                 max_ray_length,
                 normal,
+                sky_weights=sky_weights,
             )
 
         if (i + 1) % 50 == 0 or i == n_obs - 1:
@@ -529,6 +678,7 @@ def compute_svf(
     scene_mesh: pv.PolyData,
     backend: str = "raycasting",
     n_sky_patches: int = 145,
+    sky_model: str = "tregenza",
     normals: Optional[np.ndarray] = None,
     max_ray_length: float = 500.0,
     n_jobs: int = 1,
@@ -543,7 +693,13 @@ def compute_svf(
         observer_points: Nx3 observer positions.
         scene_mesh: Combined scene mesh (terrain + buildings).
         backend: ``"raycasting"`` | ``"gpu"`` | ``"pyviewfactor"``.
-        n_sky_patches: Number of sky hemisphere directions.
+        n_sky_patches: Number of sky hemisphere directions (used only
+            when ``sky_model="uniform"``; ignored for ``"tregenza"``
+            which always produces exactly 145 patches).
+        sky_model: Sky discretization scheme.  ``"tregenza"`` uses the
+            CIE 145-patch equal-area subdivision with solid-angle
+            weighting (recommended).  ``"uniform"`` uses the legacy
+            azimuth x elevation grid with equal patch counting.
         normals: Optional Nx3 normals for facade points.
         max_ray_length: Maximum ray distance (m).
         n_jobs: Number of parallel workers (raycasting backend only).
@@ -556,7 +712,16 @@ def compute_svf(
     Returns:
         N-length array of SVF values in [0, 1].
     """
-    sky_dirs = generate_sky_directions(n_sky_patches)
+    if sky_model == "tregenza":
+        sky_dirs, sky_weights = generate_tregenza_patches()
+    elif sky_model == "uniform":
+        sky_dirs = generate_sky_directions(n_sky_patches)
+        sky_weights = None
+    else:
+        raise ValueError(
+            f"Unknown sky_model: {sky_model!r}. "
+            f"Use 'tregenza' or 'uniform'."
+        )
 
     if backend == "raycasting":
         return compute_svf_raycasting(
@@ -565,6 +730,7 @@ def compute_svf(
             sky_dirs,
             max_ray_length=max_ray_length,
             normals=normals,
+            sky_weights=sky_weights,
             n_jobs=n_jobs,
             checkpoint_path=checkpoint_path,
             checkpoint_interval=checkpoint_interval,
