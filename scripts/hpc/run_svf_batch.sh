@@ -6,7 +6,7 @@
 #SBATCH --mem=32G
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=8
-#SBATCH --partition=sched_mit_hill
+#SBATCH --partition=mit_normal
 #
 # ==========================================================================
 # SVF v2 batch runner for HPC (SLURM)
@@ -24,6 +24,8 @@ set -euo pipefail
 # Configuration
 # ---------------------------------------------------------------------------
 
+# Source module system (not always in PATH on all partitions)
+source /etc/profile.d/modules.sh 2>/dev/null || source /usr/share/modules/init/bash 2>/dev/null || true
 module load miniforge/25.11.0-0
 conda activate ivf
 
