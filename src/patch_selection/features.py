@@ -114,12 +114,27 @@ def _compute_morphometric_features(
     """
     zones = _tiles_to_zones(tiles)
 
-    zones = compute_bcr(buildings, zones)
-    zones = compute_far(buildings, zones, floor_height=floor_height)
-    zones = compute_height_variability(buildings, zones)
-    zones = compute_frontal_area_ratio(buildings, zones, wind_dir=wind_dir)
+    # Ensure buildings have a 'height' column (urban_morphology expects it)
+    bldg = buildings.copy()
+    if "height" not in bldg.columns:
+        for col in ("altura", "h"):
+            if col in bldg.columns:
+                bldg["height"] = bldg[col]
+                break
+    if "height" not in bldg.columns:
+        bldg["height"] = np.nan
 
-    feature_cols = ["bcr", "far", "sigma_h", "lambda_f"]
+    zones = compute_bcr(bldg, zones)
+    zones = compute_far(bldg, zones, floor_height=floor_height)
+    zones = compute_height_variability(bldg, zones)
+
+    # Frontal area ratio for 4 cardinal directions
+    feature_cols = ["bcr", "far", "sigma_h"]
+    for direction, bearing in [("N", 0.0), ("E", 90.0), ("S", 180.0), ("W", 270.0)]:
+        zones = compute_frontal_area_ratio(bldg, zones, wind_dir=bearing)
+        zones = zones.rename(columns={"lambda_f": f"lambda_f_{direction}"})
+        feature_cols.append(f"lambda_f_{direction}")
+
     df = _zones_to_tile_df(zones, feature_cols)
 
     logger.info("Morphometric features computed for %d tiles.", len(df))
