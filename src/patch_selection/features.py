@@ -114,8 +114,12 @@ def _compute_morphometric_features(
     """
     zones = _tiles_to_zones(tiles)
 
-    # Ensure buildings have a 'height' column (urban_morphology expects it)
+    # Ensure buildings have valid geometries and a 'height' column
     bldg = buildings.copy()
+    invalid = ~bldg.geometry.is_valid
+    if invalid.any():
+        bldg.loc[invalid, "geometry"] = bldg.loc[invalid, "geometry"].buffer(0)
+        logger.info("Repaired %d invalid building geometries.", invalid.sum())
     if "height" not in bldg.columns:
         for col in ("altura", "h"):
             if col in bldg.columns:
