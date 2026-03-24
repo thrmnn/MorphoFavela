@@ -224,7 +224,9 @@ def build_building_meshes(
         use_dtm_for_base = True
 
     # Optional filtering for informal areas
-    gdf, _, _ = filter_buildings(gdf, area=area)
+    # skip_area_filter=True: large buildings (schools, commercial) still
+    # physically obstruct the sky and must be present in the SVF scene.
+    gdf, _, _ = filter_buildings(gdf, area=area, skip_area_filter=True)
     logger.info(f"  After filtering: {len(gdf)} buildings")
 
     dtm_array, transform, _, _ = load_dtm(dtm_path)

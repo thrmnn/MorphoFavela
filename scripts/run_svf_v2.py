@@ -39,6 +39,7 @@ logger = logging.getLogger("run_svf_v2")
 
 def run_grid(
     scene_mesh, terrain, footprints_gdf, dtm_path, output_dir, args,
+    boundary_gdf=None,
 ):
     logger.info("=" * 60)
     logger.info("GRID SVF")
@@ -50,6 +51,7 @@ def run_grid(
         grid_spacing=args.grid_spacing,
         pedestrian_height=args.pedestrian_height,
         buffer_around_buildings=args.buffer,
+        boundary_gdf=boundary_gdf,
     )
     logger.info(f"Grid sampling: {len(observers)} points ({time.time()-t0:.1f}s)")
 
@@ -197,7 +199,7 @@ def run_facades(
 def main():
     parser = argparse.ArgumentParser(description="SVF v2 computation")
     parser.add_argument("--area", required=True, help="Area name (e.g. vidigal_tls)")
-    parser.add_argument("--mode", default="all", choices=["grid", "streets", "facades", "all"])
+    parser.add_argument("--mode", default="streets", choices=["grid", "streets", "facades", "all"])
     parser.add_argument("--grid-spacing", type=float, default=2.0)
     parser.add_argument("--street-spacing", type=float, default=1.5)
     parser.add_argument("--facade-spacing", type=float, default=1.0)
@@ -207,8 +209,10 @@ def main():
     parser.add_argument("--max-ray-length", type=float, default=500.0)
     parser.add_argument("--n-jobs", type=int, default=1,
                         help="Number of parallel workers for raycasting (1=sequential, -1=all cores)")
-    parser.add_argument("--buffer", type=float, default=None,
-                        help="Only compute grid SVF within this distance of buildings (m)")
+    parser.add_argument("--buffer", type=float, default=30.0,
+                        help="Only compute grid SVF within this distance of buildings (m, default: 30)")
+    parser.add_argument("--no-buffer", action="store_const", const=None, dest="buffer",
+                        help="Disable proximity filter (compute grid SVF everywhere)")
     parser.add_argument("--building-margin", type=float, default=0.5,
                         help="Safety margin (m) when offsetting street points outside buildings")
     parser.add_argument("--dtm-subsample", type=int, default=1)
@@ -244,6 +248,20 @@ def main():
     )
     logger.info(f"Scene built in {time.time()-t0:.1f}s")
 
+    # DTM coverage diagnostic
+    import rasterio as _rio
+    with _rio.open(dtm_path) as _src:
+        _db = _src.bounds
+    _fb = footprints_gdf.total_bounds
+    logger.info(
+        f"DTM extent:  ({_db.left:.0f}, {_db.bottom:.0f}) - ({_db.right:.0f}, {_db.top:.0f}) "
+        f"[{_db.right-_db.left:.0f} x {_db.top-_db.bottom:.0f}m]"
+    )
+    logger.info(
+        f"Footprints:  ({_fb[0]:.0f}, {_fb[1]:.0f}) - ({_fb[2]:.0f}, {_fb[3]:.0f}) "
+        f"[{_fb[2]-_fb[0]:.0f} x {_fb[3]-_fb[1]:.0f}m]"
+    )
+
     # Visual inspection outputs
     if not args.skip_visual:
         save_scene_stl(scene_mesh, output_dir / "scene.stl")
@@ -263,11 +281,24 @@ def main():
             title=f"{args.area} -- Alignment Check",
         )
 
+    # Load boundary for grid clipping (if available)
+    boundary_path = resolve_boundary(args.area)
+    boundary_gdf = None
+    if boundary_path:
+        import geopandas as _gpd
+        boundary_gdf = _gpd.read_file(boundary_path)
+        import rasterio as _rio2
+        with _rio2.open(dtm_path) as src:
+            if boundary_gdf.crs != src.crs:
+                boundary_gdf = boundary_gdf.to_crs(src.crs)
+        logger.info(f"Loaded boundary for grid clipping: {boundary_path.name}")
+
     modes = [args.mode] if args.mode != "all" else ["grid", "streets", "facades"]
 
     for mode in modes:
         if mode == "grid":
-            run_grid(scene_mesh, terrain, footprints_gdf, dtm_path, output_dir, args)
+            run_grid(scene_mesh, terrain, footprints_gdf, dtm_path, output_dir, args,
+                     boundary_gdf=boundary_gdf)
         elif mode == "streets":
             run_streets(scene_mesh, roads_path, dtm_path, output_dir, args, footprints_gdf=footprints_gdf)
         elif mode == "facades":

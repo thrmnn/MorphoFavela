@@ -33,7 +33,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Areas with raw data needed for SVF computation
-AREAS=(vidigal_tls vidigal rocinha riodaspedras)
+AREAS=(vidigal_tls vidigal rocinha riodaspedras maré)
 
 if [[ "$ACTION" == "push" ]]; then
     echo "=== Pushing code + data to $REMOTE ==="
@@ -77,7 +77,7 @@ if [[ "$ACTION" == "push" ]]; then
     echo "[3/3] Creating output directories..."
     REMOTE_HOST="${REMOTE%%:*}"
     REMOTE_PATH="${REMOTE#*:}"
-    ssh "$REMOTE_HOST" "mkdir -p $REMOTE_PATH/outputs/{vidigal_tls,vidigal,rocinha,riodaspedras}/svf_v2 $REMOTE_PATH/outputs/comparative/typology $REMOTE_PATH/logs"
+    ssh "$REMOTE_HOST" "mkdir -p $REMOTE_PATH/outputs/{vidigal_tls,vidigal,rocinha,riodaspedras,maré}/svf_v2 $REMOTE_PATH/outputs/comparative/typology $REMOTE_PATH/logs"
 
     echo ""
     echo "=== Push complete ==="

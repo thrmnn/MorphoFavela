@@ -21,6 +21,49 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# DTM coverage validation
+# ---------------------------------------------------------------------------
+
+
+def _check_dtm_coverage(
+    dtm_path: Path,
+    data_gdf: gpd.GeoDataFrame,
+    label: str = "data",
+) -> float:
+    """Check what percentage of a GeoDataFrame's extent is covered by the DTM.
+
+    Logs a warning when coverage is below 95%, an error below 50%.
+    Returns the coverage percentage.
+    """
+    with rasterio.open(dtm_path) as src:
+        db = src.bounds
+
+    tb = data_gdf.total_bounds  # [minx, miny, maxx, maxy]
+    data_area = (tb[2] - tb[0]) * (tb[3] - tb[1])
+    if data_area <= 0:
+        return 100.0
+
+    ix_w = max(0, min(db.right, tb[2]) - max(db.left, tb[0]))
+    ix_h = max(0, min(db.top, tb[3]) - max(db.bottom, tb[1]))
+    pct = (ix_w * ix_h) / data_area * 100
+
+    if pct < 50:
+        logger.error(
+            f"DTM covers only {pct:.0f}% of {label} extent — "
+            f"most data will be lost. Re-export DTM to cover full area."
+        )
+    elif pct < 95:
+        logger.warning(
+            f"DTM covers {pct:.0f}% of {label} extent — "
+            f"some data may be lost near edges."
+        )
+    else:
+        logger.info(f"DTM covers {pct:.0f}% of {label} extent.")
+
+    return pct
+
+
+# ---------------------------------------------------------------------------
 # Grid sampling
 # ---------------------------------------------------------------------------
 
@@ -31,6 +74,7 @@ def sample_grid_points(
     grid_spacing: float = 2.0,
     pedestrian_height: float = 1.5,
     buffer_around_buildings: Optional[float] = None,
+    boundary_gdf: Optional[gpd.GeoDataFrame] = None,
 ) -> np.ndarray:
     """
     Generate a regular grid of observer points excluding building interiors.
@@ -42,10 +86,13 @@ def sample_grid_points(
         pedestrian_height: Height above ground for observer.
         buffer_around_buildings: If set, only keep points within this distance
             of at least one building (reduces computation in open areas).
+        boundary_gdf: If set, clip grid domain to this boundary polygon.
 
     Returns:
         Nx3 array of observer positions (x, y, z + pedestrian_height).
     """
+    _check_dtm_coverage(dtm_path, footprints_gdf, label="building footprints")
+
     with rasterio.open(dtm_path) as src:
         bounds = src.bounds  # (left, bottom, right, top)
 
@@ -56,6 +103,17 @@ def sample_grid_points(
     flat_y = yy.ravel()
 
     logger.info(f"Grid: {len(flat_x)} candidate points ({len(xs)}x{len(ys)})")
+
+    # Optional boundary clip (before expensive spatial join)
+    if boundary_gdf is not None and len(boundary_gdf) > 0 and len(flat_x) > 0:
+        from shapely.ops import unary_union
+
+        boundary_poly = unary_union(boundary_gdf.geometry.values)
+        pts_arr = gpd.points_from_xy(flat_x, flat_y)
+        inside_boundary = np.array([boundary_poly.contains(p) for p in pts_arr])
+        flat_x = flat_x[inside_boundary]
+        flat_y = flat_y[inside_boundary]
+        logger.info(f"  After boundary clip: {len(flat_x)} points")
 
     # Exclude points inside building footprints via spatial join
     pts_gdf = gpd.GeoDataFrame(
@@ -75,20 +133,22 @@ def sample_grid_points(
     flat_y = flat_y[ground_mask]
     logger.info(f"  After building mask: {len(flat_x)} ground points")
 
-    # Optional proximity filter
+    # Proximity filter: keep only points within buffer distance of a building
     if buffer_around_buildings is not None and len(flat_x) > 0:
-        from shapely.ops import unary_union
+        import shapely
 
-        buf = unary_union(footprints_gdf.geometry.buffer(buffer_around_buildings))
-        pts_gdf2 = gpd.GeoDataFrame(
-            geometry=[Point(x, y) for x, y in zip(flat_x, flat_y)],
-            crs=footprints_gdf.crs,
-        )
-        near_mask = pts_gdf2.geometry.within(buf).values
+        tree = STRtree(footprints_gdf.geometry.values)
+        pts = gpd.points_from_xy(flat_x, flat_y)
+        nearest_idx = tree.nearest(pts)
+        geom_arr = np.asarray(footprints_gdf.geometry.values)
+        distances = shapely.distance(pts, geom_arr[nearest_idx])
+        near_mask = distances <= buffer_around_buildings
+        n_before = len(flat_x)
         flat_x = flat_x[near_mask]
         flat_y = flat_y[near_mask]
         logger.info(
-            f"  After proximity filter ({buffer_around_buildings}m): {len(flat_x)} points"
+            f"  After proximity filter ({buffer_around_buildings}m): "
+            f"{len(flat_x)} points ({n_before - len(flat_x)} removed)"
         )
 
     # Sample Z from DTM
@@ -336,6 +396,8 @@ def sample_street_points(
 
     gdf_pts = gpd.GeoDataFrame(rows, crs=roads_gdf.crs)
 
+    _check_dtm_coverage(dtm_path, gdf_pts, label="road network")
+
     # Offset points trapped inside buildings (before Z sampling)
     if footprints_gdf is not None and len(footprints_gdf) > 0:
         gdf_pts = _offset_points_outside_buildings(
@@ -352,6 +414,11 @@ def sample_street_points(
 
     # Drop points with invalid elevation
     valid = np.isfinite(zs)
+    n_dropped = int((~valid).sum())
+    if n_dropped > 0:
+        logger.warning(
+            f"  Dropped {n_dropped}/{len(zs)} street points outside DTM bounds"
+        )
     gdf_pts = gdf_pts[valid].reset_index(drop=True)
 
     logger.info(f"  Street sample points: {len(gdf_pts)}")

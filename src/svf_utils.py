@@ -65,19 +65,27 @@ def extract_terrain_surface(mesh: pv.PolyData) -> pv.PolyData:
     return terrain
 
 
-def filter_buildings(footprints: gpd.GeoDataFrame, area: str = None) -> tuple:
+def filter_buildings(
+    footprints: gpd.GeoDataFrame,
+    area: str = None,
+    skip_area_filter: bool = False,
+) -> tuple:
     """
     Filter buildings based on area and height thresholds, and cluster filtering (for informal areas only).
 
-    Uses connected components analysis to identify the main building cluster and filter out isolated buildings.
+    Uses connected components analysis to identify significant building clusters
+    and filter out truly isolated buildings.
 
     Args:
         footprints: GeoDataFrame with building footprints
         area: Optional area name to determine if filtering should be applied
+        skip_area_filter: If True, skip the footprint-area filter. Use this
+            for SVF scene building where large buildings (schools, commercial)
+            still physically obstruct the sky and must be kept.
 
     Returns:
         Tuple of (filtered_footprints, isolated_footprints, area_filtered_footprints):
-        - filtered_footprints: GeoDataFrame with valid buildings in main cluster
+        - filtered_footprints: GeoDataFrame with valid buildings in significant clusters
         - isolated_footprints: GeoDataFrame with isolated buildings (for visualization)
         - area_filtered_footprints: GeoDataFrame with buildings filtered by area threshold (for visualization)
     """
@@ -101,9 +109,9 @@ def filter_buildings(footprints: gpd.GeoDataFrame, area: str = None) -> tuple:
         footprints = footprints.copy()
         footprints["area"] = footprints.geometry.area
 
-    # Filter by area first - track what was filtered
+    # Filter by footprint area — skip for SVF where large buildings matter
     area_filtered = gpd.GeoDataFrame(geometry=[], crs=footprints.crs)
-    if MAX_FILTER_AREA is not None:
+    if MAX_FILTER_AREA is not None and not skip_area_filter:
         area_mask = footprints["area"] <= MAX_FILTER_AREA
         filtered_by_area = (~area_mask).sum()
         area_filtered = footprints[~area_mask].copy()  # Buildings filtered by area
@@ -114,8 +122,10 @@ def filter_buildings(footprints: gpd.GeoDataFrame, area: str = None) -> tuple:
             print(
                 f"    Filtered out {filtered_by_area} buildings with area > {MAX_FILTER_AREA}m²"
             )
+    elif skip_area_filter:
+        print("    Skipping footprint-area filter (SVF mode: large buildings obstruct sky)")
 
-    # Apply cluster filtering to identify main blob
+    # Apply cluster filtering to identify significant clusters
     if len(footprints) == 0:
         isolated = gpd.GeoDataFrame(
             geometry=[],
@@ -140,26 +150,32 @@ def filter_buildings(footprints: gpd.GeoDataFrame, area: str = None) -> tuple:
     return cluster_filtered, isolated, area_filtered
 
 
-def filter_isolated_buildings(footprints: gpd.GeoDataFrame) -> tuple:
+def filter_isolated_buildings(
+    footprints: gpd.GeoDataFrame,
+    min_cluster_buildings: int = 10,
+) -> tuple:
     """
     Filter out isolated buildings using connected components analysis.
 
-    Buffers buildings and finds the largest connected component (main cluster).
-    Buildings not in the main cluster are considered isolated.
+    Buffers buildings and finds connected components.  Keeps all components
+    with at least *min_cluster_buildings* buildings (not just the single
+    largest), so multi-community areas split by highways are preserved.
 
     Args:
         footprints: GeoDataFrame with building footprints
+        min_cluster_buildings: Minimum number of buildings for a component
+            to be kept (default 10).
 
     Returns:
-        Tuple of (main_cluster_footprints, isolated_footprints):
-        - main_cluster_footprints: Buildings in the main cluster
+        Tuple of (kept_footprints, isolated_footprints):
+        - kept_footprints: Buildings in significant clusters
         - isolated_footprints: Isolated buildings (for visualization)
     """
     if len(footprints) == 0:
         isolated = gpd.GeoDataFrame(geometry=[], crs=footprints.crs)
         return footprints, isolated
 
-    print("    Identifying main building cluster...")
+    print("    Identifying building clusters...")
     initial_count = len(footprints)
 
     # Buffer buildings to account for gaps between them
@@ -181,25 +197,30 @@ def filter_isolated_buildings(footprints: gpd.GeoDataFrame) -> tuple:
         isolated = gpd.GeoDataFrame(geometry=[], crs=footprints.crs)
         return footprints, isolated
 
-    # Find the largest component (main cluster)
-    component_areas = [comp.area for comp in components]
-    main_component_idx = np.argmax(component_areas)
-    main_component = components[main_component_idx]
+    # Count buildings per component and keep significant ones
+    in_any_significant = np.zeros(len(footprints), dtype=bool)
+    component_stats = []
 
-    main_area = component_areas[main_component_idx]
-    total_area = sum(component_areas)
-    main_pct = 100 * main_area / total_area if total_area > 0 else 0
+    for i, comp in enumerate(components):
+        mask = buffered.intersects(comp).values
+        n_buildings = mask.sum()
+        component_stats.append((i, n_buildings, comp.area))
+        if n_buildings >= min_cluster_buildings:
+            in_any_significant |= mask
+
+    component_stats.sort(key=lambda x: x[1], reverse=True)
+    n_kept_clusters = sum(1 for _, n, _ in component_stats if n >= min_cluster_buildings)
 
     print(
-        f"    Found {len(components)} component(s), main cluster: {main_pct:.1f}% of total area"
+        f"    Found {len(components)} component(s), "
+        f"{n_kept_clusters} significant (>={min_cluster_buildings} buildings)"
     )
+    for i, (idx, n, area) in enumerate(component_stats[:5]):
+        status = "KEPT" if n >= min_cluster_buildings else "dropped"
+        print(f"      Component {i}: {n:,} buildings, {area/1e6:.3f} km² [{status}]")
 
-    # Identify which buildings are in the main component
-    # A building is in the main cluster if its buffered geometry intersects the main component
-    in_main_cluster = buffered.intersects(main_component)
-
-    main_cluster_footprints = footprints[in_main_cluster].copy()
-    isolated_footprints = footprints[~in_main_cluster].copy()
+    kept_footprints = footprints[in_any_significant].copy()
+    isolated_footprints = footprints[~in_any_significant].copy()
 
     isolated_count = len(isolated_footprints)
     if isolated_count > 0:
@@ -207,7 +228,7 @@ def filter_isolated_buildings(footprints: gpd.GeoDataFrame) -> tuple:
             f"    Isolated buildings: {isolated_count} ({100 * isolated_count / initial_count:.1f}%)"
         )
 
-    return main_cluster_footprints, isolated_footprints
+    return kept_footprints, isolated_footprints
 
 
 def load_building_footprints(

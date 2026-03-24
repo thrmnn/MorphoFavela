@@ -27,8 +27,8 @@
 # Setup — must happen BEFORE set -e so module sourcing doesn't kill the script
 # ---------------------------------------------------------------------------
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# Use SLURM_SUBMIT_DIR (where sbatch was invoked) or fall back to ~/IVF
+PROJECT_ROOT="${SLURM_SUBMIT_DIR:-$HOME/IVF}"
 cd "${PROJECT_ROOT}"
 mkdir -p logs
 

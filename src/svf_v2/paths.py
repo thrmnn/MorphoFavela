@@ -42,6 +42,12 @@ AREA_FILES = {
         "footprints": "complexo_do_alemao_buildings.shp",
         "roads": "roads_complexo_do_alemao.shp",
     },
+    "maré": {
+        "dtm": "mare_dtm.tif",
+        "footprints": "buildings_mare.shp",
+        "roads": "street_mare.shp",
+        "boundary": "mare_boundary.shp",
+    },
 }
 
 
