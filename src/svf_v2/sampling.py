@@ -341,9 +341,14 @@ def sample_street_points(
     pedestrian_height: float = 1.5,
     footprints_gdf: Optional[gpd.GeoDataFrame] = None,
     building_safety_margin: float = 0.5,
+    boundary_gdf: Optional[gpd.GeoDataFrame] = None,
 ) -> gpd.GeoDataFrame:
     """
     Sample observer points along road centre-lines.
+
+    When a *boundary_gdf* is provided, road geometries are clipped to the
+    boundary **before** sampling.  This prevents observation points on
+    highways or avenues outside the community from biasing SVF statistics.
 
     Args:
         roads_path: Path to roads shapefile.
@@ -355,6 +360,8 @@ def sample_street_points(
             exterior location plus *building_safety_margin*.
         building_safety_margin: Buffer distance (m) beyond the building
             boundary when offsetting trapped points.
+        boundary_gdf: If set, clip road geometries to this boundary polygon
+            before sampling, eliminating edge-effect bias from external roads.
 
     Returns:
         GeoDataFrame with columns:
@@ -371,6 +378,21 @@ def sample_street_points(
     if roads_gdf.crs is not None and roads_gdf.crs != dtm_crs:
         logger.info(f"  Reprojecting roads from {roads_gdf.crs} to {dtm_crs}")
         roads_gdf = roads_gdf.to_crs(dtm_crs)
+
+    # Clip roads to boundary — prevents sampling on external highways/avenues
+    if boundary_gdf is not None and len(boundary_gdf) > 0:
+        from shapely.ops import unary_union
+
+        boundary_poly = unary_union(boundary_gdf.geometry.values)
+        n_before = len(roads_gdf)
+        roads_gdf = gpd.clip(roads_gdf, boundary_poly)
+        # clip can produce MultiLineString fragments; explode to LineStrings
+        roads_gdf = roads_gdf.explode(index_parts=False).reset_index(drop=True)
+        # Drop tiny fragments from clipping artifacts
+        roads_gdf = roads_gdf[roads_gdf.geometry.length > spacing]
+        logger.info(
+            f"  Clipped roads to boundary: {n_before} -> {len(roads_gdf)} segments"
+        )
 
     rows = []
     for idx, row in tqdm(

@@ -76,7 +76,7 @@ def run_grid(
 
 def run_streets(
     scene_mesh, roads_path, dtm_path, output_dir, args,
-    footprints_gdf=None,
+    footprints_gdf=None, boundary_gdf=None,
 ):
     logger.info("=" * 60)
     logger.info("STREET SVF")
@@ -89,6 +89,7 @@ def run_streets(
         pedestrian_height=args.pedestrian_height,
         footprints_gdf=footprints_gdf,
         building_safety_margin=args.building_margin,
+        boundary_gdf=boundary_gdf,
     )
     logger.info(f"Street sampling: {len(street_gdf)} points ({time.time()-t0:.1f}s)")
 
@@ -131,16 +132,6 @@ def run_streets(
     with rio.open(dtm_path) as src:
         if roads_gdf.crs != src.crs:
             roads_gdf = roads_gdf.to_crs(src.crs)
-
-    # Load boundary if available
-    boundary_path = resolve_boundary(args.area)
-    boundary_gdf = None
-    if boundary_path:
-        boundary_gdf = geopandas.read_file(boundary_path)
-        with rio.open(dtm_path) as src:
-            if boundary_gdf.crs != src.crs:
-                boundary_gdf = boundary_gdf.to_crs(src.crs)
-        logger.info(f"Loaded boundary: {boundary_path}")
 
     save_street_results(
         street_gdf, output_dir,
@@ -300,7 +291,8 @@ def main():
             run_grid(scene_mesh, terrain, footprints_gdf, dtm_path, output_dir, args,
                      boundary_gdf=boundary_gdf)
         elif mode == "streets":
-            run_streets(scene_mesh, roads_path, dtm_path, output_dir, args, footprints_gdf=footprints_gdf)
+            run_streets(scene_mesh, roads_path, dtm_path, output_dir, args,
+                        footprints_gdf=footprints_gdf, boundary_gdf=boundary_gdf)
         elif mode == "facades":
             run_facades(scene_mesh, footprints_gdf, dtm_path, output_dir, args)
 
