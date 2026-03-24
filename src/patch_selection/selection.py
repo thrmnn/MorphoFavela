@@ -439,6 +439,8 @@ def select_patches(
             "n_clusters": n_clusters,
             "pca_explained_variance": pca_evr.tolist(),
             "pca_loadings": pca_loadings.tolist(),
+            "cluster_labels": labels.tolist(),
+            "pca_scores": pca_scores.tolist(),
             "cluster_profiles": cluster_profiles,
         }
     )

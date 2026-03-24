@@ -141,6 +141,7 @@ def main():
         tiles_feat = compute_tile_features(
             tiles, buildings_gdf, streets=roads_gdf,
             height_col=args.height_field,
+            dtm_path=dtm_path, svf_path=svf_path,
         )
         # Rejoin geometry from tiles (features is a plain DataFrame)
         geom_cols = ["tile_id", "geometry"]
@@ -254,19 +255,65 @@ def main():
             from src.patch_selection.visualize import (
                 plot_tile_clusters,
                 plot_pca_scatter,
+                plot_feature_distributions,
+                plot_dtm_coverage,
             )
+
+            # Merge cluster labels + PCA scores into all tiles for visualization
+            if "selected" in dir() and "cluster" in selected.columns:
+                cluster_cols = ["tile_id", "cluster"]
+                if "pc1" in selected.columns:
+                    cluster_cols.extend(["pc1", "pc2"])
+                cluster_map = selected[cluster_cols].drop_duplicates("tile_id")
+                # Get cluster for ALL tiles from the selection metadata
+                if "metadata" in dir() and "cluster_labels" in metadata:
+                    import numpy as _np
+                    labels = metadata["cluster_labels"]
+                    tiles_feat_gdf["cluster"] = labels[:len(tiles_feat_gdf)]
+                if "metadata" in dir() and "pca_scores" in metadata:
+                    scores = _np.array(metadata["pca_scores"])
+                    if scores.shape[0] == len(tiles_feat_gdf) and scores.shape[1] >= 2:
+                        tiles_feat_gdf["pc1"] = scores[:, 0]
+                        tiles_feat_gdf["pc2"] = scores[:, 1]
+
+            # Tile cluster map
             plot_tile_clusters(
                 tiles_feat_gdf, selected, output_dir / "tile_clusters.png",
                 boundary=boundary_gdf, buildings=buildings_gdf,
             )
+
+            # PCA scatter
+            ev = metadata.get("pca_explained_variance") if "metadata" in dir() else None
             plot_pca_scatter(
                 tiles_feat_gdf, selected, output_dir / "pca_scatter.png",
+                explained_variance=ev,
             )
+
+            # Feature distributions per cluster
+            skip_cols = {
+                "tile_id", "geometry", "geometry_buffered", "geometry_buffered_wkt",
+                "classification", "boundary_overlap_frac", "n_buildings",
+                "has_dtm_coverage", "buffer_distance_m", "cluster", "pc1", "pc2",
+                "selection_reason",
+            }
+            feat_cols = [
+                c for c in tiles_feat_gdf.columns
+                if c not in skip_cols and tiles_feat_gdf[c].dtype in ("float64", "float32", "int64")
+            ]
+            if feat_cols:
+                plot_feature_distributions(
+                    tiles_feat_gdf, feat_cols, output_dir / "feature_distributions.png",
+                )
+
+            # DTM coverage map
+            plot_dtm_coverage(
+                tiles_feat_gdf, output_dir / "dtm_coverage.png",
+                boundary=boundary_gdf,
+            )
+
             logger.info("Saved visualizations to %s", output_dir)
-        except ImportError:
-            logger.warning("Visualization module not yet implemented — skipping.")
         except Exception as e:
-            logger.warning("Visualization failed: %s", e)
+            logger.warning("Visualization failed: %s", e, exc_info=True)
 
     logger.info("Done.")
 
