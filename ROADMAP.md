@@ -336,16 +336,26 @@
 
 ## Next Steps & Priorities
 
+### Recently Completed
+- [x] Tregenza 145 equal-area patches (PR #6)
+- [x] Makefile build automation (PR #5)
+- [x] CFD patch selection framework — tiling, 31 features, clustering, export (PR #7)
+- [x] Mare onboarding — SVF + morphology + patch selection complete
+- [x] Complexo do Alemao re-extraction (21,729 buildings)
+
 ### High Priority
 
-#### Tregenza 145 Equal-Area Patches (In Progress)
-- [ ] Replace uniform hemisphere discretization with Tregenza 145-patch scheme
-- [ ] Validate against benchmark SVF tools (RayMan, SOLWEIG)
-- Work branch: `feature/tregenza-patches`
+#### HPC SVF Computation
+- [ ] Run full SVF for Complexo do Alemao (21,729 buildings)
+- [ ] Run full SVF for Vidigal (full extent, not just TLS subset)
 
-#### Makefile (In Progress)
-- [ ] Build automation for common workflows (compute, test, lint)
-- Work branch: `chore/cleanup-and-makefile`
+#### Cross-Area Clustering
+- [ ] Cross-area patch clustering across all 5 CFD campaign areas
+- [ ] Unified typology labels for OpenFOAM domain selection
+
+#### OpenFOAM Handoff
+- [ ] Test OpenFOAM mesh generation from exported patch geometries
+- [ ] Validate boundary condition setup for selected patches
 
 #### Validation
 - [ ] Benchmark SVF results against RayMan, SOLWEIG, or other reference tools
@@ -375,7 +385,7 @@
 
 #### Environmental Performance Modeling (Phase 5)
 - [ ] Thermal comfort modeling
-- [ ] Wind flow analysis
+- [ ] Wind flow analysis (CFD campaign in progress)
 
 #### Documentation
 - [ ] API documentation (Sphinx)
@@ -458,7 +468,8 @@
 
 ## Notes
 
-- Tregenza 145-patch scheme will improve SVF accuracy and comparability with standard tools
+- Tregenza 145-patch SVF is merged and production-ready
 - Validation against benchmark tools is needed before publication
 - All Phase 2, 3, 3.5, 4, and 4.5 analyses are complete and production-ready
-- Current focus: Tregenza patches, Makefile, and validation
+- CFD campaign: 5 areas (vidigal_tls, rocinha, riodaspedras, complexo_do_alemao, mare); CDD excluded due to broken data
+- Current focus: HPC SVF for remaining areas, cross-area clustering, OpenFOAM handoff
