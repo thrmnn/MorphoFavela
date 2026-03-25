@@ -29,7 +29,7 @@ conda activate ivf
 set -euo pipefail
 
 # Array mode: map task ID to area
-AREA_LIST=("maré" "rocinha")
+AREA_LIST=("complexo_do_alemao" "vidigal")
 
 if [[ $# -ge 1 ]]; then
     AREA="$1"

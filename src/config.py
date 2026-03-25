@@ -24,6 +24,15 @@ SUPPORTED_AREAS = [
     "complexo_do_alemao",
 ]
 
+# CFD campaign areas (subset of SUPPORTED_AREAS selected for wind simulation)
+CFD_CAMPAIGN_AREAS = [
+    "vidigal_tls",
+    "rocinha",
+    "riodaspedras",
+    "complexo_do_alemao",
+    "maré",
+]
+
 # Area classification: formal vs informal
 FORMAL_AREAS = ["copacabana"]  # Formal settlements (no filtering)
 INFORMAL_AREAS = [

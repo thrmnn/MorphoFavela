@@ -15,6 +15,7 @@ AREA_FILES = {
         "dtm": "vidigal_dtm_cropped.tif",
         "footprints": "vidigal_buildings.shp",
         "roads": "roads_vidigal.shp",
+        "boundary": "Vidigal_Limit.shp",  # shares vidigal's boundary
     },
     "vidigal": {
         "dtm": "DTM_Vidigal.tif",
@@ -26,11 +27,13 @@ AREA_FILES = {
         "dtm": "riodaspedras_dtm.tif",
         "footprints": "riodaspedras_buildings.shp",
         "roads": "roads_riodaspedras.shp",
+        "boundary": "riodaspedras_boundary.shp",
     },
     "rocinha": {
         "dtm": "rocinha_dtm.tif",
         "footprints": "rocinha_buildings.shp",
         "roads": "roads_rocinha.shp",
+        "boundary": "rocinha_boundary.shp",
     },
     "cidade_de_deus": {
         "dtm": "cidade_de_deus_dtm.tif",
@@ -41,6 +44,7 @@ AREA_FILES = {
         "dtm": "complexo_do_alemao_dtm.tif",
         "footprints": "complexo_do_alemao_buildings.shp",
         "roads": "roads_complexo_do_alemao.shp",
+        "boundary": "complexo_do_alemao_boundary.shp",
     },
     "maré": {
         "dtm": "mare_dtm.tif",

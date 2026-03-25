@@ -44,7 +44,7 @@ set -euo pipefail
 # Configuration
 # ---------------------------------------------------------------------------
 
-DEFAULT_AREAS=("rocinha" "vidigal_tls" "vidigal")
+DEFAULT_AREAS=("vidigal" "rocinha" "riodaspedras" "complexo_do_alemao" "maré")
 
 # SVF parameters
 BACKEND="raycasting"
