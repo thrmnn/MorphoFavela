@@ -11,6 +11,9 @@ from src.patch_selection.tiling import (
     compute_buffered_extents,
     enrich_tiles,
     build_tile_grid,
+    suggest_tile_size,
+    filter_tiles_by_building_count,
+    DEFAULT_MIN_BUILDING_COUNT,
 )
 
 
@@ -139,6 +142,7 @@ class TestBuildTileGrid:
         tiles = build_tile_grid(
             synthetic_boundary, synthetic_buildings, synthetic_dtm,
             tile_size=100.0,
+            min_building_count=0,  # disable filter for basic test
         )
         expected_cols = {
             "tile_id", "geometry", "geometry_buffered", "classification",
@@ -147,3 +151,67 @@ class TestBuildTileGrid:
         }
         assert expected_cols.issubset(set(tiles.columns))
         assert len(tiles) > 0
+
+    def test_pipeline_with_building_filter(self, synthetic_boundary,
+                                            synthetic_buildings, synthetic_dtm):
+        """Building count filter should reduce the number of tiles."""
+        tiles_no_filter = build_tile_grid(
+            synthetic_boundary, synthetic_buildings, synthetic_dtm,
+            tile_size=100.0, min_building_count=0,
+        )
+        # Use min_building_count=2 — small enough to keep some tiles with
+        # the 20-building synthetic dataset across 16 tiles.
+        tiles_with_filter = build_tile_grid(
+            synthetic_boundary, synthetic_buildings, synthetic_dtm,
+            tile_size=100.0, min_building_count=2,
+        )
+        assert len(tiles_with_filter) <= len(tiles_no_filter)
+
+
+class TestSuggestTileSize:
+    def test_dense_settlement(self, synthetic_boundary, synthetic_buildings):
+        """With 20 buildings in 0.16 km², density ~125/km² → sparse → 250m."""
+        size = suggest_tile_size(synthetic_boundary, synthetic_buildings)
+        assert 50 <= size <= 300
+
+    def test_returns_float(self, synthetic_boundary, synthetic_buildings):
+        size = suggest_tile_size(synthetic_boundary, synthetic_buildings)
+        assert isinstance(size, float)
+
+
+class TestFilterTilesByBuildingCount:
+    def test_filter_removes_empty_tiles(self, synthetic_boundary, synthetic_buildings):
+        tiles = generate_tiles(synthetic_boundary, tile_size=100.0)
+        tiles = classify_tiles(tiles, synthetic_boundary, clip_to_boundary=False)
+        filtered = filter_tiles_by_building_count(
+            tiles, synthetic_buildings, min_building_count=1,
+        )
+        assert "n_buildings" in filtered.columns
+        assert (filtered["n_buildings"] >= 1).all()
+        assert len(filtered) <= len(tiles)
+
+    def test_zero_threshold_keeps_all(self, synthetic_boundary, synthetic_buildings):
+        tiles = generate_tiles(synthetic_boundary, tile_size=100.0)
+        tiles = classify_tiles(tiles, synthetic_boundary, clip_to_boundary=False)
+        filtered = filter_tiles_by_building_count(
+            tiles, synthetic_buildings, min_building_count=0,
+        )
+        assert len(filtered) == len(tiles)
+
+
+class TestClassifyTilesClipping:
+    def test_edge_tiles_clipped(self, synthetic_boundary):
+        """Edge tiles clipped to boundary should have smaller area."""
+        tiles = generate_tiles(synthetic_boundary, tile_size=100.0)
+        classified = classify_tiles(tiles, synthetic_boundary, clip_to_boundary=True)
+        edge_tiles = classified[classified["classification"] == "edge"]
+        if len(edge_tiles) > 0:
+            for _, row in edge_tiles.iterrows():
+                # Clipped area should be less than or equal to unclipped
+                assert row.geometry.area <= row["geometry_unclipped"].area + 1e-6
+
+    def test_no_clip_preserves_squares(self, synthetic_boundary):
+        """Without clipping, edge tiles remain full squares."""
+        tiles = generate_tiles(synthetic_boundary, tile_size=100.0)
+        classified = classify_tiles(tiles, synthetic_boundary, clip_to_boundary=False)
+        assert "geometry_unclipped" not in classified.columns

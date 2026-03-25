@@ -13,8 +13,8 @@ Feature groups
 3. Network features — road_density, intersection_density,
    street_orientation_entropy.
 4. SVF aggregation — svf_mean, svf_std from pre-computed SVF points.
-5. Topography — elev_mean, elev_range, slope_mean, dtm_coverage_frac
-   from a DTM raster.
+5. Topography — elev_mean, elev_range, slope_mean, slope_std,
+   terrain_ruggedness, dtm_coverage_frac from a DTM raster.
 6. Spatial texture — lacunarity, fractal_dim_box, gini_building_area.
 7. Porosity and orientation — porosity_N/E/S/W, orientation_entropy.
 """
@@ -42,6 +42,53 @@ from src.urban_morphology import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Clustering feature selection
+# ---------------------------------------------------------------------------
+# Features listed here are COMPUTED (for export / analysis) but EXCLUDED from
+# PCA and clustering.  Reasons:
+#   - Perfect redundancies with another feature (r ≈ 1.0)
+#   - Data-quality metric, not a morphometric feature
+#   - Too noisy for stable clustering (extreme CV / outliers)
+
+CLUSTERING_EXCLUDE: list[str] = [
+    # Redundant with H_std (r=1.0)
+    "sigma_h",
+    # Symmetric with lambda_f_N / lambda_f_E (r=1.0)
+    "lambda_f_S",
+    "lambda_f_W",
+    # Symmetric with porosity_N / porosity_E (r=1.0)
+    "porosity_S",
+    "porosity_W",
+    # Near-duplicate of H_mean (r=0.99)
+    "H_median",
+    # Data-quality metric — use as a filter, not a clustering feature
+    "dtm_coverage_frac",
+    # Too noisy (CV > 3, extreme outliers) — unreliable for clustering
+    "H_skewness",
+    "H_kurtosis",
+]
+
+
+def get_clustering_features(all_feature_columns: list[str]) -> list[str]:
+    """Return the subset of *all_feature_columns* suitable for PCA/clustering.
+
+    Filters out features in :data:`CLUSTERING_EXCLUDE`.
+
+    Parameters
+    ----------
+    all_feature_columns : list[str]
+        Full list of computed feature column names (excluding ``tile_id``).
+
+    Returns
+    -------
+    list[str]
+        Feature names to use for clustering, preserving original order.
+    """
+    exclude_set = set(CLUSTERING_EXCLUDE)
+    return [c for c in all_feature_columns if c not in exclude_set]
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +331,7 @@ def _compute_street_features(
             result[feat] = np.nan
         return result
 
-    max_entropy = np.log(36)  # max Shannon entropy for 36 bins
+    max_entropy = np.log2(36)  # max Shannon entropy for 36 bins
     records: list[dict] = []
 
     for _, tile in tiles.iterrows():
@@ -346,7 +393,7 @@ def _compute_street_features(
             counts, _ = np.histogram(bearings_arr, bins=bins)
             counts = counts[counts > 0]
             probs = counts / counts.sum()
-            entropy = -np.sum(probs * np.log(probs))
+            entropy = -np.sum(probs * np.log2(probs))
             # Normalise by max entropy for 36 bins
             orientation_entropy = float(entropy / max_entropy)
         else:
@@ -468,6 +515,9 @@ def _compute_topography_features(
     * **elev_mean** — mean elevation from DTM within tile
     * **elev_range** — max − min elevation within tile
     * **slope_mean** — mean slope magnitude (degrees) via ``np.gradient``
+    * **slope_std** — standard deviation of slope within tile (terrain variability)
+    * **terrain_ruggedness** — Terrain Ruggedness Index (TRI): mean absolute
+      difference between each cell and its 8 neighbours
     * **dtm_coverage_frac** — fraction of DTM pixels that are valid (not NaN)
 
     Parameters
@@ -481,9 +531,12 @@ def _compute_topography_features(
     -------
     DataFrame
         Columns: ``tile_id``, ``elev_mean``, ``elev_range``, ``slope_mean``,
-        ``dtm_coverage_frac``.
+        ``slope_std``, ``terrain_ruggedness``, ``dtm_coverage_frac``.
     """
-    feature_names = ["elev_mean", "elev_range", "slope_mean", "dtm_coverage_frac"]
+    feature_names = [
+        "elev_mean", "elev_range", "slope_mean", "slope_std",
+        "terrain_ruggedness", "dtm_coverage_frac",
+    ]
 
     # Fast path: no DTM
     if dtm_path is None or not Path(dtm_path).exists():
@@ -543,13 +596,41 @@ def _compute_topography_features(
             slope_rad = np.arctan(np.sqrt(dx**2 + dy**2))
             slope_deg = np.degrees(slope_rad)
             # Only average over valid pixels
-            slope_mean = float(np.mean(slope_deg[valid]))
+            slope_valid = slope_deg[valid]
+            slope_mean = float(np.mean(slope_valid))
+            slope_std = float(np.std(slope_valid, ddof=0))
+
+            # Terrain Ruggedness Index (TRI): mean absolute difference
+            # between each cell and its 8 neighbours.
+            rows_f, cols_f = data_filled.shape
+            if rows_f >= 3 and cols_f >= 3:
+                centre = data_filled[1:-1, 1:-1]
+                tri_sum = np.zeros_like(centre)
+                for dr in (-1, 0, 1):
+                    for dc in (-1, 0, 1):
+                        if dr == 0 and dc == 0:
+                            continue
+                        tri_sum += np.abs(
+                            data_filled[1 + dr:rows_f - 1 + dr,
+                                        1 + dc:cols_f - 1 + dc] - centre
+                        )
+                tri_grid = tri_sum / 8.0
+                # Restrict to valid interior pixels
+                valid_interior = valid[1:-1, 1:-1]
+                if valid_interior.any():
+                    terrain_ruggedness = float(np.mean(tri_grid[valid_interior]))
+                else:
+                    terrain_ruggedness = np.nan
+            else:
+                terrain_ruggedness = np.nan
 
             records.append({
                 "tile_id": tile_id,
                 "elev_mean": elev_mean,
                 "elev_range": elev_range,
                 "slope_mean": slope_mean,
+                "slope_std": slope_std,
+                "terrain_ruggedness": terrain_ruggedness,
                 "dtm_coverage_frac": dtm_coverage_frac,
             })
 
@@ -696,11 +777,11 @@ def _fractal_dimension_box_counting(binary_raster: np.ndarray) -> float:
 def _gini_coefficient(values: np.ndarray) -> float:
     """Compute the Gini coefficient of an array of values.
 
-    If 0 or 1 values, returns 0.
+    If 0 or 1 values, returns NaN (insufficient data).
     """
     n = len(values)
     if n <= 1:
-        return 0.0
+        return np.nan
     x_sorted = np.sort(values)
     total = x_sorted.sum()
     if total == 0:
@@ -784,7 +865,7 @@ def _compute_texture_features(
             areas = tile_buildings.geometry.area.values
             gini = _gini_coefficient(areas)
         else:
-            gini = 0.0
+            gini = np.nan
 
         records.append({
             "tile_id": tile_id,

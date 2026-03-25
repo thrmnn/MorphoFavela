@@ -14,6 +14,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
+from src.patch_selection.features import CLUSTERING_EXCLUDE, get_clustering_features
 from src.spatial_analysis import build_spatial_weights
 from src.typology import compute_cluster_profiles, normalize_features
 
@@ -353,6 +354,8 @@ def select_patches(
     n_clusters: int | None = None,
     k_range: range = range(4, 16),
     random_state: int = 42,
+    auto_exclude: bool = True,
+    min_building_count: int = 0,
 ) -> tuple[gpd.GeoDataFrame, dict[str, Any]]:
     """Full pipeline: standardise, reduce, cluster, and select representative tiles.
 
@@ -361,7 +364,9 @@ def select_patches(
     tiles_gdf : GeoDataFrame
         Tiles with morphometric feature columns.
     feature_columns : list[str]
-        Column names to use as clustering features.
+        Column names to use as clustering features.  When *auto_exclude* is
+        True, features listed in :data:`CLUSTERING_EXCLUDE` are automatically
+        removed before PCA/clustering but are still present in the output.
     n_clusters : int or None
         Fixed number of clusters.  If *None*, the optimal *k* is auto-detected
         via silhouette sweep over *k_range*.
@@ -369,6 +374,12 @@ def select_patches(
         Candidate cluster counts when *n_clusters* is None.
     random_state : int
         Random seed for reproducibility.
+    auto_exclude : bool
+        If True (default), apply :data:`CLUSTERING_EXCLUDE` to filter out
+        redundant / noisy / data-quality features before PCA.
+    min_building_count : int
+        If > 0, tiles with fewer than this many buildings (column
+        ``n_buildings``) are dropped before clustering.
 
     Returns
     -------
@@ -379,17 +390,54 @@ def select_patches(
         ``n_clusters``, ``pca_explained_variance``, ``pca_loadings``,
         ``silhouette_info`` (if auto-detected), ``cluster_profiles``.
     """
+    # -- 0. Optional building-count filter --------------------------------
+    if min_building_count > 0 and "n_buildings" in tiles_gdf.columns:
+        n_before = len(tiles_gdf)
+        tiles_gdf = tiles_gdf[tiles_gdf["n_buildings"] >= min_building_count].copy()
+        tiles_gdf = tiles_gdf.reset_index(drop=True)
+        n_dropped = n_before - len(tiles_gdf)
+        if n_dropped > 0:
+            logger.info(
+                "Pre-clustering filter: dropped %d tiles with < %d buildings "
+                "(%d remaining).",
+                n_dropped, min_building_count, len(tiles_gdf),
+            )
+
+    # -- 0b. Feature selection -------------------------------------------
+    if auto_exclude:
+        clustering_features = get_clustering_features(feature_columns)
+        excluded = sorted(set(feature_columns) - set(clustering_features))
+        if excluded:
+            logger.info(
+                "Feature selection: using %d / %d features for clustering. "
+                "Excluded: %s",
+                len(clustering_features), len(feature_columns),
+                ", ".join(excluded),
+            )
+        else:
+            logger.info(
+                "Feature selection: all %d features used (none excluded).",
+                len(feature_columns),
+            )
+    else:
+        clustering_features = list(feature_columns)
+        logger.info(
+            "Feature selection: auto_exclude=False, using all %d features.",
+            len(feature_columns),
+        )
+
     n_tiles = len(tiles_gdf)
     logger.info(
-        "select_patches: %d tiles, %d features.", n_tiles, len(feature_columns)
+        "select_patches: %d tiles, %d clustering features.", n_tiles,
+        len(clustering_features),
     )
 
     # -- 1. Standardise features -----------------------------------------
-    normed_gdf = normalize_features(tiles_gdf, feature_columns, method="zscore")
+    normed_gdf = normalize_features(tiles_gdf, clustering_features, method="zscore")
 
     # Extract feature matrix and impute any residual NaN (belt-and-suspenders
     # after normalize_features already handles NaN).
-    X = normed_gdf[feature_columns].to_numpy(dtype=float)
+    X = normed_gdf[clustering_features].to_numpy(dtype=float)
     X = _impute_median(X)
 
     # -- 2. PCA dimensionality reduction ---------------------------------
@@ -430,13 +478,17 @@ def select_patches(
     profiling_gdf = tiles_gdf.copy()
     profiling_gdf["cluster"] = labels.astype(int)
     cluster_profiles = compute_cluster_profiles(
-        profiling_gdf, feature_columns, cluster_col="cluster"
+        profiling_gdf, clustering_features, cluster_col="cluster"
     )
 
     # -- 7. Assemble metadata --------------------------------------------
     metadata.update(
         {
             "n_clusters": n_clusters,
+            "clustering_features_used": clustering_features,
+            "clustering_features_excluded": sorted(
+                set(feature_columns) - set(clustering_features)
+            ),
             "pca_explained_variance": pca_evr.tolist(),
             "pca_loadings": pca_loadings.tolist(),
             "cluster_labels": labels.tolist(),
