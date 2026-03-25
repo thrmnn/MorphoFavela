@@ -487,7 +487,7 @@ def calculate_morphology_metrics(
                 dx = centroids[idx][0] - centroids[j][0]
                 dy = centroids[idx][1] - centroids[j][1]
                 distances.append(math.hypot(dx, dy))
-            d_w[idx] = np.sum(distances) / len(gdf)
+            d_w[idx] = np.sum(distances) / len(neigh)
         gdf["average_weighted_distance"] = d_w
     else:
         gdf["average_weighted_distance"] = np.nan

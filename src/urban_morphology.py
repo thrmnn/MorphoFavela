@@ -142,6 +142,14 @@ def compute_bcr(
     return zones
 
 
+def compute_plan_area_density(
+    buildings: gpd.GeoDataFrame,
+    zones: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    """Plan area density (lambda_p) per zone. Alias for compute_bcr."""
+    return compute_bcr(buildings, zones).rename(columns={"bcr": "lambda_p"})
+
+
 # ---------------------------------------------------------------------------
 # 3. Floor Area Ratio (FAR)
 # ---------------------------------------------------------------------------

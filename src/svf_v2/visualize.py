@@ -32,6 +32,60 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Adaptive line/marker sizing based on study area extent
+# ---------------------------------------------------------------------------
+
+
+def _adaptive_linewidth(gdf: gpd.GeoDataFrame, lw_min: float = 0.5, lw_max: float = 3.0) -> float:
+    """Compute a linewidth that scales inversely with the study area extent.
+
+    Small areas (diagonal ~0.5 km) get thick lines (~3.0), large areas
+    (diagonal ~5 km) get thin lines (~0.8).  The formula is::
+
+        lw = clamp(3.0 / (diag_km + 0.5), lw_min, lw_max)
+
+    Parameters
+    ----------
+    gdf : GeoDataFrame
+        Any GeoDataFrame in a projected CRS (units = metres).
+    lw_min, lw_max : float
+        Clamping bounds for the returned linewidth.
+
+    Returns
+    -------
+    float
+        Adaptive linewidth value.
+    """
+    bounds = gdf.total_bounds  # [minx, miny, maxx, maxy]
+    diag_km = np.sqrt((bounds[2] - bounds[0]) ** 2 + (bounds[3] - bounds[1]) ** 2) / 1000.0
+    lw = 3.0 / (diag_km + 0.5)
+    return float(np.clip(lw, lw_min, lw_max))
+
+
+def _adaptive_markersize(gdf: gpd.GeoDataFrame, ms_min: float = 0.5, ms_max: float = 5.0) -> float:
+    """Compute a marker size that scales inversely with the study area extent.
+
+    Same logic as :func:`_adaptive_linewidth` but with a different default
+    range appropriate for scatter marker sizes.
+    """
+    bounds = gdf.total_bounds
+    diag_km = np.sqrt((bounds[2] - bounds[0]) ** 2 + (bounds[3] - bounds[1]) ** 2) / 1000.0
+    ms = 4.0 / (diag_km + 0.3)
+    return float(np.clip(ms, ms_min, ms_max))
+
+
+def _adaptive_folium_weight(gdf: gpd.GeoDataFrame) -> float:
+    """Compute a Folium polyline weight that scales inversely with extent.
+
+    Returns a value in [1.5, 5.0].
+    """
+    bounds = gdf.total_bounds
+    diag_km = np.sqrt((bounds[2] - bounds[0]) ** 2 + (bounds[3] - bounds[1]) ** 2) / 1000.0
+    w = 4.0 / (diag_km + 0.5)
+    return float(np.clip(w, 1.5, 5.0))
+
+
+# ---------------------------------------------------------------------------
 # Core plot functions (called by io.py save_*_results)
 # ---------------------------------------------------------------------------
 
@@ -124,13 +178,15 @@ def plot_street_svf(
     if roads_gdf is not None and not use_segments:
         roads_gdf.plot(ax=ax, color="#aaaaaa", linewidth=0.5, zorder=2)
 
-    # Main SVF layer
+    # Main SVF layer — adaptive sizing based on study area extent
     if use_segments:
+        lw = _adaptive_linewidth(segments_gdf)
+        logger.debug("  Adaptive linewidth=%.2f for segments", lw)
         segments_gdf.plot(
             ax=ax,
             column="svf_mean",
             cmap=cmap,
-            linewidth=2.5,
+            linewidth=lw,
             vmin=0,
             vmax=1,
             legend=True,
@@ -139,11 +195,13 @@ def plot_street_svf(
         )
         ax.set_title("Street SVF — Segment Mean")
     else:
+        ms = _adaptive_markersize(gdf)
+        logger.debug("  Adaptive markersize=%.2f for points", ms)
         gdf.plot(
             ax=ax,
             column="svf",
             cmap=cmap,
-            markersize=4,
+            markersize=ms,
             vmin=0,
             vmax=1,
             legend=True,
@@ -474,9 +532,11 @@ def plot_svf_interactive(
         ).add_to(buildings_layer)
         buildings_layer.add_to(m)
 
-    # Segment lines coloured by svf_mean
+    # Segment lines coloured by svf_mean — adaptive weight
     if segments_gdf is not None and len(segments_gdf) > 0 and "svf_mean" in segments_gdf.columns:
         seg_4326 = segments_gdf.to_crs(epsg=4326)
+        folium_weight = _adaptive_folium_weight(segments_gdf)
+        logger.debug("  Adaptive Folium weight=%.2f", folium_weight)
         seg_layer = folium.FeatureGroup(name="SVF Segments", show=True)
         for _, row in seg_4326.iterrows():
             svf_val = float(row["svf_mean"])
@@ -488,14 +548,22 @@ def plot_svf_interactive(
                 f"SVF median: {row.get('svf_median', 'N/A')}<br>"
                 f"Points: {row.get('n_points', 'N/A')}"
             )
-            coords = [(c[1], c[0]) for c in row.geometry.coords]
-            folium.PolyLine(
-                coords,
-                color=color,
-                weight=4,
-                opacity=0.8,
-                popup=folium.Popup(popup_text, max_width=200),
-            ).add_to(seg_layer)
+            geom = row.geometry
+            if geom.geom_type == "MultiLineString":
+                line_coords = [
+                    [(c[1], c[0]) for c in part.coords]
+                    for part in geom.geoms
+                ]
+            else:
+                line_coords = [[(c[1], c[0]) for c in geom.coords]]
+            for coords in line_coords:
+                folium.PolyLine(
+                    coords,
+                    color=color,
+                    weight=folium_weight,
+                    opacity=0.8,
+                    popup=folium.Popup(popup_text, max_width=200),
+                ).add_to(seg_layer)
         seg_layer.add_to(m)
 
     folium.LayerControl().add_to(m)
@@ -712,7 +780,10 @@ def plot_svf_dashboard(
     ax_map, ax_hist = axes[0]
     ax_seg, ax_cdf = axes[1]
 
-    # ---- Top-left: SVF scatter map ----
+    # ---- Top-left: SVF scatter map (adaptive marker size) ----
+    ms = _adaptive_markersize(street_gdf)
+    logger.debug("  Dashboard adaptive markersize=%.2f", ms)
+
     if roads_gdf is not None and not roads_gdf.empty:
         roads_gdf.plot(ax=ax_map, color="#cccccc", linewidth=0.5, zorder=1)
 
@@ -722,7 +793,7 @@ def plot_svf_dashboard(
         cmap=get_svf_cmap(),
         vmin=0,
         vmax=1,
-        markersize=3,
+        markersize=ms,
         legend=True,
         legend_kwds={"label": "SVF", "shrink": 0.6},
         zorder=2,
