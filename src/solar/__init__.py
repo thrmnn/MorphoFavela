@@ -26,6 +26,15 @@ from src.solar.compute import (
     compute_solar_access_grid,
     compute_solar_access_streets,
 )
+from src.solar.facade import (
+    compute_facade_solar_access,
+    compute_facade_daily_irradiance_array,
+    compute_facade_sunlit_hours,
+    assess_who_threshold,
+    aggregate_by_building,
+    aggregate_by_building_floor,
+    WHO_SUNLIGHT_THRESHOLD_HOURS,
+)
 
 __all__ = [
     # sun
@@ -46,4 +55,12 @@ __all__ = [
     "compute_sunlit_matrix",
     "compute_solar_access_grid",
     "compute_solar_access_streets",
+    # facade
+    "compute_facade_solar_access",
+    "compute_facade_daily_irradiance_array",
+    "compute_facade_sunlit_hours",
+    "assess_who_threshold",
+    "aggregate_by_building",
+    "aggregate_by_building_floor",
+    "WHO_SUNLIGHT_THRESHOLD_HOURS",
 ]
