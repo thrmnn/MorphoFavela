@@ -147,7 +147,7 @@ def main():
 
     # Build scene
     logger.info("Building 3D scene...")
-    scene_mesh, buildings_gdf = build_scene(
+    scene_mesh, _building_mesh, buildings_gdf = build_scene(
         dtm_path, footprints_path,
         height_field=args.height_field,
         base_field=args.base_field,
