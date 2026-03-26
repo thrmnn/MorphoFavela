@@ -379,6 +379,18 @@ def compute_zone_metrics(
     ``bcr``, ``far``, ``sigma_h``, ``lambda_f``, and (optionally)
     ``street_orientation_entropy``.
     """
+    # Repair invalid geometries (e.g. self-intersections in Rocinha/Maré)
+    buildings = buildings.copy()
+    invalid_mask = ~buildings.geometry.is_valid
+    if invalid_mask.any():
+        logger.warning(
+            "Repairing %d invalid building geometries with buffer(0).",
+            invalid_mask.sum(),
+        )
+        buildings.loc[invalid_mask, "geometry"] = buildings.loc[
+            invalid_mask, "geometry"
+        ].buffer(0)
+
     result = compute_bcr(buildings, zones)
     result = compute_far(buildings, result, floor_height=floor_height)
     result = compute_height_variability(buildings, result)

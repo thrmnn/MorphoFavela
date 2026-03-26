@@ -26,7 +26,7 @@ SUPPORTED_AREAS = [
 
 # CFD campaign areas (subset of SUPPORTED_AREAS selected for wind simulation)
 CFD_CAMPAIGN_AREAS = [
-    "vidigal_tls",
+    "vidigal",
     "rocinha",
     "riodaspedras",
     "complexo_do_alemao",

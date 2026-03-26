@@ -105,13 +105,14 @@ def main():
             boundary_gdf, buildings_gdf, dtm_path,
             tile_size=args.tile_size, overlap=args.overlap,
         )
-        # Store geometry_buffered as WKT — GPKG only supports one geometry column
+        # Store extra geometry columns as WKT — GPKG only supports one geometry column
         tiles_save = tiles.copy()
-        if "geometry_buffered" in tiles_save.columns:
-            tiles_save["geometry_buffered_wkt"] = tiles_save["geometry_buffered"].apply(
-                lambda g: g.wkt if g is not None else None
-            )
-            tiles_save = tiles_save.drop(columns=["geometry_buffered"])
+        for gcol in ("geometry_buffered", "geometry_unclipped"):
+            if gcol in tiles_save.columns:
+                tiles_save[f"{gcol}_wkt"] = tiles_save[gcol].apply(
+                    lambda g: g.wkt if g is not None else None
+                )
+                tiles_save = tiles_save.drop(columns=[gcol])
         tiles_save.to_file(tiles_path, driver="GPKG")
         logger.info("Saved %d tiles to %s (%.1fs)", len(tiles), tiles_path.name, time.time() - t0)
 

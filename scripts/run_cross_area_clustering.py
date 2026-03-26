@@ -43,7 +43,7 @@ logger = logging.getLogger("cross_area_clustering")
 
 # The 5 CFD campaign areas (CDD excluded).
 CFD_AREAS = [
-    "vidigal_tls",
+    "vidigal",
     "rocinha",
     "riodaspedras",
     "complexo_do_alemao",
