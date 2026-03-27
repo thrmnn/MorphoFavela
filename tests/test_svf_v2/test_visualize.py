@@ -173,7 +173,6 @@ class TestPlotStreetSvf:
         assert out.stat().st_size > 0
 
     def test_segment_mode(self, tmp_path, street_gdf_with_segments):
-        from shapely.geometry import box as sbox
 
         # Create fake segments GeoDataFrame
         seg_gdf = gpd.GeoDataFrame(

@@ -2,13 +2,10 @@
 
 import numpy as np
 import geopandas as gpd
-import pytest
-from shapely.geometry import Point
 
 from src.solar.compute import (
     compute_sunlit_matrix,
     compute_solar_access_streets,
-    compute_solar_access_grid,
     _build_obb_tree,
     _ray_hits,
 )

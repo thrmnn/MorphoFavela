@@ -368,7 +368,6 @@ def compute_daily_irradiance_array(
     np.ndarray
         Daily irradiation for each point in Wh/m^2/day, shape ``(N,)``.
     """
-    n_points = len(svf_array)
     n_sun = len(sun_positions)
     hours_per_step = interval_minutes / 60.0
 

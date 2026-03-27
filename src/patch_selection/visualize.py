@@ -473,7 +473,7 @@ def plot_dtm_coverage(
         )
     else:
         # Boolean: simple green/red
-        colors = tiles_gdf[col].map({True: "#4CAF50", False: "#F44336", 1: "#4CAF50", 0: "#F44336"})
+        colors = tiles_gdf[col].map({True: "#4CAF50", False: "#F44336"})
         colors = colors.fillna("#999999")
         tiles_gdf.plot(
             ax=ax,

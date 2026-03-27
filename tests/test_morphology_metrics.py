@@ -2,7 +2,7 @@ import math
 
 import geopandas as gpd
 import numpy as np
-from shapely.geometry import LineString, Point, Polygon
+from shapely.geometry import Polygon
 
 from src.morphology_metrics import (
     _minimum_rotated_rectangle_axes,

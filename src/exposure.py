@@ -20,7 +20,6 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import ListedColormap
-from matplotlib.patches import Patch
 
 from src.cartography import add_north_arrow, add_scale_bar, add_settlement_boundary
 from src.config import DPI

@@ -4,6 +4,9 @@ This module re-exports the public API from the new ``src.solar`` package
 so that existing code continues to work without changes.
 """
 
+import numpy as _np
+import pyvista as _pv
+
 from src.solar.sun import (
     compute_sun_positions,
     sun_position_to_direction,
@@ -11,11 +14,10 @@ from src.solar.sun import (
     DEFAULT_LONGITUDE,
 )
 from src.solar.compute import (
+    _build_obb_tree,  # noqa: F401 (re-export for tests)
+    _ray_hits,  # noqa: F401 (re-export for tests)
     compute_solar_access_grid,
     compute_solar_access_streets,
-    _build_obb_tree,
-    _ray_hits,
-    _compute_sun_directions,
     compute_sunlit_matrix,
 )
 
@@ -30,8 +32,6 @@ DEFAULT_DATE = "2026-06-21"
 # Backward-compatible wrapper: the old _batch_solar_access returned an integer
 # count array.  The new code uses compute_sunlit_matrix which returns a full
 # boolean matrix.  This thin wrapper converts back to counts.
-import numpy as _np
-import pyvista as _pv
 
 
 def _batch_solar_access(
@@ -58,7 +58,6 @@ except ImportError:
     # available as a fallback so existing callers don't break.
     import logging
     import matplotlib.pyplot as plt
-    import numpy as np
     from pathlib import Path
     from typing import Optional, Tuple
 

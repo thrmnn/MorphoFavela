@@ -1,10 +1,9 @@
 """Shared fixtures for tests/test_solar/ test suite."""
 
 import pytest
-import numpy as np
 import pyvista as pv
 import geopandas as gpd
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Point
 
 
 @pytest.fixture

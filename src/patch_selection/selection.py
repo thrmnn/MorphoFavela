@@ -14,7 +14,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from src.patch_selection.features import CLUSTERING_EXCLUDE, get_clustering_features
+from src.patch_selection.features import get_clustering_features
 from src.spatial_analysis import build_spatial_weights
 from src.typology import compute_cluster_profiles, normalize_features
 

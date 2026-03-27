@@ -214,8 +214,6 @@ class TestSampleStreetPointsWithBuildings:
 
     def test_backward_compatible(self):
         """Calling without footprints_gdf produces no offset columns."""
-        from unittest.mock import patch, MagicMock
-        import rasterio
 
         # We can't easily call sample_street_points without real files,
         # so test the offset function directly with None

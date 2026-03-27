@@ -3,9 +3,8 @@
 import geopandas as gpd
 import matplotlib
 import matplotlib.pyplot as plt
-import numpy as np
 import pytest
-from shapely.geometry import Point, box
+from shapely.geometry import box
 
 from src.cartography import (
     add_north_arrow,

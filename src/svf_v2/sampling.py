@@ -197,8 +197,6 @@ def _nearest_edge_outward_normal(point: Point, polygon: Polygon) -> np.ndarray:
     n_verts = len(coords) - 1
     best_dist = np.inf
     best_normal = np.array([1.0, 0.0])
-    px, py = point.x, point.y
-
     for i in range(n_verts):
         ax, ay = coords[i, 0], coords[i, 1]
         bx, by = coords[i + 1, 0], coords[i + 1, 1]
