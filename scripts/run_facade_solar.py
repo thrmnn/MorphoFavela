@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 import geopandas as gpd
+from pyproj import CRS
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -66,6 +67,19 @@ def run_single_date(
     # Save point-level results
     date_tag = date.replace("-", "")
     points_path = output_dir / f"facade_solar_{date_tag}.gpkg"
+
+    # GPKG cannot handle compound CRS (horizontal + vertical) — strip to 2D
+    if result.crs is not None:
+        crs_obj = CRS(result.crs)
+        if crs_obj.is_compound:
+            horiz = [s for s in crs_obj.sub_crs_list if s.is_projected or s.is_geographic][0]
+            result = result.set_crs(horiz, allow_override=True)
+            logger.info("Normalized compound CRS to %s for GPKG export", horiz.name)
+
+    # Remove stale file to avoid corrupted GPKG state
+    if points_path.exists():
+        points_path.unlink()
+
     result.to_file(points_path, driver="GPKG")
     logger.info("Saved %d facade points to %s", len(result), points_path.name)
 
