@@ -392,7 +392,7 @@ def compute_facade_solar_access(
     site_elevation_m: float = 100.0,
     floor_height: float = 2.5,
     who_threshold_hours: float = WHO_SUNLIGHT_THRESHOLD_HOURS,
-    min_hit_distance: float = 0.5,
+    min_hit_distance: float = 0.2,
 ) -> gpd.GeoDataFrame:
     """Full facade solar access pipeline.
 

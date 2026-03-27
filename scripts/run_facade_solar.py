@@ -138,8 +138,8 @@ def main():
         help="Floor-to-floor height (metres, default 2.5 for informal settlements)",
     )
     parser.add_argument(
-        "--min-hit-distance", type=float, default=0.5,
-        help="Ignore ray hits closer than this (metres) to avoid self-intersection (default: 0.5)",
+        "--min-hit-distance", type=float, default=0.2,
+        help="Ignore ray hits closer than this (metres) to avoid self-intersection (default: 0.2)",
     )
     parser.add_argument(
         "--who-threshold", type=float, default=2.0,
