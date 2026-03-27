@@ -15,8 +15,10 @@ from pathlib import Path
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import matplotlib.patches as mpatches
 import matplotlib.ticker as mticker
 import numpy as np
+import pandas as pd
 from matplotlib.lines import Line2D
 from scipy.stats import gaussian_kde
 
@@ -1646,4 +1648,156 @@ def plot_solar_seasonal_comparison_hero(
     )
     plt.close(fig)
     logger.info("Saved hero seasonal comparison to %s", output_path)
+    return output_path
+
+
+# ===================================================================
+# 11. Facade Solar Dashboard
+# ===================================================================
+
+
+def plot_facade_solar_dashboard(
+    facade_gdf: gpd.GeoDataFrame,
+    buildings_who: pd.DataFrame,
+    output_path: Path,
+    footprints_gdf: gpd.GeoDataFrame | None = None,
+) -> Path:
+    """Four-panel facade solar dashboard.
+
+    Panels:
+      (a) Spatial WHO compliance map (facade points)
+      (b) Sunlit hours by floor level (box plot)
+      (c) Building-level compliance rate distribution
+      (d) Facade azimuth vs sunlit hours (polar)
+
+    Parameters
+    ----------
+    facade_gdf : GeoDataFrame
+        Facade point results with ``who_compliant``, ``facade_sunlit_hours``,
+        ``floor_level``, ``facade_azimuth``, ``building_id``.
+    buildings_who : DataFrame
+        Building-level aggregation with ``who_compliance_rate``.
+    output_path : Path
+        Where to save the figure.
+    footprints_gdf : GeoDataFrame, optional
+        Building footprints for underlay.
+    """
+    apply_publication_style()
+    fig = plt.figure(figsize=(16, 14))
+    gs = fig.add_gridspec(2, 2, hspace=0.28, wspace=0.25)
+
+    n_total = len(facade_gdf)
+    n_who = int(facade_gdf["who_compliant"].sum())
+    pct_who = 100 * n_who / n_total if n_total > 0 else 0
+
+    # ── (a) Spatial WHO map ──────────────────────────────────────────
+    ax_map = fig.add_subplot(gs[0, 0])
+    if footprints_gdf is not None:
+        footprints_gdf.plot(
+            ax=ax_map, facecolor=_BLD_FACE, edgecolor=_BLD_EDGE,
+            linewidth=_BLD_LW, alpha=_BLD_ALPHA, zorder=1,
+        )
+    # Non-compliant in blue, compliant in red-orange
+    non_comp = facade_gdf[~facade_gdf["who_compliant"]]
+    comp = facade_gdf[facade_gdf["who_compliant"]]
+    if len(non_comp) > 0:
+        non_comp.plot(ax=ax_map, color="#3b82f6", markersize=0.3, alpha=0.4, zorder=2)
+    if len(comp) > 0:
+        comp.plot(ax=ax_map, color="#ef4444", markersize=2.0, alpha=0.9, zorder=3)
+
+    ax_map.set_title("(a) WHO 2h Sunlight Compliance", fontsize=_NC_TITLE_SIZE)
+    legend_elements = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="#ef4444",
+               markersize=6, label=f"Compliant ({n_who:,})"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="#3b82f6",
+               markersize=6, label=f"Deprived ({n_total - n_who:,})"),
+    ]
+    ax_map.legend(handles=legend_elements, loc="lower right", fontsize=_NC_LEGEND_SIZE)
+    format_utm_axes(ax_map)
+    ax_map.set_aspect("equal")
+
+    # ── (b) Sunlit hours by floor level ──────────────────────────────
+    ax_floor = fig.add_subplot(gs[0, 1])
+    floors = sorted(facade_gdf["floor_level"].unique())
+    floor_data = [
+        facade_gdf.loc[facade_gdf["floor_level"] == f, "facade_sunlit_hours"].values
+        for f in floors
+    ]
+    bp = ax_floor.boxplot(
+        floor_data, positions=floors, widths=0.6,
+        patch_artist=True, showfliers=False,
+    )
+    colors_floor = plt.cm.YlOrRd(np.linspace(0.2, 0.8, len(floors)))
+    for patch, color in zip(bp["boxes"], colors_floor):
+        patch.set_facecolor(color)
+        patch.set_edgecolor("#333")
+        patch.set_linewidth(0.8)
+    for element in ["whiskers", "caps"]:
+        for line in bp[element]:
+            line.set_color("#555")
+            line.set_linewidth(0.8)
+    for line in bp["medians"]:
+        line.set_color("#111")
+        line.set_linewidth(1.2)
+
+    ax_floor.set_xlabel("Floor Level", fontsize=_NC_LABEL_SIZE)
+    ax_floor.set_ylabel("Sunlit Hours", fontsize=_NC_LABEL_SIZE)
+    ax_floor.set_title("(b) Sunlit Hours by Floor", fontsize=_NC_TITLE_SIZE)
+    ax_floor.set_xticks(floors)
+    ax_floor.set_xticklabels([f"F{f}" for f in floors])
+    ax_floor.axhline(2.0, color="#ef4444", linestyle="--", linewidth=1, alpha=0.7,
+                     label="WHO 2h threshold")
+    ax_floor.legend(fontsize=_NC_LEGEND_SIZE)
+
+    # ── (c) Building compliance rate distribution ────────────────────
+    ax_bldg = fig.add_subplot(gs[1, 0])
+    rates = buildings_who["who_compliance_rate"].values * 100
+    ax_bldg.hist(rates, bins=20, range=(0, 100), color="#3b82f6",
+                 edgecolor="white", linewidth=0.5, alpha=0.85)
+    mean_rate = rates.mean()
+    ax_bldg.axvline(mean_rate, color="#ef4444", linestyle="--", linewidth=1.5,
+                    label=f"Mean = {mean_rate:.1f}%")
+    ax_bldg.set_xlabel("WHO Compliance Rate (%)", fontsize=_NC_LABEL_SIZE)
+    ax_bldg.set_ylabel("Number of Buildings", fontsize=_NC_LABEL_SIZE)
+    ax_bldg.set_title("(c) Building-Level Compliance", fontsize=_NC_TITLE_SIZE)
+    ax_bldg.legend(fontsize=_NC_LEGEND_SIZE)
+
+    # ── (d) Facade azimuth vs sunlit hours (polar) ───────────────────
+    ax_polar = fig.add_subplot(gs[1, 1], projection="polar")
+    az_rad = np.radians(facade_gdf["facade_azimuth"].values)
+    hours = facade_gdf["facade_sunlit_hours"].values
+
+    # Bin by 10-degree sectors
+    n_bins = 36
+    bin_edges = np.linspace(0, 2 * np.pi, n_bins + 1)
+    bin_means = np.zeros(n_bins)
+    for i in range(n_bins):
+        mask = (az_rad >= bin_edges[i]) & (az_rad < bin_edges[i + 1])
+        if mask.sum() > 0:
+            bin_means[i] = hours[mask].mean()
+
+    bar_width = 2 * np.pi / n_bins
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    colors_az = plt.cm.YlOrRd(bin_means / max(bin_means.max(), 0.01))
+    ax_polar.bar(bin_centers, bin_means, width=bar_width, color=colors_az,
+                 edgecolor="#555", linewidth=0.3, alpha=0.85)
+    ax_polar.set_theta_zero_location("N")
+    ax_polar.set_theta_direction(-1)
+    ax_polar.set_title("(d) Sunlit Hours by Orientation",
+                       fontsize=_NC_TITLE_SIZE, pad=15)
+    ax_polar.tick_params(labelsize=_NC_TICK_SIZE)
+
+    # Suptitle
+    fig.suptitle(
+        f"Facade Solar Access \u2014 WHO Assessment\n"
+        f"{n_who:,}/{n_total:,} facade points compliant ({pct_who:.1f}%)",
+        fontsize=_NC_SUPTITLE_SIZE, fontweight="bold", y=0.98,
+    )
+
+    output_path = Path(output_path)
+    _ensure_dir(output_path)
+    fig.savefig(output_path, dpi=DPI, bbox_inches="tight",
+                facecolor="white", edgecolor="none")
+    plt.close(fig)
+    logger.info("Saved facade solar dashboard to %s", output_path)
     return output_path
