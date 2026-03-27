@@ -58,14 +58,37 @@ def _build_obb_tree(mesh: pv.PolyData):
     return obb
 
 
-def _ray_hits(obb_tree, origin: np.ndarray, endpoint: np.ndarray) -> bool:
-    """Return True if the ray from *origin* to *endpoint* hits the mesh."""
+def _ray_hits(
+    obb_tree,
+    origin: np.ndarray,
+    endpoint: np.ndarray,
+    min_hit_distance: float = 0.0,
+) -> bool:
+    """Return True if the ray from *origin* to *endpoint* hits the mesh.
+
+    Parameters
+    ----------
+    min_hit_distance : float
+        Ignore intersections closer than this distance (metres) to avoid
+        self-intersection with the observer's own building geometry.
+    """
     import vtk
 
     pts = vtk.vtkPoints()
     cell_ids = vtk.vtkIdList()
     obb_tree.IntersectWithLine(origin.tolist(), endpoint.tolist(), pts, cell_ids)
-    return pts.GetNumberOfPoints() > 0
+    n_hits = pts.GetNumberOfPoints()
+    if n_hits == 0:
+        return False
+    if min_hit_distance <= 0.0:
+        return True
+    # Filter out self-intersections: only count hits beyond min distance
+    origin_arr = np.asarray(origin, dtype=np.float64)
+    for i in range(n_hits):
+        hit = np.array(pts.GetPoint(i))
+        if np.linalg.norm(hit - origin_arr) > min_hit_distance:
+            return True
+    return False
 
 
 def _compute_sun_directions(
@@ -90,6 +113,7 @@ def _sunlit_matrix_chunk(
     sun_directions: np.ndarray,
     ray_length: float,
     mesh_file: str,
+    min_hit_distance: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Worker: compute sunlit matrix rows for a chunk of point indices.
 
@@ -112,7 +136,7 @@ def _sunlit_matrix_chunk(
         origin = observer_points[pi]
         for si in range(n_sun):
             endpoint = origin + sun_directions[si] * ray_length
-            if not _ray_hits(obb, origin, endpoint):
+            if not _ray_hits(obb, origin, endpoint, min_hit_distance):
                 sunlit[k, si] = True
 
     return point_indices, sunlit
@@ -124,6 +148,7 @@ def compute_sunlit_matrix(
     scene_mesh: pv.PolyData,
     ray_length: float = MAX_RAY_LENGTH,
     n_jobs: int = 1,
+    min_hit_distance: float = 0.0,
 ) -> np.ndarray:
     """Compute the sunlit boolean matrix via OBB-tree ray-casting.
 
@@ -143,6 +168,10 @@ def compute_sunlit_matrix(
     n_jobs : int
         Number of parallel workers.  ``1`` = sequential,
         ``-1`` = all available cores.
+    min_hit_distance : float
+        Ignore ray intersections closer than this distance (metres).
+        Use >0 for facade points to avoid self-intersection with the
+        observer's own building roof.  Default 0.0 (no filtering).
 
     Returns
     -------
@@ -188,6 +217,7 @@ def compute_sunlit_matrix(
                     sun_directions,
                     ray_length,
                     mesh_file,
+                    min_hit_distance,
                 )
                 for chunk in chunks
             )
@@ -219,7 +249,7 @@ def compute_sunlit_matrix(
         origin = observer_points[pi]
         for si in range(n_sun):
             endpoint = origin + sun_directions[si] * ray_length
-            if not _ray_hits(obb, origin, endpoint):
+            if not _ray_hits(obb, origin, endpoint, min_hit_distance):
                 sunlit[pi, si] = True
 
         if (pi + 1) % 100 == 0 or pi == n_pts - 1:

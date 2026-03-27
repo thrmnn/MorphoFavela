@@ -281,7 +281,7 @@ def assess_who_threshold(
 
 def compute_floor_level(
     height_above_ground: np.ndarray,
-    floor_height: float = 3.0,
+    floor_height: float = 2.5,
 ) -> np.ndarray:
     """Assign floor level (0-indexed) from height above ground.
 
@@ -348,6 +348,31 @@ def aggregate_by_building_floor(
     return agg.reset_index()
 
 
+def summarize_housing_units(
+    floor_agg: pd.DataFrame,
+    who_col: str = "who_compliance_rate",
+    threshold: float = 0.5,
+) -> dict:
+    """Summarize housing unit WHO compliance.
+
+    Each (building_id, floor_level) row = one housing unit.
+    A unit is considered below WHO if fewer than *threshold* fraction
+    of its facade points meet the 2-hour minimum.
+
+    Returns
+    -------
+    dict
+        ``total_units``, ``units_below_who``, ``pct_below``.
+    """
+    total = len(floor_agg)
+    below = int((floor_agg[who_col] < threshold).sum())
+    return {
+        "total_units": total,
+        "units_below_who": below,
+        "pct_below": 100.0 * below / total if total > 0 else 0.0,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Section F: End-to-end orchestrator
 # ---------------------------------------------------------------------------
@@ -365,8 +390,9 @@ def compute_facade_solar_access(
     ray_length: float = MAX_RAY_LENGTH,
     n_jobs: int = 1,
     site_elevation_m: float = 100.0,
-    floor_height: float = 3.0,
+    floor_height: float = 2.5,
     who_threshold_hours: float = WHO_SUNLIGHT_THRESHOLD_HOURS,
+    min_hit_distance: float = 0.5,
 ) -> gpd.GeoDataFrame:
     """Full facade solar access pipeline.
 
@@ -466,6 +492,7 @@ def compute_facade_solar_access(
         scene_mesh,
         ray_length=ray_length,
         n_jobs=n_jobs,
+        min_hit_distance=min_hit_distance,
     )
 
     # --- 5. Facade sunlit hours (with normal filtering) --------------------

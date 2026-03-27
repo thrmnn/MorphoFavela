@@ -29,6 +29,7 @@ from src.solar.facade import (  # noqa: E402
     aggregate_by_building,
     aggregate_by_building_floor,
     compute_facade_solar_access,
+    summarize_housing_units,
 )
 from src.solar.sun import REFERENCE_DATES  # noqa: E402
 
@@ -62,6 +63,7 @@ def run_single_date(
         site_elevation_m=args.site_elevation,
         floor_height=args.floor_height,
         who_threshold_hours=args.who_threshold,
+        min_hit_distance=args.min_hit_distance,
     )
 
     # Save point-level results
@@ -93,12 +95,18 @@ def run_single_date(
         100.0 * bldg_agg["who_compliance_rate"].mean(),
     )
 
-    # Floor-level aggregation
+    # Floor-level aggregation (each row = 1 housing unit)
     floor_agg = aggregate_by_building_floor(result)
     floor_path = output_dir / f"floors_who_{date_tag}.csv"
     floor_agg.to_csv(floor_path, index=False)
+
+    # Housing unit summary
+    hu = summarize_housing_units(floor_agg)
     logger.info(
-        "Floor summary: %d building-floor combinations", len(floor_agg),
+        "Housing units: %d total, %d below WHO threshold (%.1f%%)",
+        hu["total_units"],
+        hu["units_below_who"],
+        hu["pct_below"],
     )
 
     return result
@@ -126,8 +134,12 @@ def main():
     )
     parser.add_argument("--n-jobs", type=int, default=1, help="Parallel workers")
     parser.add_argument(
-        "--floor-height", type=float, default=3.0,
-        help="Floor-to-floor height (metres)",
+        "--floor-height", type=float, default=2.5,
+        help="Floor-to-floor height (metres, default 2.5 for informal settlements)",
+    )
+    parser.add_argument(
+        "--min-hit-distance", type=float, default=0.5,
+        help="Ignore ray hits closer than this (metres) to avoid self-intersection (default: 0.5)",
     )
     parser.add_argument(
         "--who-threshold", type=float, default=2.0,
