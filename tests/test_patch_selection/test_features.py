@@ -1,6 +1,5 @@
 """Tests for patch_selection.features module."""
 
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -53,8 +52,16 @@ def synthetic_buildings_with_height(synthetic_buildings):
 class TestMorphometricFeatures:
     def test_expected_columns(self, synthetic_tiles, synthetic_buildings):
         df = _compute_morphometric_features(synthetic_tiles, synthetic_buildings)
-        expected = {"tile_id", "bcr", "far", "sigma_h",
-                    "lambda_f_N", "lambda_f_E", "lambda_f_S", "lambda_f_W"}
+        expected = {
+            "tile_id",
+            "bcr",
+            "far",
+            "sigma_h",
+            "lambda_f_N",
+            "lambda_f_E",
+            "lambda_f_S",
+            "lambda_f_W",
+        }
         assert expected == set(df.columns)
 
     def test_row_count_matches_tiles(self, synthetic_tiles, synthetic_buildings):
@@ -79,22 +86,33 @@ class TestMorphometricFeatures:
 
 @pytest.mark.fast
 class TestHeightFeatures:
-    EXPECTED_COLS = {"tile_id", "H_mean", "H_median", "H_std", "H_max",
-                     "H_skewness", "H_kurtosis", "H_iqr"}
+    EXPECTED_COLS = {
+        "tile_id",
+        "H_mean",
+        "H_median",
+        "H_std",
+        "H_max",
+        "H_skewness",
+        "H_kurtosis",
+        "H_iqr",
+    }
 
     def test_expected_columns(self, synthetic_tiles, synthetic_buildings):
-        df = _compute_height_features(synthetic_tiles, synthetic_buildings,
-                                      height_col="altura")
+        df = _compute_height_features(
+            synthetic_tiles, synthetic_buildings, height_col="altura"
+        )
         assert self.EXPECTED_COLS == set(df.columns)
 
     def test_row_count_matches_tiles(self, synthetic_tiles, synthetic_buildings):
-        df = _compute_height_features(synthetic_tiles, synthetic_buildings,
-                                      height_col="altura")
+        df = _compute_height_features(
+            synthetic_tiles, synthetic_buildings, height_col="altura"
+        )
         assert len(df) == len(synthetic_tiles)
 
     def test_empty_buildings_all_nan(self, synthetic_tiles, empty_buildings):
-        df = _compute_height_features(synthetic_tiles, empty_buildings,
-                                      height_col="altura")
+        df = _compute_height_features(
+            synthetic_tiles, empty_buildings, height_col="altura"
+        )
         for col in self.EXPECTED_COLS - {"tile_id"}:
             assert df[col].isna().all(), f"{col} should be NaN for empty buildings"
 
@@ -124,8 +142,12 @@ class TestHeightFeatures:
 
 @pytest.mark.fast
 class TestStreetFeatures:
-    EXPECTED_COLS = {"tile_id", "road_density", "intersection_density",
-                     "street_orientation_entropy"}
+    EXPECTED_COLS = {
+        "tile_id",
+        "road_density",
+        "intersection_density",
+        "street_orientation_entropy",
+    }
 
     def test_expected_columns(self, synthetic_tiles, synthetic_roads):
         df = _compute_street_features(synthetic_tiles, streets=synthetic_roads)
@@ -176,8 +198,15 @@ class TestSvfFeatures:
 
 @pytest.mark.fast
 class TestTopographyFeatures:
-    EXPECTED_COLS = {"tile_id", "elev_mean", "elev_range", "slope_mean",
-                     "slope_std", "terrain_ruggedness", "dtm_coverage_frac"}
+    EXPECTED_COLS = {
+        "tile_id",
+        "elev_mean",
+        "elev_range",
+        "slope_mean",
+        "slope_std",
+        "terrain_ruggedness",
+        "dtm_coverage_frac",
+    }
 
     def test_expected_columns(self, synthetic_tiles, synthetic_dtm):
         df = _compute_topography_features(synthetic_tiles, dtm_path=synthetic_dtm)
@@ -205,8 +234,7 @@ class TestTopographyFeatures:
 
 @pytest.mark.fast
 class TestTextureFeatures:
-    EXPECTED_COLS = {"tile_id", "lacunarity", "fractal_dim_box",
-                     "gini_building_area"}
+    EXPECTED_COLS = {"tile_id", "lacunarity", "fractal_dim_box", "gini_building_area"}
 
     def test_expected_columns(self, synthetic_tiles, synthetic_buildings):
         df = _compute_texture_features(synthetic_tiles, synthetic_buildings)
@@ -241,12 +269,19 @@ class TestTextureFeatures:
 
 @pytest.mark.fast
 class TestPorosityOrientationFeatures:
-    EXPECTED_COLS = {"tile_id", "porosity_N", "porosity_E", "porosity_S",
-                     "porosity_W", "orientation_entropy"}
+    EXPECTED_COLS = {
+        "tile_id",
+        "porosity_N",
+        "porosity_E",
+        "porosity_S",
+        "porosity_W",
+        "orientation_entropy",
+    }
 
     def test_expected_columns(self, synthetic_tiles, synthetic_buildings):
-        df = _compute_porosity_orientation_features(synthetic_tiles,
-                                                     synthetic_buildings)
+        df = _compute_porosity_orientation_features(
+            synthetic_tiles, synthetic_buildings
+        )
         assert self.EXPECTED_COLS == set(df.columns)
 
     def test_empty_buildings_full_porosity(self, synthetic_tiles, empty_buildings):
@@ -255,8 +290,9 @@ class TestPorosityOrientationFeatures:
             assert df[col].isna().all()
 
     def test_porosity_range(self, synthetic_tiles, synthetic_buildings):
-        df = _compute_porosity_orientation_features(synthetic_tiles,
-                                                     synthetic_buildings)
+        df = _compute_porosity_orientation_features(
+            synthetic_tiles, synthetic_buildings
+        )
         for col in ["porosity_N", "porosity_E", "porosity_S", "porosity_W"]:
             valid = df[col].dropna()
             if len(valid) > 0:
@@ -295,42 +331,70 @@ class TestGiniCoefficient:
 
 @pytest.mark.fast
 class TestComputeTileFeatures:
-    def test_total_feature_count_33(self, synthetic_tiles, synthetic_buildings,
-                                     synthetic_roads, synthetic_dtm):
+    def test_total_feature_count_33(
+        self, synthetic_tiles, synthetic_buildings, synthetic_roads, synthetic_dtm
+    ):
         """All 7 feature groups should yield exactly 33 feature columns."""
         result = compute_tile_features(
-            synthetic_tiles, synthetic_buildings,
-            streets=synthetic_roads, dtm_path=synthetic_dtm,
+            synthetic_tiles,
+            synthetic_buildings,
+            streets=synthetic_roads,
+            dtm_path=synthetic_dtm,
         )
         feature_cols = [c for c in result.columns if c != "tile_id"]
         assert len(feature_cols) == 33, (
             f"Expected 33 features, got {len(feature_cols)}: {sorted(feature_cols)}"
         )
 
-    def test_expected_feature_names(self, synthetic_tiles, synthetic_buildings,
-                                     synthetic_roads, synthetic_dtm):
+    def test_expected_feature_names(
+        self, synthetic_tiles, synthetic_buildings, synthetic_roads, synthetic_dtm
+    ):
         result = compute_tile_features(
-            synthetic_tiles, synthetic_buildings,
-            streets=synthetic_roads, dtm_path=synthetic_dtm,
+            synthetic_tiles,
+            synthetic_buildings,
+            streets=synthetic_roads,
+            dtm_path=synthetic_dtm,
         )
         expected = {
             # Group 1
-            "bcr", "far", "sigma_h",
-            "lambda_f_N", "lambda_f_E", "lambda_f_S", "lambda_f_W",
+            "bcr",
+            "far",
+            "sigma_h",
+            "lambda_f_N",
+            "lambda_f_E",
+            "lambda_f_S",
+            "lambda_f_W",
             # Group 2
-            "H_mean", "H_median", "H_std", "H_max",
-            "H_skewness", "H_kurtosis", "H_iqr",
+            "H_mean",
+            "H_median",
+            "H_std",
+            "H_max",
+            "H_skewness",
+            "H_kurtosis",
+            "H_iqr",
             # Group 3
-            "road_density", "intersection_density", "street_orientation_entropy",
+            "road_density",
+            "intersection_density",
+            "street_orientation_entropy",
             # Group 4
-            "svf_mean", "svf_std",
+            "svf_mean",
+            "svf_std",
             # Group 5
-            "elev_mean", "elev_range", "slope_mean", "slope_std",
-            "terrain_ruggedness", "dtm_coverage_frac",
+            "elev_mean",
+            "elev_range",
+            "slope_mean",
+            "slope_std",
+            "terrain_ruggedness",
+            "dtm_coverage_frac",
             # Group 6
-            "lacunarity", "fractal_dim_box", "gini_building_area",
+            "lacunarity",
+            "fractal_dim_box",
+            "gini_building_area",
             # Group 7
-            "porosity_N", "porosity_E", "porosity_S", "porosity_W",
+            "porosity_N",
+            "porosity_E",
+            "porosity_S",
+            "porosity_W",
             "orientation_entropy",
         }
         actual = set(result.columns) - {"tile_id"}
@@ -352,8 +416,16 @@ class TestClusteringFeatureSelection:
         assert len(CLUSTERING_EXCLUDE) > 0
 
     def test_get_clustering_features_removes_excluded(self):
-        all_cols = ["bcr", "far", "sigma_h", "H_mean", "H_median",
-                     "dtm_coverage_frac", "lambda_f_N", "lambda_f_S"]
+        all_cols = [
+            "bcr",
+            "far",
+            "sigma_h",
+            "H_mean",
+            "H_median",
+            "dtm_coverage_frac",
+            "lambda_f_N",
+            "lambda_f_S",
+        ]
         result = get_clustering_features(all_cols)
         # sigma_h, H_median, dtm_coverage_frac, lambda_f_S should be excluded
         assert "sigma_h" not in result
@@ -371,15 +443,16 @@ class TestClusteringFeatureSelection:
         result = get_clustering_features(all_cols)
         assert result == ["far", "bcr", "H_mean"]
 
-    def test_get_clustering_features_with_full_set(self, synthetic_tiles,
-                                                     synthetic_buildings,
-                                                     synthetic_roads,
-                                                     synthetic_dtm):
+    def test_get_clustering_features_with_full_set(
+        self, synthetic_tiles, synthetic_buildings, synthetic_roads, synthetic_dtm
+    ):
         """Clustering features from the full feature set should exclude
         the known redundant/noisy features."""
         result = compute_tile_features(
-            synthetic_tiles, synthetic_buildings,
-            streets=synthetic_roads, dtm_path=synthetic_dtm,
+            synthetic_tiles,
+            synthetic_buildings,
+            streets=synthetic_roads,
+            dtm_path=synthetic_dtm,
         )
         all_feats = [c for c in result.columns if c != "tile_id"]
         clustering_feats = get_clustering_features(all_feats)

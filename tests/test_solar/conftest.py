@@ -10,8 +10,12 @@ from shapely.geometry import Point
 def flat_ground_mesh():
     """10x10m flat ground at z=0."""
     grid = pv.Plane(
-        center=(5, 5, 0), direction=(0, 0, 1),
-        i_size=10, j_size=10, i_resolution=4, j_resolution=4,
+        center=(5, 5, 0),
+        direction=(0, 0, 1),
+        i_size=10,
+        j_size=10,
+        i_resolution=4,
+        j_resolution=4,
     )
     return grid
 
@@ -27,12 +31,20 @@ def enclosed_mesh():
 def half_sky_mesh():
     """Ground plane + single wall on the south side blocking sun from the south."""
     ground = pv.Plane(
-        center=(5, 5, 0), direction=(0, 0, 1),
-        i_size=20, j_size=20, i_resolution=4, j_resolution=4,
+        center=(5, 5, 0),
+        direction=(0, 0, 1),
+        i_size=20,
+        j_size=20,
+        i_resolution=4,
+        j_resolution=4,
     )
     wall = pv.Plane(
-        center=(5, 0, 5), direction=(0, 1, 0),
-        i_size=20, j_size=10, i_resolution=4, j_resolution=4,
+        center=(5, 0, 5),
+        direction=(0, 1, 0),
+        i_size=20,
+        j_size=10,
+        i_resolution=4,
+        j_resolution=4,
     )
     return ground + wall
 

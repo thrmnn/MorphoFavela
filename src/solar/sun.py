@@ -31,7 +31,7 @@ REFERENCE_DATES = {
     "equinox_september": "2026-09-22",
 }
 
-DEFAULT_LATITUDE = -22.97   # Rio de Janeiro
+DEFAULT_LATITUDE = -22.97  # Rio de Janeiro
 DEFAULT_LONGITUDE = -43.17
 
 DEFAULT_DATE = "2026-06-21"  # Southern-Hemisphere winter solstice
@@ -161,19 +161,18 @@ def _sun_positions_analytical(
         hour_angle = math.radians(15.0 * (solar_hour - 12.0))
 
         # Solar altitude (elevation)
-        sin_alt = (
-            math.sin(lat_rad) * math.sin(declination)
-            + math.cos(lat_rad) * math.cos(declination) * math.cos(hour_angle)
-        )
+        sin_alt = math.sin(lat_rad) * math.sin(declination) + math.cos(
+            lat_rad
+        ) * math.cos(declination) * math.cos(hour_angle)
         sin_alt = max(-1.0, min(1.0, sin_alt))
         altitude_rad = math.asin(sin_alt)
         altitude_deg = math.degrees(altitude_rad)
 
         if altitude_deg > 0:
             # Solar azimuth (from north, clockwise)
-            cos_az = (
-                math.sin(declination) - math.sin(lat_rad) * sin_alt
-            ) / (math.cos(lat_rad) * math.cos(altitude_rad) + 1e-12)
+            cos_az = (math.sin(declination) - math.sin(lat_rad) * sin_alt) / (
+                math.cos(lat_rad) * math.cos(altitude_rad) + 1e-12
+            )
             cos_az = max(-1.0, min(1.0, cos_az))
             azimuth_deg = math.degrees(math.acos(cos_az))
             if hour_angle > 0:
@@ -221,7 +220,7 @@ def sun_position_to_direction(altitude_deg: float, azimuth_deg: float) -> np.nda
 
     x = np.sin(az) * np.cos(alt)  # east
     y = np.cos(az) * np.cos(alt)  # north
-    z = np.sin(alt)               # up
+    z = np.sin(alt)  # up
 
     vec = np.array([x, y, z], dtype=np.float64)
     norm = np.linalg.norm(vec)

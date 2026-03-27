@@ -230,7 +230,9 @@ def _export_dtm(
 
             dtm_info["total_pixels"] = int(total)
             dtm_info["valid_pixels"] = valid
-            dtm_info["coverage_fraction"] = round(valid / total, 4) if total > 0 else 0.0
+            dtm_info["coverage_fraction"] = (
+                round(valid / total, 4) if total > 0 else 0.0
+            )
             dtm_info["nodata_value"] = _serialisable(nodata)
 
             # Write cropped GeoTIFF
@@ -248,7 +250,9 @@ def _export_dtm(
 
         logger.info(
             "  dtm.tif: %d/%d valid pixels (%.1f%%)",
-            valid, total, dtm_info["coverage_fraction"] * 100,
+            valid,
+            total,
+            dtm_info["coverage_fraction"] * 100,
         )
 
     except Exception as exc:
@@ -307,8 +311,11 @@ def _write_manifest(
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2, default=_serialisable)
 
-    logger.info("Wrote manifest.json: %d patches, %d total buildings.",
-                n_patches, n_buildings_total)
+    logger.info(
+        "Wrote manifest.json: %d patches, %d total buildings.",
+        n_patches,
+        n_buildings_total,
+    )
     return manifest_path
 
 
@@ -360,7 +367,9 @@ def export_patches(
 
     logger.info(
         "Exporting %d patches to %s (n_jobs=%d).",
-        len(selected_tiles), output_dir, n_jobs,
+        len(selected_tiles),
+        output_dir,
+        n_jobs,
     )
 
     if n_jobs > 1:
@@ -381,7 +390,11 @@ def export_patches(
         for _, row in selected_tiles.iterrows():
             patch_dir = output_dir / f"patch_{row['tile_id']}"
             meta = _export_single_patch(
-                row, buildings_gdf, roads_gdf, dtm_path, patch_dir,
+                row,
+                buildings_gdf,
+                roads_gdf,
+                dtm_path,
+                patch_dir,
             )
             patches_metadata.append(meta)
 

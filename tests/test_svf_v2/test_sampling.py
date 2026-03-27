@@ -82,6 +82,7 @@ class TestOutwardNormal:
 # Helpers for offset tests
 # ---------------------------------------------------------------------------
 
+
 def _make_building_gdf(polygons, crs="EPSG:31983"):
     """Create a GeoDataFrame of building footprints from a list of Polygons."""
     return gpd.GeoDataFrame(geometry=polygons, crs=crs)
@@ -232,7 +233,9 @@ class TestSampleStreetPointsWithBuildings:
 
         # Verify no points inside building
         joined = gpd.sjoin(
-            result[["geometry"]], bldgs[["geometry"]],
-            how="inner", predicate="within",
+            result[["geometry"]],
+            bldgs[["geometry"]],
+            how="inner",
+            predicate="within",
         )
         assert len(joined) == 0

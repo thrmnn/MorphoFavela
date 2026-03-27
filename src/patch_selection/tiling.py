@@ -79,7 +79,9 @@ def generate_tiles(
         y += step
 
     gdf = gpd.GeoDataFrame(tiles, crs=boundary_gdf.crs)
-    logger.info("Generated %d tiles (%.0fm, overlap=%.0fm).", len(gdf), tile_size, overlap)
+    logger.info(
+        "Generated %d tiles (%.0fm, overlap=%.0fm).", len(gdf), tile_size, overlap
+    )
     return gdf
 
 
@@ -139,7 +141,9 @@ def classify_tiles(
     n_edge = (tiles["classification"] == "edge").sum()
     logger.info(
         "Classified %d tiles: %d interior, %d edge (dropped %d exterior)%s.",
-        len(tiles), n_int, n_edge,
+        len(tiles),
+        n_int,
+        n_edge,
         len(fracs) - len(tiles),
         ", edge tiles clipped to boundary" if clip_to_boundary else "",
     )
@@ -175,7 +179,9 @@ def suggest_tile_size(
     n_buildings = len(buildings_gdf)
 
     if area_km2 <= 0:
-        logger.warning("Boundary area is zero — defaulting to %.0fm.", DEFAULT_TILE_SIZE)
+        logger.warning(
+            "Boundary area is zero — defaulting to %.0fm.", DEFAULT_TILE_SIZE
+        )
         return DEFAULT_TILE_SIZE
 
     density = n_buildings / area_km2  # buildings per km²
@@ -193,7 +199,10 @@ def suggest_tile_size(
 
     logger.info(
         "suggest_tile_size: %.1f km², %d buildings, density=%.0f/km² → %.0fm tiles.",
-        area_km2, n_buildings, density, tile_size,
+        area_km2,
+        n_buildings,
+        density,
+        tile_size,
     )
     return tile_size
 
@@ -243,12 +252,15 @@ def filter_tiles_by_building_count(
     if n_dropped > 0:
         logger.info(
             "Building count filter: dropped %d / %d tiles (< %d buildings).",
-            n_dropped, n_before, min_building_count,
+            n_dropped,
+            n_before,
+            min_building_count,
         )
     else:
         logger.info(
             "Building count filter: all %d tiles have >= %d buildings.",
-            n_before, min_building_count,
+            n_before,
+            min_building_count,
         )
 
     return tiles.reset_index(drop=True)
@@ -304,7 +316,9 @@ def compute_buffered_extents(
     if buf_dists:
         logger.info(
             "Buffer distances: min=%.0fm, max=%.0fm, mean=%.0fm.",
-            min(buf_dists), max(buf_dists), np.mean(buf_dists),
+            min(buf_dists),
+            max(buf_dists),
+            np.mean(buf_dists),
         )
     else:
         logger.warning("No tiles to buffer.")
@@ -342,6 +356,7 @@ def enrich_tiles(
         for _, tile in tiles.iterrows():
             try:
                 from rasterio.mask import mask as rio_mask
+
                 out_image, _ = rio_mask(
                     src,
                     [tile.geometry.__geo_interface__],
@@ -361,7 +376,9 @@ def enrich_tiles(
     n_with_dtm = sum(has_coverage)
     logger.info(
         "Enriched %d tiles: %d with buildings, %d with DTM coverage.",
-        len(tiles), n_with_bldg, n_with_dtm,
+        len(tiles),
+        n_with_bldg,
+        n_with_dtm,
     )
     return tiles
 
@@ -399,13 +416,16 @@ def build_tile_grid(
     """
     tiles = generate_tiles(boundary_gdf, tile_size=tile_size, overlap=overlap)
     tiles = classify_tiles(
-        tiles, boundary_gdf,
+        tiles,
+        boundary_gdf,
         interior_threshold=interior_threshold,
         clip_to_boundary=clip_to_boundary,
     )
     if min_building_count > 0:
         tiles = filter_tiles_by_building_count(
-            tiles, buildings_gdf, min_building_count=min_building_count,
+            tiles,
+            buildings_gdf,
+            min_building_count=min_building_count,
         )
     tiles = compute_buffered_extents(tiles, buildings_gdf)
     tiles = enrich_tiles(tiles, buildings_gdf, dtm_path)

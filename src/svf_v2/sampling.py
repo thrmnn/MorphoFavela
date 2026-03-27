@@ -246,8 +246,10 @@ def _offset_points_outside_buildings(
 
     # Identify trapped points via spatial join
     joined = gpd.sjoin(
-        gdf_pts[["geometry"]], footprints_gdf[["geometry"]],
-        how="inner", predicate="within",
+        gdf_pts[["geometry"]],
+        footprints_gdf[["geometry"]],
+        how="inner",
+        predicate="within",
     )
     trapped_indices = joined.index.unique()
 
@@ -266,8 +268,9 @@ def _offset_points_outside_buildings(
         px, py = pt.x, pt.y
 
         # Find containing building(s) via STRtree
-        containing = [building_polys[i] for i in tree.query(pt)
-                       if building_polys[i].contains(pt)]
+        containing = [
+            building_polys[i] for i in tree.query(pt) if building_polys[i].contains(pt)
+        ]
         if not containing:
             continue
         bldg = containing[0]
@@ -326,9 +329,7 @@ def _offset_points_outside_buildings(
         gdf_pts.at[idx, "offset_distance"] = pt.distance(new_pt)
 
     n_offset = int(gdf_pts["was_offset"].sum())
-    logger.info(
-        f"  Offset complete: {n_offset} moved, {n_unresolvable} unresolvable"
-    )
+    logger.info(f"  Offset complete: {n_offset} moved, {n_unresolvable} unresolvable")
     return gdf_pts
 
 

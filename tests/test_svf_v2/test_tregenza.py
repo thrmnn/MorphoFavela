@@ -64,12 +64,14 @@ def half_sky_scene():
     observing from (5 - epsilon, 0, 1).
     """
     # Create a large vertical wall in the XZ plane at x=5
-    pts = np.array([
-        [5.0, -100.0, 0.0],
-        [5.0, 100.0, 0.0],
-        [5.0, 100.0, 200.0],
-        [5.0, -100.0, 200.0],
-    ])
+    pts = np.array(
+        [
+            [5.0, -100.0, 0.0],
+            [5.0, 100.0, 0.0],
+            [5.0, 100.0, 200.0],
+            [5.0, -100.0, 200.0],
+        ]
+    )
     faces = np.array([4, 0, 1, 2, 3])
     return pv.PolyData(pts, faces)
 
@@ -145,9 +147,7 @@ class TestTregenzaPatchGeneration:
 
     def test_zenith_patch_is_last(self, tregenza_dirs):
         """The last patch should be the zenith (0, 0, 1)."""
-        np.testing.assert_allclose(
-            tregenza_dirs[-1], [0.0, 0.0, 1.0], atol=1e-12
-        )
+        np.testing.assert_allclose(tregenza_dirs[-1], [0.0, 0.0, 1.0], atol=1e-12)
 
 
 # -----------------------------------------------------------------------
@@ -161,8 +161,10 @@ class TestSolidAngles:
     def test_weights_sum_to_2pi(self, tregenza_weights):
         """Total solid angle of hemisphere = 2*pi steradians."""
         np.testing.assert_allclose(
-            tregenza_weights.sum(), 2.0 * np.pi, atol=1e-10,
-            err_msg="Tregenza weights must sum to 2*pi sr"
+            tregenza_weights.sum(),
+            2.0 * np.pi,
+            atol=1e-10,
+            err_msg="Tregenza weights must sum to 2*pi sr",
         )
 
     def test_all_weights_positive(self, tregenza_weights):
@@ -179,9 +181,7 @@ class TestSolidAngles:
         mean_w = tregenza_weights.mean()
         std_w = tregenza_weights.std()
         cv = std_w / mean_w
-        assert cv < 0.25, (
-            f"Weights are not approximately equal-area (CV={cv:.3f})"
-        )
+        assert cv < 0.25, f"Weights are not approximately equal-area (CV={cv:.3f})"
 
     def test_band_solid_angles_partition(self, tregenza_weights):
         """Sum of solid angles across bands should reconstruct 2*pi.
@@ -192,14 +192,12 @@ class TestSolidAngles:
         idx = 0
         band_totals = []
         for _, n_patches, _ in TREGENZA_BANDS:
-            band_total = tregenza_weights[idx:idx + n_patches].sum()
+            band_total = tregenza_weights[idx : idx + n_patches].sum()
             band_totals.append(band_total)
             idx += n_patches
         # Zenith cap
         band_totals.append(tregenza_weights[-1])
-        np.testing.assert_allclose(
-            sum(band_totals), 2.0 * np.pi, atol=1e-10
-        )
+        np.testing.assert_allclose(sum(band_totals), 2.0 * np.pi, atol=1e-10)
 
     def test_individual_band_omega(self):
         """Verify each band's total solid angle against analytic formula."""
@@ -207,9 +205,7 @@ class TestSolidAngles:
         for el_centre_deg, n_patches, _ in TREGENZA_BANDS:
             el_lo = np.radians(el_centre_deg - band_width_deg / 2.0)
             el_hi = np.radians(el_centre_deg + band_width_deg / 2.0)
-            expected_band_omega = 2.0 * np.pi * (
-                np.sin(el_hi) - np.sin(el_lo)
-            )
+            expected_band_omega = 2.0 * np.pi * (np.sin(el_hi) - np.sin(el_lo))
             # Verify it is a reasonable positive value
             assert expected_band_omega > 0
             # Lower bands (near horizon) have larger solid angle
@@ -236,7 +232,9 @@ class TestTregenzaSVF:
         """
         obs = np.array([[5.0, 5.0, 1.5]])
         svf = compute_svf_raycasting(
-            obs, empty_scene, tregenza_dirs,
+            obs,
+            empty_scene,
+            tregenza_dirs,
             sky_weights=tregenza_weights,
         )
         assert svf[0] == pytest.approx(1.0, abs=0.05), (
@@ -255,7 +253,9 @@ class TestTregenzaSVF:
         # Observer just to the left of the wall
         obs = np.array([[4.9, 0.0, 1.0]])
         svf = compute_svf_raycasting(
-            obs, half_sky_scene, tregenza_dirs,
+            obs,
+            half_sky_scene,
+            tregenza_dirs,
             sky_weights=tregenza_weights,
         )
         assert svf[0] == pytest.approx(0.5, abs=0.08), (
@@ -269,11 +269,15 @@ class TestTregenzaSVF:
         obs_near = np.array([[4.1, 5.0, 0.1]])
         obs_far = np.array([[0.5, 0.5, 1.5]])
         svf_near = compute_svf_raycasting(
-            obs_near, single_building_scene, tregenza_dirs,
+            obs_near,
+            single_building_scene,
+            tregenza_dirs,
             sky_weights=tregenza_weights,
         )
         svf_far = compute_svf_raycasting(
-            obs_far, single_building_scene, tregenza_dirs,
+            obs_far,
+            single_building_scene,
+            tregenza_dirs,
             sky_weights=tregenza_weights,
         )
         assert svf_near[0] < svf_far[0], (
@@ -285,13 +289,17 @@ class TestTregenzaSVF:
         self, single_building_scene, tregenza_dirs, tregenza_weights
     ):
         """SVF values should always be in [0, 1]."""
-        obs = np.array([
-            [5.0, 5.0, 0.1],
-            [0.5, 0.5, 1.5],
-            [3.9, 5.0, 2.5],
-        ])
+        obs = np.array(
+            [
+                [5.0, 5.0, 0.1],
+                [0.5, 0.5, 1.5],
+                [3.9, 5.0, 2.5],
+            ]
+        )
         svf = compute_svf_raycasting(
-            obs, single_building_scene, tregenza_dirs,
+            obs,
+            single_building_scene,
+            tregenza_dirs,
             sky_weights=tregenza_weights,
         )
         assert np.all((svf >= 0.0) & (svf <= 1.0))
@@ -320,9 +328,7 @@ class TestTregenzaVsUniform:
 
         # Uniform (unweighted, same number of patches)
         dirs_u = generate_sky_directions(n_patches=145)
-        svf_uniform = compute_svf_raycasting(
-            obs, empty_scene, dirs_u, sky_weights=None
-        )
+        svf_uniform = compute_svf_raycasting(obs, empty_scene, dirs_u, sky_weights=None)
 
         # Both should be close to 1.0 for an unobstructed point,
         # but they should not be exactly the same due to different
@@ -393,6 +399,7 @@ class TestComputeSVFInterface:
     def test_default_is_tregenza(self, empty_scene):
         """The default sky_model should be 'tregenza'."""
         import inspect
+
         sig = inspect.signature(compute_svf)
         default = sig.parameters["sky_model"].default
         assert default == "tregenza"
@@ -402,8 +409,10 @@ class TestComputeSVFInterface:
         obs = np.array([[3.9, 5.0, 2.5]])
         normals = np.array([[-1.0, 0.0, 0.0]])  # facing away from building
         svf = compute_svf(
-            obs, single_building_scene,
-            sky_model="tregenza", normals=normals,
+            obs,
+            single_building_scene,
+            sky_model="tregenza",
+            normals=normals,
         )
         assert 0.0 <= svf[0] <= 1.0
         # Facing away from building with clear sky should be decent

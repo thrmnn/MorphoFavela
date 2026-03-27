@@ -28,7 +28,10 @@ def synthetic_buildings():
     heights = rng.uniform(3, 20, n)
     bases = rng.uniform(0, 5, n)
 
-    polys = [box(x - s / 2, y - s / 2, x + s / 2, y + s / 2) for x, y, s in zip(cx, cy, sizes)]
+    polys = [
+        box(x - s / 2, y - s / 2, x + s / 2, y + s / 2)
+        for x, y, s in zip(cx, cy, sizes)
+    ]
     return gpd.GeoDataFrame(
         {
             "altura": heights,
@@ -63,10 +66,16 @@ def synthetic_dtm(tmp_path):
     data = np.full((rows, cols), 5.0, dtype=np.float32)
     transform = from_bounds(xmin, ymin, xmax, ymax, cols, rows)
     with rasterio.open(
-        str(path), "w", driver="GTiff",
-        height=rows, width=cols, count=1,
-        dtype="float32", crs=CRS,
-        transform=transform, nodata=np.nan,
+        str(path),
+        "w",
+        driver="GTiff",
+        height=rows,
+        width=cols,
+        count=1,
+        dtype="float32",
+        crs=CRS,
+        transform=transform,
+        nodata=np.nan,
     ) as dst:
         dst.write(data, 1)
     return path
@@ -76,5 +85,6 @@ def synthetic_dtm(tmp_path):
 def synthetic_tiles(synthetic_boundary):
     """Pre-generated 100m tiles over the synthetic boundary."""
     from src.patch_selection.tiling import generate_tiles, classify_tiles
+
     tiles = generate_tiles(synthetic_boundary, tile_size=100.0)
     return classify_tiles(tiles, synthetic_boundary)
