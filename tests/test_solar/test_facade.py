@@ -82,31 +82,39 @@ class TestFacadeIncidentAngle:
 class TestDirectBeamOnFacade:
     def test_positive_when_sun_in_front(self):
         result = direct_beam_on_facade(
-            dni=800.0, sun_altitude_deg=45.0,
-            sun_azimuth_deg=180.0, facade_azimuth_deg=180.0,
+            dni=800.0,
+            sun_altitude_deg=45.0,
+            sun_azimuth_deg=180.0,
+            facade_azimuth_deg=180.0,
         )
         assert result > 0
 
     def test_zero_when_sun_behind(self):
         result = direct_beam_on_facade(
-            dni=800.0, sun_altitude_deg=45.0,
-            sun_azimuth_deg=0.0, facade_azimuth_deg=180.0,
+            dni=800.0,
+            sun_altitude_deg=45.0,
+            sun_azimuth_deg=0.0,
+            facade_azimuth_deg=180.0,
         )
         assert result == 0.0
 
     def test_less_than_dni(self):
         """Facade irradiance always <= DNI."""
         result = direct_beam_on_facade(
-            dni=1000.0, sun_altitude_deg=30.0,
-            sun_azimuth_deg=0.0, facade_azimuth_deg=0.0,
+            dni=1000.0,
+            sun_altitude_deg=30.0,
+            sun_azimuth_deg=0.0,
+            facade_azimuth_deg=0.0,
         )
         assert result <= 1000.0
         assert result > 0
 
     def test_zero_dni_zero_beam(self):
         result = direct_beam_on_facade(
-            dni=0.0, sun_altitude_deg=45.0,
-            sun_azimuth_deg=0.0, facade_azimuth_deg=0.0,
+            dni=0.0,
+            sun_altitude_deg=45.0,
+            sun_azimuth_deg=0.0,
+            facade_azimuth_deg=0.0,
         )
         assert result == 0.0
 
@@ -150,7 +158,10 @@ class TestFacadeSunlitHours:
         facade_azimuths = np.array([0.0])
 
         hours = compute_facade_sunlit_hours(
-            sunlit_matrix, sun_positions, facade_azimuths, interval_minutes=60,
+            sunlit_matrix,
+            sun_positions,
+            facade_azimuths,
+            interval_minutes=60,
         )
         assert hours[0] == pytest.approx(4.0)
 
@@ -163,7 +174,10 @@ class TestFacadeSunlitHours:
         facade_azimuths = np.array([0.0])
 
         hours = compute_facade_sunlit_hours(
-            sunlit_matrix, sun_positions, facade_azimuths, interval_minutes=60,
+            sunlit_matrix,
+            sun_positions,
+            facade_azimuths,
+            interval_minutes=60,
         )
         assert hours[0] == pytest.approx(0.0)
 
@@ -176,7 +190,10 @@ class TestFacadeSunlitHours:
         facade_azimuths = np.array([90.0])  # East-facing
 
         hours = compute_facade_sunlit_hours(
-            sunlit_matrix, sun_positions, facade_azimuths, interval_minutes=60,
+            sunlit_matrix,
+            sun_positions,
+            facade_azimuths,
+            interval_minutes=60,
         )
         # First two timesteps: sun within 90 deg of facade (az=90,135 vs facade=90)
         # Third: az=225 vs 90 -> diff=135 -> cos(135) < 0 -> behind
@@ -191,7 +208,10 @@ class TestFacadeSunlitHours:
         facade_azimuths = np.array([0.0])
 
         hours = compute_facade_sunlit_hours(
-            sunlit_matrix, sun_positions, facade_azimuths, interval_minutes=60,
+            sunlit_matrix,
+            sun_positions,
+            facade_azimuths,
+            interval_minutes=60,
         )
         assert hours[0] == 0.0
 
@@ -256,8 +276,12 @@ class TestFacadeDailyIrradianceArray:
         svf_array = np.ones(N)
 
         result = compute_facade_daily_irradiance_array(
-            sun_positions, sunlit_matrix, facade_azimuths, svf_array,
-            interval_minutes=30, day_of_year=172,
+            sun_positions,
+            sunlit_matrix,
+            facade_azimuths,
+            svf_array,
+            interval_minutes=30,
+            day_of_year=172,
         )
         assert result.shape == (N,)
 
@@ -266,8 +290,12 @@ class TestFacadeDailyIrradianceArray:
         from src.solar.sun import compute_sun_positions
 
         sun_positions = compute_sun_positions(
-            -22.95, -43.23, "2026-06-21",
-            hour_start=6, hour_end=18, interval_minutes=30,
+            -22.95,
+            -43.23,
+            "2026-06-21",
+            hour_start=6,
+            hour_end=18,
+            interval_minutes=30,
         )
         if not sun_positions:
             pytest.skip("No sun positions computed")
@@ -279,8 +307,12 @@ class TestFacadeDailyIrradianceArray:
         svf_array = np.ones(N)
 
         result = compute_facade_daily_irradiance_array(
-            sun_positions, sunlit_matrix, facade_azimuths, svf_array,
-            interval_minutes=30, day_of_year=172,
+            sun_positions,
+            sunlit_matrix,
+            facade_azimuths,
+            svf_array,
+            interval_minutes=30,
+            day_of_year=172,
         )
         # North-facing should get more direct beam than south-facing
         assert result[0] > result[1], (
@@ -297,8 +329,12 @@ class TestFacadeDailyIrradianceArray:
         svf_array = np.ones(N)
 
         result = compute_facade_daily_irradiance_array(
-            sun_positions, sunlit_matrix, facade_azimuths, svf_array,
-            interval_minutes=30, day_of_year=172,
+            sun_positions,
+            sunlit_matrix,
+            facade_azimuths,
+            svf_array,
+            interval_minutes=30,
+            day_of_year=172,
         )
         # Should be > 0 (diffuse component)
         assert np.all(result > 0)
@@ -312,8 +348,12 @@ class TestFacadeDailyIrradianceArray:
         svf_array = np.array([0.2, 0.8])
 
         result = compute_facade_daily_irradiance_array(
-            sun_positions, sunlit_matrix, facade_azimuths, svf_array,
-            interval_minutes=30, day_of_year=172,
+            sun_positions,
+            sunlit_matrix,
+            facade_azimuths,
+            svf_array,
+            interval_minutes=30,
+            day_of_year=172,
         )
         assert result[1] > result[0]
 
@@ -326,15 +366,17 @@ class TestFacadeDailyIrradianceArray:
 class TestAggregateByBuilding:
     @pytest.fixture
     def sample_facade_gdf(self):
-        return gpd.GeoDataFrame({
-            "geometry": [Point(0, 0)] * 6,
-            "building_id": [1, 1, 1, 2, 2, 2],
-            "facade_sunlit_hours": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-            "facade_irradiance_wh": [100, 200, 300, 400, 500, 600],
-            "who_compliant": [False, True, True, True, True, True],
-            "floor_level": [0, 0, 1, 0, 1, 2],
-            "height_above_ground": [0.5, 1.5, 3.5, 0.5, 3.5, 6.5],
-        })
+        return gpd.GeoDataFrame(
+            {
+                "geometry": [Point(0, 0)] * 6,
+                "building_id": [1, 1, 1, 2, 2, 2],
+                "facade_sunlit_hours": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+                "facade_irradiance_wh": [100, 200, 300, 400, 500, 600],
+                "who_compliant": [False, True, True, True, True, True],
+                "floor_level": [0, 0, 1, 0, 1, 2],
+                "height_above_ground": [0.5, 1.5, 3.5, 0.5, 3.5, 6.5],
+            }
+        )
 
     def test_building_count(self, sample_facade_gdf):
         result = aggregate_by_building(sample_facade_gdf)
@@ -356,14 +398,16 @@ class TestAggregateByBuilding:
 
 class TestAggregateByBuildingFloor:
     def test_floor_grouping(self):
-        gdf = gpd.GeoDataFrame({
-            "geometry": [Point(0, 0)] * 4,
-            "building_id": [1, 1, 1, 1],
-            "floor_level": [0, 0, 1, 1],
-            "facade_sunlit_hours": [1.0, 2.0, 3.0, 4.0],
-            "facade_irradiance_wh": [100, 200, 300, 400],
-            "who_compliant": [False, True, True, True],
-        })
+        gdf = gpd.GeoDataFrame(
+            {
+                "geometry": [Point(0, 0)] * 4,
+                "building_id": [1, 1, 1, 1],
+                "floor_level": [0, 0, 1, 1],
+                "facade_sunlit_hours": [1.0, 2.0, 3.0, 4.0],
+                "facade_irradiance_wh": [100, 200, 300, 400],
+                "who_compliant": [False, True, True, True],
+            }
+        )
         result = aggregate_by_building_floor(gdf)
         assert len(result) == 2  # 2 floors
 

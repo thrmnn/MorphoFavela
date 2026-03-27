@@ -45,9 +45,14 @@ def _batch_solar_access(
     Delegates to ``compute_sunlit_matrix`` and sums across sun positions.
     """
     sunlit = compute_sunlit_matrix(
-        observer_points, sun_directions, scene_mesh, ray_length=ray_length, n_jobs=1,
+        observer_points,
+        sun_directions,
+        scene_mesh,
+        ray_length=ray_length,
+        n_jobs=1,
     )
     return sunlit.sum(axis=1).astype(_np.int32)
+
 
 # plot_solar_access will be importable once src.solar.visualize is created.
 # For now, import from the original location if needed:
@@ -125,6 +130,7 @@ except ImportError:
         plt.close(fig)
 
         _logger.info("Saved solar access map to %s", output_path)
+
 
 __all__ = [
     "compute_sun_positions",

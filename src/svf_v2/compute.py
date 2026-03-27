@@ -280,9 +280,7 @@ def _svf_for_point_multi_ray(
         total_weight = valid_weights.sum()
         blocked_weight = sum(valid_weights[r] for r in hit_set)
         return (
-            (total_weight - blocked_weight) / total_weight
-            if total_weight > 0
-            else 0.0
+            (total_weight - blocked_weight) / total_weight if total_weight > 0 else 0.0
         )
     else:
         # Unweighted SVF: count ratio (legacy behaviour)
@@ -456,9 +454,7 @@ def compute_svf_raycasting(
             chunks = np.array_split(all_indices, n_jobs)
             chunks = [c for c in chunks if len(c) > 0]
 
-            worker = (
-                _compute_chunk_multi_ray if use_multi_ray else _compute_chunk_obb
-            )
+            worker = _compute_chunk_multi_ray if use_multi_ray else _compute_chunk_obb
 
             results = Parallel(n_jobs=n_jobs, verbose=5)(
                 delayed(worker)(
@@ -550,9 +546,7 @@ def compute_svf_raycasting(
             )
 
         if (i + 1) % 50 == 0 or i == n_obs - 1:
-            pbar.set_postfix(
-                mean=f"{np.mean(svf[: i + 1]):.3f}", cur=f"{svf[i]:.3f}"
-            )
+            pbar.set_postfix(mean=f"{np.mean(svf[: i + 1]):.3f}", cur=f"{svf[i]:.3f}")
         pbar.update(1)
 
         # Save checkpoint periodically
@@ -719,8 +713,7 @@ def compute_svf(
         sky_weights = None
     else:
         raise ValueError(
-            f"Unknown sky_model: {sky_model!r}. "
-            f"Use 'tregenza' or 'uniform'."
+            f"Unknown sky_model: {sky_model!r}. Use 'tregenza' or 'uniform'."
         )
 
     if backend == "raycasting":

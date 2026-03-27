@@ -237,7 +237,6 @@ def test_points():
     return points
 
 
-
 @pytest.fixture
 def gpu_available():
     """Check if GPU is available."""

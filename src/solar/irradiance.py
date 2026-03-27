@@ -268,7 +268,9 @@ def compute_instantaneous_ghi(
         I_direct = 0.0
 
     # Diffuse component (isotropic, weighted by SVF)
-    I_diffuse = diffuse_horizontal_irradiance(altitude_deg, day_of_year, site_elevation_m)
+    I_diffuse = diffuse_horizontal_irradiance(
+        altitude_deg, day_of_year, site_elevation_m
+    )
     I_diffuse_weighted = I_diffuse * svf
 
     return float(I_direct + I_diffuse_weighted)
@@ -386,7 +388,7 @@ def compute_daily_irradiance_array(
 
     # Ensure shapes are correct
     sunlit = np.asarray(sunlit_matrix, dtype=np.float64)  # (N, M)
-    svf = np.asarray(svf_array, dtype=np.float64)         # (N,)
+    svf = np.asarray(svf_array, dtype=np.float64)  # (N,)
 
     # Direct component: sum over timesteps where sunlit
     # (N, M) * (M,) -> (N, M), then sum over M -> (N,)

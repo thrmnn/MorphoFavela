@@ -245,9 +245,7 @@ def compute_facade_sunlit_hours(
     total_hours = np.zeros(N, dtype=np.float64)
 
     for j, (alt, az) in enumerate(sun_positions):
-        cos_theta = np.cos(np.radians(alt)) * np.cos(
-            np.radians(az) - facade_az_rad
-        )
+        cos_theta = np.cos(np.radians(alt)) * np.cos(np.radians(az) - facade_az_rad)
         sun_in_front = cos_theta > 0
         effective = sunlit_matrix[:, j] & sun_in_front
         total_hours += effective * hours_per_step
@@ -419,7 +417,9 @@ def compute_facade_solar_access(
 
     # --- 1. Sun positions ---------------------------------------------------
     sun_positions = compute_sun_positions(
-        latitude, longitude, date,
+        latitude,
+        longitude,
+        date,
         hour_start=hour_start,
         hour_end=hour_end,
         interval_minutes=interval_minutes,
@@ -434,7 +434,9 @@ def compute_facade_solar_access(
 
     logger.info(
         "Sun positions: %d timesteps (%s, lat=%.2f)",
-        len(sun_positions), date, latitude,
+        len(sun_positions),
+        date,
+        latitude,
     )
 
     # --- 2. Sun direction vectors -------------------------------------------
@@ -444,16 +446,19 @@ def compute_facade_solar_access(
     )
 
     # --- 3. Observer points -------------------------------------------------
-    observer_points = np.column_stack([
-        facade_gdf["x"].values,
-        facade_gdf["y"].values,
-        facade_gdf["z"].values,
-    ])
+    observer_points = np.column_stack(
+        [
+            facade_gdf["x"].values,
+            facade_gdf["y"].values,
+            facade_gdf["z"].values,
+        ]
+    )
 
     # --- 4. Sunlit matrix (existing, unchanged) -----------------------------
     logger.info(
         "Computing sunlit matrix: %d facade points x %d sun positions...",
-        len(observer_points), len(sun_dirs),
+        len(observer_points),
+        len(sun_dirs),
     )
     sunlit_matrix = compute_sunlit_matrix(
         observer_points,
@@ -466,7 +471,10 @@ def compute_facade_solar_access(
     # --- 5. Facade sunlit hours (with normal filtering) --------------------
     facade_azimuths = facade_gdf["facade_azimuth"].values
     facade_sunlit_hours = compute_facade_sunlit_hours(
-        sunlit_matrix, sun_positions, facade_azimuths, interval_minutes,
+        sunlit_matrix,
+        sun_positions,
+        facade_azimuths,
+        interval_minutes,
     )
     facade_gdf["facade_sunlit_hours"] = facade_sunlit_hours
 
@@ -475,22 +483,33 @@ def compute_facade_solar_access(
     dt = datetime.strptime(date, "%Y-%m-%d")
     doy = dt.timetuple().tm_yday
 
-    svf_array = facade_gdf["svf"].values if "svf" in facade_gdf.columns else np.ones(len(facade_gdf))
+    svf_array = (
+        facade_gdf["svf"].values
+        if "svf" in facade_gdf.columns
+        else np.ones(len(facade_gdf))
+    )
 
     facade_irradiance = compute_facade_daily_irradiance_array(
-        sun_positions, sunlit_matrix, facade_azimuths, svf_array,
-        interval_minutes, doy, site_elevation_m,
+        sun_positions,
+        sunlit_matrix,
+        facade_azimuths,
+        svf_array,
+        interval_minutes,
+        doy,
+        site_elevation_m,
     )
     facade_gdf["facade_irradiance_wh"] = facade_irradiance
 
     # --- 7. WHO threshold ---------------------------------------------------
     facade_gdf["who_compliant"] = assess_who_threshold(
-        facade_sunlit_hours, who_threshold_hours,
+        facade_sunlit_hours,
+        who_threshold_hours,
     )
 
     # --- 8. Floor level -----------------------------------------------------
     facade_gdf["floor_level"] = compute_floor_level(
-        facade_gdf["height_above_ground"].values, floor_height,
+        facade_gdf["height_above_ground"].values,
+        floor_height,
     )
 
     # --- Summary logging ----------------------------------------------------
@@ -498,12 +517,16 @@ def compute_facade_solar_access(
     n_total = len(facade_gdf)
     logger.info(
         "Facade solar access complete: %d/%d points meet WHO %.1fh threshold (%.1f%%).",
-        n_compliant, n_total, who_threshold_hours,
+        n_compliant,
+        n_total,
+        who_threshold_hours,
         100.0 * n_compliant / n_total if n_total > 0 else 0.0,
     )
     logger.info(
         "  Sunlit hours: mean=%.2f, min=%.2f, max=%.2f",
-        facade_sunlit_hours.mean(), facade_sunlit_hours.min(), facade_sunlit_hours.max(),
+        facade_sunlit_hours.mean(),
+        facade_sunlit_hours.min(),
+        facade_sunlit_hours.max(),
     )
     logger.info(
         "  Irradiance: mean=%.0f Wh/m2/day",

@@ -333,9 +333,7 @@ class TestComputeExposureIndex:
         result = compute_exposure_index(zone_gdf_with_metrics, metrics)
         vals = result["solar_deficit"].values
         expected = (vals - vals.min()) / (vals.max() - vals.min())
-        np.testing.assert_allclose(
-            result["exposure_index"].values, expected, rtol=1e-6
-        )
+        np.testing.assert_allclose(result["exposure_index"].values, expected, rtol=1e-6)
 
     def test_empty_metrics_dict(self, zone_gdf_with_metrics):
         result = compute_exposure_index(zone_gdf_with_metrics, {})
@@ -393,26 +391,20 @@ class TestPlotExposurePanel:
         assert out.exists()
 
     def test_with_boundary(self, zone_gdf_with_metrics, tmp_path):
-        boundary = gpd.GeoDataFrame(
-            geometry=[box(0, 0, 250, 50)], crs="EPSG:32723"
-        )
+        boundary = gpd.GeoDataFrame(geometry=[box(0, 0, 250, 50)], crs="EPSG:32723")
         out = tmp_path / "panel_boundary.png"
         plot_exposure_panel(zone_gdf_with_metrics, out, boundary_gdf=boundary)
         assert out.exists()
 
     def test_with_footprints(self, zone_gdf_with_metrics, tmp_path):
-        buildings = gpd.GeoDataFrame(
-            geometry=[box(10, 10, 20, 20)], crs="EPSG:32723"
-        )
+        buildings = gpd.GeoDataFrame(geometry=[box(10, 10, 20, 20)], crs="EPSG:32723")
         out = tmp_path / "panel_buildings.png"
         plot_exposure_panel(zone_gdf_with_metrics, out, footprints_gdf=buildings)
         assert out.exists()
 
     def test_no_matching_columns(self, tmp_path):
         """GeoDataFrame without any matching columns."""
-        gdf = gpd.GeoDataFrame(
-            {"x": [1]}, geometry=[box(0, 0, 1, 1)], crs="EPSG:32723"
-        )
+        gdf = gpd.GeoDataFrame({"x": [1]}, geometry=[box(0, 0, 1, 1)], crs="EPSG:32723")
         out = tmp_path / "panel_empty.png"
         plot_exposure_panel(gdf, out)
         # Should not raise
@@ -436,12 +428,8 @@ class TestPlotExposureBivariate:
         # Should not raise, file may or may not exist
 
     def test_with_boundary_and_footprints(self, zone_gdf_with_metrics, tmp_path):
-        boundary = gpd.GeoDataFrame(
-            geometry=[box(0, 0, 500, 50)], crs="EPSG:32723"
-        )
-        buildings = gpd.GeoDataFrame(
-            geometry=[box(10, 10, 20, 20)], crs="EPSG:32723"
-        )
+        boundary = gpd.GeoDataFrame(geometry=[box(0, 0, 500, 50)], crs="EPSG:32723")
+        buildings = gpd.GeoDataFrame(geometry=[box(10, 10, 20, 20)], crs="EPSG:32723")
         out = tmp_path / "bivariate_full.png"
         plot_exposure_bivariate(
             zone_gdf_with_metrics,

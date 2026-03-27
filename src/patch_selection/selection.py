@@ -137,12 +137,8 @@ def _cluster_kmedoids(
     try:
         from sklearn_extra.cluster import KMedoids
 
-        logger.info(
-            "Using sklearn_extra KMedoids (n_clusters=%d).", n_clusters
-        )
-        model = KMedoids(
-            n_clusters=n_clusters, random_state=random_state, method="pam"
-        )
+        logger.info("Using sklearn_extra KMedoids (n_clusters=%d).", n_clusters)
+        model = KMedoids(n_clusters=n_clusters, random_state=random_state, method="pam")
         labels = model.fit_predict(X)
         medoid_indices = model.medoid_indices_
         return labels.astype(int), medoid_indices.astype(int)
@@ -327,9 +323,7 @@ def _select_representatives(
         return result
 
     selected = tiles_gdf.iloc[selected_indices].copy()
-    selected["selection_reason"] = [
-        ", ".join(reasons[i]) for i in selected_indices
-    ]
+    selected["selection_reason"] = [", ".join(reasons[i]) for i in selected_indices]
 
     logger.info(
         "Selected %d representative tiles (%d medoid, %d pca_extreme, "
@@ -400,7 +394,9 @@ def select_patches(
             logger.info(
                 "Pre-clustering filter: dropped %d tiles with < %d buildings "
                 "(%d remaining).",
-                n_dropped, min_building_count, len(tiles_gdf),
+                n_dropped,
+                min_building_count,
+                len(tiles_gdf),
             )
 
     # -- 0b. Feature selection -------------------------------------------
@@ -411,7 +407,8 @@ def select_patches(
             logger.info(
                 "Feature selection: using %d / %d features for clustering. "
                 "Excluded: %s",
-                len(clustering_features), len(feature_columns),
+                len(clustering_features),
+                len(feature_columns),
                 ", ".join(excluded),
             )
         else:
@@ -428,7 +425,8 @@ def select_patches(
 
     n_tiles = len(tiles_gdf)
     logger.info(
-        "select_patches: %d tiles, %d clustering features.", n_tiles,
+        "select_patches: %d tiles, %d clustering features.",
+        n_tiles,
         len(clustering_features),
     )
 
@@ -498,8 +496,7 @@ def select_patches(
     )
 
     logger.info(
-        "Patch selection complete: %d representatives from %d tiles "
-        "(%d clusters).",
+        "Patch selection complete: %d representatives from %d tiles (%d clusters).",
         len(selected_gdf),
         n_tiles,
         n_clusters,

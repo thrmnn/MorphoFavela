@@ -85,8 +85,10 @@ def save_solar_results(
     # Summary statistics CSV
     # ------------------------------------------------------------------
     stat_cols = [
-        c for c in gdf.columns
-        if c.startswith("solar_hours") or c.startswith("irradiance")
+        c
+        for c in gdf.columns
+        if c.startswith("solar_hours")
+        or c.startswith("irradiance")
         or c in ("svf", "shadow_frequency", "sunshine_ratio_mean", "seasonal_range")
     ]
     if stat_cols:
@@ -107,7 +109,8 @@ def save_solar_results(
     # ------------------------------------------------------------------
     if primary_col in gdf.columns:
         plot_solar_access(
-            gdf, out / "solar_access.png",
+            gdf,
+            out / "solar_access.png",
             footprints_gdf=footprints_gdf,
             column=primary_col,
             boundary_gdf=boundary_gdf,
@@ -119,7 +122,8 @@ def save_solar_results(
     date_cols = sorted([c for c in gdf.columns if c.startswith("solar_hours_20")])
     if date_cols:
         plot_solar_seasonal_panel(
-            gdf, out / "solar_seasonal_panel.png",
+            gdf,
+            out / "solar_seasonal_panel.png",
             footprints_gdf=footprints_gdf,
             boundary_gdf=boundary_gdf,
             date_columns=date_cols,
@@ -130,7 +134,8 @@ def save_solar_results(
     # ------------------------------------------------------------------
     if primary_col in gdf.columns:
         plot_solar_distribution(
-            gdf, out / "solar_distribution.png",
+            gdf,
+            out / "solar_distribution.png",
             column=primary_col,
         )
 
@@ -138,7 +143,8 @@ def save_solar_results(
     # Dashboard
     # ------------------------------------------------------------------
     plot_solar_dashboard(
-        gdf, out / "solar_dashboard.png",
+        gdf,
+        out / "solar_dashboard.png",
         footprints_gdf=footprints_gdf,
         roads_gdf=roads_gdf,
         boundary_gdf=boundary_gdf,
@@ -149,7 +155,8 @@ def save_solar_results(
     # ------------------------------------------------------------------
     if "irradiance_mean" in gdf.columns:
         plot_solar_irradiance_map(
-            gdf, out / "solar_irradiance.png",
+            gdf,
+            out / "solar_irradiance.png",
             footprints_gdf=footprints_gdf,
             boundary_gdf=boundary_gdf,
         )
@@ -159,7 +166,8 @@ def save_solar_results(
     # ------------------------------------------------------------------
     if "svf" in gdf.columns and primary_col in gdf.columns:
         plot_solar_vs_svf(
-            gdf, out / "solar_vs_svf.png",
+            gdf,
+            out / "solar_vs_svf.png",
             solar_col=primary_col,
         )
 
@@ -167,7 +175,8 @@ def save_solar_results(
     # Sun-path diagram
     # ------------------------------------------------------------------
     plot_solar_sun_path(
-        latitude, longitude,
+        latitude,
+        longitude,
         out / "solar_sun_path.png",
     )
 

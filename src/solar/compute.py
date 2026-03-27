@@ -160,7 +160,10 @@ def compute_sunlit_matrix(
 
     logger.info(
         "Computing sunlit matrix: %d points x %d sun positions = %d rays (n_jobs=%d)",
-        n_pts, n_sun, n_pts * n_sun, n_jobs,
+        n_pts,
+        n_sun,
+        n_pts * n_sun,
+        n_jobs,
     )
 
     # ------------------------------------------------------------------
@@ -180,7 +183,11 @@ def compute_sunlit_matrix(
 
             results = Parallel(n_jobs=n_jobs, verbose=5)(
                 delayed(_sunlit_matrix_chunk)(
-                    chunk, observer_points, sun_directions, ray_length, mesh_file,
+                    chunk,
+                    observer_points,
+                    sun_directions,
+                    ray_length,
+                    mesh_file,
                 )
                 for chunk in chunks
             )
@@ -292,7 +299,9 @@ def compute_solar_access_grid(
     from src.svf_v2.sampling import sample_grid_points
 
     logger.info(
-        "Computing grid solar access (spacing=%.1fm, height=%.1fm)", grid_spacing, evaluation_height
+        "Computing grid solar access (spacing=%.1fm, height=%.1fm)",
+        grid_spacing,
+        evaluation_height,
     )
 
     # --- Generate observer points ---
@@ -308,8 +317,14 @@ def compute_solar_access_grid(
         logger.warning("No grid observers generated -- returning empty GeoDataFrame")
         return gpd.GeoDataFrame(
             columns=[
-                "geometry", "x", "y", "z", "solar_hours",
-                "irradiance_wh", "sunshine_ratio", "shadow_frequency",
+                "geometry",
+                "x",
+                "y",
+                "z",
+                "solar_hours",
+                "irradiance_wh",
+                "sunshine_ratio",
+                "shadow_frequency",
                 "n_sun_positions",
             ],
             crs=footprints_gdf.crs,
@@ -328,7 +343,11 @@ def compute_solar_access_grid(
 
     # --- Sunlit matrix ---
     sunlit_matrix = compute_sunlit_matrix(
-        observers, sun_dirs, scene_mesh, ray_length, n_jobs=n_jobs,
+        observers,
+        sun_dirs,
+        scene_mesh,
+        ray_length,
+        n_jobs=n_jobs,
     )
 
     # --- Solar hours ---
@@ -474,7 +493,9 @@ def compute_solar_access_streets(
     elif "z" in street_gdf.columns:
         zs = street_gdf["z"].values.astype(np.float64) + evaluation_height
     else:
-        logger.warning("No z/z_observer column -- using evaluation_height=%.1f", evaluation_height)
+        logger.warning(
+            "No z/z_observer column -- using evaluation_height=%.1f", evaluation_height
+        )
         zs = np.full(n_pts, evaluation_height, dtype=np.float64)
 
     observers = np.column_stack([xs, ys, zs])
@@ -489,7 +510,11 @@ def compute_solar_access_streets(
 
     # Sunlit matrix
     sunlit_matrix = compute_sunlit_matrix(
-        observers, sun_dirs, scene_mesh, ray_length, n_jobs=n_jobs,
+        observers,
+        sun_dirs,
+        scene_mesh,
+        ray_length,
+        n_jobs=n_jobs,
     )
 
     # Solar hours

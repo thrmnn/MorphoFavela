@@ -76,7 +76,9 @@ def save_grid_results(
     _rasterise_svf(points, svf, crs, out / "svf_grid.tif", grid_spacing)
 
     # Heatmap plot
-    plot_svf_heatmap(points, svf, out / "svf_heatmap.png", footprints_gdf=footprints_gdf)
+    plot_svf_heatmap(
+        points, svf, out / "svf_heatmap.png", footprints_gdf=footprints_gdf
+    )
 
 
 def _rasterise_svf(
@@ -434,8 +436,12 @@ def plot_offset_diagnostic(
         # Buildings
         if footprints_gdf is not None:
             footprints_gdf.plot(
-                ax=ax, facecolor="lightgrey", edgecolor="black",
-                linewidth=0.3, alpha=0.6, label="Buildings",
+                ax=ax,
+                facecolor="lightgrey",
+                edgecolor="black",
+                linewidth=0.3,
+                alpha=0.6,
+                label="Buildings",
             )
 
         # Non-offset points
@@ -453,9 +459,17 @@ def plot_offset_diagnostic(
         ny = np.array([p.y for p in off.geometry])
         ax.scatter(nx, ny, c="red", s=6, alpha=0.7, zorder=5, label="Offset")
         ax.quiver(
-            ox, oy, nx - ox, ny - oy,
-            angles="xy", scale_units="xy", scale=1,
-            color="red", alpha=0.5, width=0.003, headwidth=3,
+            ox,
+            oy,
+            nx - ox,
+            ny - oy,
+            angles="xy",
+            scale_units="xy",
+            scale=1,
+            color="red",
+            alpha=0.5,
+            width=0.003,
+            headwidth=3,
         )
 
         ax.set_aspect("equal")

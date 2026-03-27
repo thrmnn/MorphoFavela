@@ -306,9 +306,7 @@ def calculate_morphology_metrics(
     # --- Filter degenerate / invalid geometries --------------------------
     _n_before = len(gdf)
     valid_mask = (
-        ~gdf.geometry.is_empty
-        & gdf.geometry.is_valid
-        & (gdf.geometry.area >= 1e-6)
+        ~gdf.geometry.is_empty & gdf.geometry.is_valid & (gdf.geometry.area >= 1e-6)
     )
     n_filtered = int((~valid_mask).sum())
     if n_filtered > 0:

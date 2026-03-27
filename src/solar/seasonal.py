@@ -84,7 +84,9 @@ def compute_seasonal_solar(
     n_pts = len(observer_points)
     logger.info(
         "Seasonal solar analysis: %d points, %d dates, %d-min interval",
-        n_pts, len(dates), interval_minutes,
+        n_pts,
+        len(dates),
+        interval_minutes,
     )
 
     date_results: dict[str, dict] = {}
@@ -128,8 +130,7 @@ def compute_seasonal_solar(
 
             # 4. Solar hours
             solar_hours = (
-                sunlit_matrix.sum(axis=1).astype(np.float64)
-                * interval_minutes / 60.0
+                sunlit_matrix.sum(axis=1).astype(np.float64) * interval_minutes / 60.0
             )
 
         # Track shadow frequency across all dates
@@ -155,6 +156,7 @@ def compute_seasonal_solar(
         # 3. Irradiance (optional)
         if svf_array is not None and n_sun > 0:
             from datetime import datetime as _dt
+
             _day_of_year = _dt.fromisoformat(date).timetuple().tm_yday
             irradiance_wh = compute_daily_irradiance_array(
                 sun_positions=sun_positions,
@@ -175,7 +177,9 @@ def compute_seasonal_solar(
 
         logger.info(
             "  Solar hours: mean=%.2f, min=%.2f, max=%.2f",
-            solar_hours.mean(), solar_hours.min(), solar_hours.max(),
+            solar_hours.mean(),
+            solar_hours.min(),
+            solar_hours.max(),
         )
 
     # ------------------------------------------------------------------
