@@ -32,6 +32,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import (
+    COMPARATIVE_AREAS,
     SUPPORTED_AREAS,
     EXPECTED_CRS,
     MIN_BUILDING_AREA,
@@ -56,15 +57,15 @@ logger = logging.getLogger(__name__)
 
 # ── Swiss design palette ─────────────────────────────────────────────────
 SWISS = {
-    "primary": "#1A1A1A",        # Near-black
-    "secondary": "#5C5C5C",      # Medium gray
-    "accent": "#2A5FA5",         # Deeper blue
-    "accent_light": "#E8EFF7",   # Very light blue for backgrounds
+    "primary": "#1A1A1A",  # Near-black
+    "secondary": "#5C5C5C",  # Medium gray
+    "accent": "#2A5FA5",  # Deeper blue
+    "accent_light": "#E8EFF7",  # Very light blue for backgrounds
     "background": "#FFFFFF",
-    "light_gray": "#F2F2F2",     # Slightly warmer gray
+    "light_gray": "#F2F2F2",  # Slightly warmer gray
     "text": "#1A1A1A",
     "grid": "#D9D9D9",
-    "caption": "#666666",        # For figure captions
+    "caption": "#666666",  # For figure captions
 }
 
 PAGE_SIZE = (8.5, 11)  # US Letter, portrait
@@ -91,8 +92,14 @@ def _next_figure_number() -> int:
 
 # ── Valid section names for --sections filter ────────────────────────────
 ALL_SECTIONS = [
-    "title", "summary", "methodology", "theory", "parameters",
-    "results", "comparative", "figures",
+    "title",
+    "summary",
+    "methodology",
+    "theory",
+    "parameters",
+    "results",
+    "comparative",
+    "figures",
 ]
 
 # ── Human-readable metric labels ────────────────────────────────────────
@@ -146,6 +153,7 @@ def _area_name(slug: str) -> str:
 #  DATA COLLECTION
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def collect_area_data(area: str) -> Dict[str, Any]:
     """
     Collect all available analysis outputs for a single area.
@@ -171,7 +179,9 @@ def collect_area_data(area: str) -> Dict[str, Any]:
         bounds = gdf.total_bounds  # minx, miny, maxx, maxy
         out["study_area_m2"] = (bounds[2] - bounds[0]) * (bounds[3] - bounds[1])
         area_km2 = out["study_area_m2"] / 1e6
-        out["building_density"] = out["building_count"] / area_km2 if area_km2 > 0 else 0
+        out["building_density"] = (
+            out["building_count"] / area_km2 if area_km2 > 0 else 0
+        )
         logger.info("  buildings: %d", out["building_count"])
 
         # ── Building height statistics ──────────────────────────────────
@@ -189,16 +199,28 @@ def collect_area_data(area: str) -> Dict[str, Any]:
                 out["height_median"] = float(h.median())
                 out["height_max"] = float(h.max())
                 out["height_min"] = float(h.min())
-                logger.info("  height stats: mean=%.2f, max=%.2f", out["height_mean"], out["height_max"])
+                logger.info(
+                    "  height stats: mean=%.2f, max=%.2f",
+                    out["height_mean"],
+                    out["height_max"],
+                )
             else:
                 logger.warning("  no valid height values found")
         else:
             logger.warning("  no height column found in buildings GeoDataFrame")
 
         # ── Building-level morphometric means for comparison ────────────
-        for col in ["shared_walls", "building_adjacency", "shape_index",
-                     "squareness", "tessellation_area", "elongation",
-                     "convexity", "inter_building_distance", "covered_area_ratio"]:
+        for col in [
+            "shared_walls",
+            "building_adjacency",
+            "shape_index",
+            "squareness",
+            "tessellation_area",
+            "elongation",
+            "convexity",
+            "inter_building_distance",
+            "covered_area_ratio",
+        ]:
             if col in gdf.columns:
                 vals = gdf[col].dropna()
                 if len(vals) > 0:
@@ -246,7 +268,9 @@ def collect_area_data(area: str) -> Dict[str, Any]:
                 out["svf_seg_range_mean"] = float(svf_range_vals.mean())
             if "n_points" in seg.columns:
                 n_single = int((seg["n_points"] == 1).sum())
-                out["svf_seg_pct_single_pt"] = 100.0 * n_single / len(seg) if len(seg) else 0.0
+                out["svf_seg_pct_single_pt"] = (
+                    100.0 * n_single / len(seg) if len(seg) else 0.0
+                )
 
             logger.info("  SVF segments: %d rows from %s", len(seg), fname)
             break
@@ -340,6 +364,7 @@ def _discover_figures(area: str) -> Dict[str, Path]:
 #  FORMATTING UTILITIES
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _fmt(val: float, decimals: int = 3) -> str:
     """Format a float for display, handling None/NaN."""
     if val is None or (isinstance(val, float) and np.isnan(val)):
@@ -373,6 +398,7 @@ def _section_header(level: int, title: str) -> str:
 #  NARRATIVE HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _narrative_summary(d: Dict[str, Any]) -> str:
     """Generate a brief narrative synthesis for one area."""
     area = _area_name(d["area"])
@@ -382,7 +408,7 @@ def _narrative_summary(d: Dict[str, Any]) -> str:
     parts.append(
         f"{area} is {'a formally planned' if atype == 'formal' else 'an informal'} "
         f"settlement comprising {d['building_count']:,} buildings "
-        f"across {d['study_area_m2']/1e6:.2f} km\u00b2 "
+        f"across {d['study_area_m2'] / 1e6:.2f} km\u00b2 "
         f"({d['building_density']:,.0f} buildings/km\u00b2)."
     )
 
@@ -413,7 +439,11 @@ def _narrative_summary(d: Dict[str, Any]) -> str:
     if sigma_h is not None:
         parts.append(
             f"Height variability (\u03c3_h = {sigma_h:.2f} m) "
-            + (f"and frontal area index (\u03bb_f = {lambda_f:.3f}) " if lambda_f is not None else "")
+            + (
+                f"and frontal area index (\u03bb_f = {lambda_f:.3f}) "
+                if lambda_f is not None
+                else ""
+            )
             + "characterize the vertical roughness of the urban canopy."
         )
 
@@ -467,6 +497,7 @@ def _interpret_sigma_h(sigma_h: float) -> str:
 #  MARKDOWN GENERATION
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") -> str:
     """Build a complete Markdown report string."""
     lines: List[str] = []
@@ -474,7 +505,9 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
     area_names = [d["area"] for d in areas_data]
 
     # ── Title page ──────────────────────────────────────────────────────
-    lines.append("# Urban Morphology and Environmental Performance Analysis of Informal Settlements in Rio de Janeiro\n")
+    lines.append(
+        "# Urban Morphology and Environmental Performance Analysis of Informal Settlements in Rio de Janeiro\n"
+    )
     area_label = ", ".join(_area_name(a) for a in area_names)
     if mode == "comparative":
         lines.append(f"## Comparative Study: {area_label}\n")
@@ -496,10 +529,12 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
     ]
     if mode == "comparative":
         toc.append("5. [Comparative Analysis](#5-comparative-analysis)")
-    toc.extend([
-        "6. [Discussion](#6-discussion)",
-        "7. [Recommendations & Next Steps](#7-recommendations--next-steps)",
-    ])
+    toc.extend(
+        [
+            "6. [Discussion](#6-discussion)",
+            "7. [Recommendations & Next Steps](#7-recommendations--next-steps)",
+        ]
+    )
     lines.extend(toc)
     lines.append("")
 
@@ -517,7 +552,7 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
         lines.append("| Metric | Value |")
         lines.append("|:-------|------:|")
         lines.append(f"| Buildings | {d['building_count']:,} |")
-        lines.append(f"| Study Area | {d['study_area_m2']/1e6:.2f} km\u00b2 |")
+        lines.append(f"| Study Area | {d['study_area_m2'] / 1e6:.2f} km\u00b2 |")
         lines.append(f"| Building Density | {d['building_density']:,.0f} /km\u00b2 |")
         if d.get("height_mean") is not None:
             lines.append(f"| Mean Building Height | {d['height_mean']:.1f} m |")
@@ -534,23 +569,33 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
     lines.append(_section_header(2, "2. Methodology & Workflow"))
     lines.append("The IVF analysis pipeline comprises the following phases:\n")
     phases = [
-        ("Data Acquisition & Preprocessing",
-         "Building footprints, DTM rasters, and road networks are loaded, "
-         "reprojected to UTM 23S (EPSG:32723), and filtered for informal settlements "
-         "(height, area, volume, h/w ratio thresholds)."),
-        ("Morphology Metrics",
-         "25 building-level morphometric indicators computed via momepy/libpysal: "
-         "shape index, compactness, elongation, tessellation, adjacency, shared walls, etc."),
-        ("Sky View Factor (SVF)",
-         "Street-level SVF computed along road centerlines using 3D ray-casting "
-         "against building volumes and DTM terrain. Results are segment-averaged."),
-        ("Urban Morphology (Zone-Level)",
-         "Grid-based zoning (tessellation) with BCR, FAR, \u03c3_h, \u03bb_f, "
-         "and street orientation entropy per zone. Spatial autocorrelation via "
-         "Moran's I and LISA clusters."),
-        ("Patch Selection for CFD",
-         "Grid tiling of study area; 31 morphometric features per tile; PCA + "
-         "k-means clustering; representative patch selection for OpenFOAM simulation."),
+        (
+            "Data Acquisition & Preprocessing",
+            "Building footprints, DTM rasters, and road networks are loaded, "
+            "reprojected to UTM 23S (EPSG:32723), and filtered for informal settlements "
+            "(height, area, volume, h/w ratio thresholds).",
+        ),
+        (
+            "Morphology Metrics",
+            "25 building-level morphometric indicators computed via momepy/libpysal: "
+            "shape index, compactness, elongation, tessellation, adjacency, shared walls, etc.",
+        ),
+        (
+            "Sky View Factor (SVF)",
+            "Street-level SVF computed along road centerlines using 3D ray-casting "
+            "against building volumes and DTM terrain. Results are segment-averaged.",
+        ),
+        (
+            "Urban Morphology (Zone-Level)",
+            "Grid-based zoning (tessellation) with BCR, FAR, \u03c3_h, \u03bb_f, "
+            "and street orientation entropy per zone. Spatial autocorrelation via "
+            "Moran's I and LISA clusters.",
+        ),
+        (
+            "Patch Selection for CFD",
+            "Grid tiling of study area; 31 morphometric features per tile; PCA + "
+            "k-means clustering; representative patch selection for OpenFOAM simulation.",
+        ),
     ]
     for i, (name, desc) in enumerate(phases, 1):
         lines.append(f"**Phase {i}: {name}**")
@@ -574,14 +619,21 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
 
     # Key morphometric columns for informal settlement analysis
     MORPH_KEY_COLS = [
-        "height", "shape_index", "shared_walls", "building_adjacency",
-        "tessellation_area", "squareness", "elongation", "convexity",
-        "covered_area_ratio", "inter_building_distance",
+        "height",
+        "shape_index",
+        "shared_walls",
+        "building_adjacency",
+        "tessellation_area",
+        "squareness",
+        "elongation",
+        "convexity",
+        "covered_area_ratio",
+        "inter_building_distance",
     ]
 
     for d in areas_data:
         area = d["area"]
-        lines.append(f"### 4.{areas_data.index(d)+1}. {_area_name(area)}\n")
+        lines.append(f"### 4.{areas_data.index(d) + 1}. {_area_name(area)}\n")
 
         # 4.x.1 Building-Level Morphology
         if d.get("morphology_stats") is not None:
@@ -609,9 +661,13 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
             lines.append(f"- **Mean SVF:** {_fmt(d['svf_mean'])}")
             lines.append(f"- **Median SVF:** {_fmt(d['svf_median'])}")
             lines.append(f"- **Std SVF:** {_fmt(d['svf_std'])}")
-            lines.append(f"- **Range:** {_fmt(d['svf_min'])} \u2013 {_fmt(d['svf_max'])}")
+            lines.append(
+                f"- **Range:** {_fmt(d['svf_min'])} \u2013 {_fmt(d['svf_max'])}"
+            )
             if d.get("svf_segments") is not None:
-                lines.append(f"- **Street segments analysed:** {len(d['svf_segments']):,}")
+                lines.append(
+                    f"- **Street segments analysed:** {len(d['svf_segments']):,}"
+                )
 
             # Segment length diagnostics
             if d.get("svf_seg_count") is not None:
@@ -623,12 +679,10 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
                     f"{d['svf_seg_length_median']:.1f} m"
                 )
                 lines.append(
-                    f"- **Very short segments (<10 m):** "
-                    f"{d['svf_seg_pct_short']:.1f}%"
+                    f"- **Very short segments (<10 m):** {d['svf_seg_pct_short']:.1f}%"
                 )
                 lines.append(
-                    f"- **Long segments (>100 m):** "
-                    f"{d['svf_seg_pct_long']:.1f}%"
+                    f"- **Long segments (>100 m):** {d['svf_seg_pct_long']:.1f}%"
                 )
                 if d.get("svf_seg_range_mean") is not None:
                     lines.append(
@@ -694,7 +748,9 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
             pca_var = pm.get("pca_explained_variance", [])
             if pca_var:
                 cum_var = sum(pca_var[:3])
-                lines.append(f"- **PCA variance explained (first 3 components):** {cum_var:.1%}")
+                lines.append(
+                    f"- **PCA variance explained (first 3 components):** {cum_var:.1%}"
+                )
             lines.append("")
 
     # ── 5. Comparative Analysis ──────────────────────────────────────────
@@ -705,7 +761,13 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
         # Build comparison table
         header_cols = ["Metric"] + [_area_name(d["area"]) for d in areas_data]
         lines.append("| " + " | ".join(header_cols) + " |")
-        lines.append("|:" + "|".join(["------" + (":" if i > 0 else "") for i in range(len(header_cols))]) + "|")
+        lines.append(
+            "|:"
+            + "|".join(
+                ["------" + (":" if i > 0 else "") for i in range(len(header_cols))]
+            )
+            + "|"
+        )
 
         metrics_to_compare = [
             ("Buildings", "building_count", ",.0f"),
@@ -832,6 +894,7 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
 #  PDF GENERATION
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _apply_swiss_style():
     """Configure matplotlib for Swiss design aesthetics.
 
@@ -842,20 +905,22 @@ def _apply_swiss_style():
     apply_publication_style()
 
     # Report-specific overrides
-    plt.rcParams.update({
-        "font.family": "sans-serif",
-        "font.sans-serif": ["Helvetica", "Arial", "DejaVu Sans"],
-        "font.size": 10,                 # Body text
-        "axes.titlesize": 15,            # Section titles
-        "axes.labelsize": 12,            # Subsection / axis labels
-        "axes.labelcolor": SWISS["text"],
-        "text.color": SWISS["text"],
-        "axes.edgecolor": SWISS["secondary"],
-        "axes.linewidth": 0.5,
-        "figure.facecolor": "white",
-        "axes.facecolor": "white",
-        "savefig.facecolor": "white",
-    })
+    plt.rcParams.update(
+        {
+            "font.family": "sans-serif",
+            "font.sans-serif": ["Helvetica", "Arial", "DejaVu Sans"],
+            "font.size": 10,  # Body text
+            "axes.titlesize": 15,  # Section titles
+            "axes.labelsize": 12,  # Subsection / axis labels
+            "axes.labelcolor": SWISS["text"],
+            "text.color": SWISS["text"],
+            "axes.edgecolor": SWISS["secondary"],
+            "axes.linewidth": 0.5,
+            "figure.facecolor": "white",
+            "axes.facecolor": "white",
+            "savefig.facecolor": "white",
+        }
+    )
 
 
 def _pdf_base_page(pdf: PdfPages, area_label: str = "") -> plt.Figure:
@@ -881,21 +946,44 @@ def _pdf_base_page(pdf: PdfPages, area_label: str = "") -> plt.Figure:
     fig.patch.set_facecolor("white")
 
     # ── Top accent line (thin) ──────────────────────────────────────
-    ax_top = fig.add_axes([MARGIN["left"], 0.955, MARGIN["right"] - MARGIN["left"], 0.002])
+    ax_top = fig.add_axes(
+        [MARGIN["left"], 0.955, MARGIN["right"] - MARGIN["left"], 0.002]
+    )
     ax_top.add_patch(Rectangle((0, 0), 1, 1, facecolor=SWISS["accent"]))
     ax_top.axis("off")
 
     # ── Footer: area name (left) | page number (center) | date (right) ──
     date_str = datetime.now().strftime("%B %Y")
-    fig.text(MARGIN["left"], 0.025, area_label,
-             ha="left", va="center", fontsize=8,
-             color=SWISS["secondary"], family="sans-serif")
-    fig.text(0.5, 0.025, f"{pdf.get_pagecount() + 1}",
-             ha="center", va="center", fontsize=8,
-             color=SWISS["secondary"], family="sans-serif")
-    fig.text(MARGIN["right"], 0.025, date_str,
-             ha="right", va="center", fontsize=8,
-             color=SWISS["secondary"], family="sans-serif")
+    fig.text(
+        MARGIN["left"],
+        0.025,
+        area_label,
+        ha="left",
+        va="center",
+        fontsize=8,
+        color=SWISS["secondary"],
+        family="sans-serif",
+    )
+    fig.text(
+        0.5,
+        0.025,
+        f"{pdf.get_pagecount() + 1}",
+        ha="center",
+        va="center",
+        fontsize=8,
+        color=SWISS["secondary"],
+        family="sans-serif",
+    )
+    fig.text(
+        MARGIN["right"],
+        0.025,
+        date_str,
+        ha="right",
+        va="center",
+        fontsize=8,
+        color=SWISS["secondary"],
+        family="sans-serif",
+    )
 
     return fig
 
@@ -914,19 +1002,33 @@ def _pdf_title_page(pdf: PdfPages, areas_data: List[Dict], mode: str):
     fig.patch.set_facecolor("white")
 
     # ── Title: 20pt bold ────────────────────────────────────────────
-    fig.text(0.5, 0.65,
-             "Urban Morphology and\nEnvironmental Performance Analysis\n"
-             "of Informal Settlements in Rio de Janeiro",
-             ha="center", va="center", fontsize=20, fontweight="bold",
-             color=SWISS["text"], family="sans-serif",
-             linespacing=1.5)
+    fig.text(
+        0.5,
+        0.65,
+        "Urban Morphology and\nEnvironmental Performance Analysis\n"
+        "of Informal Settlements in Rio de Janeiro",
+        ha="center",
+        va="center",
+        fontsize=20,
+        fontweight="bold",
+        color=SWISS["text"],
+        family="sans-serif",
+        linespacing=1.5,
+    )
 
     # ── Subtitle: area names — 13pt secondary ───────────────────────
     area_label = " / ".join(_area_name(d["area"]) for d in areas_data)
     mode_label = "Comparative Analysis" if mode == "comparative" else "Area Report"
-    fig.text(0.5, 0.55, f"{mode_label}: {area_label}",
-             ha="center", va="center", fontsize=13,
-             color=SWISS["secondary"], family="sans-serif")
+    fig.text(
+        0.5,
+        0.55,
+        f"{mode_label}: {area_label}",
+        ha="center",
+        va="center",
+        fontsize=13,
+        color=SWISS["secondary"],
+        family="sans-serif",
+    )
 
     # ── Single accent bar — centered, 40% width ────────────────────
     ax_bar = fig.add_axes([0.30, 0.50, 0.40, 0.003])
@@ -934,43 +1036,76 @@ def _pdf_title_page(pdf: PdfPages, areas_data: List[Dict], mode: str):
     ax_bar.axis("off")
 
     # ── Institution: 11pt ───────────────────────────────────────────
-    fig.text(0.5, 0.42, "Massachusetts Institute of Technology",
-             ha="center", va="center", fontsize=11,
-             color=SWISS["text"], family="sans-serif")
+    fig.text(
+        0.5,
+        0.42,
+        "Massachusetts Institute of Technology",
+        ha="center",
+        va="center",
+        fontsize=11,
+        color=SWISS["text"],
+        family="sans-serif",
+    )
 
     # ── Project: 11pt italic ────────────────────────────────────────
-    fig.text(0.5, 0.38, "Informal Ventilation Flows (IVF)",
-             ha="center", va="center", fontsize=11,
-             color=SWISS["text"], family="sans-serif",
-             style="italic")
+    fig.text(
+        0.5,
+        0.38,
+        "Informal Ventilation Flows (IVF)",
+        ha="center",
+        va="center",
+        fontsize=11,
+        color=SWISS["text"],
+        family="sans-serif",
+        style="italic",
+    )
 
     # ── Date: 11pt ──────────────────────────────────────────────────
-    fig.text(0.5, 0.34, datetime.now().strftime("%B %Y"),
-             ha="center", va="center", fontsize=11,
-             color=SWISS["secondary"], family="sans-serif")
+    fig.text(
+        0.5,
+        0.34,
+        datetime.now().strftime("%B %Y"),
+        ha="center",
+        va="center",
+        fontsize=11,
+        color=SWISS["secondary"],
+        family="sans-serif",
+    )
 
     pdf.savefig(fig, facecolor="white", dpi=150)
     plt.close(fig)
 
 
-def _pdf_text_page(pdf: PdfPages, title: str, text_lines: List[str],
-                   area_label: str = ""):
+def _pdf_text_page(
+    pdf: PdfPages, title: str, text_lines: List[str], area_label: str = ""
+):
     """Render a page of text content with proper word wrapping."""
     fig = _pdf_base_page(pdf, area_label=area_label)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.axis("off")
 
     # Section title — 15pt bold
-    ax.text(0.5, MARGIN["top"], title,
-            ha="center", va="top", fontsize=15, fontweight="bold",
-            color=SWISS["text"], family="sans-serif",
-            transform=ax.transAxes)
+    ax.text(
+        0.5,
+        MARGIN["top"],
+        title,
+        ha="center",
+        va="top",
+        fontsize=15,
+        fontweight="bold",
+        color=SWISS["text"],
+        family="sans-serif",
+        transform=ax.transAxes,
+    )
 
     # Decorative line under title
-    line = plt.Line2D([MARGIN["left"], MARGIN["right"]],
-                      [MARGIN["top"] - 0.025, MARGIN["top"] - 0.025],
-                      transform=ax.transAxes,
-                      color=SWISS["accent"], linewidth=1.0)
+    line = plt.Line2D(
+        [MARGIN["left"], MARGIN["right"]],
+        [MARGIN["top"] - 0.025, MARGIN["top"] - 0.025],
+        transform=ax.transAxes,
+        color=SWISS["accent"],
+        linewidth=1.0,
+    )
     ax.add_line(line)
 
     # Body text with proper word wrapping
@@ -995,10 +1130,17 @@ def _pdf_text_page(pdf: PdfPages, title: str, text_lines: List[str],
         for wline in wrapped:
             if y < MARGIN["bottom"]:
                 break
-            ax.text(MARGIN["left"], y, wline,
-                    transform=ax.transAxes, fontsize=fontsize,
-                    fontweight=weight, color=SWISS["text"],
-                    family="sans-serif", verticalalignment="top")
+            ax.text(
+                MARGIN["left"],
+                y,
+                wline,
+                transform=ax.transAxes,
+                fontsize=fontsize,
+                fontweight=weight,
+                color=SWISS["text"],
+                family="sans-serif",
+                verticalalignment="top",
+            )
             y -= line_h
         y -= para_spacing * 0.3
 
@@ -1008,23 +1150,38 @@ def _pdf_text_page(pdf: PdfPages, title: str, text_lines: List[str],
     _save_page(pdf, fig)
 
 
-def _pdf_table_page(pdf: PdfPages, title: str, df: pd.DataFrame,
-                    col_widths: Optional[List[float]] = None,
-                    area_label: str = ""):
+def _pdf_table_page(
+    pdf: PdfPages,
+    title: str,
+    df: pd.DataFrame,
+    col_widths: Optional[List[float]] = None,
+    area_label: str = "",
+):
     """Render a table as a full PDF page."""
     fig = _pdf_base_page(pdf, area_label=area_label)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.axis("off")
 
-    ax.text(0.5, MARGIN["top"], title,
-            ha="center", va="top", fontsize=15, fontweight="bold",
-            color=SWISS["text"], family="sans-serif",
-            transform=ax.transAxes)
+    ax.text(
+        0.5,
+        MARGIN["top"],
+        title,
+        ha="center",
+        va="top",
+        fontsize=15,
+        fontweight="bold",
+        color=SWISS["text"],
+        family="sans-serif",
+        transform=ax.transAxes,
+    )
 
-    line = plt.Line2D([MARGIN["left"], MARGIN["right"]],
-                      [MARGIN["top"] - 0.025, MARGIN["top"] - 0.025],
-                      transform=ax.transAxes,
-                      color=SWISS["accent"], linewidth=1.0)
+    line = plt.Line2D(
+        [MARGIN["left"], MARGIN["right"]],
+        [MARGIN["top"] - 0.025, MARGIN["top"] - 0.025],
+        transform=ax.transAxes,
+        color=SWISS["accent"],
+        linewidth=1.0,
+    )
     ax.add_line(line)
 
     # Truncate to fit on page
@@ -1047,7 +1204,14 @@ def _pdf_table_page(pdf: PdfPages, title: str, df: pd.DataFrame,
         return str(x)
 
     for col in display_df.columns:
-        if display_df[col].dtype in [np.float64, np.float32, float, np.int64, np.int32, int]:
+        if display_df[col].dtype in [
+            np.float64,
+            np.float32,
+            float,
+            np.int64,
+            np.int32,
+            int,
+        ]:
             display_df[col] = display_df[col].apply(_fmt_cell)
 
     cell_text = display_df.values.tolist()
@@ -1098,9 +1262,13 @@ def _pdf_table_page(pdf: PdfPages, title: str, df: pd.DataFrame,
     _save_page(pdf, fig)
 
 
-def _pdf_figure_page(pdf: PdfPages, title: str, img_path: Path,
-                     caption: Optional[str] = None,
-                     area_label: str = ""):
+def _pdf_figure_page(
+    pdf: PdfPages,
+    title: str,
+    img_path: Path,
+    caption: Optional[str] = None,
+    area_label: str = "",
+):
     """Embed an existing PNG figure as a full PDF page.
 
     Parameters
@@ -1125,9 +1293,17 @@ def _pdf_figure_page(pdf: PdfPages, title: str, img_path: Path,
     numbered_title = f"Fig. {fig_num} \u2014 {title}"
 
     # Figure title at 0.96
-    fig.text(0.5, 0.96, numbered_title,
-             ha="center", va="top", fontsize=13, fontweight="bold",
-             color=SWISS["text"], family="sans-serif")
+    fig.text(
+        0.5,
+        0.96,
+        numbered_title,
+        ha="center",
+        va="top",
+        fontsize=13,
+        fontweight="bold",
+        color=SWISS["text"],
+        family="sans-serif",
+    )
 
     # Image area: 0.07 to 0.91 vertically
     img_bottom = 0.07
@@ -1149,8 +1325,9 @@ def _pdf_figure_page(pdf: PdfPages, title: str, img_path: Path,
         elif aspect >= 0.8:
             # Near-square: slight inset
             inset = 0.02
-            ax = fig.add_axes([img_left + inset, img_bottom,
-                               img_width - 2 * inset, img_height])
+            ax = fig.add_axes(
+                [img_left + inset, img_bottom, img_width - 2 * inset, img_height]
+            )
         else:
             # Portrait: center with margin
             w = img_width * 0.75
@@ -1167,16 +1344,30 @@ def _pdf_figure_page(pdf: PdfPages, title: str, img_path: Path,
 
     except Exception as e:
         logger.warning("Could not embed figure %s: %s", img_path, e)
-        fig.text(0.5, 0.5, f"[Figure not available: {e}]",
-                 ha="center", va="center", fontsize=10,
-                 color=SWISS["secondary"])
+        fig.text(
+            0.5,
+            0.5,
+            f"[Figure not available: {e}]",
+            ha="center",
+            va="center",
+            fontsize=10,
+            color=SWISS["secondary"],
+        )
 
     # Caption at 0.04 — 9pt italic
     if caption:
-        fig.text(0.5, 0.04, caption,
-                 ha="center", va="top", fontsize=9, style="italic",
-                 color=SWISS["caption"], family="sans-serif",
-                 wrap=True)
+        fig.text(
+            0.5,
+            0.04,
+            caption,
+            ha="center",
+            va="top",
+            fontsize=9,
+            style="italic",
+            color=SWISS["caption"],
+            family="sans-serif",
+            wrap=True,
+        )
 
     _save_page(pdf, fig)
 
@@ -1217,13 +1408,20 @@ def _pdf_methodology_diagram(pdf: PdfPages, area_label: str = ""):
 
     fig = _pdf_base_page(pdf, area_label=area_label)
 
-    fig.text(0.5, MARGIN["top"], "Methodology Pipeline",
-             ha="center", va="top", fontsize=15, fontweight="bold",
-             color=SWISS["text"], family="sans-serif")
+    fig.text(
+        0.5,
+        MARGIN["top"],
+        "Methodology Pipeline",
+        ha="center",
+        va="top",
+        fontsize=15,
+        fontweight="bold",
+        color=SWISS["text"],
+        family="sans-serif",
+    )
 
     # Create axes for the diagram
-    ax = fig.add_axes([MARGIN["left"], 0.15,
-                       MARGIN["right"] - MARGIN["left"], 0.72])
+    ax = fig.add_axes([MARGIN["left"], 0.15, MARGIN["right"] - MARGIN["left"], 0.72])
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 6)
     ax.axis("off")
@@ -1240,27 +1438,44 @@ def _pdf_methodology_diagram(pdf: PdfPages, area_label: str = ""):
     box_w = 1.5
     box_h = 1.2
 
-    for (cx, cy, label) in boxes:
+    for cx, cy, label in boxes:
         rect = plt.Rectangle(
-            (cx - box_w / 2, cy - box_h / 2), box_w, box_h,
-            facecolor="white", edgecolor=SWISS["accent"],
-            linewidth=1.5, zorder=3,
+            (cx - box_w / 2, cy - box_h / 2),
+            box_w,
+            box_h,
+            facecolor="white",
+            edgecolor=SWISS["accent"],
+            linewidth=1.5,
+            zorder=3,
         )
         ax.add_patch(rect)
-        ax.text(cx, cy, label,
-                ha="center", va="center", fontsize=9.5, fontweight="bold",
-                color=SWISS["text"], family="sans-serif", zorder=4)
+        ax.text(
+            cx,
+            cy,
+            label,
+            ha="center",
+            va="center",
+            fontsize=9.5,
+            fontweight="bold",
+            color=SWISS["text"],
+            family="sans-serif",
+            zorder=4,
+        )
 
     # Arrows between boxes
     arrow_kw = dict(
         arrowstyle="->,head_width=0.2,head_length=0.15",
-        color=SWISS["secondary"], linewidth=1.2, zorder=2,
+        color=SWISS["secondary"],
+        linewidth=1.2,
+        zorder=2,
     )
     for i in range(len(boxes) - 1):
         x_start = boxes[i][0] + box_w / 2
         x_end = boxes[i + 1][0] - box_w / 2
         arrow = FancyArrowPatch(
-            (x_start, 3.0), (x_end, 3.0), **arrow_kw,
+            (x_start, 3.0),
+            (x_end, 3.0),
+            **arrow_kw,
         )
         ax.add_patch(arrow)
 
@@ -1270,34 +1485,58 @@ def _pdf_methodology_diagram(pdf: PdfPages, area_label: str = ""):
         (3.0, "DTM"),
         (5.0, "Roads"),
     ]
-    for (cx, label) in inputs:
-        ax.text(cx, 3.0 + box_h / 2 + 0.5, label,
-                ha="center", va="center", fontsize=8.5, style="italic",
-                color=SWISS["secondary"], family="sans-serif")
-        ax.annotate("", xy=(cx, 3.0 + box_h / 2),
-                    xytext=(cx, 3.0 + box_h / 2 + 0.3),
-                    arrowprops=dict(arrowstyle="->",
-                                    color=SWISS["grid"], lw=0.8))
+    for cx, label in inputs:
+        ax.text(
+            cx,
+            3.0 + box_h / 2 + 0.5,
+            label,
+            ha="center",
+            va="center",
+            fontsize=8.5,
+            style="italic",
+            color=SWISS["secondary"],
+            family="sans-serif",
+        )
+        ax.annotate(
+            "",
+            xy=(cx, 3.0 + box_h / 2),
+            xytext=(cx, 3.0 + box_h / 2 + 0.3),
+            arrowprops=dict(arrowstyle="->", color=SWISS["grid"], lw=0.8),
+        )
 
     # Output labels on bottom
     outputs = [
         (7.0, "Reports"),
         (9.0, "CFD Patches"),
     ]
-    for (cx, label) in outputs:
-        ax.text(cx, 3.0 - box_h / 2 - 0.5, label,
-                ha="center", va="center", fontsize=8.5, style="italic",
-                color=SWISS["secondary"], family="sans-serif")
-        ax.annotate("", xy=(cx, 3.0 - box_h / 2 - 0.3),
-                    xytext=(cx, 3.0 - box_h / 2),
-                    arrowprops=dict(arrowstyle="->",
-                                    color=SWISS["grid"], lw=0.8))
+    for cx, label in outputs:
+        ax.text(
+            cx,
+            3.0 - box_h / 2 - 0.5,
+            label,
+            ha="center",
+            va="center",
+            fontsize=8.5,
+            style="italic",
+            color=SWISS["secondary"],
+            family="sans-serif",
+        )
+        ax.annotate(
+            "",
+            xy=(cx, 3.0 - box_h / 2 - 0.3),
+            xytext=(cx, 3.0 - box_h / 2),
+            arrowprops=dict(arrowstyle="->", color=SWISS["grid"], lw=0.8),
+        )
 
     _save_page(pdf, fig)
 
 
-def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
-                 mode: str = "single", sections: Optional[List[str]] = None):
+def generate_pdf(
+    areas_data: List[Dict[str, Any]],
+    output_path: Path,
+    mode: str = "single",
+    sections: Optional[List[str]] = None,
+):
     """Generate a multi-page PDF technical report.
 
     Parameters
@@ -1323,77 +1562,148 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
 
     # Key morphometric columns for tables
     MORPH_KEY_COLS = [
-        "height", "shape_index", "shared_walls", "building_adjacency",
-        "tessellation_area", "squareness", "elongation", "convexity",
-        "covered_area_ratio", "inter_building_distance",
+        "height",
+        "shape_index",
+        "shared_walls",
+        "building_adjacency",
+        "tessellation_area",
+        "squareness",
+        "elongation",
+        "convexity",
+        "covered_area_ratio",
+        "inter_building_distance",
     ]
 
     # ── Figure captions keyed by figure key ─────────────────────────
     FIGURE_CAPTIONS = {
         # SVF
-        "svf_v2/svf_dashboard":
-            "Sky View Factor dashboard showing spatial distribution and summary statistics.",
-        "svf_v2/svf_distribution":
-            "Distribution of street-level SVF values across sampled segments.",
-        "svf_v2/svf_streets_map":
-            "Spatial map of SVF values along street centerlines.",
-        "svf_v2/svf_streets_segments_map":
-            "Segment-level SVF map with colour-coded classification.",
+        "svf_v2/svf_dashboard": "Sky View Factor dashboard showing spatial distribution and summary statistics.",
+        "svf_v2/svf_distribution": "Distribution of street-level SVF values across sampled segments.",
+        "svf_v2/svf_streets_map": "Spatial map of SVF values along street centerlines.",
+        "svf_v2/svf_streets_segments_map": "Segment-level SVF map with colour-coded classification.",
         # Building morphology
-        "morphology_metrics/morphology_distributions":
-            "Kernel density estimates for key building-level morphometric indicators.",
+        "morphology_metrics/morphology_distributions": "Kernel density estimates for key building-level morphometric indicators.",
         # Zone morphology
-        "urban_morphology/maps/zone_metrics_panel":
-            "Zone-level panel showing BCR, FAR, height variability, and frontal area index.",
-        "urban_morphology/maps/lisa_clusters_bcr":
-            "LISA cluster map for BCR identifying statistically significant spatial clusters.",
-        "urban_morphology/maps/lisa_clusters_far":
-            "LISA cluster map for FAR showing floor area ratio hot/cold spots.",
-        "urban_morphology/maps/lisa_clusters_sigma_h":
-            "LISA cluster map for \u03c3_h revealing height variability clusters.",
-        "urban_morphology/maps/exposure_panel":
-            "Multi-metric sky exposure panel across analysis zones.",
-        "urban_morphology/maps/exposure_bivariate":
-            "Bivariate map of sky exposure and building density interaction.",
+        "urban_morphology/maps/zone_metrics_panel": "Zone-level panel showing BCR, FAR, height variability, and frontal area index.",
+        "urban_morphology/maps/lisa_clusters_bcr": "LISA cluster map for BCR identifying statistically significant spatial clusters.",
+        "urban_morphology/maps/lisa_clusters_far": "LISA cluster map for FAR showing floor area ratio hot/cold spots.",
+        "urban_morphology/maps/lisa_clusters_sigma_h": "LISA cluster map for \u03c3_h revealing height variability clusters.",
+        "urban_morphology/maps/exposure_panel": "Multi-metric sky exposure panel across analysis zones.",
+        "urban_morphology/maps/exposure_bivariate": "Bivariate map of sky exposure and building density interaction.",
         # Patch selection
-        "patch_selection/tile_clusters":
-            "Tile-level k-means cluster assignments for CFD patch selection.",
-        "patch_selection/pca_scatter":
-            "PCA scatter plot of tile features coloured by cluster membership.",
-        "patch_selection/feature_distributions":
-            "Feature distributions across morphometric clusters.",
+        "patch_selection/tile_clusters": "Tile-level k-means cluster assignments for CFD patch selection.",
+        "patch_selection/pca_scatter": "PCA scatter plot of tile features coloured by cluster membership.",
+        "patch_selection/feature_distributions": "Feature distributions across morphometric clusters.",
         # Solar access
-        "solar/solar_dashboard":
-            "Solar access dashboard: spatial distribution, statistics, and seasonal variation.",
-        "solar/solar_access":
-            "Spatial map of direct sunlight hours at street level.",
-        "solar/solar_distribution":
-            "Distribution of solar access hours across sampled points.",
-        "solar/solar_irradiance":
-            "Direct and diffuse irradiance map (Wh/m\u00b2/day).",
-        "solar/solar_seasonal_panel":
-            "Seasonal comparison of solar access (solstices and equinoxes).",
-        "solar/solar_sun_path":
-            "Sun path diagram with seasonal trajectories and horizon profile.",
-        "solar/solar_vs_svf":
-            "Bivariate comparison of solar access hours and Sky View Factor.",
-        "solar/solar_access_heatmap":
-            "Heatmap of solar access intensity across the study area.",
-        "solar/solar_access_threshold":
-            "WHO 2-hour sunlight threshold classification map.",
-        "solar/hero_solar_deprivation":
-            "Solar deprivation hotspot map highlighting areas below WHO threshold.",
-        "solar/hero_seasonal_contrast":
-            "Seasonal contrast showing winter vs. summer solar access patterns.",
+        "solar/solar_dashboard": "Solar access dashboard: spatial distribution, statistics, and seasonal variation.",
+        "solar/solar_access": "Spatial map of direct sunlight hours at street level.",
+        "solar/solar_distribution": "Distribution of solar access hours across sampled points.",
+        "solar/solar_irradiance": "Direct and diffuse irradiance map (Wh/m\u00b2/day).",
+        "solar/solar_seasonal_panel": "Seasonal comparison of solar access (solstices and equinoxes).",
+        "solar/solar_sun_path": "Sun path diagram with seasonal trajectories and horizon profile.",
+        "solar/solar_vs_svf": "Bivariate comparison of solar access hours and Sky View Factor.",
+        "solar/solar_access_heatmap": "Heatmap of solar access intensity across the study area.",
+        "solar/solar_access_threshold": "WHO 2-hour sunlight threshold classification map.",
+        "solar/hero_solar_deprivation": "Solar deprivation hotspot map highlighting areas below WHO threshold.",
+        "solar/hero_seasonal_contrast": "Seasonal contrast showing winter vs. summer solar access patterns.",
     }
 
     with PdfPages(output_path) as pdf:
-
         # ── Title page ───────────────────────────────────────────────────
         if _want("title"):
             _pdf_title_page(pdf, areas_data, mode)
 
         # ── Executive summary ────────────────────────────────────────────
+
+        # ── Cross-area synthesis (comparative mode only) ─────────────────
+        if _want("summary") and mode == "comparative" and len(areas_data) > 1:
+            informal = [d for d in areas_data if d["area_type"] == "informal"]
+            formal = [d for d in areas_data if d["area_type"] == "formal"]
+
+            synth_lines = [
+                "**Cross-Area Synthesis**",
+                "",
+                f"This comparative study analyses {len(areas_data)} urban areas "
+                f"({len(informal)} informal settlement{'s' if len(informal) != 1 else ''}, "
+                f"{len(formal)} formal neighborhood{'s' if len(formal) != 1 else ''}) "
+                f"in Rio de Janeiro to quantify how morphological density creates "
+                f"systematic disparities in sky access and solar exposure.",
+                "",
+            ]
+
+            # Total buildings across all areas
+            total_buildings = sum(d.get("building_count", 0) for d in areas_data)
+            synth_lines.append(
+                f"Across all study areas, {total_buildings:,} buildings were analysed."
+            )
+            synth_lines.append("")
+
+            # Aggregate SVF and BCR for informal vs formal
+            svf_informal = [
+                d["svf_mean"] for d in informal if d.get("svf_mean") is not None
+            ]
+            svf_formal = [
+                d["svf_mean"] for d in formal if d.get("svf_mean") is not None
+            ]
+            bcr_informal = [
+                d["zone_bcr_mean"]
+                for d in informal
+                if d.get("zone_bcr_mean") is not None
+            ]
+            bcr_formal = [
+                d["zone_bcr_mean"] for d in formal if d.get("zone_bcr_mean") is not None
+            ]
+
+            if svf_informal:
+                mean_svf_inf = np.mean(svf_informal)
+                synth_lines.append(
+                    f"Informal settlements exhibit a mean SVF of {mean_svf_inf:.3f}, "
+                )
+                if svf_formal:
+                    mean_svf_for = np.mean(svf_formal)
+                    pct_reduction = (1 - mean_svf_inf / mean_svf_for) * 100
+                    synth_lines[-1] = (
+                        f"Informal settlements exhibit a mean SVF of {mean_svf_inf:.3f}, "
+                        f"compared to {mean_svf_for:.3f} in formal neighborhoods — "
+                        f"a {pct_reduction:.0f}% reduction in sky access."
+                    )
+                else:
+                    synth_lines[-1] = (
+                        f"Informal settlements exhibit a mean SVF of {mean_svf_inf:.3f}."
+                    )
+                synth_lines.append("")
+
+            if bcr_informal:
+                mean_bcr_inf = np.mean(bcr_informal)
+                if bcr_formal:
+                    mean_bcr_for = np.mean(bcr_formal)
+                    synth_lines.append(
+                        f"Ground coverage is markedly higher in informal areas "
+                        f"(mean BCR {mean_bcr_inf:.3f}) than in formal areas "
+                        f"({mean_bcr_for:.3f}), confirming that denser building "
+                        f"footprints drive the observed sky-access deficit."
+                    )
+                else:
+                    synth_lines.append(
+                        f"Informal areas have a mean BCR of {mean_bcr_inf:.3f}."
+                    )
+                synth_lines.append("")
+
+            # Closing remark
+            if svf_informal and svf_formal:
+                synth_lines.append(
+                    "These findings demonstrate that the morphological intensity of "
+                    "informal settlements produces measurably worse environmental "
+                    "conditions at the pedestrian level, with implications for thermal "
+                    "comfort, daylight access, and public-health outcomes."
+                )
+            synth_lines.append("")
+
+            _pdf_text_page(
+                pdf, "Executive Summary", synth_lines, area_label=area_footer
+            )
+
+        # ── Per-area executive summaries ─────────────────────────────────────
         if _want("summary"):
             for d in areas_data:
                 summary_lines = [
@@ -1405,8 +1715,12 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
 
                 summary_lines.append("**Key Metrics:**")
                 summary_lines.append(f"  Buildings: {d['building_count']:,}")
-                summary_lines.append(f"  Study area: {d['study_area_m2']/1e6:.2f} km\u00b2")
-                summary_lines.append(f"  Density: {d['building_density']:,.0f} buildings/km\u00b2")
+                summary_lines.append(
+                    f"  Study area: {d['study_area_m2'] / 1e6:.2f} km\u00b2"
+                )
+                summary_lines.append(
+                    f"  Density: {d['building_density']:,.0f} buildings/km\u00b2"
+                )
                 if d.get("height_mean") is not None:
                     summary_lines.append(
                         f"  Mean height: {d['height_mean']:.1f} m "
@@ -1420,11 +1734,14 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
                 if d.get("zone_bcr_mean") is not None:
                     summary_lines.append(f"  Mean BCR: {d['zone_bcr_mean']:.3f}")
                 if d.get("zone_lambda_f_mean") is not None:
-                    summary_lines.append(f"  Mean \u03bb_f: {d['zone_lambda_f_mean']:.3f}")
+                    summary_lines.append(
+                        f"  Mean \u03bb_f: {d['zone_lambda_f_mean']:.3f}"
+                    )
                 summary_lines.append("")
 
-                _pdf_text_page(pdf, "Executive Summary", summary_lines,
-                               area_label=area_footer)
+                _pdf_text_page(
+                    pdf, "Executive Summary", summary_lines, area_label=area_footer
+                )
 
         # ── Methodology text + diagram ───────────────────────────────────
         if _want("methodology"):
@@ -1460,8 +1777,9 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
                 "Beckman) with Hottel clear-sky transmittance. WHO 2-hour "
                 "direct sunlight threshold assessment per facade point.",
             ]
-            _pdf_text_page(pdf, "Methodology & Workflow", method_lines,
-                           area_label=area_footer)
+            _pdf_text_page(
+                pdf, "Methodology & Workflow", method_lines, area_label=area_footer
+            )
             _pdf_methodology_diagram(pdf, area_label=area_footer)
 
         # ── Theory / metric definitions ──────────────────────────────────
@@ -1470,17 +1788,39 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
 
         # ── Parameters table ─────────────────────────────────────────────
         if _want("parameters"):
-            params_df = pd.DataFrame([
-                {"Parameter": "CRS", "Value": EXPECTED_CRS},
-                {"Parameter": "Min Building Area", "Value": f"{MIN_BUILDING_AREA} m\u00b2"},
-                {"Parameter": "Max Filter Height (informal)", "Value": f"{MAX_FILTER_HEIGHT} m"},
-                {"Parameter": "Max Filter Area (informal)", "Value": f"{MAX_FILTER_AREA:,} m\u00b2"},
-                {"Parameter": "Max Filter Volume (informal)", "Value": f"{MAX_FILTER_VOLUME:,} m\u00b3"},
-                {"Parameter": "Cluster Buffer", "Value": f"{BUILDING_CLUSTER_BUFFER} m"},
-                {"Parameter": "Output DPI", "Value": str(DPI)},
-            ])
-            _pdf_table_page(pdf, "Parameters & Configuration", params_df,
-                            col_widths=[0.55, 0.45], area_label=area_footer)
+            params_df = pd.DataFrame(
+                [
+                    {"Parameter": "CRS", "Value": EXPECTED_CRS},
+                    {
+                        "Parameter": "Min Building Area",
+                        "Value": f"{MIN_BUILDING_AREA} m\u00b2",
+                    },
+                    {
+                        "Parameter": "Max Filter Height (informal)",
+                        "Value": f"{MAX_FILTER_HEIGHT} m",
+                    },
+                    {
+                        "Parameter": "Max Filter Area (informal)",
+                        "Value": f"{MAX_FILTER_AREA:,} m\u00b2",
+                    },
+                    {
+                        "Parameter": "Max Filter Volume (informal)",
+                        "Value": f"{MAX_FILTER_VOLUME:,} m\u00b3",
+                    },
+                    {
+                        "Parameter": "Cluster Buffer",
+                        "Value": f"{BUILDING_CLUSTER_BUFFER} m",
+                    },
+                    {"Parameter": "Output DPI", "Value": str(DPI)},
+                ]
+            )
+            _pdf_table_page(
+                pdf,
+                "Parameters & Configuration",
+                params_df,
+                col_widths=[0.55, 0.45],
+                area_label=area_footer,
+            )
 
         # ── Per-area results ─────────────────────────────────────────────
         if _want("results"):
@@ -1496,14 +1836,20 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
                         display = mstats[available].T
                         display.index.name = "Metric"
                         display = display.reset_index()
-                        display["Metric"] = display["Metric"].map(
-                            lambda x: _label(x)
-                        )
+                        display["Metric"] = display["Metric"].map(lambda x: _label(x))
                         stat_rows = ["count", "mean", "std", "min", "50%", "max"]
-                        keep_cols = ["Metric"] + [r for r in stat_rows if r in display.columns]
+                        keep_cols = ["Metric"] + [
+                            r for r in stat_rows if r in display.columns
+                        ]
                         display = display[keep_cols]
-                        col_rename = {"count": "Count", "mean": "Mean", "std": "Std",
-                                      "min": "Min", "50%": "Median", "max": "Max"}
+                        col_rename = {
+                            "count": "Count",
+                            "mean": "Mean",
+                            "std": "Std",
+                            "min": "Min",
+                            "50%": "Median",
+                            "max": "Max",
+                        }
                         display = display.rename(columns=col_rename)
                         _pdf_table_page(
                             pdf,
@@ -1540,8 +1886,12 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
                         zone_lines.append(_interpret_sigma_h(sigma_h))
                         zone_lines.append("")
 
-                    _pdf_text_page(pdf, f"Zone Morphology \u2014 {a_label}",
-                                   zone_lines, area_label=a_label)
+                    _pdf_text_page(
+                        pdf,
+                        f"Zone Morphology \u2014 {a_label}",
+                        zone_lines,
+                        area_label=a_label,
+                    )
 
                 # Moran's I table
                 if d.get("moran_summary") is not None:
@@ -1634,50 +1984,74 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
                     val = d.get(key)
                     if key == "study_area_m2" and val is not None:
                         val = val / 1e6
-                    if val is not None and not (isinstance(val, float) and np.isnan(val)):
+                    if val is not None and not (
+                        isinstance(val, float) and np.isnan(val)
+                    ):
                         row[_area_name(d["area"])] = val
                     else:
                         row[_area_name(d["area"])] = "N/A"
                 rows.append(row)
             comp_df = pd.DataFrame(rows)
-            _pdf_table_page(pdf, "Comparative Analysis", comp_df,
-                            area_label=area_footer)
+            _pdf_table_page(
+                pdf, "Comparative Analysis", comp_df, area_label=area_footer
+            )
 
             # ── Cross-area clustering & typology figures ──────────────────
             comp_dir = get_comparative_analysis_dir()
             COMP_FIGURES = [
-                (comp_dir / "cross_area_clustering" / "pca_by_area.png",
-                 "Cross-Area PCA by Study Area",
-                 "PCA projection of tile features coloured by study area membership."),
-                (comp_dir / "cross_area_clustering" / "pca_by_cluster.png",
-                 "Cross-Area PCA by Cluster",
-                 "PCA projection coloured by cross-area cluster assignment."),
-                (comp_dir / "cross_area_clustering" / "feature_distributions_by_area.png",
-                 "Feature Distributions by Area",
-                 "Key morphometric feature distributions compared across study areas."),
-                (comp_dir / "cross_area_clustering" / "selected_patches_map.png",
-                 "Selected CFD Patches",
-                 "Geographic locations of representative patches selected for CFD simulation."),
-                (comp_dir / "cross_area_clustering" / "silhouette_curve.png",
-                 "Silhouette Analysis",
-                 "Silhouette coefficient by number of clusters for optimal k selection."),
-                (comp_dir / "svf_segment_analysis.png",
-                 "SVF Segment Analysis",
-                 "Comparative segment-level SVF analysis across study areas."),
-                (comp_dir / "typology" / "maps" / "typology_clusters.png",
-                 "Morphological Typology",
-                 "Cross-area morphological typology classification map."),
-                (comp_dir / "typology" / "maps" / "cluster_profiles.png",
-                 "Cluster Profiles",
-                 "Radar charts showing morphometric profiles of each typology cluster."),
-                (comp_dir / "typology" / "maps" / "elbow_silhouette.png",
-                 "Typology Clustering Diagnostics",
-                 "Elbow and silhouette analysis for typology cluster count selection."),
+                (
+                    comp_dir / "cross_area_clustering" / "pca_by_area.png",
+                    "Cross-Area PCA by Study Area",
+                    "PCA projection of tile features coloured by study area membership.",
+                ),
+                (
+                    comp_dir / "cross_area_clustering" / "pca_by_cluster.png",
+                    "Cross-Area PCA by Cluster",
+                    "PCA projection coloured by cross-area cluster assignment.",
+                ),
+                (
+                    comp_dir
+                    / "cross_area_clustering"
+                    / "feature_distributions_by_area.png",
+                    "Feature Distributions by Area",
+                    "Key morphometric feature distributions compared across study areas.",
+                ),
+                (
+                    comp_dir / "cross_area_clustering" / "selected_patches_map.png",
+                    "Selected CFD Patches",
+                    "Geographic locations of representative patches selected for CFD simulation.",
+                ),
+                (
+                    comp_dir / "cross_area_clustering" / "silhouette_curve.png",
+                    "Silhouette Analysis",
+                    "Silhouette coefficient by number of clusters for optimal k selection.",
+                ),
+                (
+                    comp_dir / "svf_segment_analysis.png",
+                    "SVF Segment Analysis",
+                    "Comparative segment-level SVF analysis across study areas.",
+                ),
+                (
+                    comp_dir / "typology" / "maps" / "typology_clusters.png",
+                    "Morphological Typology",
+                    "Cross-area morphological typology classification map.",
+                ),
+                (
+                    comp_dir / "typology" / "maps" / "cluster_profiles.png",
+                    "Cluster Profiles",
+                    "Radar charts showing morphometric profiles of each typology cluster.",
+                ),
+                (
+                    comp_dir / "typology" / "maps" / "elbow_silhouette.png",
+                    "Typology Clustering Diagnostics",
+                    "Elbow and silhouette analysis for typology cluster count selection.",
+                ),
             ]
             for fig_path, title, caption in COMP_FIGURES:
                 if fig_path.exists():
-                    _pdf_figure_page(pdf, title, fig_path,
-                                     caption=caption, area_label=area_footer)
+                    _pdf_figure_page(
+                        pdf, title, fig_path, caption=caption, area_label=area_footer
+                    )
 
     logger.info("PDF saved: %s", output_path)
 
@@ -1685,6 +2059,7 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
 # ═══════════════════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -1697,22 +2072,33 @@ def main():
           python scripts/generate_report.py --area rocinha --format pdf --sections title,methodology,results
         """),
     )
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument("--area", type=str, help="Single area name")
-    group.add_argument("--areas", type=str,
-                       help="Comma-separated area names for comparative mode")
-    parser.add_argument("--mode", choices=["single", "comparative"],
-                        default="single",
-                        help="Report mode (default: single)")
-    parser.add_argument("--format", choices=["markdown", "pdf", "both"],
-                        default="both", dest="output_format",
-                        help="Output format (default: both)")
+    group.add_argument(
+        "--areas",
+        type=str,
+        help="Comma-separated area names (defaults to COMPARATIVE_AREAS in comparative mode)",
+    )
     parser.add_argument(
-        "--sections", type=str, default=None,
+        "--mode",
+        choices=["single", "comparative"],
+        default="single",
+        help="Report mode (default: single)",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["markdown", "pdf", "both"],
+        default="both",
+        dest="output_format",
+        help="Output format (default: both)",
+    )
+    parser.add_argument(
+        "--sections",
+        type=str,
+        default=None,
         help=(
             "Comma-separated list of PDF sections to generate "
-            "(default: all). Valid names: "
-            + ", ".join(ALL_SECTIONS)
+            "(default: all). Valid names: " + ", ".join(ALL_SECTIONS)
         ),
     )
 
@@ -1721,8 +2107,15 @@ def main():
     # Resolve area list
     if args.area:
         area_names = [args.area]
-    else:
+    elif args.areas:
         area_names = [a.strip() for a in args.areas.split(",")]
+    elif args.mode == "comparative":
+        area_names = list(COMPARATIVE_AREAS)
+        logger.info("Using default COMPARATIVE_AREAS: %s", area_names)
+    else:
+        parser.error(
+            "--area or --areas is required (or use --mode comparative for defaults)"
+        )
         if len(area_names) > 1 and args.mode == "single":
             args.mode = "comparative"
             logger.info("Multiple areas provided -- switching to comparative mode.")
@@ -1739,9 +2132,7 @@ def main():
         section_list = [s.strip() for s in args.sections.split(",")]
         invalid = [s for s in section_list if s not in ALL_SECTIONS]
         if invalid:
-            logger.error(
-                "Unknown section(s): %s. Valid: %s", invalid, ALL_SECTIONS
-            )
+            logger.error("Unknown section(s): %s. Valid: %s", invalid, ALL_SECTIONS)
             sys.exit(1)
         logger.info("Generating sections: %s", section_list)
 

@@ -265,9 +265,7 @@ def _cluster(
         from sklearn_extra.cluster import KMedoids
 
         logger.info("Using KMedoids (n_clusters=%d).", n_clusters)
-        model = KMedoids(
-            n_clusters=n_clusters, random_state=random_state, method="pam"
-        )
+        model = KMedoids(n_clusters=n_clusters, random_state=random_state, method="pam")
         labels = model.fit_predict(X)
         return labels.astype(int), model.medoid_indices_.astype(int)
     except ImportError:
@@ -401,9 +399,7 @@ def _select_representatives(
         return result
 
     selected = combined.iloc[selected_indices].copy()
-    selected["selection_reason"] = [
-        ", ".join(reasons[i]) for i in selected_indices
-    ]
+    selected["selection_reason"] = [", ".join(reasons[i]) for i in selected_indices]
 
     logger.info(
         "Selected %d representative tiles: %d medoid, %d pca_extreme, %d transition.",
@@ -421,7 +417,7 @@ def _select_representatives(
 
 # Consistent area color palette
 AREA_COLORS = {
-    "vidigal_tls": "#e41a1c",
+    "vidigal": "#e41a1c",
     "rocinha": "#377eb8",
     "riodaspedras": "#4daf4a",
     "complexo_do_alemao": "#984ea3",
@@ -537,9 +533,7 @@ def plot_pca_by_cluster(
         ylabel = f"PC2 ({explained_variance[1] * 100:.1f}%)"
     ax.set_xlabel(xlabel, fontsize=11)
     ax.set_ylabel(ylabel, fontsize=11)
-    ax.set_title(
-        "Global PCA — Colored by Cluster", fontsize=13, fontweight="bold"
-    )
+    ax.set_title("Global PCA — Colored by Cluster", fontsize=13, fontweight="bold")
     ax.legend(fontsize=8, loc="best", ncol=2)
     ax.grid(alpha=0.2)
     ax.spines["top"].set_visible(False)
@@ -570,6 +564,7 @@ def plot_feature_distributions_by_area(
 
     try:
         import seaborn as sns
+
         _use_seaborn = True
     except ImportError:
         _use_seaborn = False
@@ -592,8 +587,7 @@ def plot_feature_distributions_by_area(
             )
         else:
             data_by_area = [
-                combined.loc[combined["area"] == a, col].dropna().values
-                for a in areas
+                combined.loc[combined["area"] == a, col].dropna().values for a in areas
             ]
             bp = ax.boxplot(
                 data_by_area,
@@ -615,9 +609,7 @@ def plot_feature_distributions_by_area(
     for ax in axes[n_features:]:
         ax.set_visible(False)
 
-    fig.suptitle(
-        "Feature Distributions by Area", fontsize=14, fontweight="bold"
-    )
+    fig.suptitle("Feature Distributions by Area", fontsize=14, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
@@ -645,9 +637,7 @@ def plot_selected_patches_map(
     n_areas = len(areas)
     ncols = min(3, n_areas)
     nrows = math.ceil(n_areas / ncols)
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(7 * ncols, 6 * nrows)
-    )
+    fig, axes = plt.subplots(nrows, ncols, figsize=(7 * ncols, 6 * nrows))
     axes = np.atleast_1d(axes).flatten()
 
     clusters = sorted(combined["cluster"].unique())
@@ -656,7 +646,9 @@ def plot_selected_patches_map(
     for idx, area in enumerate(areas):
         ax = axes[idx]
         area_tiles = combined[combined["area"] == area]
-        area_selected = selected[selected["area"] == area] if selected is not None else None
+        area_selected = (
+            selected[selected["area"] == area] if selected is not None else None
+        )
 
         # All tiles in area
         if "cluster" in area_tiles.columns:
@@ -694,7 +686,9 @@ def plot_selected_patches_map(
                         va="center",
                     )
 
-        ax.set_title(f"{area} ({len(area_tiles)} tiles)", fontsize=11, fontweight="bold")
+        ax.set_title(
+            f"{area} ({len(area_tiles)} tiles)", fontsize=11, fontweight="bold"
+        )
         ax.set_aspect("equal")
         ax.set_xlabel("Easting (m)", fontsize=8)
         ax.set_ylabel("Northing (m)", fontsize=8)
@@ -712,17 +706,18 @@ def plot_selected_patches_map(
         legend_ax.legend(handles=patches, loc="center", fontsize=10, ncol=2)
     else:
         fig.legend(
-            handles=patches, loc="lower center", fontsize=9,
-            ncol=min(len(clusters), 6), bbox_to_anchor=(0.5, -0.02),
+            handles=patches,
+            loc="lower center",
+            fontsize=9,
+            ncol=min(len(clusters), 6),
+            bbox_to_anchor=(0.5, -0.02),
         )
 
     # Hide unused axes
-    for ax in axes[n_areas + 1:]:
+    for ax in axes[n_areas + 1 :]:
         ax.set_visible(False)
 
-    fig.suptitle(
-        "Selected Patches by Area", fontsize=14, fontweight="bold"
-    )
+    fig.suptitle("Selected Patches by Area", fontsize=14, fontweight="bold")
     fig.tight_layout(rect=[0, 0.02, 1, 0.96])
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
@@ -742,7 +737,13 @@ def plot_silhouette_curve(
     optimal = sil_info["optimal_k"]
 
     ax.plot(ks, scores, "o-", color="#377eb8", linewidth=2, markersize=6)
-    ax.axvline(optimal, color="#e41a1c", linestyle="--", linewidth=1.5, label=f"Optimal k={optimal}")
+    ax.axvline(
+        optimal,
+        color="#e41a1c",
+        linestyle="--",
+        linewidth=1.5,
+        label=f"Optimal k={optimal}",
+    )
     ax.set_xlabel("Number of Clusters (k)", fontsize=11)
     ax.set_ylabel("Silhouette Score", fontsize=11)
     ax.set_title("Silhouette Analysis", fontsize=13, fontweight="bold")
@@ -884,7 +885,9 @@ def run_cross_area_clustering(
 
     if n_clusters is None:
         logger.info("=" * 60)
-        logger.info("STEP 4a: SILHOUETTE SWEEP (k=%d..%d)", k_range.start, k_range.stop - 1)
+        logger.info(
+            "STEP 4a: SILHOUETTE SWEEP (k=%d..%d)", k_range.start, k_range.stop - 1
+        )
         logger.info("=" * 60)
         sil_info = _find_optimal_k(
             pca_scores, k_range=k_range, random_state=random_state
@@ -925,25 +928,27 @@ def run_cross_area_clustering(
     cluster_profiles = compute_cluster_profiles(
         combined, feature_cols, cluster_col="cluster"
     )
-    metadata.update({
-        "n_clusters": n_clusters,
-        "n_tiles": len(combined),
-        "n_selected": len(selected),
-        "areas": sorted(combined["area"].unique().tolist()),
-        "tiles_per_area": combined["area"].value_counts().to_dict(),
-        "feature_columns": feature_cols,
-        "pca_explained_variance": pca_evr.tolist(),
-        "pca_n_components": pca_scores.shape[1],
-        "pca_loadings": pca_loadings.tolist(),
-        "cluster_labels": labels.tolist(),
-        "cluster_profiles": (
-            cluster_profiles.to_dict()
-            if isinstance(cluster_profiles, pd.DataFrame)
-            else cluster_profiles
-        ),
-        "composition": composition.to_dict(),
-        "elapsed_seconds": round(time.time() - t_start, 1),
-    })
+    metadata.update(
+        {
+            "n_clusters": n_clusters,
+            "n_tiles": len(combined),
+            "n_selected": len(selected),
+            "areas": sorted(combined["area"].unique().tolist()),
+            "tiles_per_area": combined["area"].value_counts().to_dict(),
+            "feature_columns": feature_cols,
+            "pca_explained_variance": pca_evr.tolist(),
+            "pca_n_components": pca_scores.shape[1],
+            "pca_loadings": pca_loadings.tolist(),
+            "cluster_labels": labels.tolist(),
+            "cluster_profiles": (
+                cluster_profiles.to_dict()
+                if isinstance(cluster_profiles, pd.DataFrame)
+                else cluster_profiles
+            ),
+            "composition": composition.to_dict(),
+            "elapsed_seconds": round(time.time() - t_start, 1),
+        }
+    )
 
     # ── 9. Save outputs ──────────────────────────────────────────────────
     logger.info("=" * 60)
@@ -1003,7 +1008,8 @@ def run_cross_area_clustering(
 
     try:
         plot_pca_by_area(
-            combined, output_dir / "pca_by_area.png",
+            combined,
+            output_dir / "pca_by_area.png",
             explained_variance=pca_evr,
         )
     except Exception as e:
@@ -1011,7 +1017,9 @@ def run_cross_area_clustering(
 
     try:
         plot_pca_by_cluster(
-            combined, selected, output_dir / "pca_by_cluster.png",
+            combined,
+            selected,
+            output_dir / "pca_by_cluster.png",
             explained_variance=pca_evr,
         )
     except Exception as e:
@@ -1019,14 +1027,18 @@ def run_cross_area_clustering(
 
     try:
         plot_feature_distributions_by_area(
-            combined, feature_cols, output_dir / "feature_distributions_by_area.png",
+            combined,
+            feature_cols,
+            output_dir / "feature_distributions_by_area.png",
         )
     except Exception as e:
         logger.warning("Feature distributions plot failed: %s", e, exc_info=True)
 
     try:
         plot_selected_patches_map(
-            combined, selected, output_dir / "selected_patches_map.png",
+            combined,
+            selected,
+            output_dir / "selected_patches_map.png",
         )
     except Exception as e:
         logger.warning("Selected patches map failed: %s", e, exc_info=True)
@@ -1066,10 +1078,7 @@ Examples:
         "--areas",
         type=str,
         default=",".join(CFD_AREAS),
-        help=(
-            "Comma-separated area names "
-            f"(default: {','.join(CFD_AREAS)})"
-        ),
+        help=(f"Comma-separated area names (default: {','.join(CFD_AREAS)})"),
     )
     parser.add_argument(
         "--n-clusters",
@@ -1113,7 +1122,9 @@ Examples:
         try:
             n_clusters = int(args.n_clusters)
         except ValueError:
-            parser.error(f"--n-clusters must be an integer or 'auto', got: {args.n_clusters}")
+            parser.error(
+                f"--n-clusters must be an integer or 'auto', got: {args.n_clusters}"
+            )
 
     k_range = range(args.k_min, args.k_max + 1)
 
