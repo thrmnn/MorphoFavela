@@ -10,16 +10,13 @@ import logging
 from pathlib import Path
 
 import geopandas as gpd
-import numpy as np
 
 from src.solar.sun import DEFAULT_LATITUDE, DEFAULT_LONGITUDE
 from src.solar.visualize import (
     plot_solar_access,
     plot_solar_dashboard,
-    plot_solar_deprivation_hero,
     plot_solar_distribution,
     plot_solar_irradiance_map,
-    plot_solar_seasonal_comparison_hero,
     plot_solar_seasonal_panel,
     plot_solar_sun_path,
     plot_solar_vs_svf,

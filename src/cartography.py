@@ -15,10 +15,8 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
-from matplotlib.patches import FancyArrowPatch
 
 from src.config import (
-    BACKGROUND_COLOR,
     BUILDING_CMAP,
     CONTOUR_COLOR,
     CONTOUR_INTERVAL,

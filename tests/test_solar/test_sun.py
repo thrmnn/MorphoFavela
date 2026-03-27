@@ -3,7 +3,6 @@
 import math
 
 import numpy as np
-import pytest
 
 from src.solar.sun import (
     compute_sun_positions,
@@ -11,8 +10,6 @@ from src.solar.sun import (
     compute_sun_positions_multi_day,
     compute_extraterrestrial_irradiance,
     REFERENCE_DATES,
-    DEFAULT_LATITUDE,
-    DEFAULT_LONGITUDE,
 )
 
 

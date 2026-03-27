@@ -5,7 +5,7 @@ import pytest
 import geopandas as gpd
 import rasterio
 from rasterio.transform import from_bounds
-from shapely.geometry import box, Point, Polygon, LineString
+from shapely.geometry import box, LineString
 
 CRS = "EPSG:31983"
 

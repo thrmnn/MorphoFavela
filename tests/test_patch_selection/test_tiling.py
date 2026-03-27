@@ -1,7 +1,5 @@
 """Tests for patch_selection.tiling module."""
 
-import numpy as np
-import pytest
 import geopandas as gpd
 from shapely.geometry import box
 
@@ -13,7 +11,6 @@ from src.patch_selection.tiling import (
     build_tile_grid,
     suggest_tile_size,
     filter_tiles_by_building_count,
-    DEFAULT_MIN_BUILDING_COUNT,
 )
 
 

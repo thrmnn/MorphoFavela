@@ -23,7 +23,6 @@ from src.cartography import (
     add_north_arrow,
     add_scale_bar,
     add_settlement_boundary,
-    style_buildings_by_height,
 )
 from src.config import (
     COLORMAP_BCR,

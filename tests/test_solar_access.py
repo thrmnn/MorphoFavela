@@ -3,13 +3,12 @@
 import math
 
 import numpy as np
+import pandas as pd
 import pyvista as pv
-import pytest
 
 from src.solar_access import (
     compute_sun_positions,
     sun_position_to_direction,
-    _compute_sun_directions,
     _batch_solar_access,
     _build_obb_tree,
     _ray_hits,
@@ -405,7 +404,6 @@ class TestComputeSolarAccessStreets:
     def test_empty_input(self):
         """Empty input should return empty with correct columns."""
         import geopandas as gpd
-        from shapely.geometry import Point
 
         scene = _open_sky_scene()
         pts = gpd.GeoDataFrame(
@@ -448,7 +446,3 @@ class TestRayHelpers:
         origin = np.array([0.0, 0.0, 1.0])
         endpoint = np.array([0.0, 0.0, 100.0])
         assert _ray_hits(obb, origin, endpoint) is False
-
-
-# Need pandas for the empty GeoDataFrame test
-import pandas as pd

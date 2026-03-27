@@ -1,12 +1,11 @@
 """Tests for patch_selection.features module."""
 
-import math
 
 import numpy as np
 import pandas as pd
 import pytest
 import geopandas as gpd
-from shapely.geometry import box, LineString
+from shapely.geometry import box
 
 from src.patch_selection.features import (
     CLUSTERING_EXCLUDE,
@@ -220,7 +219,7 @@ class TestTextureFeatures:
 
     def test_gini_empty_tile_nan(self, synthetic_tiles, synthetic_buildings):
         """Tiles with no buildings should have NaN gini (Bug Fix 2 regression)."""
-        df = _compute_texture_features(synthetic_tiles, synthetic_buildings)
+        _compute_texture_features(synthetic_tiles, synthetic_buildings)
         # Any tile with 0 buildings should have NaN gini, not 0.0
         # We verify that no tile has gini == 0.0 unless it actually has buildings
         # (Gini can be 0 for equal-area buildings, but not for empty tiles)

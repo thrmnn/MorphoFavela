@@ -15,8 +15,6 @@ from pathlib import Path
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-import matplotlib.patches as mpatches
-import matplotlib.ticker as mticker
 import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
@@ -28,14 +26,11 @@ from src.cartography import (
     add_settlement_boundary,
     apply_publication_style,
     format_utm_axes,
-    style_buildings_by_height,
 )
 from src.config import DPI, FIGURE_SIZE
 from src.solar.sun import (
     compute_sun_positions,
     REFERENCE_DATES,
-    DEFAULT_LATITUDE,
-    DEFAULT_LONGITUDE,
 )
 
 logger = logging.getLogger(__name__)

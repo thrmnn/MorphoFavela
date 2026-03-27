@@ -6,10 +6,6 @@ to be created in parallel; these tests will fail with ImportError until
 the module exists.
 """
 
-import numpy as np
-import pytest
-import geopandas as gpd
-from shapely.geometry import Point
 
 from src.solar.visualize import (
     plot_solar_access,

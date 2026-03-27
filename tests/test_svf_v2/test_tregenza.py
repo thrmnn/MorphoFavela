@@ -362,7 +362,6 @@ class TestTregenzaVsUniform:
         # The values should differ; we don't assert direction of bias
         # because it depends on the specific geometry, but they should
         # not be identical
-        diff = abs(svf_t[0] - svf_u[0])
         # At minimum, they are both computed without error
         assert np.isfinite(svf_t[0])
         assert np.isfinite(svf_u[0])

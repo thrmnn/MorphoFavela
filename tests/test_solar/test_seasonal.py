@@ -1,7 +1,6 @@
 """Tests for src/solar/seasonal.py — multi-day seasonal solar analysis."""
 
 import numpy as np
-import pytest
 
 from src.solar.seasonal import compute_seasonal_solar
 from src.solar.sun import REFERENCE_DATES
