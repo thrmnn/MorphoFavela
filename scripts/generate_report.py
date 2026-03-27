@@ -321,13 +321,16 @@ def _discover_figures(area: str) -> Dict[str, Path]:
         "morphology_metrics": get_area_analysis_dir(area, "morphology_metrics"),
         "urban_morphology": get_area_analysis_dir(area, "urban_morphology"),
         "patch_selection": get_area_analysis_dir(area, "patch_selection"),
+        "solar": get_area_analysis_dir(area, "solar"),
     }
 
     for label, d in search_dirs.items():
         if not d.exists():
             continue
         for png in sorted(d.rglob("*.png")):
-            key = f"{label}/{png.stem}"
+            # Include subdirectory path to avoid key collisions
+            rel = png.relative_to(d)
+            key = f"{label}/{rel.with_suffix('')}"
             figs[key] = png
 
     return figs
@@ -1313,6 +1316,7 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
 
     # ── Figure captions keyed by figure key ─────────────────────────
     FIGURE_CAPTIONS = {
+        # SVF
         "svf_v2/svf_dashboard":
             "Sky View Factor dashboard showing spatial distribution and summary statistics.",
         "svf_v2/svf_distribution":
@@ -1321,18 +1325,52 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
             "Spatial map of SVF values along street centerlines.",
         "svf_v2/svf_streets_segments_map":
             "Segment-level SVF map with colour-coded classification.",
+        # Building morphology
         "morphology_metrics/morphology_distributions":
             "Kernel density estimates for key building-level morphometric indicators.",
+        # Zone morphology
         "urban_morphology/maps/zone_metrics_panel":
             "Zone-level panel showing BCR, FAR, height variability, and frontal area index.",
         "urban_morphology/maps/lisa_clusters_bcr":
             "LISA cluster map for BCR identifying statistically significant spatial clusters.",
+        "urban_morphology/maps/lisa_clusters_far":
+            "LISA cluster map for FAR showing floor area ratio hot/cold spots.",
+        "urban_morphology/maps/lisa_clusters_sigma_h":
+            "LISA cluster map for \u03c3_h revealing height variability clusters.",
+        "urban_morphology/maps/exposure_panel":
+            "Multi-metric sky exposure panel across analysis zones.",
+        "urban_morphology/maps/exposure_bivariate":
+            "Bivariate map of sky exposure and building density interaction.",
+        # Patch selection
         "patch_selection/tile_clusters":
             "Tile-level k-means cluster assignments for CFD patch selection.",
         "patch_selection/pca_scatter":
             "PCA scatter plot of tile features coloured by cluster membership.",
         "patch_selection/feature_distributions":
             "Feature distributions across morphometric clusters.",
+        # Solar access
+        "solar/solar_dashboard":
+            "Solar access dashboard: spatial distribution, statistics, and seasonal variation.",
+        "solar/solar_access":
+            "Spatial map of direct sunlight hours at street level.",
+        "solar/solar_distribution":
+            "Distribution of solar access hours across sampled points.",
+        "solar/solar_irradiance":
+            "Direct and diffuse irradiance map (Wh/m\u00b2/day).",
+        "solar/solar_seasonal_panel":
+            "Seasonal comparison of solar access (solstices and equinoxes).",
+        "solar/solar_sun_path":
+            "Sun path diagram with seasonal trajectories and horizon profile.",
+        "solar/solar_vs_svf":
+            "Bivariate comparison of solar access hours and Sky View Factor.",
+        "solar/solar_access_heatmap":
+            "Heatmap of solar access intensity across the study area.",
+        "solar/solar_access_threshold":
+            "WHO 2-hour sunlight threshold classification map.",
+        "solar/hero_solar_deprivation":
+            "Solar deprivation hotspot map highlighting areas below WHO threshold.",
+        "solar/hero_seasonal_contrast":
+            "Seasonal contrast showing winter vs. summer solar access patterns.",
     }
 
     with PdfPages(output_path) as pdf:
@@ -1401,6 +1439,12 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
                 "Grid tiling of study area; 31 morphometric features per tile; "
                 "PCA + k-means clustering; representative patch selection for "
                 "OpenFOAM simulation.",
+                "",
+                "**Phase 6: Solar Access & Facade Irradiance**",
+                "Street- and facade-level solar access via ray-casting against "
+                "3D scene geometry. Tilted-surface irradiance model (Duffie & "
+                "Beckman) with Hottel clear-sky transmittance. WHO 2-hour "
+                "direct sunlight threshold assessment per facade point.",
             ]
             _pdf_text_page(pdf, "Methodology & Workflow", method_lines,
                            area_label=area_footer)
@@ -1506,13 +1550,33 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
                 figs = d.get("figures", {})
 
                 priority = [
+                    # SVF
                     "svf_v2/svf_dashboard",
                     "svf_v2/svf_distribution",
                     "svf_v2/svf_streets_map",
                     "svf_v2/svf_streets_segments_map",
+                    # Building morphology
                     "morphology_metrics/morphology_distributions",
+                    # Zone morphology
                     "urban_morphology/maps/zone_metrics_panel",
                     "urban_morphology/maps/lisa_clusters_bcr",
+                    "urban_morphology/maps/lisa_clusters_far",
+                    "urban_morphology/maps/lisa_clusters_sigma_h",
+                    "urban_morphology/maps/exposure_panel",
+                    "urban_morphology/maps/exposure_bivariate",
+                    # Solar access
+                    "solar/solar_dashboard",
+                    "solar/solar_access",
+                    "solar/solar_distribution",
+                    "solar/solar_irradiance",
+                    "solar/solar_seasonal_panel",
+                    "solar/solar_sun_path",
+                    "solar/solar_vs_svf",
+                    "solar/solar_access_heatmap",
+                    "solar/solar_access_threshold",
+                    "solar/hero_solar_deprivation",
+                    "solar/hero_seasonal_contrast",
+                    # Patch selection
                     "patch_selection/tile_clusters",
                     "patch_selection/pca_scatter",
                     "patch_selection/feature_distributions",
@@ -1564,6 +1628,42 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
             comp_df = pd.DataFrame(rows)
             _pdf_table_page(pdf, "Comparative Analysis", comp_df,
                             area_label=area_footer)
+
+            # ── Cross-area clustering & typology figures ──────────────────
+            comp_dir = get_comparative_analysis_dir()
+            COMP_FIGURES = [
+                (comp_dir / "cross_area_clustering" / "pca_by_area.png",
+                 "Cross-Area PCA by Study Area",
+                 "PCA projection of tile features coloured by study area membership."),
+                (comp_dir / "cross_area_clustering" / "pca_by_cluster.png",
+                 "Cross-Area PCA by Cluster",
+                 "PCA projection coloured by cross-area cluster assignment."),
+                (comp_dir / "cross_area_clustering" / "feature_distributions_by_area.png",
+                 "Feature Distributions by Area",
+                 "Key morphometric feature distributions compared across study areas."),
+                (comp_dir / "cross_area_clustering" / "selected_patches_map.png",
+                 "Selected CFD Patches",
+                 "Geographic locations of representative patches selected for CFD simulation."),
+                (comp_dir / "cross_area_clustering" / "silhouette_curve.png",
+                 "Silhouette Analysis",
+                 "Silhouette coefficient by number of clusters for optimal k selection."),
+                (comp_dir / "svf_segment_analysis.png",
+                 "SVF Segment Analysis",
+                 "Comparative segment-level SVF analysis across study areas."),
+                (comp_dir / "typology" / "maps" / "typology_clusters.png",
+                 "Morphological Typology",
+                 "Cross-area morphological typology classification map."),
+                (comp_dir / "typology" / "maps" / "cluster_profiles.png",
+                 "Cluster Profiles",
+                 "Radar charts showing morphometric profiles of each typology cluster."),
+                (comp_dir / "typology" / "maps" / "elbow_silhouette.png",
+                 "Typology Clustering Diagnostics",
+                 "Elbow and silhouette analysis for typology cluster count selection."),
+            ]
+            for fig_path, title, caption in COMP_FIGURES:
+                if fig_path.exists():
+                    _pdf_figure_page(pdf, title, fig_path,
+                                     caption=caption, area_label=area_footer)
 
     logger.info("PDF saved: %s", output_path)
 
