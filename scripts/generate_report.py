@@ -902,7 +902,7 @@ def _pdf_base_page(pdf: PdfPages, area_label: str = "") -> plt.Figure:
 
 def _save_page(pdf: PdfPages, fig: plt.Figure):
     """Save a page figure to the PDF and close it."""
-    pdf.savefig(fig, bbox_inches="tight", facecolor="white", dpi=150)
+    pdf.savefig(fig, facecolor="white", dpi=150)
     plt.close(fig)
 
 
@@ -949,7 +949,7 @@ def _pdf_title_page(pdf: PdfPages, areas_data: List[Dict], mode: str):
              ha="center", va="center", fontsize=11,
              color=SWISS["secondary"], family="sans-serif")
 
-    pdf.savefig(fig, bbox_inches="tight", facecolor="white", dpi=150)
+    pdf.savefig(fig, facecolor="white", dpi=150)
     plt.close(fig)
 
 
@@ -1032,16 +1032,23 @@ def _pdf_table_page(pdf: PdfPages, title: str, df: pd.DataFrame,
     display_df = df.head(max_rows).copy()
 
     # Format numeric values: integers with commas, floats to 2-3 decimals
+    def _fmt_cell(x):
+        if pd.isna(x):
+            return "N/A"
+        if isinstance(x, (int, np.integer)):
+            return f"{x:,}"
+        if isinstance(x, (float, np.floating)):
+            # Detect integer-valued floats (e.g., building count stored as float)
+            if x == int(x) and abs(x) >= 1:
+                return f"{int(x):,}"
+            if abs(x) >= 10:
+                return f"{x:,.2f}"
+            return f"{x:.3f}"
+        return str(x)
+
     for col in display_df.columns:
-        if display_df[col].dtype in [np.float64, np.float32, float]:
-            display_df[col] = display_df[col].apply(
-                lambda x: f"{x:,.2f}" if pd.notna(x) and abs(x) >= 10
-                else f"{x:.3f}" if pd.notna(x) else "N/A"
-            )
-        elif display_df[col].dtype in [np.int64, np.int32, int]:
-            display_df[col] = display_df[col].apply(
-                lambda x: f"{x:,}" if pd.notna(x) else "N/A"
-            )
+        if display_df[col].dtype in [np.float64, np.float32, float, np.int64, np.int32, int]:
+            display_df[col] = display_df[col].apply(_fmt_cell)
 
     cell_text = display_df.values.tolist()
     col_labels = list(display_df.columns)
@@ -1055,12 +1062,19 @@ def _pdf_table_page(pdf: PdfPages, title: str, df: pd.DataFrame,
     if not col_widths:
         col_widths = [1.0 / len(col_labels)] * len(col_labels)
 
+    # Scale table height to row count (avoid excessive whitespace)
+    n_rows = len(cell_text) + 1  # +1 for header
+    row_height = min(0.035, 0.84 / max(n_rows, 1))
+    table_height = min(0.84, row_height * n_rows)
+    table_top = MARGIN["top"] - 0.04
+    table_bottom = table_top - table_height
+
     table = ax.table(
         cellText=cell_text,
         colLabels=col_labels,
         colWidths=col_widths,
         loc="upper center",
-        bbox=[0.05, MARGIN["bottom"], 0.9, 0.84],
+        bbox=[0.05, table_bottom, 0.9, table_height],
     )
 
     table.auto_set_font_size(False)
@@ -1112,7 +1126,7 @@ def _pdf_figure_page(pdf: PdfPages, title: str, img_path: Path,
 
     # Figure title at 0.96
     fig.text(0.5, 0.96, numbered_title,
-             ha="center", va="top", fontsize=10, fontweight="bold",
+             ha="center", va="top", fontsize=13, fontweight="bold",
              color=SWISS["text"], family="sans-serif")
 
     # Image area: 0.07 to 0.91 vertically
@@ -1142,7 +1156,7 @@ def _pdf_figure_page(pdf: PdfPages, title: str, img_path: Path,
             w = img_width * 0.75
             ax = fig.add_axes([(1 - w) / 2, img_bottom, w, img_height])
 
-        ax.imshow(img)
+        ax.imshow(img, aspect="auto")
         ax.axis("off")
 
         # Thin 0.5pt gray border around the figure image area
