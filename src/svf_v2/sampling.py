@@ -195,10 +195,13 @@ def _nearest_edge_outward_normal(point: Point, polygon: Polygon) -> np.ndarray:
     """
     coords = np.array(polygon.exterior.coords)
     n_verts = len(coords) - 1
+    # Detect winding order
+    signed_area = 0.5 * np.sum(
+        coords[:-1, 0] * coords[1:, 1] - coords[1:, 0] * coords[:-1, 1]
+    )
+    is_ccw = signed_area > 0
     best_dist = np.inf
     best_normal = np.array([1.0, 0.0])
-    px, py = point.x, point.y
-
     for i in range(n_verts):
         ax, ay = coords[i, 0], coords[i, 1]
         bx, by = coords[i + 1, 0], coords[i + 1, 1]
@@ -208,7 +211,7 @@ def _nearest_edge_outward_normal(point: Point, polygon: Polygon) -> np.ndarray:
         d = point.distance(edge_pt)
         if d < best_dist:
             best_dist = d
-            best_normal = _outward_normal_2d(ax, ay, bx, by)
+            best_normal = _outward_normal_2d(ax, ay, bx, by, ccw=is_ccw)
 
     norm = np.linalg.norm(best_normal)
     if norm < 1e-12:
@@ -248,8 +251,10 @@ def _offset_points_outside_buildings(
 
     # Identify trapped points via spatial join
     joined = gpd.sjoin(
-        gdf_pts[["geometry"]], footprints_gdf[["geometry"]],
-        how="inner", predicate="within",
+        gdf_pts[["geometry"]],
+        footprints_gdf[["geometry"]],
+        how="inner",
+        predicate="within",
     )
     trapped_indices = joined.index.unique()
 
@@ -268,8 +273,9 @@ def _offset_points_outside_buildings(
         px, py = pt.x, pt.y
 
         # Find containing building(s) via STRtree
-        containing = [building_polys[i] for i in tree.query(pt)
-                       if building_polys[i].contains(pt)]
+        containing = [
+            building_polys[i] for i in tree.query(pt) if building_polys[i].contains(pt)
+        ]
         if not containing:
             continue
         bldg = containing[0]
@@ -328,9 +334,7 @@ def _offset_points_outside_buildings(
         gdf_pts.at[idx, "offset_distance"] = pt.distance(new_pt)
 
     n_offset = int(gdf_pts["was_offset"].sum())
-    logger.info(
-        f"  Offset complete: {n_offset} moved, {n_unresolvable} unresolvable"
-    )
+    logger.info(f"  Offset complete: {n_offset} moved, {n_unresolvable} unresolvable")
     return gdf_pts
 
 
@@ -452,19 +456,30 @@ def sample_street_points(
 # ---------------------------------------------------------------------------
 
 
-def _outward_normal_2d(ax: float, ay: float, bx: float, by: float) -> np.ndarray:
+def _outward_normal_2d(
+    ax: float, ay: float, bx: float, by: float, ccw: bool = True
+) -> np.ndarray:
     """
-    Outward normal for edge A->B of a CCW-wound exterior ring.
+    Outward normal for edge A->B of a polygon exterior ring.
 
-    For CCW winding (Shapely default), rotating edge vector 90 deg clockwise
-    gives the outward normal:  (dy, -dx) normalised.
+    For CCW winding, rotating edge vector 90 deg clockwise gives the
+    outward normal:  (dy, -dx).  For CW winding, the opposite: (-dy, dx).
+
+    Parameters
+    ----------
+    ccw : bool
+        True if the ring is counter-clockwise (Shapely default for valid
+        geometries), False if clockwise (common in shapefiles).
     """
     dx = bx - ax
     dy = by - ay
     length = np.hypot(dx, dy)
     if length < 1e-12:
         return np.array([0.0, 0.0])
-    return np.array([dy, -dx]) / length
+    if ccw:
+        return np.array([dy, -dx]) / length
+    else:
+        return np.array([-dy, dx]) / length
 
 
 def sample_facade_points(
@@ -528,6 +543,12 @@ def sample_facade_points(
             coords = np.array(poly.exterior.coords)
             n_verts = len(coords) - 1  # last == first
 
+            # Detect winding order via signed area
+            signed_area = 0.5 * np.sum(
+                coords[:-1, 0] * coords[1:, 1] - coords[1:, 0] * coords[:-1, 1]
+            )
+            is_ccw = signed_area > 0
+
             for i in range(n_verts):
                 ax, ay = coords[i, 0], coords[i, 1]
                 bx, by = coords[i + 1, 0], coords[i + 1, 1]
@@ -536,7 +557,7 @@ def sample_facade_points(
                 if edge_len < 0.1:
                     continue
 
-                normal_2d = _outward_normal_2d(ax, ay, bx, by)
+                normal_2d = _outward_normal_2d(ax, ay, bx, by, ccw=is_ccw)
                 nx, ny = normal_2d
                 # Facade azimuth: angle from north (CW positive)
                 azimuth = (np.degrees(np.arctan2(nx, ny)) + 360) % 360

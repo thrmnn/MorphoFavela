@@ -1,7 +1,5 @@
 """Tests for patch_selection.tiling module."""
 
-import numpy as np
-import pytest
 import geopandas as gpd
 from shapely.geometry import box
 
@@ -13,7 +11,6 @@ from src.patch_selection.tiling import (
     build_tile_grid,
     suggest_tile_size,
     filter_tiles_by_building_count,
-    DEFAULT_MIN_BUILDING_COUNT,
 )
 
 
@@ -71,7 +68,10 @@ class TestClassifyTiles:
     def test_full_overlap_is_interior(self, synthetic_boundary):
         """Tile fully inside boundary → interior."""
         tile_inside = gpd.GeoDataFrame(
-            {"tile_id": ["inside"], "geometry": [box(679900, 7470900, 680000, 7471000)]},
+            {
+                "tile_id": ["inside"],
+                "geometry": [box(679900, 7470900, 680000, 7471000)],
+            },
             crs="EPSG:31983",
         )
         classified = classify_tiles(tile_inside, synthetic_boundary)
@@ -114,12 +114,16 @@ class TestBufferedExtents:
     def test_buffer_clamped(self, synthetic_boundary, synthetic_buildings):
         tiles = generate_tiles(synthetic_boundary, tile_size=100.0)
         tiles = classify_tiles(tiles, synthetic_boundary)
-        tiles = compute_buffered_extents(tiles, synthetic_buildings, clamp=(50.0, 100.0))
+        tiles = compute_buffered_extents(
+            tiles, synthetic_buildings, clamp=(50.0, 100.0)
+        )
         assert tiles["buffer_distance_m"].between(50.0, 100.0).all()
 
 
 class TestEnrichTiles:
-    def test_building_count(self, synthetic_boundary, synthetic_buildings, synthetic_dtm):
+    def test_building_count(
+        self, synthetic_boundary, synthetic_buildings, synthetic_dtm
+    ):
         tiles = generate_tiles(synthetic_boundary, tile_size=200.0)
         tiles = classify_tiles(tiles, synthetic_boundary)
         tiles = enrich_tiles(tiles, synthetic_buildings, synthetic_dtm)
@@ -138,32 +142,48 @@ class TestEnrichTiles:
 
 
 class TestBuildTileGrid:
-    def test_full_pipeline(self, synthetic_boundary, synthetic_buildings, synthetic_dtm):
+    def test_full_pipeline(
+        self, synthetic_boundary, synthetic_buildings, synthetic_dtm
+    ):
         tiles = build_tile_grid(
-            synthetic_boundary, synthetic_buildings, synthetic_dtm,
+            synthetic_boundary,
+            synthetic_buildings,
+            synthetic_dtm,
             tile_size=100.0,
             min_building_count=0,  # disable filter for basic test
         )
         expected_cols = {
-            "tile_id", "geometry", "geometry_buffered", "classification",
-            "boundary_overlap_frac", "n_buildings", "has_dtm_coverage",
+            "tile_id",
+            "geometry",
+            "geometry_buffered",
+            "classification",
+            "boundary_overlap_frac",
+            "n_buildings",
+            "has_dtm_coverage",
             "buffer_distance_m",
         }
         assert expected_cols.issubset(set(tiles.columns))
         assert len(tiles) > 0
 
-    def test_pipeline_with_building_filter(self, synthetic_boundary,
-                                            synthetic_buildings, synthetic_dtm):
+    def test_pipeline_with_building_filter(
+        self, synthetic_boundary, synthetic_buildings, synthetic_dtm
+    ):
         """Building count filter should reduce the number of tiles."""
         tiles_no_filter = build_tile_grid(
-            synthetic_boundary, synthetic_buildings, synthetic_dtm,
-            tile_size=100.0, min_building_count=0,
+            synthetic_boundary,
+            synthetic_buildings,
+            synthetic_dtm,
+            tile_size=100.0,
+            min_building_count=0,
         )
         # Use min_building_count=2 — small enough to keep some tiles with
         # the 20-building synthetic dataset across 16 tiles.
         tiles_with_filter = build_tile_grid(
-            synthetic_boundary, synthetic_buildings, synthetic_dtm,
-            tile_size=100.0, min_building_count=2,
+            synthetic_boundary,
+            synthetic_buildings,
+            synthetic_dtm,
+            tile_size=100.0,
+            min_building_count=2,
         )
         assert len(tiles_with_filter) <= len(tiles_no_filter)
 
@@ -184,7 +204,9 @@ class TestFilterTilesByBuildingCount:
         tiles = generate_tiles(synthetic_boundary, tile_size=100.0)
         tiles = classify_tiles(tiles, synthetic_boundary, clip_to_boundary=False)
         filtered = filter_tiles_by_building_count(
-            tiles, synthetic_buildings, min_building_count=1,
+            tiles,
+            synthetic_buildings,
+            min_building_count=1,
         )
         assert "n_buildings" in filtered.columns
         assert (filtered["n_buildings"] >= 1).all()
@@ -194,7 +216,9 @@ class TestFilterTilesByBuildingCount:
         tiles = generate_tiles(synthetic_boundary, tile_size=100.0)
         tiles = classify_tiles(tiles, synthetic_boundary, clip_to_boundary=False)
         filtered = filter_tiles_by_building_count(
-            tiles, synthetic_buildings, min_building_count=0,
+            tiles,
+            synthetic_buildings,
+            min_building_count=0,
         )
         assert len(filtered) == len(tiles)
 

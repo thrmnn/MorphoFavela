@@ -1,4 +1,4 @@
-"""Tests for src/visualize_morphology.py."""
+"""Tests for src/visualization/morphology.py."""
 
 import numpy as np
 import pandas as pd
@@ -6,7 +6,7 @@ import geopandas as gpd
 import pytest
 from shapely.geometry import box
 
-from src.visualize_morphology import (
+from src.visualization.morphology import (
     plot_cluster_profiles,
     plot_elbow_silhouette,
     plot_lisa_clusters,
@@ -89,17 +89,13 @@ class TestPlotZoneMetricsPanel:
 
     def test_missing_columns(self, tmp_path):
         """GeoDataFrame with none of the default metric columns."""
-        gdf = gpd.GeoDataFrame(
-            {"x": [1]}, geometry=[box(0, 0, 1, 1)], crs="EPSG:32723"
-        )
+        gdf = gpd.GeoDataFrame({"x": [1]}, geometry=[box(0, 0, 1, 1)], crs="EPSG:32723")
         out = tmp_path / "panel_empty.png"
         plot_zone_metrics_panel(gdf, out)
         # Should not raise; file may or may not be created
 
     def test_with_boundary_clipping(self, zone_gdf, tmp_path):
-        boundary = gpd.GeoDataFrame(
-            geometry=[box(0, 0, 500, 50)], crs="EPSG:32723"
-        )
+        boundary = gpd.GeoDataFrame(geometry=[box(0, 0, 500, 50)], crs="EPSG:32723")
         out = tmp_path / "panel_clipped.png"
         plot_zone_metrics_panel(zone_gdf, out, boundary_gdf=boundary)
         assert out.exists()
@@ -132,21 +128,15 @@ class TestPlotLisaClusters:
             assert p.exists()
 
     def test_with_boundary_clipping(self, zone_gdf, tmp_path):
-        boundary = gpd.GeoDataFrame(
-            geometry=[box(0, 0, 500, 50)], crs="EPSG:32723"
-        )
+        boundary = gpd.GeoDataFrame(geometry=[box(0, 0, 500, 50)], crs="EPSG:32723")
         out = tmp_path / "lisa_clipped.png"
         plot_lisa_clusters(zone_gdf, "lisa_cluster_bcr", out, boundary_gdf=boundary)
         assert out.exists()
 
     def test_with_footprints(self, zone_gdf, tmp_path):
-        buildings = gpd.GeoDataFrame(
-            geometry=[box(10, 10, 20, 20)], crs="EPSG:32723"
-        )
+        buildings = gpd.GeoDataFrame(geometry=[box(10, 10, 20, 20)], crs="EPSG:32723")
         out = tmp_path / "lisa_buildings.png"
-        plot_lisa_clusters(
-            zone_gdf, "lisa_cluster_bcr", out, footprints_gdf=buildings
-        )
+        plot_lisa_clusters(zone_gdf, "lisa_cluster_bcr", out, footprints_gdf=buildings)
         assert out.exists()
 
 

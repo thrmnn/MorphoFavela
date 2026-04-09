@@ -320,8 +320,11 @@ def _compute_street_features(
         Columns: ``tile_id``, ``road_density``, ``intersection_density``,
         ``street_orientation_entropy``.
     """
-    feature_names = ["road_density", "intersection_density",
-                     "street_orientation_entropy"]
+    feature_names = [
+        "road_density",
+        "intersection_density",
+        "street_orientation_entropy",
+    ]
 
     # Fast path: no street data
     if streets is None or streets.empty:
@@ -342,12 +345,14 @@ def _compute_street_features(
         clipped = gpd.clip(streets, tile.geometry)
 
         if clipped.empty:
-            records.append({
-                "tile_id": tile_id,
-                "road_density": 0.0,
-                "intersection_density": 0.0,
-                "street_orientation_entropy": np.nan,
-            })
+            records.append(
+                {
+                    "tile_id": tile_id,
+                    "road_density": 0.0,
+                    "intersection_density": 0.0,
+                    "street_orientation_entropy": np.nan,
+                }
+            )
             continue
 
         # --- road_density: total length (km) / tile area (km²) ---
@@ -399,12 +404,14 @@ def _compute_street_features(
         else:
             orientation_entropy = np.nan
 
-        records.append({
-            "tile_id": tile_id,
-            "road_density": float(road_density),
-            "intersection_density": float(intersection_density),
-            "street_orientation_entropy": orientation_entropy,
-        })
+        records.append(
+            {
+                "tile_id": tile_id,
+                "road_density": float(road_density),
+                "intersection_density": float(intersection_density),
+                "street_orientation_entropy": orientation_entropy,
+            }
+        )
 
     feat_df = pd.DataFrame(records)
     all_tiles = pd.DataFrame({"tile_id": tiles["tile_id"]})
@@ -481,11 +488,13 @@ def _compute_svf_features(
         if len(svf_vals) == 0:
             records.append({"tile_id": tile_id, "svf_mean": np.nan, "svf_std": np.nan})
         else:
-            records.append({
-                "tile_id": tile_id,
-                "svf_mean": float(np.mean(svf_vals)),
-                "svf_std": float(np.std(svf_vals, ddof=0)),
-            })
+            records.append(
+                {
+                    "tile_id": tile_id,
+                    "svf_mean": float(np.mean(svf_vals)),
+                    "svf_std": float(np.std(svf_vals, ddof=0)),
+                }
+            )
 
     if records:
         feat_df = pd.DataFrame(records)
@@ -534,8 +543,12 @@ def _compute_topography_features(
         ``slope_std``, ``terrain_ruggedness``, ``dtm_coverage_frac``.
     """
     feature_names = [
-        "elev_mean", "elev_range", "slope_mean", "slope_std",
-        "terrain_ruggedness", "dtm_coverage_frac",
+        "elev_mean",
+        "elev_range",
+        "slope_mean",
+        "slope_std",
+        "terrain_ruggedness",
+        "dtm_coverage_frac",
     ]
 
     # Fast path: no DTM
@@ -559,13 +572,18 @@ def _compute_topography_features(
 
             try:
                 out_image, _ = rasterio.mask.mask(
-                    src, [tile_geom], crop=True, filled=True,
+                    src,
+                    [tile_geom],
+                    crop=True,
+                    filled=True,
                 )
             except Exception:
-                records.append({
-                    "tile_id": tile_id,
-                    **{feat: np.nan for feat in feature_names},
-                })
+                records.append(
+                    {
+                        "tile_id": tile_id,
+                        **{feat: np.nan for feat in feature_names},
+                    }
+                )
                 continue
 
             data = out_image[0].astype(float)
@@ -578,10 +596,12 @@ def _compute_topography_features(
             n_valid = int(valid.sum())
 
             if n_valid == 0:
-                records.append({
-                    "tile_id": tile_id,
-                    **{feat: np.nan for feat in feature_names},
-                })
+                records.append(
+                    {
+                        "tile_id": tile_id,
+                        **{feat: np.nan for feat in feature_names},
+                    }
+                )
                 continue
 
             valid_vals = data[valid]
@@ -611,8 +631,10 @@ def _compute_topography_features(
                         if dr == 0 and dc == 0:
                             continue
                         tri_sum += np.abs(
-                            data_filled[1 + dr:rows_f - 1 + dr,
-                                        1 + dc:cols_f - 1 + dc] - centre
+                            data_filled[
+                                1 + dr : rows_f - 1 + dr, 1 + dc : cols_f - 1 + dc
+                            ]
+                            - centre
                         )
                 tri_grid = tri_sum / 8.0
                 # Restrict to valid interior pixels
@@ -624,15 +646,17 @@ def _compute_topography_features(
             else:
                 terrain_ruggedness = np.nan
 
-            records.append({
-                "tile_id": tile_id,
-                "elev_mean": elev_mean,
-                "elev_range": elev_range,
-                "slope_mean": slope_mean,
-                "slope_std": slope_std,
-                "terrain_ruggedness": terrain_ruggedness,
-                "dtm_coverage_frac": dtm_coverage_frac,
-            })
+            records.append(
+                {
+                    "tile_id": tile_id,
+                    "elev_mean": elev_mean,
+                    "elev_range": elev_range,
+                    "slope_mean": slope_mean,
+                    "slope_std": slope_std,
+                    "terrain_ruggedness": terrain_ruggedness,
+                    "dtm_coverage_frac": dtm_coverage_frac,
+                }
+            )
 
     if records:
         feat_df = pd.DataFrame(records)
@@ -735,7 +759,7 @@ def _lacunarity(binary_raster: np.ndarray, box_size: int) -> float:
         return np.nan
 
     var_val = sums.var()
-    return float(var_val / (mean_val ** 2) + 1.0)
+    return float(var_val / (mean_val**2) + 1.0)
 
 
 def _fractal_dimension_box_counting(binary_raster: np.ndarray) -> float:
@@ -759,7 +783,7 @@ def _fractal_dimension_box_counting(binary_raster: np.ndarray) -> float:
         count = 0
         for r in range(n_boxes_r):
             for c in range(n_boxes_c):
-                block = binary_raster[r * bs:(r + 1) * bs, c * bs:(c + 1) * bs]
+                block = binary_raster[r * bs : (r + 1) * bs, c * bs : (c + 1) * bs]
                 if block.any():
                     count += 1
         if count > 0:
@@ -850,8 +874,10 @@ def _compute_texture_features(
 
         # Rasterize
         raster = _rasterize_buildings_in_tile(
-            tile_geom, tile_buildings,
-            resolution=resolution, grid_size=grid_size,
+            tile_geom,
+            tile_buildings,
+            resolution=resolution,
+            grid_size=grid_size,
         )
 
         # Lacunarity
@@ -867,12 +893,14 @@ def _compute_texture_features(
         else:
             gini = np.nan
 
-        records.append({
-            "tile_id": tile_id,
-            "lacunarity": lac,
-            "fractal_dim_box": fd,
-            "gini_building_area": gini,
-        })
+        records.append(
+            {
+                "tile_id": tile_id,
+                "lacunarity": lac,
+                "fractal_dim_box": fd,
+                "gini_building_area": gini,
+            }
+        )
 
     feat_df = pd.DataFrame(records)
     all_tiles = pd.DataFrame({"tile_id": tiles["tile_id"]})
@@ -918,7 +946,10 @@ def _compute_porosity_orientation_features(
         ``porosity_W``, ``orientation_entropy``.
     """
     feature_names = [
-        "porosity_N", "porosity_E", "porosity_S", "porosity_W",
+        "porosity_N",
+        "porosity_E",
+        "porosity_S",
+        "porosity_W",
         "orientation_entropy",
     ]
     ray_spacing = 5.0
@@ -1006,7 +1037,7 @@ def _compute_porosity_orientation_features(
                 for i in range(len(coords) - 1):
                     dx = coords[i + 1][0] - coords[i][0]
                     dy = coords[i + 1][1] - coords[i][1]
-                    edge_len = np.sqrt(dx ** 2 + dy ** 2)
+                    edge_len = np.sqrt(dx**2 + dy**2)
                     if edge_len > max_len:
                         max_len = edge_len
                         angle = np.degrees(np.arctan2(dy, dx)) % 180.0
@@ -1033,7 +1064,8 @@ def _compute_porosity_orientation_features(
     result = all_tiles.merge(feat_df, on="tile_id", how="left")
 
     logger.info(
-        "Porosity/orientation features computed for %d tiles.", len(result),
+        "Porosity/orientation features computed for %d tiles.",
+        len(result),
     )
     return result
 
@@ -1099,12 +1131,17 @@ def compute_tile_features(
 
     # --- Group 1: morphometric features ---
     morpho_df = _compute_morphometric_features(
-        tiles, buildings, floor_height=floor_height, wind_dir=wind_dir,
+        tiles,
+        buildings,
+        floor_height=floor_height,
+        wind_dir=wind_dir,
     )
 
     # --- Group 2: height distribution ---
     height_df = _compute_height_features(
-        tiles, buildings, height_col=height_col,
+        tiles,
+        buildings,
+        height_col=height_col,
     )
 
     # --- Group 3: street network ---

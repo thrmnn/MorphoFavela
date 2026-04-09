@@ -33,7 +33,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import shared utilities
-from src.svf_utils import load_mesh, extract_terrain_surface
+from src.svf_v2.utils import load_mesh, extract_terrain_surface
 from scripts.compute_svf_streets import (
     sample_points_along_line,
     extract_elevation_from_mesh

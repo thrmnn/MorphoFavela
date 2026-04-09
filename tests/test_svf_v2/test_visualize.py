@@ -98,9 +98,7 @@ class TestPlotSvfComparison:
 
     def test_creates_parent_dirs(self, tmp_path, informal_gdf, planned_gdf):
         out = tmp_path / "sub" / "dir" / "comparison.png"
-        result = plot_svf_comparison(
-            {"Vidigal": informal_gdf, "CDD": planned_gdf}, out
-        )
+        result = plot_svf_comparison({"Vidigal": informal_gdf, "CDD": planned_gdf}, out)
         assert result == out
         assert out.exists()
 
@@ -173,7 +171,6 @@ class TestPlotStreetSvf:
         assert out.stat().st_size > 0
 
     def test_segment_mode(self, tmp_path, street_gdf_with_segments):
-        from shapely.geometry import box as sbox
 
         # Create fake segments GeoDataFrame
         seg_gdf = gpd.GeoDataFrame(
@@ -189,8 +186,10 @@ class TestPlotStreetSvf:
         )
         out = tmp_path / "street_segments.png"
         plot_street_svf(
-            street_gdf_with_segments, out,
-            segments_gdf=seg_gdf, mode="segments",
+            street_gdf_with_segments,
+            out,
+            segments_gdf=seg_gdf,
+            mode="segments",
         )
         assert out.exists()
 
@@ -231,10 +230,12 @@ class TestPlotSvfDistribution:
     def test_with_zeros(self, tmp_path):
         """Data with a spike at zero."""
         rng = np.random.default_rng(99)
-        svf = np.concatenate([
-            np.zeros(50),
-            np.clip(rng.normal(0.5, 0.2, 150), 0.01, 1.0),
-        ])
+        svf = np.concatenate(
+            [
+                np.zeros(50),
+                np.clip(rng.normal(0.5, 0.2, 150), 0.01, 1.0),
+            ]
+        )
         gdf = gpd.GeoDataFrame(
             {"svf": svf},
             geometry=[Point(i, i) for i in range(200)],

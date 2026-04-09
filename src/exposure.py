@@ -20,7 +20,6 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import ListedColormap
-from matplotlib.patches import Patch
 
 from src.cartography import add_north_arrow, add_scale_bar, add_settlement_boundary
 from src.config import DPI
@@ -78,10 +77,19 @@ def compute_zone_solar_deficit(
         return zones
 
     # Ensure matching CRS
-    if solar_gdf.crs is not None and zones.crs is not None and solar_gdf.crs != zones.crs:
+    if (
+        solar_gdf.crs is not None
+        and zones.crs is not None
+        and solar_gdf.crs != zones.crs
+    ):
         solar_gdf = solar_gdf.to_crs(zones.crs)
 
-    joined = gpd.sjoin(solar_gdf[[solar_col, "geometry"]], zones[["zone_id", "geometry"]], how="inner", predicate="within")
+    joined = gpd.sjoin(
+        solar_gdf[[solar_col, "geometry"]],
+        zones[["zone_id", "geometry"]],
+        how="inner",
+        predicate="within",
+    )
 
     if joined.empty:
         zones["mean_solar"] = np.nan
@@ -105,7 +113,9 @@ def compute_zone_solar_deficit(
     if reference_hours <= 0:
         reference_hours = 1.0
 
-    zones["solar_deficit"] = (1.0 - zones["mean_solar"] / reference_hours).clip(0.0, 1.0)
+    zones["solar_deficit"] = (1.0 - zones["mean_solar"] / reference_hours).clip(
+        0.0, 1.0
+    )
 
     logger.info(
         "Solar deficit computed for %d zones (reference=%.1f h).",
@@ -157,7 +167,12 @@ def compute_zone_svf_deficit(
     if svf_gdf.crs is not None and zones.crs is not None and svf_gdf.crs != zones.crs:
         svf_gdf = svf_gdf.to_crs(zones.crs)
 
-    joined = gpd.sjoin(svf_gdf[[svf_col, "geometry"]], zones[["zone_id", "geometry"]], how="inner", predicate="within")
+    joined = gpd.sjoin(
+        svf_gdf[[svf_col, "geometry"]],
+        zones[["zone_id", "geometry"]],
+        how="inner",
+        predicate="within",
+    )
 
     if joined.empty:
         zones["mean_svf"] = np.nan
@@ -172,7 +187,9 @@ def compute_zone_svf_deficit(
 
     zones["svf_deficit"] = (1.0 - zones["mean_svf"]).clip(0.0, 1.0)
 
-    logger.info("SVF deficit computed for %d zones.", zones["svf_deficit"].notna().sum())
+    logger.info(
+        "SVF deficit computed for %d zones.", zones["svf_deficit"].notna().sum()
+    )
     return zones
 
 
@@ -215,14 +232,20 @@ def compute_zone_building_density(
         logger.warning("No footprints provided -- density columns set to zero.")
         return zones
 
-    if footprints_gdf.crs is not None and zones.crs is not None and footprints_gdf.crs != zones.crs:
+    if (
+        footprints_gdf.crs is not None
+        and zones.crs is not None
+        and footprints_gdf.crs != zones.crs
+    ):
         footprints_gdf = footprints_gdf.to_crs(zones.crs)
 
     # Prepare footprints: keep only geometry and height
     fp = footprints_gdf.copy()
     if height_col not in fp.columns:
         fp[height_col] = 1.0  # default to 1 m if no height data
-        logger.warning("Height column '%s' not found -- defaulting to 1.0 m.", height_col)
+        logger.warning(
+            "Height column '%s' not found -- defaulting to 1.0 m.", height_col
+        )
 
     # Replace invalid heights
     fp[height_col] = fp[height_col].replace([np.inf, -np.inf], np.nan).fillna(1.0)
@@ -248,7 +271,9 @@ def compute_zone_building_density(
         zones["built_volume"] = 0.0
         zones["open_space_ratio"] = 1.0
         zones["density_ratio"] = 0.0
-        logger.warning("Overlay returned no intersections -- density columns set to zero.")
+        logger.warning(
+            "Overlay returned no intersections -- density columns set to zero."
+        )
         return zones
 
     # Compute clipped footprint area and volume
@@ -333,7 +358,9 @@ def compute_exposure_index(
     available = {name: col for name, col in metrics.items() if col in zones.columns}
     if not available:
         zones["exposure_index"] = np.nan
-        logger.warning("None of the requested metric columns found -- exposure_index set to NaN.")
+        logger.warning(
+            "None of the requested metric columns found -- exposure_index set to NaN."
+        )
         return zones
 
     # Resolve weights
@@ -447,7 +474,11 @@ def plot_exposure_panel(
         plot_gdf = plot_gdf.loc[has_any_data].copy()
 
     # Filter to available columns
-    available = [(col, cmap, title) for col, cmap, title in metrics_to_plot if col in plot_gdf.columns]
+    available = [
+        (col, cmap, title)
+        for col, cmap, title in metrics_to_plot
+        if col in plot_gdf.columns
+    ]
     if not available:
         logger.warning("No metric columns found for exposure panel -- skipping.")
         return output_path
@@ -509,7 +540,7 @@ def plot_exposure_panel(
 
         # Style the colorbar
         for child_ax in fig.axes:
-            if child_ax not in axes and child_ax not in fig.axes[:len(axes)]:
+            if child_ax not in axes and child_ax not in fig.axes[: len(axes)]:
                 child_ax.tick_params(labelsize=7)
 
         if boundary_gdf is not None:
@@ -520,16 +551,22 @@ def plot_exposure_panel(
         # Panel label (a, b, c, d)
         if idx < len(_PANEL_LABELS):
             ax.text(
-                0.02, 0.98, _PANEL_LABELS[idx],
-                transform=ax.transAxes, fontsize=13, fontweight="bold",
-                va="top", ha="left", zorder=20,
+                0.02,
+                0.98,
+                _PANEL_LABELS[idx],
+                transform=ax.transAxes,
+                fontsize=13,
+                fontweight="bold",
+                va="top",
+                ha="left",
+                zorder=20,
             )
 
         add_scale_bar(ax)
         add_north_arrow(ax)
         ax.set_axis_off()
 
-    for ax in axes[len(available):]:
+    for ax in axes[len(available) :]:
         ax.set_visible(False)
 
     fig.tight_layout(h_pad=2, w_pad=2)
@@ -556,11 +593,17 @@ def _build_bivariate_cmap(n: int = 3) -> tuple[ListedColormap, list[str]]:
     # 3x3 palette inspired by Joshua Stevens bivariate schemes
     palette_3x3 = [
         # row 0 (low y): light teal  -> medium blue  -> dark blue
-        "#e8e8e8", "#b5c0da", "#6c83b5",
+        "#e8e8e8",
+        "#b5c0da",
+        "#6c83b5",
         # row 1 (mid y): light pink  -> medium purple -> dark purple
-        "#e4acac", "#ad9ea5", "#627f8c",
+        "#e4acac",
+        "#ad9ea5",
+        "#627f8c",
         # row 2 (high y): dark red   -> dark magenta  -> dark navy
-        "#c85a5a", "#985356", "#574249",
+        "#c85a5a",
+        "#985356",
+        "#574249",
     ]
 
     if n != 3:
@@ -632,7 +675,9 @@ def plot_exposure_bivariate(
     gdf_valid = gdf.loc[valid_mask].copy()
 
     if len(gdf_valid) < n_classes:
-        logger.warning("Too few valid zones (%d) for bivariate plot -- skipping.", len(gdf_valid))
+        logger.warning(
+            "Too few valid zones (%d) for bivariate plot -- skipping.", len(gdf_valid)
+        )
         return output_path
 
     # Quantile classification
@@ -657,6 +702,7 @@ def plot_exposure_bivariate(
 
     # --- Plot ---
     from src.cartography import apply_publication_style
+
     apply_publication_style()
 
     fig, (ax_map, ax_legend) = plt.subplots(
@@ -683,7 +729,9 @@ def plot_exposure_bivariate(
             zorder=1,
         )
 
-    gdf_valid.plot(ax=ax_map, color=colors, edgecolor="#777777", linewidth=0.3, zorder=2)
+    gdf_valid.plot(
+        ax=ax_map, color=colors, edgecolor="#777777", linewidth=0.3, zorder=2
+    )
 
     if boundary_gdf is not None:
         add_settlement_boundary(ax_map, boundary_gdf)

@@ -23,7 +23,7 @@ from src.config import get_area_data_dir, get_area_output_dir
 from src.metrics import calculate_basic_metrics
 from src.spatial_analysis import compute_global_morans_i, compute_lisa
 from src.urban_morphology import compute_zone_metrics, create_analysis_zones
-from src.visualize_morphology import plot_lisa_clusters_panel, plot_zone_metrics_panel
+from src.visualization.morphology import plot_lisa_clusters_panel, plot_zone_metrics_panel
 
 logging.basicConfig(
     level=logging.INFO,

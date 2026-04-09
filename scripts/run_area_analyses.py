@@ -96,8 +96,8 @@ def main():
     # 1. Basic Metrics
     if not args.skip_metrics:
         cmd = [
-            sys.executable, "scripts/calculate_metrics.py",
-            "--area", area
+            sys.executable, "scripts/calculate_morphology_metrics.py",
+            "--area", area, "--basic-only"
         ]
         if not run_command(cmd, "Basic morphometric metrics"):
             print("Warning: Metrics calculation failed, continuing...")

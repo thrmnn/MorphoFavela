@@ -2,13 +2,10 @@
 
 import numpy as np
 import geopandas as gpd
-import pytest
-from shapely.geometry import Point
 
 from src.solar.compute import (
     compute_sunlit_matrix,
     compute_solar_access_streets,
-    compute_solar_access_grid,
     _build_obb_tree,
     _ray_hits,
 )
@@ -80,9 +77,7 @@ class TestSunlitMatrix:
 
     def test_enclosed_all_shaded(self, enclosed_mesh):
         obs = np.array([[5.0, 5.0, 5.0]])
-        dirs = _make_sun_dirs(
-            (45.0, 0.0), (45.0, 90.0), (45.0, 180.0), (45.0, 270.0)
-        )
+        dirs = _make_sun_dirs((45.0, 0.0), (45.0, 90.0), (45.0, 180.0), (45.0, 270.0))
         result = compute_sunlit_matrix(obs, dirs, enclosed_mesh)
         assert not result.any()  # all False — completely enclosed
 

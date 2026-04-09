@@ -78,7 +78,9 @@ def plot_tile_clusters(
     output_path = Path(output_path)
 
     if "cluster" not in tiles_gdf.columns:
-        logger.warning("Column 'cluster' not found in tiles_gdf -- skipping tile cluster map.")
+        logger.warning(
+            "Column 'cluster' not found in tiles_gdf -- skipping tile cluster map."
+        )
         return output_path
 
     fig, ax = plt.subplots(1, 1, figsize=(12, 8))
@@ -215,7 +217,9 @@ def plot_pca_scatter(
     required = {"pc1", "pc2", "cluster"}
     missing = required - set(tiles_gdf.columns)
     if missing:
-        logger.warning("Missing columns %s in tiles_gdf -- skipping PCA scatter.", missing)
+        logger.warning(
+            "Missing columns %s in tiles_gdf -- skipping PCA scatter.", missing
+        )
         return output_path
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 8))
@@ -262,7 +266,11 @@ def plot_pca_scatter(
         if "tile_id" in selected_gdf.columns:
             for idx in sel.index:
                 row = tiles_gdf.loc[idx]
-                tid = selected_gdf.loc[idx, "tile_id"] if idx in selected_gdf.index else ""
+                tid = (
+                    selected_gdf.loc[idx, "tile_id"]
+                    if idx in selected_gdf.index
+                    else ""
+                )
                 ax.annotate(
                     str(tid),
                     xy=(row["pc1"], row["pc2"]),
@@ -331,7 +339,9 @@ def plot_feature_distributions(
     # Filter to available columns
     available = [c for c in feature_columns if c in tiles_gdf.columns]
     if not available:
-        logger.warning("No requested feature columns found -- skipping feature distributions.")
+        logger.warning(
+            "No requested feature columns found -- skipping feature distributions."
+        )
         return output_path
 
     dropped = set(feature_columns) - set(available)
@@ -350,6 +360,7 @@ def plot_feature_distributions(
     # Try seaborn for nicer boxplots, fall back to matplotlib
     try:
         import seaborn as sns
+
         _use_seaborn = True
     except ImportError:
         _use_seaborn = False
@@ -473,7 +484,7 @@ def plot_dtm_coverage(
         )
     else:
         # Boolean: simple green/red
-        colors = tiles_gdf[col].map({True: "#4CAF50", False: "#F44336", 1: "#4CAF50", 0: "#F44336"})
+        colors = tiles_gdf[col].map({True: "#4CAF50", False: "#F44336"})
         colors = colors.fillna("#999999")
         tiles_gdf.plot(
             ax=ax,

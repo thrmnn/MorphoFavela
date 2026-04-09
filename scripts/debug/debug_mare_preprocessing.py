@@ -31,7 +31,7 @@ from src.config import (
     get_area_output_dir,
     is_informal_area,
 )
-from src.svf_utils import filter_buildings
+from src.svf_v2.utils import filter_buildings
 from src.svf_v2.paths import resolve_boundary, resolve_paths
 
 

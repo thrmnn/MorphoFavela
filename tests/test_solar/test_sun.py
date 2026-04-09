@@ -3,7 +3,6 @@
 import math
 
 import numpy as np
-import pytest
 
 from src.solar.sun import (
     compute_sun_positions,
@@ -11,8 +10,6 @@ from src.solar.sun import (
     compute_sun_positions_multi_day,
     compute_extraterrestrial_irradiance,
     REFERENCE_DATES,
-    DEFAULT_LATITUDE,
-    DEFAULT_LONGITUDE,
 )
 
 
@@ -61,7 +58,9 @@ class TestComputeSunPositions:
             interval_minutes=60,
         )
         # Winter solstice at lat -23: sunrise ~06:30, sunset ~17:15 local
-        assert 7 <= len(positions) <= 13, f"Expected 7-13 positions, got {len(positions)}"
+        assert 7 <= len(positions) <= 13, (
+            f"Expected 7-13 positions, got {len(positions)}"
+        )
 
     def test_max_altitude_winter_solstice_rio(self):
         """At lat -23 winter solstice, max altitude ~ 43-44 degrees.
@@ -82,12 +81,20 @@ class TestComputeSunPositions:
     def test_summer_more_than_winter(self):
         """Summer solstice should have more sun positions than winter."""
         pos_winter = compute_sun_positions(
-            latitude=-22.97, longitude=-43.17, date="2026-06-21",
-            hour_start=5, hour_end=19, interval_minutes=60,
+            latitude=-22.97,
+            longitude=-43.17,
+            date="2026-06-21",
+            hour_start=5,
+            hour_end=19,
+            interval_minutes=60,
         )
         pos_summer = compute_sun_positions(
-            latitude=-22.97, longitude=-43.17, date="2026-12-21",
-            hour_start=5, hour_end=19, interval_minutes=60,
+            latitude=-22.97,
+            longitude=-43.17,
+            date="2026-12-21",
+            hour_start=5,
+            hour_end=19,
+            interval_minutes=60,
         )
         assert len(pos_summer) > len(pos_winter)
 
@@ -100,8 +107,12 @@ class TestComputeSunPositions:
     def test_equator_equinox_high_sun(self):
         """Equator on equinox: sun nearly overhead, ~12h daylight."""
         positions = compute_sun_positions(
-            latitude=0.0, longitude=0.0, date="2026-03-20",
-            hour_start=4, hour_end=20, interval_minutes=60,
+            latitude=0.0,
+            longitude=0.0,
+            date="2026-03-20",
+            hour_start=4,
+            hour_end=20,
+            interval_minutes=60,
         )
         assert len(positions) >= 10
         max_alt = max(alt for alt, _ in positions)
@@ -148,7 +159,9 @@ class TestSunPositionToDirection:
             for az in [0, 45, 90, 135, 180, 225, 270, 315]:
                 d = sun_position_to_direction(float(alt), float(az))
                 np.testing.assert_allclose(
-                    np.linalg.norm(d), 1.0, atol=1e-12,
+                    np.linalg.norm(d),
+                    1.0,
+                    atol=1e-12,
                     err_msg=f"Non-unit at alt={alt}, az={az}",
                 )
 
@@ -223,5 +236,5 @@ class TestExtraterrestrialIrradiance:
     def test_symmetry_around_perihelion(self):
         """Days equidistant from perihelion should have similar irradiance."""
         i_before = compute_extraterrestrial_irradiance(350)  # ~Dec 16
-        i_after = compute_extraterrestrial_irradiance(20)    # ~Jan 20
+        i_after = compute_extraterrestrial_irradiance(20)  # ~Jan 20
         assert abs(i_before - i_after) / i_before < 0.02  # within 2%

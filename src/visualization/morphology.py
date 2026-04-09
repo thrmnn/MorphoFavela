@@ -23,7 +23,6 @@ from src.cartography import (
     add_north_arrow,
     add_scale_bar,
     add_settlement_boundary,
-    style_buildings_by_height,
 )
 from src.config import (
     COLORMAP_BCR,
@@ -93,7 +92,9 @@ def plot_zone_metrics_panel(
             plot_gdf = gdf
 
     # Filter to available columns
-    available = [(col, cmap, title) for col, cmap, title in metrics if col in plot_gdf.columns]
+    available = [
+        (col, cmap, title) for col, cmap, title in metrics if col in plot_gdf.columns
+    ]
     if not available:
         logger.warning("No metric columns found for zone panel — skipping.")
         return output_path
@@ -169,9 +170,15 @@ def plot_zone_metrics_panel(
         # Panel label
         if idx < len(_panel_labels):
             ax.text(
-                0.02, 0.98, _panel_labels[idx],
-                transform=ax.transAxes, fontsize=13, fontweight="bold",
-                va="top", ha="left", zorder=20,
+                0.02,
+                0.98,
+                _panel_labels[idx],
+                transform=ax.transAxes,
+                fontsize=13,
+                fontweight="bold",
+                va="top",
+                ha="left",
+                zorder=20,
             )
 
         add_scale_bar(ax)
@@ -254,8 +261,22 @@ def plot_lisa_clusters(
     # Use semi-transparent fills so building fabric shows through ns zones
     ns_mask = plot_gdf[cluster_col] == "ns"
     if ns_mask.any():
-        plot_gdf[~ns_mask].plot(ax=ax, color=colors[~ns_mask], edgecolor="gray", linewidth=0.2, alpha=0.85, zorder=2)
-        plot_gdf[ns_mask].plot(ax=ax, color=colors[ns_mask], edgecolor="gray", linewidth=0.2, alpha=0.4, zorder=1)
+        plot_gdf[~ns_mask].plot(
+            ax=ax,
+            color=colors[~ns_mask],
+            edgecolor="gray",
+            linewidth=0.2,
+            alpha=0.85,
+            zorder=2,
+        )
+        plot_gdf[ns_mask].plot(
+            ax=ax,
+            color=colors[ns_mask],
+            edgecolor="gray",
+            linewidth=0.2,
+            alpha=0.4,
+            zorder=1,
+        )
     else:
         plot_gdf.plot(ax=ax, color=colors, edgecolor="gray", linewidth=0.2, zorder=2)
 
@@ -347,7 +368,11 @@ def plot_typology_map(
     # Legend with zone counts
     counts = gdf[cluster_col].value_counts()
     patches = [
-        Patch(facecolor=color_map[c], edgecolor="gray", label=f"Cluster {c} (n={counts.get(c, 0)})")
+        Patch(
+            facecolor=color_map[c],
+            edgecolor="gray",
+            label=f"Cluster {c} (n={counts.get(c, 0)})",
+        )
         for c in clusters
     ]
     ax.legend(handles=patches, loc="lower right", fontsize=9)
@@ -407,7 +432,13 @@ def plot_cluster_profiles(
         count = row.get("count", "?")
         vals = [row[f] for f in features]
         offset = (i - n_clusters / 2 + 0.5) * width
-        ax.bar(x + offset, vals, width, label=f"Cluster {cluster} (n={count})", color=cmap(i))
+        ax.bar(
+            x + offset,
+            vals,
+            width,
+            label=f"Cluster {cluster} (n={count})",
+            color=cmap(i),
+        )
 
     ax.set_xticks(x)
     ax.set_xticklabels(features, rotation=30, ha="right")
@@ -590,10 +621,17 @@ def plot_moran_scatter(
     ax.axvline(0, color="gray", linewidth=0.5)
     ax.set_xlabel(f"z ({column})", fontsize=11)
     ax.set_ylabel(f"Wz ({column})", fontsize=11)
-    ax.set_title(f"Moran Scatter — {column} (slope={coeffs[0]:.3f})", fontsize=12, fontweight="bold")
+    ax.set_title(
+        f"Moran Scatter — {column} (slope={coeffs[0]:.3f})",
+        fontsize=12,
+        fontweight="bold",
+    )
 
     # Legend
-    patches = [Patch(facecolor=v, edgecolor="gray", label=k) for k, v in quadrant_colors.items()]
+    patches = [
+        Patch(facecolor=v, edgecolor="gray", label=k)
+        for k, v in quadrant_colors.items()
+    ]
     ax.legend(handles=patches, loc="upper left", fontsize=9)
 
     plt.tight_layout()

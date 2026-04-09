@@ -1,19 +1,17 @@
-"""Tests for src.solar_access module."""
+"""Tests for solar computation (src.solar package)."""
 
 import math
 
 import numpy as np
+import pandas as pd
 import pyvista as pv
-import pytest
 
-from src.solar_access import (
-    compute_sun_positions,
-    sun_position_to_direction,
-    _compute_sun_directions,
-    _batch_solar_access,
+from src.solar.sun import compute_sun_positions, sun_position_to_direction
+from src.solar.compute import (
     _build_obb_tree,
     _ray_hits,
     compute_solar_access_streets,
+    compute_sunlit_matrix,
 )
 
 
@@ -34,23 +32,34 @@ def _flat_terrain(size: float = 50.0, n: int = 21) -> pv.PolyData:
     for i in range(n - 1):
         for j in range(n - 1):
             idx = i * n + j
-            faces.extend([[3, idx, idx + 1, idx + n],
-                          [3, idx + 1, idx + n + 1, idx + n]])
+            faces.extend(
+                [[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]]
+            )
     return pv.PolyData(points, faces)
 
 
 def _box_mesh(
-    xmin: float, xmax: float,
-    ymin: float, ymax: float,
-    zmin: float, zmax: float,
+    xmin: float,
+    xmax: float,
+    ymin: float,
+    ymax: float,
+    zmin: float,
+    zmax: float,
 ) -> pv.PolyData:
     """Axis-aligned closed box mesh."""
-    verts = np.array([
-        [xmin, ymin, zmin], [xmax, ymin, zmin],
-        [xmax, ymax, zmin], [xmin, ymax, zmin],
-        [xmin, ymin, zmax], [xmax, ymin, zmax],
-        [xmax, ymax, zmax], [xmin, ymax, zmax],
-    ], dtype=np.float32)
+    verts = np.array(
+        [
+            [xmin, ymin, zmin],
+            [xmax, ymin, zmin],
+            [xmax, ymax, zmin],
+            [xmin, ymax, zmin],
+            [xmin, ymin, zmax],
+            [xmax, ymin, zmax],
+            [xmax, ymax, zmax],
+            [xmin, ymax, zmax],
+        ],
+        dtype=np.float32,
+    )
     faces = [
         [4, 0, 3, 2, 1],  # bottom
         [4, 4, 5, 6, 7],  # top
@@ -81,10 +90,10 @@ def _enclosed_scene() -> pv.PolyData:
     # Four continuous walls forming a closed rectangle
     wall_h = 100.0
     walls = [
-        _box_mesh(-10, 10,   8, 10, 0, wall_h),   # north wall (full width)
-        _box_mesh(-10, 10, -10, -8, 0, wall_h),   # south wall (full width)
-        _box_mesh(  8, 10, -10, 10, 0, wall_h),   # east wall  (full depth)
-        _box_mesh(-10, -8, -10, 10, 0, wall_h),   # west wall  (full depth)
+        _box_mesh(-10, 10, 8, 10, 0, wall_h),  # north wall (full width)
+        _box_mesh(-10, 10, -10, -8, 0, wall_h),  # south wall (full width)
+        _box_mesh(8, 10, -10, 10, 0, wall_h),  # east wall  (full depth)
+        _box_mesh(-10, -8, -10, 10, 0, wall_h),  # west wall  (full depth)
     ]
     combined = terrain
     for w in walls:
@@ -141,7 +150,9 @@ class TestComputeSunPositions:
         )
         # Winter solstice at lat -23: sunrise ~06:30, sunset ~17:15 local
         # Expect roughly 10-11 valid positions
-        assert 7 <= len(positions) <= 13, f"Expected 7-13 positions, got {len(positions)}"
+        assert 7 <= len(positions) <= 13, (
+            f"Expected 7-13 positions, got {len(positions)}"
+        )
 
     def test_max_altitude_winter_solstice_rio(self):
         """At lat -23 winter solstice, max altitude ~ 43-44 degrees."""
@@ -222,8 +233,10 @@ class TestSunPositionToDirection:
             for az in [0, 45, 90, 135, 180, 225, 270, 315]:
                 d = sun_position_to_direction(float(alt), float(az))
                 np.testing.assert_allclose(
-                    np.linalg.norm(d), 1.0, atol=1e-12,
-                    err_msg=f"Non-unit at alt={alt}, az={az}"
+                    np.linalg.norm(d),
+                    1.0,
+                    atol=1e-12,
+                    err_msg=f"Non-unit at alt={alt}, az={az}",
                 )
 
     def test_45_degree_altitude(self):
@@ -238,25 +251,31 @@ class TestSunPositionToDirection:
 # ===================================================================
 
 
-class TestBatchSolarAccess:
+class TestSunlitMatrix:
     """Test ray-casting solar access with controlled geometry."""
+
+    @staticmethod
+    def _sunlit_counts(observer, sun_dirs, scene):
+        """Helper: compute unobstructed sun-position counts per observer."""
+        sunlit = compute_sunlit_matrix(observer, sun_dirs, scene, n_jobs=1)
+        return sunlit.sum(axis=1).astype(np.int32)
 
     def test_open_sky_full_access(self):
         """A point on flat terrain with no obstructions gets full sun."""
         scene = _open_sky_scene()
-        observer = np.array([[0.0, 0.0, 1.5]])  # 1.5m above ground
+        observer = np.array([[0.0, 0.0, 1.5]])
 
-        # Synthetic sun positions: a few directions well above horizon
-        sun_dirs = np.array([
-            sun_position_to_direction(45.0, 0.0),
-            sun_position_to_direction(45.0, 90.0),
-            sun_position_to_direction(45.0, 180.0),
-            sun_position_to_direction(45.0, 270.0),
-            sun_position_to_direction(60.0, 0.0),
-        ])
+        sun_dirs = np.array(
+            [
+                sun_position_to_direction(45.0, 0.0),
+                sun_position_to_direction(45.0, 90.0),
+                sun_position_to_direction(45.0, 180.0),
+                sun_position_to_direction(45.0, 270.0),
+                sun_position_to_direction(60.0, 0.0),
+            ]
+        )
 
-        counts = _batch_solar_access(observer, sun_dirs, scene)
-        # All 5 directions should be unobstructed
+        counts = self._sunlit_counts(observer, sun_dirs, scene)
         assert counts[0] == 5
 
     def test_enclosed_zero_access(self):
@@ -264,53 +283,59 @@ class TestBatchSolarAccess:
         scene = _enclosed_scene()
         observer = np.array([[0.0, 0.0, 1.5]])
 
-        # Sun at various low to medium altitudes hitting walls
-        sun_dirs = np.array([
-            sun_position_to_direction(20.0, 0.0),
-            sun_position_to_direction(20.0, 90.0),
-            sun_position_to_direction(20.0, 180.0),
-            sun_position_to_direction(20.0, 270.0),
-            sun_position_to_direction(30.0, 45.0),
-            sun_position_to_direction(30.0, 135.0),
-            sun_position_to_direction(30.0, 225.0),
-            sun_position_to_direction(30.0, 315.0),
-        ])
+        sun_dirs = np.array(
+            [
+                sun_position_to_direction(20.0, 0.0),
+                sun_position_to_direction(20.0, 90.0),
+                sun_position_to_direction(20.0, 180.0),
+                sun_position_to_direction(20.0, 270.0),
+                sun_position_to_direction(30.0, 45.0),
+                sun_position_to_direction(30.0, 135.0),
+                sun_position_to_direction(30.0, 225.0),
+                sun_position_to_direction(30.0, 315.0),
+            ]
+        )
 
-        counts = _batch_solar_access(observer, sun_dirs, scene)
+        counts = self._sunlit_counts(observer, sun_dirs, scene)
         assert counts[0] == 0, f"Expected 0 unobstructed, got {counts[0]}"
 
     def test_partial_obstruction(self):
         """A single wall obstructs some directions but not others."""
         terrain = _flat_terrain(size=50.0, n=11)
-        # Wall to the north only
         wall = _box_mesh(-5, 5, 3, 5, 0, 20)
         scene = terrain.merge(wall)
 
         observer = np.array([[0.0, 0.0, 1.5]])
 
-        sun_dirs = np.array([
-            sun_position_to_direction(30.0, 0.0),    # north -> blocked
-            sun_position_to_direction(30.0, 180.0),   # south -> clear
-        ])
+        sun_dirs = np.array(
+            [
+                sun_position_to_direction(30.0, 0.0),  # north -> blocked
+                sun_position_to_direction(30.0, 180.0),  # south -> clear
+            ]
+        )
 
-        counts = _batch_solar_access(observer, sun_dirs, scene)
-        assert counts[0] == 1  # only south direction unobstructed
+        counts = self._sunlit_counts(observer, sun_dirs, scene)
+        assert counts[0] == 1
 
     def test_multiple_points(self):
         """Multiple observer points in open sky should all get full access."""
         scene = _open_sky_scene()
-        observers = np.array([
-            [0.0, 0.0, 1.5],
-            [10.0, 10.0, 1.5],
-            [-10.0, -10.0, 1.5],
-        ])
+        observers = np.array(
+            [
+                [0.0, 0.0, 1.5],
+                [10.0, 10.0, 1.5],
+                [-10.0, -10.0, 1.5],
+            ]
+        )
 
-        sun_dirs = np.array([
-            sun_position_to_direction(45.0, 0.0),
-            sun_position_to_direction(45.0, 180.0),
-        ])
+        sun_dirs = np.array(
+            [
+                sun_position_to_direction(45.0, 0.0),
+                sun_position_to_direction(45.0, 180.0),
+            ]
+        )
 
-        counts = _batch_solar_access(observers, sun_dirs, scene)
+        counts = self._sunlit_counts(observers, sun_dirs, scene)
         np.testing.assert_array_equal(counts, [2, 2, 2])
 
     def test_no_sun_positions_zero_counts(self):
@@ -319,7 +344,7 @@ class TestBatchSolarAccess:
         observer = np.array([[0.0, 0.0, 1.5]])
         sun_dirs = np.empty((0, 3))
 
-        counts = _batch_solar_access(observer, sun_dirs, scene)
+        counts = self._sunlit_counts(observer, sun_dirs, scene)
         assert counts[0] == 0
 
 
@@ -379,8 +404,10 @@ class TestComputeSolarAccessStreets:
         )
 
         result = compute_solar_access_streets(
-            pts, scene,
-            latitude=-22.97, longitude=-43.17,
+            pts,
+            scene,
+            latitude=-22.97,
+            longitude=-43.17,
             date="2026-06-21",
         )
 
@@ -405,7 +432,6 @@ class TestComputeSolarAccessStreets:
     def test_empty_input(self):
         """Empty input should return empty with correct columns."""
         import geopandas as gpd
-        from shapely.geometry import Point
 
         scene = _open_sky_scene()
         pts = gpd.GeoDataFrame(
@@ -448,7 +474,3 @@ class TestRayHelpers:
         origin = np.array([0.0, 0.0, 1.0])
         endpoint = np.array([0.0, 0.0, 100.0])
         assert _ray_hits(obb, origin, endpoint) is False
-
-
-# Need pandas for the empty GeoDataFrame test
-import pandas as pd

@@ -1,8 +1,7 @@
 """
 Shared utilities for SVF and solar access computation.
 
-This module contains common functions used by both SVF and solar access scripts,
-including mesh loading, terrain extraction, building footprint handling, and
+Mesh loading, terrain extraction, building footprint handling, and
 ground point generation.
 """
 
@@ -123,7 +122,9 @@ def filter_buildings(
                 f"    Filtered out {filtered_by_area} buildings with area > {MAX_FILTER_AREA}m²"
             )
     elif skip_area_filter:
-        print("    Skipping footprint-area filter (SVF mode: large buildings obstruct sky)")
+        print(
+            "    Skipping footprint-area filter (SVF mode: large buildings obstruct sky)"
+        )
 
     # Apply cluster filtering to identify significant clusters
     if len(footprints) == 0:
@@ -209,7 +210,9 @@ def filter_isolated_buildings(
             in_any_significant |= mask
 
     component_stats.sort(key=lambda x: x[1], reverse=True)
-    n_kept_clusters = sum(1 for _, n, _ in component_stats if n >= min_cluster_buildings)
+    n_kept_clusters = sum(
+        1 for _, n, _ in component_stats if n >= min_cluster_buildings
+    )
 
     print(
         f"    Found {len(components)} component(s), "
@@ -217,7 +220,7 @@ def filter_isolated_buildings(
     )
     for i, (idx, n, area) in enumerate(component_stats[:5]):
         status = "KEPT" if n >= min_cluster_buildings else "dropped"
-        print(f"      Component {i}: {n:,} buildings, {area/1e6:.3f} km² [{status}]")
+        print(f"      Component {i}: {n:,} buildings, {area / 1e6:.3f} km² [{status}]")
 
     kept_footprints = footprints[in_any_significant].copy()
     isolated_footprints = footprints[~in_any_significant].copy()

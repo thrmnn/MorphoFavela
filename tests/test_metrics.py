@@ -19,6 +19,7 @@ from src.metrics import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _square(x0: float, y0: float, size: float) -> Polygon:
     """Return an axis-aligned square polygon."""
     return box(x0, y0, x0 + size, y0 + size)
@@ -38,6 +39,7 @@ def _make_gdf(geoms, base_height=None, top_height=None, crs="EPSG:32723"):
 # ---------------------------------------------------------------------------
 # normalize_height_columns
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizeHeightColumns:
     def test_normalize_height_columns_standard(self):
@@ -65,9 +67,7 @@ class TestNormalizeHeightColumns:
 
     def test_normalize_missing_columns_raises(self):
         """GDF without any recognised height columns raises ValueError."""
-        gdf = gpd.GeoDataFrame(
-            {"foo": [1.0], "geometry": [_square(0, 0, 5)]}
-        )
+        gdf = gpd.GeoDataFrame({"foo": [1.0], "geometry": [_square(0, 0, 5)]})
         with pytest.raises(ValueError, match="Expected columns"):
             normalize_height_columns(gdf)
 
@@ -75,6 +75,7 @@ class TestNormalizeHeightColumns:
 # ---------------------------------------------------------------------------
 # calculate_basic_metrics
 # ---------------------------------------------------------------------------
+
 
 class TestCalculateBasicMetrics:
     def test_basic_metrics_square_building(self):
@@ -124,6 +125,7 @@ class TestCalculateBasicMetrics:
 # calculate_inter_building_distance
 # ---------------------------------------------------------------------------
 
+
 class TestInterBuildingDistance:
     def test_inter_building_distance(self):
         """Two 5x5 buildings separated by 10 m gap."""
@@ -169,6 +171,7 @@ class TestInterBuildingDistance:
 # ---------------------------------------------------------------------------
 # validate_footprints
 # ---------------------------------------------------------------------------
+
 
 class TestValidateFootprints:
     def test_validate_footprints_valid(self):
@@ -223,6 +226,7 @@ class TestValidateFootprints:
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     def test_empty_gdf(self):

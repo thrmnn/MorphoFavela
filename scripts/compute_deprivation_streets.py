@@ -346,7 +346,7 @@ def main():
     
     if building_file is not None and segments is not None:
         try:
-            from src.svf_utils import load_building_footprints
+            from src.svf_v2.utils import load_building_footprints
             bounds = segments.total_bounds
             building_footprints = load_building_footprints(
                 building_file,

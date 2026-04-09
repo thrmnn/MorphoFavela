@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Calculate extended morphology metrics for building footprints.
+Calculate building morphometric metrics (basic and/or extended morphology).
 
 Usage:
     python scripts/calculate_morphology_metrics.py --area riodaspedras
+    python scripts/calculate_morphology_metrics.py --area vidigal_tls --basic-only
 """
 
 import argparse
@@ -25,7 +26,14 @@ from src.config import (
 )
 from src.metrics import calculate_basic_metrics, validate_footprints, normalize_height_columns
 from src.morphology_metrics import calculate_morphology_metrics
-from src.visualize import create_metric_map, create_metric_distributions
+from src.visualization import (
+    create_metric_map,
+    create_metric_distributions,
+    create_thematic_maps,
+    create_multi_panel_summary,
+    create_statistical_distributions,
+    create_scatter_plots,
+)
 
 # Setup logging
 logging.basicConfig(
@@ -50,6 +58,7 @@ def main() -> None:
     parser.add_argument("--street-buffer", type=float, default=1.0, help="Street buffer distance (m)")
     parser.add_argument("--voronoi-buffer", type=float, default=50.0, help="Voronoi envelope buffer distance (m)")
     parser.add_argument("--weight-mode", type=str, default="adjacent", help="Weighting mode for d_w (adjacent)")
+    parser.add_argument("--basic-only", action="store_true", help="Compute only basic metrics (skip extended morphology)")
     args = parser.parse_args()
 
     logger.info("Starting extended morphology analysis")
@@ -165,76 +174,89 @@ def main() -> None:
         if removed > 0:
             logger.info(f"Filtered out {removed} buildings with extreme height/area ratios")
 
-    # 5. Load streets (optional)
-    streets = None
-    if args.streets:
-        streets_path = Path(args.streets)
-        if streets_path.exists():
-            streets = gpd.read_file(streets_path)
-            logger.info(f"Loaded streets from {streets_path} ({len(streets)} features)")
-        else:
-            logger.warning(f"Streets file not found: {streets_path}")
+    # 5. Extended morphology metrics (unless --basic-only)
+    if not args.basic_only:
+        streets = None
+        if args.streets:
+            streets_path = Path(args.streets)
+            if streets_path.exists():
+                streets = gpd.read_file(streets_path)
+                logger.info(f"Loaded streets from {streets_path} ({len(streets)} features)")
+            else:
+                logger.warning(f"Streets file not found: {streets_path}")
 
-    # 6. Morphology metrics
-    logger.info("Calculating morphology metrics...")
-    buildings = calculate_morphology_metrics(
-        buildings,
-        streets=streets,
-        street_buffer=args.street_buffer,
-        voronoi_buffer=args.voronoi_buffer,
-        weight_mode=args.weight_mode,
-    )
-    logger.info(f"✓ Calculated morphology metrics for {len(buildings)} buildings")
+        logger.info("Calculating morphology metrics...")
+        buildings = calculate_morphology_metrics(
+            buildings,
+            streets=streets,
+            street_buffer=args.street_buffer,
+            voronoi_buffer=args.voronoi_buffer,
+            weight_mode=args.weight_mode,
+        )
+        logger.info(f"✓ Calculated morphology metrics for {len(buildings)} buildings")
 
-    # 7. Output directory
+    # 6. Output directory
     if args.output:
         output_base = Path(args.output)
     elif args.area:
-        output_base = get_area_analysis_dir(args.area, "morphology_metrics")
+        analysis_type = "metrics" if args.basic_only else "morphology_metrics"
+        output_base = get_area_analysis_dir(args.area, analysis_type)
     else:
-        output_base = OUTPUTS_DIR / "morphology_metrics"
+        output_base = OUTPUTS_DIR / ("metrics" if args.basic_only else "morphology_metrics")
     output_base.mkdir(parents=True, exist_ok=True)
 
-    # 8. Save GeoPackage
-    output_gpkg = output_base / "buildings_with_morphology_metrics.gpkg"
+    # 7. Save GeoPackage
+    output_gpkg = output_base / "buildings_with_metrics.gpkg"
     buildings.to_file(output_gpkg, driver="GPKG")
     logger.info(f"Saved metrics to {output_gpkg}")
 
-    # 9. Summary statistics
-    metric_cols = [
-        "area", "perimeter", "longest_axis_length",
-        "shape_index", "compactness_weighted_axis", "convexity",
-        "shared_walls", "perimeter_wall", "num_corners",
-        "equivalent_rectangular_index", "rectangularity", "squareness",
-        "square_compactness", "elongation", "cwt",
-        "mean_distance_between_buildings", "inter_building_distance",
-        "building_adjacency", "covered_area_ratio",
-        "tessellation_area", "cell_alignment", "tessellation_neighbors",
-        "fractal_dimension", "average_weighted_distance", "facade_ratio",
-    ]
-    stats = generate_summary_stats(buildings, metric_cols)
-    stats.to_csv(output_base / "morphology_summary_stats.csv")
-
-    # 10. Visualizations
+    # 8. Summary statistics & visualizations
     maps_dir = output_base / "maps"
     maps_dir.mkdir(exist_ok=True)
-    for metric in metric_cols:
-        if metric in buildings.columns:
-            create_metric_map(
-                buildings,
-                metric,
-                maps_dir / f"{metric}_map.png",
-                cmap="viridis",
-                title=metric.replace("_", " ").title()
-            )
 
-    create_metric_distributions(
-        buildings,
-        metric_cols,
-        output_base / "morphology_distributions.png"
-    )
+    if args.basic_only:
+        # Basic metrics: summary panel visualizations
+        metric_cols = ["height", "area", "volume", "perimeter", "hw_ratio", "inter_building_distance"]
+        stats = generate_summary_stats(buildings, metric_cols)
+        stats.to_csv(output_base / "summary_stats.csv")
 
-    logger.info("✓ Morphology analysis complete")
+        create_thematic_maps(buildings, maps_dir / "height_volume_maps.png")
+        create_multi_panel_summary(buildings, maps_dir / "multi_panel_summary.png")
+        create_statistical_distributions(buildings, maps_dir / "statistical_distributions.png")
+        create_scatter_plots(buildings, maps_dir / "scatter_plots.png")
+    else:
+        # Extended morphology: per-metric maps
+        metric_cols = [
+            "area", "perimeter", "longest_axis_length",
+            "shape_index", "compactness_weighted_axis", "convexity",
+            "shared_walls", "perimeter_wall", "num_corners",
+            "equivalent_rectangular_index", "rectangularity", "squareness",
+            "square_compactness", "elongation", "cwt",
+            "mean_distance_between_buildings", "inter_building_distance",
+            "building_adjacency", "covered_area_ratio",
+            "tessellation_area", "cell_alignment", "tessellation_neighbors",
+            "fractal_dimension", "average_weighted_distance", "facade_ratio",
+        ]
+        stats = generate_summary_stats(buildings, metric_cols)
+        stats.to_csv(output_base / "morphology_summary_stats.csv")
+
+        for metric in metric_cols:
+            if metric in buildings.columns:
+                create_metric_map(
+                    buildings,
+                    metric,
+                    maps_dir / f"{metric}_map.png",
+                    cmap="viridis",
+                    title=metric.replace("_", " ").title(),
+                )
+
+        create_metric_distributions(
+            buildings,
+            metric_cols,
+            output_base / "morphology_distributions.png",
+        )
+
+    logger.info("✓ Analysis complete")
 
 
 if __name__ == "__main__":

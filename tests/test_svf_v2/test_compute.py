@@ -127,15 +127,11 @@ class TestCheckpointResume:
     def test_checkpoint_resume(self, empty_scene, sky_directions_small, tmp_path):
         """Run with checkpointing, simulate interruption, resume and verify result."""
         n_points = 20
-        obs = np.array(
-            [[float(i), 5.0, 1.5] for i in np.linspace(1, 9, n_points)]
-        )
+        obs = np.array([[float(i), 5.0, 1.5] for i in np.linspace(1, 9, n_points)])
         checkpoint_path = tmp_path / ".svf_checkpoint.npz"
 
         # Step 1: Full uninterrupted run (reference result)
-        svf_reference = compute_svf_raycasting(
-            obs, empty_scene, sky_directions_small
-        )
+        svf_reference = compute_svf_raycasting(obs, empty_scene, sky_directions_small)
 
         # Step 2: Run with checkpoint_interval=5 to produce a checkpoint file.
         # We do a full run first so the checkpoint is written at indices 4, 9, 14.
@@ -155,7 +151,9 @@ class TestCheckpointResume:
         )
 
         # Checkpoint file should be cleaned up after successful completion
-        assert not checkpoint_path.exists(), "Checkpoint should be removed after completion"
+        assert not checkpoint_path.exists(), (
+            "Checkpoint should be removed after completion"
+        )
 
         # Resumed result should match the full reference run
         np.testing.assert_array_equal(
@@ -169,9 +167,7 @@ class TestCheckpointResume:
     ):
         """Verify checkpoint file is written at the expected interval."""
         n_points = 12
-        obs = np.array(
-            [[float(i), 5.0, 1.5] for i in np.linspace(1, 9, n_points)]
-        )
+        obs = np.array([[float(i), 5.0, 1.5] for i in np.linspace(1, 9, n_points)])
         checkpoint_path = tmp_path / ".svf_checkpoint.npz"
 
         # Run with checkpoint_interval=5; file is written at index 4, 9
@@ -195,9 +191,7 @@ class TestCheckpointResume:
     ):
         """If checkpoint has wrong array length, start from scratch."""
         n_points = 10
-        obs = np.array(
-            [[float(i), 5.0, 1.5] for i in np.linspace(1, 9, n_points)]
-        )
+        obs = np.array([[float(i), 5.0, 1.5] for i in np.linspace(1, 9, n_points)])
         checkpoint_path = tmp_path / ".svf_checkpoint.npz"
 
         # Create a checkpoint with wrong size
@@ -215,9 +209,7 @@ class TestCheckpointResume:
         assert len(svf) == n_points
         assert not checkpoint_path.exists()
 
-    def test_no_checkpoint_backward_compatible(
-        self, empty_scene, sky_directions_small
-    ):
+    def test_no_checkpoint_backward_compatible(self, empty_scene, sky_directions_small):
         """Calling without checkpoint params still works (backward compat)."""
         obs = np.array([[5.0, 5.0, 1.5]])
         svf = compute_svf_raycasting(obs, empty_scene, sky_directions_small)
@@ -279,7 +271,9 @@ class TestOBBTreeOptimization:
 class TestParallelSVF:
     """Tests for parallel (n_jobs > 1) SVF computation."""
 
-    def test_n_jobs_1_matches_default(self, single_building_scene, sky_directions_small):
+    def test_n_jobs_1_matches_default(
+        self, single_building_scene, sky_directions_small
+    ):
         """n_jobs=1 should produce the same result as the default path."""
         obs = np.array(
             [
@@ -331,9 +325,7 @@ class TestParallelSVF:
             err_msg="Parallel SVF should match sequential SVF",
         )
 
-    def test_parallel_with_normals(
-        self, single_building_scene, sky_directions_small
-    ):
+    def test_parallel_with_normals(self, single_building_scene, sky_directions_small):
         """Parallel path should handle normals correctly."""
         obs = np.array(
             [
@@ -381,9 +373,7 @@ class TestParallelSVF:
                 [8.0, 8.0, 1.5],
             ]
         )
-        svf = compute_svf_raycasting(
-            obs, empty_scene, sky_directions_small, n_jobs=-1
-        )
+        svf = compute_svf_raycasting(obs, empty_scene, sky_directions_small, n_jobs=-1)
         assert len(svf) == 3
         assert np.all((svf >= 0) & (svf <= 1))
 

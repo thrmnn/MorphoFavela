@@ -33,6 +33,17 @@ CFD_CAMPAIGN_AREAS = [
     "maré",
 ]
 
+# Areas for comparative analysis (excludes subsets like vidigal_tls)
+COMPARATIVE_AREAS = [
+    "vidigal",
+    "copacabana",
+    "riodaspedras",
+    "rocinha",
+    "maré",
+    "cidade_de_deus",
+    "complexo_do_alemao",
+]
+
 # Area classification: formal vs informal
 FORMAL_AREAS = ["copacabana"]  # Formal settlements (no filtering)
 INFORMAL_AREAS = [
