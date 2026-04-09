@@ -361,6 +361,56 @@ def compute_street_orientation_entropy(
 
 
 # ---------------------------------------------------------------------------
+# 6b. Per-zone street orientation entropy
+# ---------------------------------------------------------------------------
+
+
+def _compute_zone_entropy(
+    streets: gpd.GeoDataFrame,
+    zones: gpd.GeoDataFrame,
+    n_bins: int = 36,
+) -> gpd.GeoDataFrame:
+    """Compute street orientation entropy per zone by clipping streets to each zone."""
+    zones = zones.copy()
+
+    if streets is None or streets.empty:
+        zones["street_orientation_entropy"] = np.nan
+        return zones
+
+    # Spatial index for efficiency
+    sindex = streets.sindex
+
+    entropy_values: dict[int, float] = {}
+    for _, zone_row in zones.iterrows():
+        zone_id = zone_row["zone_id"]
+        zone_geom = zone_row.geometry
+
+        # Find candidate streets via spatial index
+        candidates = list(sindex.intersection(zone_geom.bounds))
+        if not candidates:
+            entropy_values[zone_id] = np.nan
+            continue
+
+        # Clip streets to zone
+        zone_streets = streets.iloc[candidates].copy()
+        zone_streets = zone_streets[zone_streets.intersects(zone_geom)]
+        if zone_streets.empty:
+            entropy_values[zone_id] = np.nan
+            continue
+
+        clipped = zone_streets.clip(zone_geom)
+        clipped = clipped[~clipped.is_empty]
+        if clipped.empty:
+            entropy_values[zone_id] = np.nan
+            continue
+
+        entropy_values[zone_id] = compute_street_orientation_entropy(clipped, n_bins)
+
+    zones["street_orientation_entropy"] = zones["zone_id"].map(entropy_values)
+    return zones
+
+
+# ---------------------------------------------------------------------------
 # 7. Orchestrator
 # ---------------------------------------------------------------------------
 
@@ -397,8 +447,7 @@ def compute_zone_metrics(
     result = compute_frontal_area_ratio(buildings, result, wind_dir=wind_dir)
 
     if streets is not None:
-        entropy = compute_street_orientation_entropy(streets, n_bins=n_bins)
-        result["street_orientation_entropy"] = entropy
+        result = _compute_zone_entropy(streets, result, n_bins=n_bins)
     else:
         result["street_orientation_entropy"] = np.nan
 
