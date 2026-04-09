@@ -1,4 +1,4 @@
-"""Tests for src/visualize_morphology.py."""
+"""Tests for src/visualization/morphology.py."""
 
 import numpy as np
 import pandas as pd
@@ -6,7 +6,7 @@ import geopandas as gpd
 import pytest
 from shapely.geometry import box
 
-from src.visualize_morphology import (
+from src.visualization.morphology import (
     plot_cluster_profiles,
     plot_elbow_silhouette,
     plot_lisa_clusters,

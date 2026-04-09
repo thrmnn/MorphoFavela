@@ -4,6 +4,10 @@
 
 Before running GPU-accelerated SVF computation, you need to install PyTorch and PyTorch3D.
 
+- NVIDIA GPU with CUDA support
+- PyTorch with CUDA
+- PyTorch3D
+
 ## Step 1: Install PyTorch with CUDA
 
 ### Check CUDA Version
@@ -52,13 +56,6 @@ pip install pytorch3d
 python -c "import pytorch3d; print(f'PyTorch3D: {pytorch3d.__version__}')"
 ```
 
-## Step 3: Test GPU Setup
-
-Run the GPU availability check:
-```bash
-python -c "from src.svf_gpu_utils import check_gpu_availability; print(check_gpu_availability())"
-```
-
 ## Troubleshooting
 
 ### CUDA Out of Memory
@@ -76,17 +73,8 @@ python -c "from src.svf_gpu_utils import check_gpu_availability; print(check_gpu
 - Use `--force-cpu` to explicitly use CPU
 - CPU version works without PyTorch/PyTorch3D
 
-## Usage
+## Expected Performance
 
-Once installed, run GPU-accelerated SVF computation:
-
-```bash
-python scripts/compute_svf_streets_gpu.py \
-    --stl data/riodaspedras/raw/full_scan.stl \
-    --roads data/riodaspedras/raw/roads_riodaspedras.shp \
-    --footprints data/riodaspedras/raw/riodaspedras_buildings.shp \
-    --area riodaspedras \
-    --use-gpu \
-    --spacing 3.0 \
-    --sky-patches 145
-```
+- **Current (CPU)**: ~7 seconds per point
+- **Target (GPU)**: ~0.1-0.5 seconds per point
+- **Speedup**: 10-70x depending on GPU

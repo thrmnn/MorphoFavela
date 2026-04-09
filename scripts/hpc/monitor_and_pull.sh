@@ -152,7 +152,7 @@ print(f'  SVF viz complete for {area}')
     if [[ -f "outputs/${area}/urban_morphology/zone_metrics.gpkg" ]]; then
         python -c "
 import geopandas as gpd
-from src.visualize_morphology import (
+from src.visualization.morphology import (
     plot_zone_metrics_panel,
     plot_lisa_clusters_panel,
 )

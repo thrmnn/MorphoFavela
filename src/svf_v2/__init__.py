@@ -25,6 +25,15 @@ from src.svf_v2.io import (
     save_facade_results,
     save_scene_stl,
 )
+from src.svf_v2.utils import (
+    load_mesh,
+    extract_terrain_surface,
+    filter_buildings,
+    filter_isolated_buildings,
+    load_building_footprints,
+    compute_ground_mask,
+    generate_ground_points,
+)
 
 __all__ = [
     # Computation
@@ -53,4 +62,12 @@ __all__ = [
     "save_street_results",
     "save_facade_results",
     "save_scene_stl",
+    # Utilities (migrated from svf_utils)
+    "load_mesh",
+    "extract_terrain_surface",
+    "filter_buildings",
+    "filter_isolated_buildings",
+    "load_building_footprints",
+    "compute_ground_mask",
+    "generate_ground_points",
 ]

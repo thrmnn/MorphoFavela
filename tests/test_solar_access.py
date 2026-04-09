@@ -1,4 +1,4 @@
-"""Tests for src.solar_access module."""
+"""Tests for solar computation (src.solar package)."""
 
 import math
 
@@ -6,13 +6,12 @@ import numpy as np
 import pandas as pd
 import pyvista as pv
 
-from src.solar_access import (
-    compute_sun_positions,
-    sun_position_to_direction,
-    _batch_solar_access,
+from src.solar.sun import compute_sun_positions, sun_position_to_direction
+from src.solar.compute import (
     _build_obb_tree,
     _ray_hits,
     compute_solar_access_streets,
+    compute_sunlit_matrix,
 )
 
 
@@ -252,15 +251,20 @@ class TestSunPositionToDirection:
 # ===================================================================
 
 
-class TestBatchSolarAccess:
+class TestSunlitMatrix:
     """Test ray-casting solar access with controlled geometry."""
+
+    @staticmethod
+    def _sunlit_counts(observer, sun_dirs, scene):
+        """Helper: compute unobstructed sun-position counts per observer."""
+        sunlit = compute_sunlit_matrix(observer, sun_dirs, scene, n_jobs=1)
+        return sunlit.sum(axis=1).astype(np.int32)
 
     def test_open_sky_full_access(self):
         """A point on flat terrain with no obstructions gets full sun."""
         scene = _open_sky_scene()
-        observer = np.array([[0.0, 0.0, 1.5]])  # 1.5m above ground
+        observer = np.array([[0.0, 0.0, 1.5]])
 
-        # Synthetic sun positions: a few directions well above horizon
         sun_dirs = np.array(
             [
                 sun_position_to_direction(45.0, 0.0),
@@ -271,8 +275,7 @@ class TestBatchSolarAccess:
             ]
         )
 
-        counts = _batch_solar_access(observer, sun_dirs, scene)
-        # All 5 directions should be unobstructed
+        counts = self._sunlit_counts(observer, sun_dirs, scene)
         assert counts[0] == 5
 
     def test_enclosed_zero_access(self):
@@ -280,7 +283,6 @@ class TestBatchSolarAccess:
         scene = _enclosed_scene()
         observer = np.array([[0.0, 0.0, 1.5]])
 
-        # Sun at various low to medium altitudes hitting walls
         sun_dirs = np.array(
             [
                 sun_position_to_direction(20.0, 0.0),
@@ -294,13 +296,12 @@ class TestBatchSolarAccess:
             ]
         )
 
-        counts = _batch_solar_access(observer, sun_dirs, scene)
+        counts = self._sunlit_counts(observer, sun_dirs, scene)
         assert counts[0] == 0, f"Expected 0 unobstructed, got {counts[0]}"
 
     def test_partial_obstruction(self):
         """A single wall obstructs some directions but not others."""
         terrain = _flat_terrain(size=50.0, n=11)
-        # Wall to the north only
         wall = _box_mesh(-5, 5, 3, 5, 0, 20)
         scene = terrain.merge(wall)
 
@@ -313,8 +314,8 @@ class TestBatchSolarAccess:
             ]
         )
 
-        counts = _batch_solar_access(observer, sun_dirs, scene)
-        assert counts[0] == 1  # only south direction unobstructed
+        counts = self._sunlit_counts(observer, sun_dirs, scene)
+        assert counts[0] == 1
 
     def test_multiple_points(self):
         """Multiple observer points in open sky should all get full access."""
@@ -334,7 +335,7 @@ class TestBatchSolarAccess:
             ]
         )
 
-        counts = _batch_solar_access(observers, sun_dirs, scene)
+        counts = self._sunlit_counts(observers, sun_dirs, scene)
         np.testing.assert_array_equal(counts, [2, 2, 2])
 
     def test_no_sun_positions_zero_counts(self):
@@ -343,7 +344,7 @@ class TestBatchSolarAccess:
         observer = np.array([[0.0, 0.0, 1.5]])
         sun_dirs = np.empty((0, 3))
 
-        counts = _batch_solar_access(observer, sun_dirs, scene)
+        counts = self._sunlit_counts(observer, sun_dirs, scene)
         assert counts[0] == 0
 
 

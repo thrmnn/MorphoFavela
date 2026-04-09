@@ -202,7 +202,7 @@ def build_building_meshes(
     Returns:
         (combined_mesh, filtered_gdf) -- mesh may be None if no valid buildings.
     """
-    from src.svf_utils import filter_buildings
+    from src.svf_v2.utils import filter_buildings
 
     gdf = gpd.read_file(footprints_path)
     logger.info(f"Loaded {len(gdf)} building footprints (CRS {gdf.crs})")

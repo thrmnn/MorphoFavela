@@ -31,7 +31,7 @@ import logging
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.svf_utils import load_mesh, extract_terrain_surface, load_building_footprints
+from src.svf_v2.utils import load_mesh, extract_terrain_surface, load_building_footprints
 from src.metrics import normalize_height_columns
 from src.config import MIN_BUILDING_AREA, MAX_FILTER_AREA, is_formal_area
 from scripts.compute_svf_streets import sample_points_along_line, extract_elevation_from_mesh

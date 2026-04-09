@@ -26,7 +26,7 @@ from src.typology import (
     find_optimal_k,
     normalize_features,
 )
-from src.visualize_morphology import (
+from src.visualization import (
     plot_cluster_profiles,
     plot_elbow_silhouette,
     plot_typology_map,

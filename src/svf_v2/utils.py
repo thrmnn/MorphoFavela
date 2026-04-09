@@ -1,8 +1,7 @@
 """
 Shared utilities for SVF and solar access computation.
 
-This module contains common functions used by both SVF and solar access scripts,
-including mesh loading, terrain extraction, building footprint handling, and
+Mesh loading, terrain extraction, building footprint handling, and
 ground point generation.
 """
 

@@ -35,7 +35,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import shared utilities
-from src.svf_utils import (
+from src.svf_v2.utils import (
     load_mesh,
     load_building_footprints,
     compute_ground_mask,
