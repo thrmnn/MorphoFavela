@@ -20,11 +20,19 @@ import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 import numpy as np
 import rasterio
-from matplotlib.colors import TwoSlopeNorm
+from matplotlib.colors import Normalize, TwoSlopeNorm
+
+from src.cartography import (
+    add_north_arrow,
+    add_scale_bar,
+    add_terrain_contours,
+    apply_publication_style,
+    format_utm_axes,
+)
 
 logger = logging.getLogger(__name__)
 
-# ── Swiss design palette ─────────────────────────────────────────────────
+# -- Swiss design palette --
 SWISS = {
     "primary": "#1A1A1A",
     "secondary": "#5C5C5C",
@@ -38,79 +46,6 @@ SWISS = {
 }
 
 DPI = 300
-FONT_FAMILY = "sans-serif"
-
-
-def _setup_style():
-    """Apply consistent matplotlib style."""
-    mpl.rcParams.update(
-        {
-            "font.family": FONT_FAMILY,
-            "font.size": 9,
-            "axes.labelsize": 10,
-            "axes.titlesize": 11,
-            "xtick.labelsize": 8,
-            "ytick.labelsize": 8,
-            "figure.facecolor": "white",
-            "axes.facecolor": "white",
-            "savefig.facecolor": "white",
-            "savefig.dpi": DPI,
-        }
-    )
-
-
-def _add_scalebar(ax, length_m=100, loc="lower right"):
-    """Add a simple scale bar to a map axes."""
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
-    x_range = xlim[1] - xlim[0]
-    y_range = ylim[1] - ylim[0]
-
-    if loc == "lower right":
-        x0 = xlim[1] - 0.05 * x_range - length_m
-        y0 = ylim[0] + 0.04 * y_range
-    else:
-        x0 = xlim[0] + 0.05 * x_range
-        y0 = ylim[0] + 0.04 * y_range
-
-    ax.plot([x0, x0 + length_m], [y0, y0], "k-", linewidth=2, solid_capstyle="butt")
-    ax.text(
-        x0 + length_m / 2,
-        y0 + 0.015 * y_range,
-        f"{length_m} m",
-        ha="center",
-        va="bottom",
-        fontsize=7,
-        color=SWISS["primary"],
-    )
-
-
-def _add_north_arrow(ax, loc="upper right"):
-    """Add a simple north arrow."""
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
-    x_range = xlim[1] - xlim[0]
-    y_range = ylim[1] - ylim[0]
-
-    if loc == "upper right":
-        x = xlim[1] - 0.06 * x_range
-        y = ylim[1] - 0.06 * y_range
-    else:
-        x = xlim[0] + 0.06 * x_range
-        y = ylim[1] - 0.06 * y_range
-
-    arrow_len = 0.05 * y_range
-    ax.annotate(
-        "N",
-        xy=(x, y),
-        xytext=(x, y - arrow_len),
-        arrowprops=dict(arrowstyle="->", color=SWISS["primary"], lw=1.5),
-        ha="center",
-        va="bottom",
-        fontsize=8,
-        fontweight="bold",
-        color=SWISS["primary"],
-    )
 
 
 def _hillshade(dem, azimuth=315, altitude=45):
@@ -126,18 +61,8 @@ def _hillshade(dem, azimuth=315, altitude=45):
     return np.clip(shade, 0, 1)
 
 
-def figure_site_overview(
-    buildings: gpd.GeoDataFrame,
-    dtm_path: Path,
-    output_path: Path,
-    boundary: Optional[gpd.GeoDataFrame] = None,
-    area_name: str = "Study Area",
-):
-    """Figure 1: Site overview — buildings on hillshade DTM."""
-    _setup_style()
-    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
-
-    # Hillshade background
+def _add_hillshade_background(ax, dtm_path: Path):
+    """Render hillshade DTM as a background image on *ax* and return extent."""
     with rasterio.open(dtm_path) as src:
         dem = src.read(1).astype(np.float64)
         nodata = src.nodata
@@ -146,17 +71,37 @@ def figure_site_overview(
         extent = [src.bounds.left, src.bounds.right, src.bounds.bottom, src.bounds.top]
         hs = _hillshade(dem)
         ax.imshow(hs, extent=extent, cmap="Greys_r", alpha=0.6, origin="upper")
+    return extent
 
-        # Elevation contours
-        rows, cols = dem.shape
-        x = np.linspace(src.bounds.left, src.bounds.right, cols)
-        y = np.linspace(src.bounds.top, src.bounds.bottom, rows)
-        X, Y = np.meshgrid(x, y)
-        dem_masked = np.ma.masked_invalid(dem)
-        contours = ax.contour(
-            X, Y, dem_masked, levels=15, colors="#8B7355", linewidths=0.4, alpha=0.5
-        )
-        ax.clabel(contours, inline=True, fontsize=6, fmt="%.0f")
+
+def _set_bounds_from_gdf(ax, gdf: gpd.GeoDataFrame, margin: float = 20):
+    """Set axes limits to the total bounds of *gdf* with a margin."""
+    bounds = gdf.total_bounds
+    ax.set_xlim(bounds[0] - margin, bounds[2] + margin)
+    ax.set_ylim(bounds[1] - margin, bounds[3] + margin)
+
+
+# =========================================================================
+# Figure 1 -- Site Overview
+# =========================================================================
+
+
+def figure_site_overview(
+    buildings: gpd.GeoDataFrame,
+    dtm_path: Path,
+    output_path: Path,
+    boundary: Optional[gpd.GeoDataFrame] = None,
+    area_name: str = "Study Area",
+):
+    """Figure 1: Site overview -- buildings on hillshade DTM."""
+    apply_publication_style()
+    fig, ax = plt.subplots(1, 1, figsize=(12, 9))
+
+    # Hillshade background
+    _add_hillshade_background(ax, dtm_path)
+
+    # Terrain contours via cartography module
+    add_terrain_contours(ax, dtm_path)
 
     # Building footprints
     buildings.plot(
@@ -180,12 +125,10 @@ def figure_site_overview(
         color=SWISS["primary"],
         pad=12,
     )
-    ax.set_xlabel("Easting (m)")
-    ax.set_ylabel("Northing (m)")
-    ax.tick_params(labelsize=7)
 
-    _add_scalebar(ax)
-    _add_north_arrow(ax)
+    format_utm_axes(ax)
+    add_scale_bar(ax)
+    add_north_arrow(ax)
 
     # Building count annotation
     ax.text(
@@ -209,6 +152,11 @@ def figure_site_overview(
     logger.info("Figure 1 saved: %s", output_path)
 
 
+# =========================================================================
+# Figure 2 -- SVF Map
+# =========================================================================
+
+
 def figure_svf_map(
     grid: gpd.GeoDataFrame,
     buildings: gpd.GeoDataFrame,
@@ -217,8 +165,8 @@ def figure_svf_map(
     svf_col: str = "svf",
 ):
     """Figure 2: SVF map on 10m grid with diverging colormap at SVF=0.15."""
-    _setup_style()
-    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+    apply_publication_style()
+    fig, ax = plt.subplots(1, 1, figsize=(12, 9))
 
     # Filter cells with SVF data
     valid = grid[grid[svf_col].notna()].copy()
@@ -277,15 +225,20 @@ def figure_svf_map(
         color=SWISS["primary"],
         pad=12,
     )
-    ax.set_xlabel("Easting (m)")
-    ax.set_ylabel("Northing (m)")
-    _add_scalebar(ax)
-    _add_north_arrow(ax)
+
+    format_utm_axes(ax)
+    add_scale_bar(ax)
+    add_north_arrow(ax)
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=DPI, bbox_inches="tight")
     plt.close(fig)
     logger.info("Figure 2 saved: %s", output_path)
+
+
+# =========================================================================
+# Figure 3 -- Morphometric Panel (2x3)
+# =========================================================================
 
 
 def figure_morphometric_panel(
@@ -295,7 +248,7 @@ def figure_morphometric_panel(
     area_name: str = "Study Area",
 ):
     """Figure 3: 2x3 panel of morphometric indicators."""
-    _setup_style()
+    apply_publication_style()
 
     panels = [
         ("lambda_p", r"$\lambda_p$ (Plan Area Density)", "YlOrRd"),
@@ -306,7 +259,7 @@ def figure_morphometric_panel(
         ("slope_deg", "Terrain Slope (degrees)", "terrain"),
     ]
 
-    fig, axes = plt.subplots(2, 3, figsize=(16, 11))
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
     axes = axes.flatten()
 
     for idx, (col, label, cmap) in enumerate(panels):
@@ -357,15 +310,12 @@ def figure_morphometric_panel(
             )
 
         ax.set_title(label, fontsize=10, fontweight="bold", color=SWISS["primary"])
-        ax.set_xlabel("")
-        ax.set_ylabel("")
-        ax.tick_params(labelsize=6)
 
         # Synchronize spatial extent
-        bounds = buildings.total_bounds
-        margin = 20
-        ax.set_xlim(bounds[0] - margin, bounds[2] + margin)
-        ax.set_ylim(bounds[1] - margin, bounds[3] + margin)
+        _set_bounds_from_gdf(ax, buildings)
+
+        # UTM formatting (hide labels on panel subplots to reduce clutter)
+        format_utm_axes(ax, show_labels=False)
 
     fig.suptitle(
         f"{area_name} — Morphometric Indicators (10m grid)",
@@ -380,13 +330,18 @@ def figure_morphometric_panel(
     logger.info("Figure 3 saved: %s", output_path)
 
 
+# =========================================================================
+# Figure 4 -- SVF vs Slope Scatter
+# =========================================================================
+
+
 def figure_svf_slope_scatter(
     grid: gpd.GeoDataFrame,
     output_path: Path,
     area_name: str = "Study Area",
 ):
     """Figure 4: SVF vs slope scatter with marginal histograms, colored by lambda_p."""
-    _setup_style()
+    apply_publication_style()
 
     cols = ["svf", "slope_deg", "lambda_p"]
     valid = grid.dropna(subset=cols).copy()
@@ -394,7 +349,7 @@ def figure_svf_slope_scatter(
         logger.warning("Too few valid cells for SVF-slope scatter; skipping.")
         return
 
-    fig = plt.figure(figsize=(10, 8))
+    fig = plt.figure(figsize=(12, 9))
 
     # Main axes + marginals
     gs = fig.add_gridspec(
@@ -482,13 +437,18 @@ def figure_svf_slope_scatter(
     logger.info("Figure 4 saved: %s", output_path)
 
 
+# =========================================================================
+# Figure 5 -- Correlation Matrix
+# =========================================================================
+
+
 def figure_correlation_matrix(
     grid: gpd.GeoDataFrame,
     output_path: Path,
     area_name: str = "Study Area",
 ):
     """Figure 5: Pairwise Pearson correlation heatmap."""
-    _setup_style()
+    apply_publication_style()
 
     indicator_cols = [
         "svf",
@@ -521,7 +481,7 @@ def figure_correlation_matrix(
     data = grid[available].dropna()
     corr = data.corr()
 
-    fig, ax = plt.subplots(figsize=(9, 7.5))
+    fig, ax = plt.subplots(figsize=(12, 9))
 
     im = ax.imshow(corr.values, cmap="RdBu_r", vmin=-1, vmax=1, aspect="auto")
 
@@ -556,7 +516,7 @@ def figure_correlation_matrix(
         for j in range(i + 1, len(available)):
             if abs(corr.values[i, j]) > 0.7:
                 high_corr_pairs.append(
-                    f"{avail_labels[i]}–{avail_labels[j]}: r={corr.values[i, j]:.2f}"
+                    f"{avail_labels[i]}--{avail_labels[j]}: r={corr.values[i, j]:.2f}"
                 )
 
     if high_corr_pairs:
@@ -585,13 +545,18 @@ def figure_correlation_matrix(
     logger.info("Figure 5 saved: %s", output_path)
 
 
+# =========================================================================
+# Figure 6 -- Distributions (Violin Plots)
+# =========================================================================
+
+
 def figure_distributions(
     grid: gpd.GeoDataFrame,
     output_path: Path,
     area_name: str = "Study Area",
 ):
     """Figure 6: Violin plots of morphometric distributions with LCZ3 reference bands."""
-    _setup_style()
+    apply_publication_style()
 
     # Indicators and their LCZ3 compact low-rise reference ranges
     indicators = {
@@ -618,7 +583,7 @@ def figure_distributions(
         return
 
     n = len(available)
-    fig, axes = plt.subplots(1, n, figsize=(2.2 * n, 5))
+    fig, axes = plt.subplots(1, n, figsize=(16, 7))
     if n == 1:
         axes = [axes]
 
@@ -689,3 +654,275 @@ def figure_distributions(
     fig.savefig(output_path, dpi=DPI, bbox_inches="tight")
     plt.close(fig)
     logger.info("Figure 6 saved: %s", output_path)
+
+
+# =========================================================================
+# Figure 7 -- Street-Level SVF Map  (NEW)
+# =========================================================================
+
+
+def figure_street_svf_map(
+    streets_svf: gpd.GeoDataFrame,
+    buildings: gpd.GeoDataFrame,
+    dtm_path: Path,
+    output_path: Path,
+    boundary: Optional[gpd.GeoDataFrame] = None,
+    area_name: str = "Study Area",
+):
+    """Figure 7: Street-level SVF -- segments colored by svf_mean on hillshade DTM.
+
+    Parameters
+    ----------
+    streets_svf : GeoDataFrame
+        Street segments with columns ``svf_mean``, ``n_points``, ``geometry``.
+    buildings : GeoDataFrame
+        Building footprints.
+    dtm_path : Path
+        Path to GeoTIFF DTM raster.
+    output_path : Path
+        Destination for the saved figure.
+    boundary : GeoDataFrame, optional
+        Settlement boundary polygon.
+    area_name : str
+        Name shown in the title.
+    """
+    apply_publication_style()
+    fig, ax = plt.subplots(1, 1, figsize=(12, 9))
+
+    # Hillshade background + contours
+    _add_hillshade_background(ax, dtm_path)
+    add_terrain_contours(ax, dtm_path)
+
+    # Building footprints (light gray background)
+    buildings.plot(
+        ax=ax,
+        facecolor=SWISS["building_face"],
+        edgecolor=SWISS["building_edge"],
+        linewidth=0.2,
+        alpha=0.5,
+    )
+
+    # Boundary
+    if boundary is not None:
+        boundary.boundary.plot(
+            ax=ax, color=SWISS["primary"], linewidth=1.2, linestyle="--", alpha=0.6
+        )
+
+    # -- Street segments colored by svf_mean --
+    valid = streets_svf[streets_svf["svf_mean"].notna()].copy()
+    if valid.empty:
+        logger.warning("No street SVF data for map; skipping.")
+        plt.close(fig)
+        return
+
+    # Linewidth proportional to n_points (higher n_points = thicker = more confident)
+    if "n_points" in valid.columns:
+        np_vals = valid["n_points"].values.astype(float)
+        np_min, np_max = np_vals.min(), np_vals.max()
+        if np_max > np_min:
+            lw = 0.8 + 2.2 * (np_vals - np_min) / (np_max - np_min)
+        else:
+            lw = np.full_like(np_vals, 1.5)
+    else:
+        lw = np.full(len(valid), 1.5)
+
+    vmin = valid["svf_mean"].quantile(0.01)
+    vmax = valid["svf_mean"].quantile(0.99)
+    norm = Normalize(vmin=vmin, vmax=vmax)
+    cmap = plt.get_cmap("cividis")
+
+    # Plot each segment individually so linewidth can vary
+    for i, (_, row) in enumerate(valid.iterrows()):
+        color = cmap(norm(row["svf_mean"]))
+        gpd.GeoDataFrame([row], geometry="geometry", crs=valid.crs).plot(
+            ax=ax, color=color, linewidth=lw[i], zorder=3
+        )
+
+    # Colorbar
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cb = fig.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
+    cb.set_label("Street-Level SVF (mean)", fontsize=10)
+
+    # Annotate darkest streets (lowest SVF)
+    n_annotate = min(3, len(valid))
+    darkest = valid.nsmallest(n_annotate, "svf_mean")
+    for _, row in darkest.iterrows():
+        centroid = row.geometry.centroid
+        ax.annotate(
+            f"SVF={row['svf_mean']:.2f}",
+            xy=(centroid.x, centroid.y),
+            fontsize=6.5,
+            color="#b91c1c",
+            fontweight="bold",
+            ha="center",
+            path_effects=[pe.withStroke(linewidth=2, foreground="white")],
+            zorder=5,
+        )
+
+    ax.set_title(
+        f"{area_name} — Street-Level Sky View Factor",
+        fontsize=14,
+        fontweight="bold",
+        color=SWISS["primary"],
+        pad=12,
+    )
+
+    format_utm_axes(ax)
+    add_scale_bar(ax)
+    add_north_arrow(ax)
+
+    # Summary annotation
+    ax.text(
+        0.02,
+        0.02,
+        f"{len(valid):,} segments | "
+        f"mean SVF = {valid['svf_mean'].mean():.3f} | "
+        f"min = {valid['svf_mean'].min():.3f}",
+        transform=ax.transAxes,
+        fontsize=7,
+        color=SWISS["secondary"],
+        bbox=dict(
+            boxstyle="round,pad=0.3",
+            facecolor="white",
+            alpha=0.85,
+            edgecolor=SWISS["grid"],
+        ),
+    )
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=DPI, bbox_inches="tight")
+    plt.close(fig)
+    logger.info("Figure 7 saved: %s", output_path)
+
+
+# =========================================================================
+# Figure 8 -- Building Heights  (NEW)
+# =========================================================================
+
+
+def figure_building_heights(
+    buildings: gpd.GeoDataFrame,
+    dtm_path: Path,
+    output_path: Path,
+    boundary: Optional[gpd.GeoDataFrame] = None,
+    area_name: str = "Study Area",
+):
+    """Figure 8: Building footprints colored by height on hillshade DTM.
+
+    Parameters
+    ----------
+    buildings : GeoDataFrame
+        Building footprints with ``altura`` (or ``height``) column.
+    dtm_path : Path
+        Path to GeoTIFF DTM raster.
+    output_path : Path
+        Destination for the saved figure.
+    boundary : GeoDataFrame, optional
+        Settlement boundary polygon.
+    area_name : str
+        Name shown in the title.
+    """
+    apply_publication_style()
+    fig, ax = plt.subplots(1, 1, figsize=(12, 9))
+
+    # Hillshade background + contours
+    _add_hillshade_background(ax, dtm_path)
+    add_terrain_contours(ax, dtm_path)
+
+    # Boundary
+    if boundary is not None:
+        boundary.boundary.plot(
+            ax=ax, color=SWISS["primary"], linewidth=1.2, linestyle="--", alpha=0.6
+        )
+
+    # Determine height column
+    if "altura" in buildings.columns:
+        height_col = "altura"
+    elif "height" in buildings.columns:
+        height_col = "height"
+    else:
+        logger.warning(
+            "No height column (altura/height) in buildings; falling back to flat fill."
+        )
+        buildings.plot(
+            ax=ax,
+            facecolor=SWISS["building_face"],
+            edgecolor=SWISS["building_edge"],
+            linewidth=0.3,
+            alpha=0.85,
+        )
+        ax.set_title(
+            f"{area_name} — Building Heights (no data)",
+            fontsize=14,
+            fontweight="bold",
+            color=SWISS["primary"],
+            pad=12,
+        )
+        format_utm_axes(ax)
+        add_scale_bar(ax)
+        add_north_arrow(ax)
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=DPI, bbox_inches="tight")
+        plt.close(fig)
+        logger.info("Figure 8 saved (no height data): %s", output_path)
+        return
+
+    valid_heights = buildings[height_col].replace([np.inf, -np.inf], np.nan).dropna()
+    vmin = valid_heights.min() if len(valid_heights) > 0 else 0
+    vmax = valid_heights.max() if len(valid_heights) > 0 else 1
+
+    buildings.plot(
+        ax=ax,
+        column=height_col,
+        cmap="YlOrRd",
+        vmin=vmin,
+        vmax=vmax,
+        alpha=0.85,
+        edgecolor="#555555",
+        linewidth=0.3,
+        legend=True,
+        legend_kwds={
+            "label": "Building Height (m)",
+            "shrink": 0.6,
+            "pad": 0.02,
+        },
+        zorder=2,
+    )
+
+    ax.set_title(
+        f"{area_name} — Building Heights",
+        fontsize=14,
+        fontweight="bold",
+        color=SWISS["primary"],
+        pad=12,
+    )
+
+    format_utm_axes(ax)
+    add_scale_bar(ax)
+    add_north_arrow(ax)
+
+    # Summary annotation
+    mean_h = valid_heights.mean()
+    max_h = valid_heights.max()
+    ax.text(
+        0.02,
+        0.02,
+        f"{len(buildings):,} buildings | "
+        f"mean height = {mean_h:.1f} m | "
+        f"max = {max_h:.1f} m",
+        transform=ax.transAxes,
+        fontsize=7,
+        color=SWISS["secondary"],
+        bbox=dict(
+            boxstyle="round,pad=0.3",
+            facecolor="white",
+            alpha=0.85,
+            edgecolor=SWISS["grid"],
+        ),
+    )
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=DPI, bbox_inches="tight")
+    plt.close(fig)
+    logger.info("Figure 8 saved: %s", output_path)

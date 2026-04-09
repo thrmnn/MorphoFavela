@@ -85,7 +85,14 @@ def load_data(area: str):
             scene_stl = stl_candidate
             break
 
-    return buildings, streets, boundary, dtm_path, svf_points, scene_stl
+    # Load street-level SVF segments (the primary SVF dataset)
+    streets_svf = None
+    svf_segments_path = svf_dir / "svf_streets_segments.gpkg"
+    if svf_segments_path.exists():
+        logger.info("Loading street SVF segments: %s", svf_segments_path)
+        streets_svf = gpd.read_file(svf_segments_path)
+
+    return buildings, streets, boundary, dtm_path, svf_points, scene_stl, streets_svf
 
 
 def run_audit(area: str, cell_size: float = 10.0, skip_figures: bool = False):
@@ -97,9 +104,13 @@ def run_audit(area: str, cell_size: float = 10.0, skip_figures: bool = False):
     logger.info("MORPHOMETRIC AUDIT: %s", area)
     logger.info("=" * 60)
 
-    buildings, streets, boundary, dtm_path, svf_points, scene_stl = load_data(area)
+    buildings, streets, boundary, dtm_path, svf_points, scene_stl, streets_svf = (
+        load_data(area)
+    )
     n_buildings = len(buildings)
     logger.info("Buildings: %d, Streets: %d segments", n_buildings, len(streets))
+    if streets_svf is not None:
+        logger.info("Street SVF segments: %d", len(streets_svf))
 
     # ── 2. SVF Audit ────────────────────────────────────────────────
     logger.info("Running SVF audit...")
@@ -173,6 +184,8 @@ def run_audit(area: str, cell_size: float = 10.0, skip_figures: bool = False):
         logger.info("Generating publication figures...")
         from src.morphometry.figures import (
             figure_site_overview,
+            figure_building_heights,
+            figure_street_svf_map,
             figure_svf_map,
             figure_morphometric_panel,
             figure_svf_slope_scatter,
@@ -182,51 +195,76 @@ def run_audit(area: str, cell_size: float = 10.0, skip_figures: bool = False):
 
         area_display = area.replace("_", " ").title()
 
-        try:
-            p = fig_dir / "fig01_site_overview.png"
-            figure_site_overview(
-                buildings, dtm_path, p, boundary=boundary, area_name=area_display
-            )
-            figure_paths["site_overview"] = p
-        except Exception as e:
-            logger.error("Figure 1 failed: %s", e)
+        fig_specs = [
+            (
+                "site_overview",
+                "fig01_site_overview.png",
+                lambda p: figure_site_overview(
+                    buildings, dtm_path, p, boundary=boundary, area_name=area_display
+                ),
+            ),
+            (
+                "building_heights",
+                "fig02_building_heights.png",
+                lambda p: figure_building_heights(
+                    buildings, dtm_path, p, boundary=boundary, area_name=area_display
+                ),
+            ),
+            (
+                "street_svf",
+                "fig03_street_svf.png",
+                lambda p: (
+                    figure_street_svf_map(
+                        streets_svf,
+                        buildings,
+                        dtm_path,
+                        p,
+                        boundary=boundary,
+                        area_name=area_display,
+                    )
+                    if streets_svf is not None
+                    else None
+                ),
+            ),
+            (
+                "svf_map",
+                "fig04_svf_map.png",
+                lambda p: figure_svf_map(grid, buildings, p, area_name=area_display),
+            ),
+            (
+                "morphometric_panel",
+                "fig05_morphometric_panel.png",
+                lambda p: figure_morphometric_panel(
+                    grid, buildings, p, area_name=area_display
+                ),
+            ),
+            (
+                "svf_slope_scatter",
+                "fig06_svf_slope_scatter.png",
+                lambda p: figure_svf_slope_scatter(grid, p, area_name=area_display),
+            ),
+            (
+                "correlation_matrix",
+                "fig07_correlation_matrix.png",
+                lambda p: figure_correlation_matrix(grid, p, area_name=area_display),
+            ),
+            (
+                "distributions",
+                "fig08_distributions.png",
+                lambda p: figure_distributions(grid, p, area_name=area_display),
+            ),
+        ]
 
-        try:
-            p = fig_dir / "fig02_svf_map.png"
-            figure_svf_map(grid, buildings, p, area_name=area_display)
-            figure_paths["svf_map"] = p
-        except Exception as e:
-            logger.error("Figure 2 failed: %s", e)
+        for key, fname, gen_fn in fig_specs:
+            try:
+                p = fig_dir / fname
+                gen_fn(p)
+                if p.exists():
+                    figure_paths[key] = p
+            except Exception as e:
+                logger.error("Figure %s failed: %s", key, e)
 
-        try:
-            p = fig_dir / "fig03_morphometric_panel.png"
-            figure_morphometric_panel(grid, buildings, p, area_name=area_display)
-            figure_paths["morphometric_panel"] = p
-        except Exception as e:
-            logger.error("Figure 3 failed: %s", e)
-
-        try:
-            p = fig_dir / "fig04_svf_slope_scatter.png"
-            figure_svf_slope_scatter(grid, p, area_name=area_display)
-            figure_paths["svf_slope_scatter"] = p
-        except Exception as e:
-            logger.error("Figure 4 failed: %s", e)
-
-        try:
-            p = fig_dir / "fig05_correlation_matrix.png"
-            figure_correlation_matrix(grid, p, area_name=area_display)
-            figure_paths["correlation_matrix"] = p
-        except Exception as e:
-            logger.error("Figure 5 failed: %s", e)
-
-        try:
-            p = fig_dir / "fig06_distributions.png"
-            figure_distributions(grid, p, area_name=area_display)
-            figure_paths["distributions"] = p
-        except Exception as e:
-            logger.error("Figure 6 failed: %s", e)
-
-        logger.info("Generated %d / 6 figures", len(figure_paths))
+        logger.info("Generated %d / %d figures", len(figure_paths), len(fig_specs))
 
     # ── 7. Generate PDF report ────────────────────────────────────
     logger.info("Generating PDF report...")
@@ -240,6 +278,9 @@ def run_audit(area: str, cell_size: float = 10.0, skip_figures: bool = False):
         audit_result=audit_result,
         figure_paths=figure_paths,
         n_buildings=n_buildings,
+        streets_svf=streets_svf,
+        buildings=buildings,
+        dtm_path=dtm_path,
     )
 
     elapsed = time.time() - t0
