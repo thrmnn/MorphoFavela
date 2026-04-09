@@ -1,0 +1,280 @@
+#!/usr/bin/env python3
+"""Run a complete morphometric analysis audit for any area.
+
+Orchestrates: data loading, SVF audit, 10m grid morphometrics,
+publication figures, and PDF report generation.
+
+Usage:
+    python scripts/run_morphometric_audit.py --area vidigal
+    python scripts/run_morphometric_audit.py --area rocinha --cell-size 15
+    python scripts/run_morphometric_audit.py --area vidigal --skip-figures
+"""
+
+import argparse
+import logging
+import sys
+import time
+from pathlib import Path
+
+import geopandas as gpd
+
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.config import get_area_output_dir, is_informal_area  # noqa: E402
+from src.svf_v2.paths import resolve_paths, resolve_boundary  # noqa: E402
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+)
+logger = logging.getLogger("morphometric_audit")
+
+
+def load_data(area: str):
+    """Load all input data for the area."""
+    dtm_path, fp_path, roads_path = resolve_paths(area)
+    boundary_path = resolve_boundary(area)
+
+    logger.info("Loading building footprints: %s", fp_path)
+    buildings = gpd.read_file(fp_path)
+
+    # Normalize height columns
+    if "altura" in buildings.columns and "height" not in buildings.columns:
+        buildings["height"] = buildings["altura"]
+    if "base" in buildings.columns and "base_height" not in buildings.columns:
+        buildings["base_height"] = buildings["base"]
+    if "base_height" in buildings.columns and "altura" in buildings.columns:
+        buildings["top_height"] = buildings["base_height"] + buildings["altura"]
+
+    # Filter invalid buildings
+    if "height" in buildings.columns:
+        before = len(buildings)
+        buildings = buildings[buildings["height"] > 0].copy()
+        if is_informal_area(area):
+            buildings = buildings[buildings["height"] <= 20].copy()
+        buildings = buildings[buildings.geometry.area >= 9.0].copy()
+        logger.info("Filtered buildings: %d -> %d", before, len(buildings))
+
+    logger.info("Loading roads: %s", roads_path)
+    streets = gpd.read_file(roads_path)
+
+    boundary = None
+    if boundary_path is not None:
+        logger.info("Loading boundary: %s", boundary_path)
+        boundary = gpd.read_file(boundary_path)
+
+    # Load existing SVF results
+    svf_dir = get_area_output_dir(area) / "svf_v2"
+    svf_points = None
+    for svf_file in ["svf_grid.gpkg", "svf_streets.gpkg"]:
+        svf_path = svf_dir / svf_file
+        if svf_path.exists():
+            logger.info("Loading SVF points: %s", svf_path)
+            svf_points = gpd.read_file(svf_path)
+            break
+
+    # Scene STL for terrain check — prefer the processed scene from svf_v2
+    scene_stl = None
+    for stl_candidate in [
+        svf_dir / "scene.stl",
+        svf_dir / "scene.vtk",
+        *sorted(Path(dtm_path).parent.glob("*.stl")),
+    ]:
+        if stl_candidate.exists():
+            scene_stl = stl_candidate
+            break
+
+    return buildings, streets, boundary, dtm_path, svf_points, scene_stl
+
+
+def run_audit(area: str, cell_size: float = 10.0, skip_figures: bool = False):
+    """Run the complete morphometric audit pipeline."""
+    t0 = time.time()
+
+    # ── 1. Load data ────────────────────────────────────────────────
+    logger.info("=" * 60)
+    logger.info("MORPHOMETRIC AUDIT: %s", area)
+    logger.info("=" * 60)
+
+    buildings, streets, boundary, dtm_path, svf_points, scene_stl = load_data(area)
+    n_buildings = len(buildings)
+    logger.info("Buildings: %d, Streets: %d segments", n_buildings, len(streets))
+
+    # ── 2. SVF Audit ────────────────────────────────────────────────
+    logger.info("Running SVF audit...")
+    from src.morphometry.audit import audit_svf
+
+    audit_result = audit_svf(
+        svf_points=svf_points,
+        buildings=buildings,
+        boundary=boundary,
+        scene_stl_path=scene_stl,
+    )
+    logger.info(
+        "SVF audit: mean=%.3f, %d issues (%d critical)",
+        audit_result.mean,
+        len(audit_result.issues),
+        sum(1 for i in audit_result.issues if i.severity == "critical"),
+    )
+
+    # ── 3. Grid morphometrics ──────────────────────────────────────
+    logger.info("Computing grid morphometrics (cell_size=%dm)...", cell_size)
+    from src.morphometry.grid import compute_grid_morphometrics
+
+    grid = compute_grid_morphometrics(
+        buildings=buildings,
+        dtm_path=dtm_path,
+        cell_size=cell_size,
+        svf_points=svf_points,
+        streets=streets,
+        boundary=boundary,
+    )
+
+    # ── 4. Output directories ──────────────────────────────────────
+    out_dir = get_area_output_dir(area) / "morphometric_audit"
+    data_dir = out_dir / "data"
+    fig_dir = out_dir / "figures"
+    report_dir = out_dir / "report"
+    for d in [data_dir, fig_dir, report_dir]:
+        d.mkdir(parents=True, exist_ok=True)
+
+    # ── 5. Save grid data ─────────────────────────────────────────
+    logger.info("Saving grid data...")
+    grid.to_file(data_dir / "grid_metrics.gpkg", driver="GPKG")
+
+    # CSV export
+    csv_cols = [
+        "zone_id",
+        "centroid_x",
+        "centroid_y",
+        "svf",
+        "lambda_p",
+        "lambda_f_mean",
+        "lambda_f_max",
+        "porosity",
+        "sigma_h",
+        "H_mean",
+        "street_orientation_entropy",
+        "slope_deg",
+        "aspect_deg",
+        "far",
+        "building_count",
+        "svf_count",
+    ]
+    available_cols = [c for c in csv_cols if c in grid.columns]
+    grid[available_cols].to_csv(data_dir / "grid_metrics.csv", index=False)
+    logger.info("Saved %d cells to grid_metrics.gpkg and .csv", len(grid))
+
+    # ── 6. Generate figures ───────────────────────────────────────
+    figure_paths = {}
+
+    if not skip_figures:
+        logger.info("Generating publication figures...")
+        from src.morphometry.figures import (
+            figure_site_overview,
+            figure_svf_map,
+            figure_morphometric_panel,
+            figure_svf_slope_scatter,
+            figure_correlation_matrix,
+            figure_distributions,
+        )
+
+        area_display = area.replace("_", " ").title()
+
+        try:
+            p = fig_dir / "fig01_site_overview.png"
+            figure_site_overview(
+                buildings, dtm_path, p, boundary=boundary, area_name=area_display
+            )
+            figure_paths["site_overview"] = p
+        except Exception as e:
+            logger.error("Figure 1 failed: %s", e)
+
+        try:
+            p = fig_dir / "fig02_svf_map.png"
+            figure_svf_map(grid, buildings, p, area_name=area_display)
+            figure_paths["svf_map"] = p
+        except Exception as e:
+            logger.error("Figure 2 failed: %s", e)
+
+        try:
+            p = fig_dir / "fig03_morphometric_panel.png"
+            figure_morphometric_panel(grid, buildings, p, area_name=area_display)
+            figure_paths["morphometric_panel"] = p
+        except Exception as e:
+            logger.error("Figure 3 failed: %s", e)
+
+        try:
+            p = fig_dir / "fig04_svf_slope_scatter.png"
+            figure_svf_slope_scatter(grid, p, area_name=area_display)
+            figure_paths["svf_slope_scatter"] = p
+        except Exception as e:
+            logger.error("Figure 4 failed: %s", e)
+
+        try:
+            p = fig_dir / "fig05_correlation_matrix.png"
+            figure_correlation_matrix(grid, p, area_name=area_display)
+            figure_paths["correlation_matrix"] = p
+        except Exception as e:
+            logger.error("Figure 5 failed: %s", e)
+
+        try:
+            p = fig_dir / "fig06_distributions.png"
+            figure_distributions(grid, p, area_name=area_display)
+            figure_paths["distributions"] = p
+        except Exception as e:
+            logger.error("Figure 6 failed: %s", e)
+
+        logger.info("Generated %d / 6 figures", len(figure_paths))
+
+    # ── 7. Generate PDF report ────────────────────────────────────
+    logger.info("Generating PDF report...")
+    from src.morphometry.report import generate_pdf_report
+
+    pdf_path = report_dir / "morphometric_report.pdf"
+    generate_pdf_report(
+        output_path=pdf_path,
+        area=area,
+        grid=grid,
+        audit_result=audit_result,
+        figure_paths=figure_paths,
+        n_buildings=n_buildings,
+    )
+
+    elapsed = time.time() - t0
+    logger.info("=" * 60)
+    logger.info("AUDIT COMPLETE in %.1f seconds", elapsed)
+    logger.info("  Grid data: %s", data_dir / "grid_metrics.gpkg")
+    logger.info("  Figures:   %s/", fig_dir)
+    logger.info("  Report:    %s", pdf_path)
+    logger.info("=" * 60)
+
+    return grid, audit_result
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Morphometric analysis audit for informal settlements",
+    )
+    parser.add_argument(
+        "--area", required=True, help="Area name (e.g., vidigal, rocinha, riodaspedras)"
+    )
+    parser.add_argument(
+        "--cell-size",
+        type=float,
+        default=10.0,
+        help="Grid cell size in metres (default: 10)",
+    )
+    parser.add_argument(
+        "--skip-figures",
+        action="store_true",
+        help="Skip figure generation (data + report only)",
+    )
+    args = parser.parse_args()
+
+    run_audit(args.area, cell_size=args.cell_size, skip_figures=args.skip_figures)
+
+
+if __name__ == "__main__":
+    main()
