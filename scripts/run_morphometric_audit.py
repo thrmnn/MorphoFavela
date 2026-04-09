@@ -64,8 +64,11 @@ def load_data(area: str):
         logger.info("Loading boundary: %s", boundary_path)
         boundary = gpd.read_file(boundary_path)
 
-    # Load existing SVF results
-    svf_dir = get_area_output_dir(area) / "svf_v2"
+    # Load existing SVF results — check new layout first, then legacy
+    svf_dir = get_area_output_dir(area) / "morphometrics" / "svf"
+    if not svf_dir.exists():
+        svf_dir = get_area_output_dir(area) / "svf_v2"
+
     svf_points = None
     for svf_file in ["svf_grid.gpkg", "svf_streets.gpkg"]:
         svf_path = svf_dir / svf_file
@@ -74,7 +77,7 @@ def load_data(area: str):
             svf_points = gpd.read_file(svf_path)
             break
 
-    # Scene STL for terrain check — prefer the processed scene from svf_v2
+    # Scene STL for terrain check
     scene_stl = None
     for stl_candidate in [
         svf_dir / "scene.stl",
@@ -143,16 +146,41 @@ def run_audit(area: str, cell_size: float = 10.0, skip_figures: bool = False):
     )
 
     # ── 4. Output directories ──────────────────────────────────────
-    out_dir = get_area_output_dir(area) / "morphometric_audit"
-    data_dir = out_dir / "data"
+    out_dir = get_area_output_dir(area) / "morphometrics"
+    svf_dir_out = out_dir / "svf"
+    buildings_dir = out_dir / "buildings"
+    grid_dir = out_dir / "grid"
     fig_dir = out_dir / "figures"
     report_dir = out_dir / "report"
-    for d in [data_dir, fig_dir, report_dir]:
+    for d in [svf_dir_out, buildings_dir, grid_dir, fig_dir, report_dir]:
         d.mkdir(parents=True, exist_ok=True)
+
+    # ── 4b. Copy SVF data into morphometrics/svf/ ─────────────────
+    svf_src_dir = get_area_output_dir(area) / "svf_v2"
+    if svf_src_dir.exists():
+        import shutil
+
+        for svf_file in svf_src_dir.glob("*"):
+            dest = svf_dir_out / svf_file.name
+            if not dest.exists():
+                if svf_file.is_file():
+                    shutil.copy2(svf_file, dest)
+        logger.info("SVF data linked to morphometrics/svf/")
+
+    # ── 4c. Copy building metrics into morphometrics/buildings/ ────
+    bld_src = get_area_output_dir(area) / "morphology_metrics"
+    if bld_src.exists():
+        import shutil
+
+        for bld_file in bld_src.glob("*"):
+            dest = buildings_dir / bld_file.name
+            if not dest.exists() and bld_file.is_file():
+                shutil.copy2(bld_file, dest)
+        logger.info("Building metrics linked to morphometrics/buildings/")
 
     # ── 5. Save grid data ─────────────────────────────────────────
     logger.info("Saving grid data...")
-    grid.to_file(data_dir / "grid_metrics.gpkg", driver="GPKG")
+    grid.to_file(grid_dir / "grid_metrics.gpkg", driver="GPKG")
 
     # CSV export
     csv_cols = [
@@ -174,7 +202,7 @@ def run_audit(area: str, cell_size: float = 10.0, skip_figures: bool = False):
         "svf_count",
     ]
     available_cols = [c for c in csv_cols if c in grid.columns]
-    grid[available_cols].to_csv(data_dir / "grid_metrics.csv", index=False)
+    grid[available_cols].to_csv(grid_dir / "grid_metrics.csv", index=False)
     logger.info("Saved %d cells to grid_metrics.gpkg and .csv", len(grid))
 
     # ── 6. Generate figures ───────────────────────────────────────
@@ -286,7 +314,7 @@ def run_audit(area: str, cell_size: float = 10.0, skip_figures: bool = False):
     elapsed = time.time() - t0
     logger.info("=" * 60)
     logger.info("AUDIT COMPLETE in %.1f seconds", elapsed)
-    logger.info("  Grid data: %s", data_dir / "grid_metrics.gpkg")
+    logger.info("  Grid data: %s", grid_dir / "grid_metrics.gpkg")
     logger.info("  Figures:   %s/", fig_dir)
     logger.info("  Report:    %s", pdf_path)
     logger.info("=" * 60)

@@ -109,26 +109,29 @@ def get_comparative_analysis_dir() -> Path:
 
 
 # Standard analysis type subdirectories
+# New canonical layout (2026-04):
+#   morphometrics/       — SVF, building metrics, 10m grid, figures, report
+#     svf/               — raw SVF computation (grid, streets, scene)
+#     buildings/          — per-building shape metrics
+#     grid/               — 10m grid indicators
+#     figures/            — publication figures
+#     report/             — PDF report
+#   solar/               — solar access + facade solar
+#   cfd/                 — patch selection + OpenFOAM exports
 ANALYSIS_TYPES = {
-    "metrics": "metrics",  # Basic morphometric metrics
-    "morphology_metrics": "morphology_metrics",  # Extended morphology metrics
-    "morphology_risk": "morphology_risk",  # Risk visualization outputs
-    "svf": "svf",  # Sky View Factor
-    "solar": "solar",  # Solar access
-    "sky_exposure": "sky_exposure",  # Sky exposure plane exceedance
-    "porosity": "porosity",  # Sectional porosity
-    "density": "density",  # Occupancy density proxy
-    "deprivation": "deprivation",  # Deprivation index (unit-level)
-    "deprivation_raster": "deprivation_raster",  # Deprivation index (raster-based)
-    "maps": "maps",  # General maps/visualizations
-    "urban_morphology": "urban_morphology",  # Zone-level urban morphology metrics
-    "spatial_analysis": "spatial_analysis",  # Spatial autocorrelation (Moran's I, LISA)
-    "typology": "typology",  # Settlement typology classification
-    "exposure": "exposure",  # Environmental exposure index (zone-level)
+    "morphometrics": "morphometrics",  # Unified morphometric analysis
+    "solar": "solar",  # Solar access (street + facade)
+    "cfd": "cfd",  # CFD patch selection and exports
+    # Legacy (kept for backward compatibility with older scripts)
+    "svf_v2": "svf_v2",
+    "morphology_metrics": "morphology_metrics",
+    "urban_morphology": "urban_morphology",
+    "patch_selection": "patch_selection",
+    "facade_solar": "facade_solar",
 }
 
 # Analysis parameters
-EXPECTED_CRS = "EPSG:32723"  # UTM Zone 23S (São Paulo) - adjust as needed
+EXPECTED_CRS = "EPSG:31983"  # SIRGAS 2000 / UTM zone 23S (Rio de Janeiro)
 MIN_BUILDING_AREA = 9.0  # m² (minimum reasonable building size)
 MAX_BUILDING_HEIGHT = 100.0  # m (sanity check for validation)
 # Filtering parameters (applied only to informal areas, not formal areas)

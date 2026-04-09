@@ -117,14 +117,20 @@ def audit_svf(
             AuditIssue("critical", "range", f"{n_over_one} SVF values exceed 1.0.")
         )
 
-    # High-SVF in built-up areas
+    # High-SVF in built-up areas (use spatial join, not union_all — scales to large datasets)
     if buildings is not None and not buildings.empty:
-        building_union = buildings.geometry.union_all()
-        # Points within 5m of buildings
-        buffered = building_union.buffer(5)
-        near_buildings = svf_points[svf_points.within(buffered)]
-        if len(near_buildings) > 0:
-            near_svf = near_buildings[svf_col]
+        buffered_bld = buildings.copy()
+        buffered_bld["geometry"] = buffered_bld.geometry.buffer(5)
+        near_join = gpd.sjoin(
+            svf_points[[svf_col, "geometry"]],
+            buffered_bld[["geometry"]],
+            how="inner",
+            predicate="within",
+        )
+        # Drop duplicates (a point near multiple buildings)
+        near_join = near_join.drop_duplicates(subset=near_join.geometry.name)
+        if len(near_join) > 0:
+            near_svf = near_join[svf_col]
             n_high = int((near_svf > 0.6).sum())
             pct_high = 100.0 * n_high / len(near_svf)
             if pct_high > 20:
@@ -149,7 +155,11 @@ def audit_svf(
     if boundary is not None:
         boundary_union = boundary.geometry.union_all()
         result.total_study_area_m2 = boundary_union.area
-        svf_hull = svf_points.geometry.union_all().convex_hull
+        # Use convex hull of sample for coverage (cheaper than union_all on points)
+        from shapely.geometry import MultiPoint
+
+        sample_pts = svf_points.geometry.values[:5000]
+        svf_hull = MultiPoint([p for p in sample_pts if p is not None]).convex_hull
         result.svf_coverage_area_m2 = svf_hull.intersection(boundary_union).area
         result.coverage_pct = (
             100.0 * result.svf_coverage_area_m2 / result.total_study_area_m2
@@ -165,11 +175,15 @@ def audit_svf(
                 )
             )
 
-    # ── Points inside buildings check ───────────────────────────────
+    # ── Points inside buildings check (spatial join, not union_all) ──
     if buildings is not None and not buildings.empty:
-        building_union_simple = buildings.geometry.union_all().buffer(0)
-        inside = svf_points[svf_points.within(building_union_simple)]
-        n_inside = len(inside)
+        inside_join = gpd.sjoin(
+            svf_points[["geometry"]],
+            buildings[["geometry"]],
+            how="inner",
+            predicate="within",
+        )
+        n_inside = len(inside_join.drop_duplicates(subset=inside_join.geometry.name))
         if n_inside > 0:
             pct_inside = 100.0 * n_inside / len(svf_points)
             if pct_inside > 5:

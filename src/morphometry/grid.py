@@ -104,8 +104,14 @@ def compute_grid_morphometrics(
     """
     logger.info("Computing grid morphometrics at %dm resolution...", cell_size)
 
-    # Ensure buildings have a height column
+    # Repair invalid geometries (critical for areas like Rocinha with self-intersections)
     bld = buildings.copy()
+    invalid_mask = ~bld.geometry.is_valid
+    if invalid_mask.any():
+        logger.warning("Repairing %d invalid building geometries.", invalid_mask.sum())
+        bld.loc[invalid_mask, "geometry"] = bld.loc[invalid_mask, "geometry"].buffer(0)
+
+    # Ensure buildings have a height column
     if "height" not in bld.columns:
         if "altura" in bld.columns and "base" in bld.columns:
             bld["height"] = bld["altura"]
