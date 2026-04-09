@@ -31,10 +31,21 @@ logging.basicConfig(
 logger = logging.getLogger("morphometric_audit")
 
 
-def load_data(area: str):
-    """Load all input data for the area."""
+def load_data(area: str, buildings_override: str = None, dtm_override: str = None):
+    """Load all input data for the area.
+
+    Optional overrides let callers substitute extended building/DTM files
+    (e.g., with city-wide context for CFD domain coverage).
+    """
     dtm_path, fp_path, roads_path = resolve_paths(area)
     boundary_path = resolve_boundary(area)
+
+    if buildings_override:
+        fp_path = Path(buildings_override)
+        logger.info("Using OVERRIDE buildings: %s", fp_path)
+    if dtm_override:
+        dtm_path = Path(dtm_override)
+        logger.info("Using OVERRIDE DTM: %s", dtm_path)
 
     logger.info("Loading building footprints: %s", fp_path)
     buildings = gpd.read_file(fp_path)
@@ -98,17 +109,24 @@ def load_data(area: str):
     return buildings, streets, boundary, dtm_path, svf_points, scene_stl, streets_svf
 
 
-def run_audit(area: str, cell_size: float = 10.0, skip_figures: bool = False):
+def run_audit(
+    area: str,
+    cell_size: float = 10.0,
+    skip_figures: bool = False,
+    buildings_override: str = None,
+    dtm_override: str = None,
+    output_suffix: str = "",
+):
     """Run the complete morphometric audit pipeline."""
     t0 = time.time()
 
     # ── 1. Load data ────────────────────────────────────────────────
     logger.info("=" * 60)
-    logger.info("MORPHOMETRIC AUDIT: %s", area)
+    logger.info("MORPHOMETRIC AUDIT: %s%s", area, f" ({output_suffix})" if output_suffix else "")
     logger.info("=" * 60)
 
     buildings, streets, boundary, dtm_path, svf_points, scene_stl, streets_svf = (
-        load_data(area)
+        load_data(area, buildings_override=buildings_override, dtm_override=dtm_override)
     )
     n_buildings = len(buildings)
     logger.info("Buildings: %d, Streets: %d segments", n_buildings, len(streets))
@@ -146,7 +164,8 @@ def run_audit(area: str, cell_size: float = 10.0, skip_figures: bool = False):
     )
 
     # ── 4. Output directories ──────────────────────────────────────
-    out_dir = get_area_output_dir(area) / "morphometrics"
+    morph_dir_name = "morphometrics" + (f"_{output_suffix}" if output_suffix else "")
+    out_dir = get_area_output_dir(area) / morph_dir_name
     svf_dir_out = out_dir / "svf"
     buildings_dir = out_dir / "buildings"
     grid_dir = out_dir / "grid"
@@ -340,9 +359,31 @@ def main():
         action="store_true",
         help="Skip figure generation (data + report only)",
     )
+    parser.add_argument(
+        "--buildings",
+        default=None,
+        help="Override building footprints path (e.g., extended context file)",
+    )
+    parser.add_argument(
+        "--dtm",
+        default=None,
+        help="Override DTM raster path (e.g., extended DTM)",
+    )
+    parser.add_argument(
+        "--output-suffix",
+        default="",
+        help="Suffix for output directory (e.g., 'extended' → morphometrics_extended/)",
+    )
     args = parser.parse_args()
 
-    run_audit(args.area, cell_size=args.cell_size, skip_figures=args.skip_figures)
+    run_audit(
+        args.area,
+        cell_size=args.cell_size,
+        skip_figures=args.skip_figures,
+        buildings_override=args.buildings,
+        dtm_override=args.dtm,
+        output_suffix=args.output_suffix,
+    )
 
 
 if __name__ == "__main__":

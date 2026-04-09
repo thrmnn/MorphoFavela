@@ -11,9 +11,19 @@ ENV/
 .pytest_cache/
 .ruff_cache/
 
-# Data and outputs (not tracked)
+# Data and outputs (not tracked — large files, generated)
 data/
 outputs/
+
+# Logs and HPC artifacts
+logs/
+*.log
+slurm-*.out
+*.o[0-9]*
+*.e[0-9]*
+
+# Claude Code session data
+.claude/
 
 # IDE
 .vscode/
@@ -28,12 +38,4 @@ Thumbs.db
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
-
-# Logs
-*.log
-
-# HPC / SLURM artifacts
-slurm-*.out
-*.o[0-9]*
-*.e[0-9]*
 

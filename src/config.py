@@ -109,25 +109,20 @@ def get_comparative_analysis_dir() -> Path:
 
 
 # Standard analysis type subdirectories
-# New canonical layout (2026-04):
+# Canonical layout (2026-04):
 #   morphometrics/       — SVF, building metrics, 10m grid, figures, report
 #     svf/               — raw SVF computation (grid, streets, scene)
 #     buildings/          — per-building shape metrics
 #     grid/               — 10m grid indicators
 #     figures/            — publication figures
 #     report/             — PDF report
+#   sampling_cfd/        — stratified CFD patch selection + per-patch exports
+#     pilot_sampling/    — pilot batch (12-15 patches per site)
 #   solar/               — solar access + facade solar
-#   cfd/                 — patch selection + OpenFOAM exports
 ANALYSIS_TYPES = {
-    "morphometrics": "morphometrics",  # Unified morphometric analysis
-    "solar": "solar",  # Solar access (street + facade)
-    "cfd": "cfd",  # CFD patch selection and exports
-    # Legacy (kept for backward compatibility with older scripts)
-    "svf_v2": "svf_v2",
-    "morphology_metrics": "morphology_metrics",
-    "urban_morphology": "urban_morphology",
-    "patch_selection": "patch_selection",
-    "facade_solar": "facade_solar",
+    "morphometrics": "morphometrics",
+    "sampling_cfd": "sampling_cfd",
+    "solar": "solar",
 }
 
 # Analysis parameters
