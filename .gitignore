@@ -13,7 +13,13 @@ ENV/
 
 # Data and outputs (not tracked — large files, generated)
 data/
-outputs/
+outputs/*
+
+# Exception: track paper figure scripts (not their rendered exports)
+!outputs/paper_figures/
+outputs/paper_figures/*
+!outputs/paper_figures/*.py
+!outputs/paper_figures/README.md
 
 # Logs and HPC artifacts
 logs/
