@@ -26,7 +26,7 @@ for f in outputs/paper_figures/fig*.py; do python3 "$f"; done
 |--------|--------|-------------|-------------|
 | Fig S1 | `figS1_correlation_matrices.py` | 10m grids (all sites) | 5 correlation heatmaps, consistent scale |
 | Fig S2 | `figS2_context_extension.py` | Extended buildings, buffer analysis | Context validation: buildings, candidate pool, patch maps |
-| Fig S3 | `figS3_resolution_sensitivity.py` | 10m + 20m grids | Placeholder — requires 20m grids |
+| Fig S3 | `figS3_resolution_sensitivity.py` | 10m + 20m grids | **3 variants** — distribution overlay, scatter comparison, difference maps |
 | Fig S4 | `figS4_patch_thumbnails.py` | Campaign patches, buildings | Per-site patch thumbnails (one page per site) |
 
 ## Style
