@@ -377,15 +377,62 @@
 
 ### Lower Priority
 
-#### Advanced Morphometric Analysis (Phase 3.2)
-- [ ] Neighborhood-level metrics (BCR, FAR)
+## Phase 5: CFD Sampling Campaign ✅ COMPLETE (2026-04-09)
+
+### Completed
+- [x] 10m morphometric grid computation across 5 sites (82,314 cells total)
+- [x] Extended building + terrain context from city-wide RJ data (300m buffer)
+- [x] Stratified pilot sampling (12-strata: SVF × slope × λp)
+- [x] Pilot batch: 69 patches across 5 sites
+- [x] Full-campaign incremental allocation with SVF-priority weighting
+- [x] Campaign total: 119 patches (Vidigal 22, Rocinha 25, RdP 22, CDA 25, Maré 25)
+- [x] Per-patch exports: buildings.gpkg, terrain.tif, patch_meta.json
+- [x] Cross-site summary with pooled strata table
+- [x] Rocinha topology audit (10 invalid geometries, all repaired by buffer(0))
+
+### Recommended CFD pipeline test patch
+**MAR-P07** (Maré): slope 0.8°, H_max 12.2m, 1,200 buildings in domain,
+mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
+
+---
+
+## Phase 6: CFD Simulations (in other repo)
+
+### Next steps (handled in the CFD repo)
+- [ ] OpenFOAM case setup from per-patch exports
+- [ ] Inlet profiles from INMET wind rose data (8 directions)
+- [ ] Mesh convergence study on the test patch
+- [ ] Submit full 119-patch campaign to HPC (MIT ORCD)
+- [ ] Post-processing: wind velocity at pedestrian height, aggregate to grid cells
+- [ ] Integrate CFD results back into this repo's morphometric dataset
+
+---
+
+## Phase 7: Analysis + Publication (after CFD)
+
+### Nature Cities submission
+- [x] Figures 1-5 main + S1/S2/S4 supplementary (S3 awaits 20m grids)
+- [x] Site colors and style system (`outputs/paper_figures/fig_style.py`)
+- [x] Cross-site feature space, allocation summary, morphometric maps
+- [ ] Integrate CFD-derived wind velocity into figures (risk maps, threshold analysis)
+- [ ] Statistical analysis: SVF/λp/terrain as predictors of wind conditions
+- [ ] Draft manuscript
+
+### Follow-up analyses (candidates)
+- [ ] 20m morphometric grids for resolution sensitivity (Fig S3)
+- [ ] Facade solar for remaining 4 sites (only vidigal_tls has results)
+- [ ] Typology clustering validated against CFD results
+- [ ] Cross-site regression: morphology → wind conditions
+
+---
+
+## Future Work (Deferred)
+
+#### Advanced Morphometric Analysis
+- [ ] Neighborhood-level metrics beyond the 12 in the grid
 - [ ] Spatial autocorrelation analysis
 - [ ] Building adjacency analysis
 - [ ] Fractal dimension calculation
-
-#### Environmental Performance Modeling (Phase 5)
-- [ ] Thermal comfort modeling
-- [ ] Wind flow analysis (CFD campaign in progress)
 
 #### Documentation
 - [ ] API documentation (Sphinx)
@@ -452,6 +499,18 @@
 - Legacy SVF code archived
 - **Status**: SVF v2 engine production-ready
 
+### v5.0.0 (April 2026)
+- CFD sampling pipeline: `run_pilot_sampling.py`, `run_campaign_sampling.py`, `build_extended_context.py`
+- 12-strata stratified sampling (SVF × slope × λp) with maximin spacing
+- Extended building + DTM context from city-wide RJ data (300m buffer, reduces domain exclusion from 55% to ~3%)
+- 119 patches allocated across 5 sites (69 pilot + 50 campaign)
+- SVF-priority weighting for health-relevant low-SVF strata (2×)
+- Per-patch exports ready for OpenFOAM: buildings.gpkg, terrain.tif, patch_meta.json
+- Cross-site comparative outputs in `outputs/comparative/`
+- Canonical output layout: `morphometrics/`, `sampling_cfd/`, `comparative/`
+- Nature Cities paper figures: 9 scripts + shared style module (`outputs/paper_figures/`)
+- **Status**: Phase 5 complete, ready for OpenFOAM simulations in CFD repo
+
 ### v4.0.0 (March 2025)
 - Urban morphology metrics: plan area density, frontal area density, height variability, street orientation entropy
 - Zone flagging for environmental risk areas
@@ -471,5 +530,9 @@
 - Tregenza 145-patch SVF is merged and production-ready
 - Validation against benchmark tools is needed before publication
 - All Phase 2, 3, 3.5, 4, and 4.5 analyses are complete and production-ready
-- CFD campaign: 5 areas (vidigal_tls, rocinha, riodaspedras, complexo_do_alemao, mare); CDD excluded due to broken data
+- CFD campaign: 5 areas — vidigal, rocinha, riodaspedras, complexo_do_alemao, maré
+  (CDD excluded due to broken building data; see `project_cdd_data_bug` memory)
+- CFD simulation execution is handled in a separate repo; this repo produces the
+  patches (`sampling_cfd/campaign_sampling/patches/`) and will ingest results back
+  for Phase 7 analysis
 - Current focus: HPC SVF for remaining areas, cross-area clustering, OpenFOAM handoff

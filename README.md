@@ -14,7 +14,40 @@ A Python pipeline for calculating morphometric metrics from building footprints 
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Current status**: All Phase 1 and Phase 2 analyses complete. Phase 3 (Multi-Area Comparative Analysis) complete - supports formal vs informal settlement comparison with comprehensive PDF reports.
+See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Current status**: Phases 1-4 complete. Phase 5 (CFD campaign) — 119 patches allocated across 5 sites, ready for OpenFOAM simulations. Paper figures for Nature Cities submission complete.
+
+## CFD Sampling Campaign
+
+Stratified sampling pipeline for CFD wind simulations across 5 informal settlements:
+
+```bash
+# 1. Build extended building + DTM context (city-wide data, 300m buffer)
+python scripts/build_extended_context.py --area {site} --buffer 300
+
+# 2. Run pilot sampling (12-strata, 12-15 patches per site)
+python scripts/run_pilot_sampling.py --site {site} \
+  --buildings data/{site}/buildings_extended_300m.gpkg \
+  --dtm data/{site}/dtm_extended_300m.tif
+
+# 3. Scale to full campaign (SVF-priority weighting, adds ~10 patches per site)
+python scripts/run_campaign_sampling.py
+```
+
+Results: 119 patches (5 sites × ~24 patches), each with per-patch building footprints,
+terrain clip, and metadata ready for OpenFOAM case setup. Outputs in
+`outputs/{site}/sampling_cfd/campaign_sampling/` and cross-site summary in
+`outputs/comparative/final_allocation/`.
+
+## Paper Figures
+
+Publication figures for the Nature Cities submission are in `outputs/paper_figures/`.
+Each script is standalone and regenerable from pipeline outputs:
+
+```bash
+for f in outputs/paper_figures/fig*.py; do python3 "$f"; done
+```
+
+See `outputs/paper_figures/README.md` for per-figure documentation.
 
 ## Installation
 
