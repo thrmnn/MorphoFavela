@@ -80,22 +80,34 @@ Simulation metadata:
 data/{site}/wind_rose.json
 ```
 
+**Placeholder files already exist at this location** generated from a
+climatological prior for Rio de Janeiro. They MUST be replaced with real
+INMET station data before running the CFD campaign — the source field in
+the existing files is explicitly tagged `PLACEHOLDER` so the swap is
+obvious.
+
+To rebuild a wind rose from INMET CSV observations:
+
+```bash
+python scripts/build_wind_rose.py --site vidigal \
+    --inmet-csv data/inmet/alto_da_boa_vista.csv \
+    --station "INMET Alto da Boa Vista A652" \
+    --year-start 2010 --year-end 2023
+```
+
+Schema (matches `src/cfd_integration/schema.py:WindRose`):
+
 ```json
 {
     "site": "vidigal",
-    "source": "INMET Alto da Boa Vista 2010-2020",
-    "frequencies": {
-        "N": 0.04, "NE": 0.12, "E": 0.09, "SE": 0.16,
-        "S": 0.21, "SW": 0.18, "W": 0.11, "NW": 0.09
-    },
-    "mean_speeds": {
-        "N": 2.1, "NE": 3.4, "E": 3.8, "SE": 4.2,
-        "S": 2.8, "SW": 2.5, "W": 2.0, "NW": 1.8
-    }
+    "source": "INMET Alto da Boa Vista A652 2010-2023 — n=113,892 obs",
+    "frequencies": {"N": 0.04, "NE": 0.12, ..., "NW": 0.09},
+    "mean_speeds":  {"N": 2.1,  "NE": 3.4,  ..., "NW": 1.8},
+    "recommended_station": "Alto da Boa Vista (A652) — nearest mountainous site"
 }
 ```
 
-Frequencies should sum to ~1.0. `mean_speeds` in m/s at 10m height. Used to
+Frequencies sum to ~1.0. `mean_speeds` in m/s at 10 m height. Used to
 compute annualised (wind-rose-weighted) metrics per patch.
 
 ---
