@@ -867,11 +867,22 @@ d477935 test(cfd-integration): 46 tests covering schema, IO, aggregation, metric
 
 ---
 
-*Prepared in `docs/technical_report/`. To regenerate all figures:*
+*Prepared in `docs/technical_report/`. Available in both markdown
+(`technical_report.md`) and PDF (`technical_report.pdf`) formats.*
+
+**Regenerate the PDF:**
+```bash
+python docs/technical_report/build_pdf.py
+```
+*Pipeline: pandoc (markdown → HTML) then weasyprint (HTML → PDF).
+Requires `pandoc` and the `weasyprint` Python package.*
+
+**Regenerate all figures:**
 ```bash
 for f in outputs/paper_figures/fig*.py; do python3 "$f"; done
 ```
-*To regenerate campaign allocation:*
+
+**Regenerate campaign allocation:**
 ```bash
 python scripts/run_campaign_sampling.py
 ```
