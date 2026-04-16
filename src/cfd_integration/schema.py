@@ -88,12 +88,24 @@ class WindRose:
     Frequencies should sum to 1.0 (or will be normalised).
 
     Optionally includes a speed distribution per direction (mean wind speed
-    from INMET, used to scale dimensionless CFD results).
+    from INMET, used to scale dimensionless CFD results), plus provenance
+    metadata so readers can assess confidence (station identity, time
+    window, observation count, calm fraction, anemometer reference height,
+    and a free-form quality flag).
     """
     site: str
     frequencies: dict[str, float]              # e.g., {"N": 0.05, "NE": 0.12, ...}
     mean_speeds: dict[str, float] = field(default_factory=dict)  # m/s per direction
-    source: str = ""                           # e.g., "INMET Alto da Boa Vista 2010-2020"
+    source: str = ""                           # human-readable provenance line
+    reference_height_m: Optional[float] = None  # anemometer height, nominally 10 m
+    station_id: Optional[str] = None           # INMET code (e.g., "A652")
+    station_name: Optional[str] = None         # e.g., "Alto da Boa Vista"
+    station_coords: Optional[tuple[float, float]] = None  # (lat, lon)
+    time_window_start: Optional[str] = None    # ISO date (e.g., "2015-01-01")
+    time_window_end: Optional[str] = None      # ISO date
+    n_observations: Optional[int] = None       # total observations in the window
+    calm_fraction: Optional[float] = None      # fraction of obs with |U| < 0.5 m/s
+    quality_flag: Optional[str] = None         # "measured" | "gap-filled" | "placeholder-prior"
 
     def __post_init__(self):
         # Normalise frequencies
@@ -104,6 +116,11 @@ class WindRose:
         for d in self.frequencies:
             if d not in WIND_DIRECTIONS_8:
                 raise ValueError(f"Unknown wind direction: {d}")
+
+    @property
+    def is_placeholder(self) -> bool:
+        """True if this rose is a climatological prior, not station data."""
+        return self.quality_flag == "placeholder-prior"
 
 
 @dataclass

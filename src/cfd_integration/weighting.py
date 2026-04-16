@@ -26,21 +26,42 @@ logger = logging.getLogger(__name__)
 def load_wind_rose(path: Path, site: str) -> WindRose:
     """Load a wind rose from JSON.
 
-    Expected schema:
+    Expected schema (all fields except site + frequencies are optional):
         {
             "site": "vidigal",
-            "source": "INMET Alto da Boa Vista 2010-2020",
+            "source": "INMET Alto da Boa Vista 2015-2024",
             "frequencies": {"N": 0.04, "NE": 0.12, ...},
-            "mean_speeds":  {"N": 2.1,  "NE": 3.4, ...}  (optional)
+            "mean_speeds":  {"N": 2.1,  "NE": 3.4, ...},
+            "reference_height_m": 10.0,
+            "station_id": "A652",
+            "station_name": "Alto da Boa Vista",
+            "station_coords": [-22.9762, -43.2784],
+            "time_window_start": "2015-01-01",
+            "time_window_end": "2024-12-31",
+            "n_observations": 84321,
+            "calm_fraction": 0.08,
+            "quality_flag": "measured"
         }
     """
     with open(path) as f:
         data = json.load(f)
+    coords = data.get("station_coords")
+    if coords is not None:
+        coords = (float(coords[0]), float(coords[1]))
     return WindRose(
         site=data.get("site", site),
         frequencies=data["frequencies"],
         mean_speeds=data.get("mean_speeds", {}),
         source=data.get("source", ""),
+        reference_height_m=data.get("reference_height_m"),
+        station_id=data.get("station_id"),
+        station_name=data.get("station_name"),
+        station_coords=coords,
+        time_window_start=data.get("time_window_start"),
+        time_window_end=data.get("time_window_end"),
+        n_observations=data.get("n_observations"),
+        calm_fraction=data.get("calm_fraction"),
+        quality_flag=data.get("quality_flag"),
     )
 
 
