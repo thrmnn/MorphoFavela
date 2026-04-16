@@ -1,24 +1,25 @@
 """Spatial aggregation: map CFD sample points onto the 10m morphometric grid.
 
-Primary path: aggregate only within the 100m analysis patch of each CFD
-simulation. Points outside this patch (but still within the 250m CFD domain)
-are optionally available via aggregate_to_domain() for robustness checks.
+Primary path: aggregate only within the 100m-diameter circular analysis patch
+of each CFD simulation. Points outside this patch (but still within the 250m
+CFD domain) are optionally available via aggregate_to_domain() for robustness
+checks.
 
-The 100m analysis patch is the only zone where CFD results are scientifically
-defensible for quantitative use (Blocken 2015, COST Action 732) — the buffer
-beyond is atmospheric context to develop realistic turbulence, not a
-measurement region.
+The 100m-diameter analysis patch is the only zone where CFD results are
+scientifically defensible for quantitative use (Blocken 2015, COST Action 732) —
+the buffer beyond is atmospheric context to develop realistic turbulence, not
+a measurement region.
 """
 
 from __future__ import annotations
 
 import logging
+import math
 from typing import Optional
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-from shapely.geometry import Point, box
 
 from src.cfd_integration.metrics import (
     ach,
@@ -34,13 +35,14 @@ logger = logging.getLogger(__name__)
 def aggregate_to_patch(
     patch_result: CFDPatchResult,
     patch_center_xy: tuple[float, float],
-    analysis_patch_size: float = 100.0,
+    analysis_patch_diameter: float = 100.0,
     canopy_height: Optional[float] = None,
     stagnation_threshold: float = 0.5,
 ) -> dict:
     """Aggregate CFD sample points to a single patch-level summary.
 
-    Crops samples to the 100m analysis patch, computes scalar metrics.
+    Crops samples to the 100m-diameter circular analysis patch, computes
+    scalar metrics.
 
     Parameters
     ----------
@@ -48,8 +50,8 @@ def aggregate_to_patch(
         CFD output for one patch × one wind direction.
     patch_center_xy : (float, float)
         Patch center in UTM (from campaign_patches.csv).
-    analysis_patch_size : float
-        Side length of the square analysis zone (default 100m).
+    analysis_patch_diameter : float
+        Diameter of the circular analysis zone (default 100m).
     canopy_height : float, optional
         Urban canopy height for ACH computation (m). If None, ACH is skipped.
     stagnation_threshold : float
@@ -60,13 +62,13 @@ def aggregate_to_patch(
     dict with per-patch metrics.
     """
     cx, cy = patch_center_xy
-    half = analysis_patch_size / 2
+    radius = analysis_patch_diameter / 2
+    r2 = radius * radius
 
     samples = patch_result.samples
-    mask = (
-        (samples["x"] >= cx - half) & (samples["x"] <= cx + half)
-        & (samples["y"] >= cy - half) & (samples["y"] <= cy + half)
-    )
+    dx = samples["x"] - cx
+    dy = samples["y"] - cy
+    mask = (dx * dx + dy * dy) <= r2
     in_patch = samples[mask]
 
     if in_patch.empty:
@@ -102,7 +104,8 @@ def aggregate_to_patch(
 
     if canopy_height is not None and canopy_height > 0:
         # Per-cell ACH would need cell-level decomposition; here give patch-level
-        result["ach_patch"] = ach(u_mag, canopy_height, analysis_patch_size**2)
+        patch_area = math.pi * radius * radius
+        result["ach_patch"] = ach(u_mag, canopy_height, patch_area)
 
     return result
 
@@ -111,14 +114,15 @@ def aggregate_to_grid(
     patch_result: CFDPatchResult,
     grid: gpd.GeoDataFrame,
     patch_center_xy: tuple[float, float],
-    analysis_patch_size: float = 100.0,
+    analysis_patch_diameter: float = 100.0,
     stagnation_threshold: float = 0.5,
     canopy_height_col: str = "H_mean",
 ) -> gpd.GeoDataFrame:
     """Map CFD samples to individual 10m grid cells within the analysis patch.
 
-    For each 10m cell within the 100m analysis zone, compute metrics from
-    CFD samples falling inside the cell's bounding box.
+    For each 10m cell whose centroid lies inside the 100m-diameter circular
+    analysis zone, compute metrics from CFD samples falling inside the cell's
+    bounding box.
 
     Parameters
     ----------
@@ -128,24 +132,25 @@ def aggregate_to_grid(
         and optionally `canopy_height_col` for per-cell ACH).
     patch_center_xy : (float, float)
         UTM coords of the patch center.
-    analysis_patch_size : float
-        Side length of the analysis zone (m).
+    analysis_patch_diameter : float
+        Diameter of the circular analysis zone (m).
 
     Returns
     -------
     GeoDataFrame
-        Subset of grid (only cells within the analysis patch) with new columns:
+        Subset of grid (only cells whose centroid is inside the analysis patch)
+        with new columns:
             cfd_U_mean, cfd_U_p10, cfd_stagnation_frac, cfd_TKE_mean,
             cfd_TI_mean, cfd_ach, cfd_n_samples
     """
     cx, cy = patch_center_xy
-    half = analysis_patch_size / 2
+    radius = analysis_patch_diameter / 2
+    r2 = radius * radius
 
-    # Select cells within the analysis patch
-    cell_mask = (
-        (grid["centroid_x"] >= cx - half) & (grid["centroid_x"] <= cx + half)
-        & (grid["centroid_y"] >= cy - half) & (grid["centroid_y"] <= cy + half)
-    )
+    # Select cells whose centroids fall inside the circular analysis patch
+    dx = grid["centroid_x"] - cx
+    dy = grid["centroid_y"] - cy
+    cell_mask = (dx * dx + dy * dy) <= r2
     cells = grid[cell_mask].copy()
     if cells.empty:
         return cells

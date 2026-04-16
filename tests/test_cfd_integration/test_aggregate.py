@@ -1,4 +1,4 @@
-"""Tests for spatial aggregation: CFD samples → 100m patch → 10m grid cells."""
+"""Tests for spatial aggregation: CFD samples → 100m-diameter circular patch → 10m grid cells."""
 
 import geopandas as gpd
 import numpy as np
@@ -39,9 +39,9 @@ def _make_grid(center_x=0.0, center_y=0.0, extent=100.0):
 
 class TestAggregateToPatch:
     def test_crops_to_analysis_patch(self, patch_result):
-        """Only samples within the central 100m square should be used."""
+        """Only samples within the central 100m-diameter circle should be used."""
         result = aggregate_to_patch(
-            patch_result, patch_center_xy=(0, 0), analysis_patch_size=100
+            patch_result, patch_center_xy=(0, 0), analysis_patch_diameter=100
         )
         assert result["n_samples"] > 0
         # Our synthetic domain is 250m radius, 100m patch should have a
@@ -84,7 +84,10 @@ class TestAggregateToGrid:
     def test_produces_cell_level_metrics(self, patch_result):
         grid = _make_grid()
         cells = aggregate_to_grid(patch_result, grid, (0, 0))
-        assert len(cells) == 100  # 10×10 grid at 10m in 100m patch
+        # 10×10 grid at 10m spacing → centroids at ±5…±45; 80 centroids fall
+        # inside the 50m-radius circle (π/4 × 100 = 78.54, rounded up to 80
+        # by the discrete centroid pattern).
+        assert len(cells) == 80
         assert "cfd_U_mean" in cells.columns
         assert "cfd_ach" in cells.columns
         # At least some cells have valid data
@@ -95,9 +98,9 @@ class TestAggregateToGrid:
         grid = _make_grid(extent=200)  # 20×20 cells at 10m
         assert len(grid) == 400
         cells = aggregate_to_grid(patch_result, grid, (0, 0),
-                                  analysis_patch_size=100)
-        # Only the inner 100×100m (10×10 cells) should remain
-        assert len(cells) == 100
+                                  analysis_patch_diameter=100)
+        # Only centroids inside the 100m-diameter circle survive — 80 cells.
+        assert len(cells) == 80
 
     def test_tags_with_patch_and_direction(self, patch_result):
         grid = _make_grid()
