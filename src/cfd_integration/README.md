@@ -80,35 +80,84 @@ Simulation metadata:
 data/{site}/wind_rose.json
 ```
 
-**Placeholder files already exist at this location** generated from a
-climatological prior for Rio de Janeiro. They MUST be replaced with real
-INMET station data before running the CFD campaign — the source field in
-the existing files is explicitly tagged `PLACEHOLDER` so the swap is
-obvious.
+**Placeholder files already exist at this location**, generated from a
+Rio-coastal climatological prior. Each is explicitly tagged
+`"quality_flag": "placeholder-prior"` and carries a per-site
+recommended INMET station plus an `expected_adjustment` note; they MUST
+be replaced with real station data before running the CFD campaign.
 
-To rebuild a wind rose from INMET CSV observations:
+#### Getting INMET data
+
+INMET publishes one nationwide yearly ZIP (~100 MB) per calendar year
+at a stable URL. The ZIPs contain one CSV per automatic station for the
+full year, BDMEP format (`sep=;`, `decimal=,`, latin-1, 8-row metadata
+header, `-9999` for missing values, anemometer at z = 10 m).
 
 ```bash
+# Download one year (requires browser User-Agent — default curl UA is blocked)
+curl -A "Mozilla/5.0" -O \
+  "https://portal.inmet.gov.br/uploads/dadoshistoricos/2023.zip"
+
+# Unzip and keep only the 4 RJ stations we need
+unzip -j 2023.zip 'INMET_SE_RJ_A6{52,36,21,02}*.CSV' -d data/inmet/2023/
+
+# Build one rose from multiple yearly CSVs for the same station
 python scripts/build_wind_rose.py --site vidigal \
-    --inmet-csv data/inmet/alto_da_boa_vista.csv \
-    --station "INMET Alto da Boa Vista A652" \
-    --year-start 2010 --year-end 2023
+    --inmet-csv data/inmet/2015_2024/A652_concat.csv \
+    --station-id A652 --station-name "Forte de Copacabana" \
+    --station-lat -22.988 --station-lon -43.190 \
+    --year-start 2015 --year-end 2024
 ```
 
-Schema (matches `src/cfd_integration/schema.py:WindRose`):
+Recommended stations per site (verified April 2026):
+
+| Site | Station | Code | Coords | Class |
+|------|---------|------|--------|-------|
+| Vidigal | Forte de Copacabana | A652 | −22.988, −43.190 | coastal |
+| Rocinha | Forte de Copacabana | A652 | −22.988, −43.190 | coastal |
+| Rio das Pedras | Jacarepaguá | A636 | −22.99, −43.37 | plain |
+| Complexo do Alemão | Vila Militar | A621 | −22.86, −43.41 | urban interior |
+| Maré | SBGL Galeão METAR (preferred) / A652 (INMET fallback) | — | −22.81, −43.25 | bayside |
+
+Maré's bay regime is best captured by SBGL (Galeão airport) METAR via
+Iowa State's ASOS archive; METAR ingestion is not yet implemented in
+`build_wind_rose.py`. A621 and A602 coordinates were sourced from
+cross-references rather than the INMET catalogue directly — verify
+against the station catalogue CSV before citing.
+
+#### JSON schema
 
 ```json
 {
-    "site": "vidigal",
-    "source": "INMET Alto da Boa Vista A652 2010-2023 — n=113,892 obs",
-    "frequencies": {"N": 0.04, "NE": 0.12, ..., "NW": 0.09},
-    "mean_speeds":  {"N": 2.1,  "NE": 3.4,  ..., "NW": 1.8},
-    "recommended_station": "Alto da Boa Vista (A652) — nearest mountainous site"
+  "site": "vidigal",
+  "source": "INMET Forte de Copacabana (A652) 2015-2024; n=84,321 obs (6,745 calm)",
+  "frequencies": {"N": 0.04, "NE": 0.12, ..., "NW": 0.09},
+  "mean_speeds":  {"N": 2.1, "NE": 3.4, ..., "NW": 1.8},
+  "reference_height_m": 10.0,
+  "station_id": "A652",
+  "station_name": "Forte de Copacabana",
+  "station_coords": [-22.988, -43.190],
+  "time_window_start": "2015-01-01",
+  "time_window_end": "2024-12-31",
+  "n_observations": 84321,
+  "calm_fraction": 0.08,
+  "quality_flag": "measured"
 }
 ```
 
-Frequencies sum to ~1.0. `mean_speeds` in m/s at 10 m height. Used to
-compute annualised (wind-rose-weighted) metrics per patch.
+Frequencies sum to 1.0. `mean_speeds` are m/s at z = 10 m after calm
+exclusion. `calm_fraction` (observations with |U| < 0.5 m/s or NaN
+direction) is recorded but NOT redistributed into the 8 directional
+bins. `quality_flag` is one of `measured`, `gap-filled`, or
+`placeholder-prior` — the last blocks accidental use for annualised
+metrics.
+
+**Neutral-stability assumption:** the k-ω SST inflow uses a log-law
+profile that implicitly assumes a neutral atmospheric boundary layer.
+For Rio, daytime unstable convection and evening stable inversions
+bias the stagnation metric; this limitation is accepted for the
+screening campaign. A future campaign could stratify the rose by
+stability class.
 
 ---
 

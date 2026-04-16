@@ -110,20 +110,56 @@ domains that exceed individual favela boundaries.
 
 Annualised wind roses are required to weight CFD results across the eight
 cardinal directions. Each site has a `data/{site}/wind_rose.json` file
-currently populated with a climatological prior (explicitly tagged
-`PLACEHOLDER` in the source field); these must be replaced with
-station-specific INMET records before the CFD campaign is analysed.
+whose schema is defined by `src.cfd_integration.schema.WindRose` — frequencies
+and mean speeds per direction, plus provenance metadata (station id,
+coordinates, time window, observation count, calm fraction, anemometer
+reference height, and a `quality_flag` ∈ {`measured`, `gap-filled`,
+`placeholder-prior`}).
 
-Recommended INMET stations per site (documented in
-`scripts/build_wind_rose.py`):
+**Current status.** All five files are regenerated from a Rio-coastal
+climatological prior and explicitly tagged `placeholder-prior`. They
+carry a per-site recommended INMET station and an `expected_adjustment`
+note describing how real station data is likely to differ from the
+prior. They are not usable for annualised metrics; the CFD campaign's
+results chapter will only be compiled once real data replaces the
+placeholders.
 
-| Site | Station | Rationale |
-|------|---------|-----------|
-| Vidigal | Alto da Boa Vista (A652) | nearest mountainous site |
-| Rocinha | Alto da Boa Vista (A652) | same massif |
-| Rio das Pedras | Jacarepaguá (A636) | west-zone plain |
-| Complexo do Alemão | Marambaia (A602) or Guaratiba | north-zone plain |
-| Maré | Ilha do Governador / Galeão | bayside |
+**Recommended stations** (verified April 2026 against the INMET
+catalogue, daily-graph URLs, and the published TMY paper for A652):
+
+| Site | Station | Code | Coords (lat, lon) | Class | Notes |
+|------|---------|------|-------------------|-------|-------|
+| Vidigal | Forte de Copacabana | A652 | −22.988, −43.190 | coastal | Nearest unobstructed coastal reference (~5 km E). CFD captures the Dois Irmãos lee-side locally; inflow rose stays at A652. |
+| Rocinha | Forte de Copacabana | A652 | −22.988, −43.190 | coastal | Provides the unobstructed SE→NE driver. Valley channelling is resolved by the CFD itself. |
+| Rio das Pedras | Jacarepaguá | A636 | −22.99, −43.37 | plain | Colocated with the Jacarepaguá lowland. |
+| Complexo do Alemão | Vila Militar | A621 | −22.86, −43.41 | urban interior | Closest north-zone station (~8 km W). Corrects the earlier placeholder recommendation of A602 Marambaia, which is geographically mismatched (southwest coast, not north zone). |
+| Maré | SBGL Galeão METAR (preferred); A652 (INMET fallback) | — / A652 | −22.81, −43.25 / −22.988, −43.190 | bayside | Galeão airport METAR via the Iowa State ASOS archive is the best match for the bay regime; METAR ingestion is not yet implemented in `build_wind_rose.py`. A652 is the INMET fallback. |
+
+**The earlier placeholder attributed A652 to "Alto da Boa Vista" — that
+name belongs to the municipal Alerta Rio network, not INMET. A652 is
+Forte de Copacabana. The station table is corrected here.**
+
+**Data acquisition.** INMET publishes one nationwide yearly ZIP
+(~100 MB) at
+`https://portal.inmet.gov.br/uploads/dadoshistoricos/{YEAR}.zip`, live
+and unauthenticated (browser User-Agent required). Each ZIP contains
+one CSV per automatic station for the year. The ingestion pipeline is
+documented in `src/cfd_integration/README.md` and implemented in
+`scripts/build_wind_rose.py from_inmet_csv`.
+
+BDMEP CSV format: `sep=;`, `decimal=,`, latin-1 encoding, 8-row
+metadata header, missing values encoded as −9999, anemometer at z =
+10 m. Calm periods (|U| < 0.5 m/s or direction = NaN) are excluded
+from direction binning but recorded in `calm_fraction` so they are not
+hidden.
+
+**Neutral-stability assumption.** The k-ω SST inlet uses a log-law
+profile that implicitly assumes a neutral atmospheric boundary layer.
+For Rio, daytime unstable convection and evening stable inversions
+bias the stagnation metric. This limitation is accepted for the
+screening campaign and documented in §10. A future campaign could
+stratify the rose by stability class (e.g., day vs night, or
+Pasquill-Gifford class).
 
 ### 2.4 Coordinate reference system
 
@@ -761,10 +797,19 @@ Key scripts:
 ## 10. Known Limitations
 
 1. **Wind forcing is placeholder.** All five `wind_rose.json` files
-   currently contain a climatological prior tagged `PLACEHOLDER`. Real
-   INMET station data must be ingested via `scripts/build_wind_rose.py`
-   before CFD results can be annualised. This is a pre-analysis task,
-   not a code defect.
+   carry `"quality_flag": "placeholder-prior"` and a per-site
+   `expected_adjustment` note; the schema includes provenance fields
+   (station id + coords, time window, observation count, calm
+   fraction, anemometer height) but they are null pending ingestion of
+   real data from the stations recommended in §2.3. The code path for
+   ingestion (`scripts/build_wind_rose.py --inmet-csv`) is implemented
+   and verified against the BDMEP CSV format; the outstanding step is
+   downloading the yearly ZIPs and running it. Neutral stability is
+   also assumed (see §2.3).
+
+   Additionally, the earlier placeholder recommendations misattributed
+   A652 ("Alto da Boa Vista") and A602 (Marambaia, for Complexo do
+   Alemão). Both are corrected in §2.3's station table.
 
 2. **CFD results not yet integrated.** `src/cfd_integration/` is
    tested but has not yet processed real simulation data. Any
