@@ -104,8 +104,8 @@ def main():
         for _, row in patches_now.iterrows():
             cx = row.get("center_x", row.get("centroid_x"))
             cy = row.get("center_y", row.get("centroid_y"))
-            ax.add_patch(plt.Rectangle(
-                (cx - 50, cy - 50), 100, 100,
+            ax.add_patch(plt.Circle(
+                (cx, cy), 50,
                 linewidth=0.5, edgecolor="#CC6677", facecolor="#CC6677", alpha=0.3, zorder=5,
             ))
 

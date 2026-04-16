@@ -59,9 +59,9 @@ def main():
                     linewidth=0.1, zorder=1,
                 )
 
-            # Analysis patch (100m square)
-            ax.add_patch(plt.Rectangle(
-                (cx - 50, cy - 50), 100, 100,
+            # Analysis patch (100m-diameter circle)
+            ax.add_patch(plt.Circle(
+                (cx, cy), 50,
                 linewidth=0.6, edgecolor=SITE_COLORS[site],
                 facecolor="none", linestyle="--", zorder=5,
             ))
