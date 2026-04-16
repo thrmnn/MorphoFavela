@@ -720,14 +720,13 @@ src/
 │   ├── paths.py              # per-site path registry
 │   └── ...
 ├── solar/                     # solar access (phase 4)
-├── cfd_integration/           # CFD ingestion (phase 7)
-│   ├── schema.py
-│   ├── io.py
-│   ├── aggregate.py
-│   ├── metrics.py
-│   ├── weighting.py
-│   └── README.md             # CFD agent specification
-└── patch_selection/           # legacy PCA+clustering (deprecated)
+└── cfd_integration/           # CFD ingestion (phase 7)
+    ├── schema.py
+    ├── io.py
+    ├── aggregate.py
+    ├── metrics.py
+    ├── weighting.py
+    └── README.md             # CFD agent specification
 ```
 
 Key scripts:

@@ -32,9 +32,6 @@ pipeline: ## Run full pipeline for an area (AREA=rocinha)
 report: ## Generate report for an area (AREA=rocinha)
 	python scripts/generate_report.py --area $(AREA) --format both
 
-cross-cluster: ## Run cross-area clustering
-	python scripts/run_cross_area_clustering.py
-
 clean: ## Remove caches and build artifacts
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type d -name .pytest_cache -exec rm -rf {} +

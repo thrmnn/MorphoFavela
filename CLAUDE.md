@@ -73,23 +73,17 @@ Simulation execution happens in a separate repository. This repo:
 Do not implement OpenFOAM case setup or mesh generation here. If asked,
 point to the CFD repo.
 
-## Two "patch" pipelines — don't confuse them
+## CFD patch sampling lives in scripts/
 
-The repo has two parallel systems that both use the word "patch". They
-serve different purposes and share no code:
+The 119-patch CFD campaign (stratified on SVF × slope × λp, 100 m-
+diameter circular analysis patches) is produced by two scripts:
 
-- **CFD analysis patches** (the 119-patch stratified campaign — SVF ×
-  slope × λp) live entirely in `scripts/run_pilot_sampling.py` +
-  `scripts/run_campaign_sampling.py`, writing to
-  `outputs/{site}/sampling_cfd/`. CFD runtime consumers live in
-  `src/cfd_integration/`.
-- **Generic tile-based patch selection** (clustering on morphometric
-  features) lives in `src/patch_selection/` and is driven by
-  `scripts/run_patch_selection.py`, `scripts/run_cross_area_clustering.py`,
-  `scripts/prepare_openfoam.py`. Not part of the CFD campaign.
+- `scripts/run_pilot_sampling.py` — 12–15 patches per site, stratum
+  coverage + greedy maximin spacing
+- `scripts/run_campaign_sampling.py` — incremental top-up to 22–25
+  per site with SVF-priority weighting
 
-When a task mentions CFD, sampling, the 119 patches, stratification,
-Blocken compliance, or `sampling_cfd/` outputs, work in the two
-sampling scripts and `src/cfd_integration/` — **not** in
-`src/patch_selection/`. Confusing the two costs a full exploration
-pass because the naming overlap is identical.
+Outputs land in `outputs/{site}/sampling_cfd/`. CFD runtime consumers
+(aggregation, metrics, weighting) are in `src/cfd_integration/`. An
+earlier clustering-based approach in `src/patch_selection/` was
+deleted in April 2026 — don't recreate it.

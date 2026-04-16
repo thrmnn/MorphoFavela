@@ -287,25 +287,7 @@ def collect_area_data(area: str) -> Dict[str, Any]:
     else:
         out["moran_summary"] = None
 
-    # ── 4. Patch selection (CFD) ─────────────────────────────────────────
-    patch_dir = get_area_analysis_dir(area, "patch_selection")
-    meta_path = patch_dir / "selection_metadata.json"
-    tiles_path = patch_dir / "tiles_features.csv"
-
-    if meta_path.exists():
-        with open(meta_path) as f:
-            out["patch_metadata"] = json.load(f)
-        logger.info("  patch metadata loaded")
-    else:
-        out["patch_metadata"] = None
-
-    if tiles_path.exists():
-        out["tiles_features"] = pd.read_csv(tiles_path)
-        logger.info("  tiles_features: %d tiles", len(out["tiles_features"]))
-    else:
-        out["tiles_features"] = None
-
-    # ── 5. Discover existing figures ─────────────────────────────────────
+    # ── 4. Discover existing figures ─────────────────────────────────────
     out["figures"] = _discover_figures(area)
     logger.info("  discovered %d figures", len(out["figures"]))
 
@@ -320,7 +302,6 @@ def _discover_figures(area: str) -> Dict[str, Path]:
         "svf_v2": get_area_analysis_dir(area, "svf_v2"),
         "morphology_metrics": get_area_analysis_dir(area, "morphology_metrics"),
         "urban_morphology": get_area_analysis_dir(area, "urban_morphology"),
-        "patch_selection": get_area_analysis_dir(area, "patch_selection"),
     }
 
     for label, d in search_dirs.items():
@@ -680,19 +661,6 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
                         f"| {row.get('p_value', 'N/A')} |"
                     )
                 lines.append("")
-
-        # 4.x.4 Patch selection
-        if d.get("patch_metadata") is not None:
-            pm = d["patch_metadata"]
-            lines.append("#### CFD Patch Selection\n")
-            lines.append(f"- **Number of clusters:** {pm.get('n_clusters', 'N/A')}")
-            n_tiles = len(pm.get("cluster_labels", []))
-            lines.append(f"- **Total tiles evaluated:** {n_tiles}")
-            pca_var = pm.get("pca_explained_variance", [])
-            if pca_var:
-                cum_var = sum(pca_var[:3])
-                lines.append(f"- **PCA variance explained (first 3 components):** {cum_var:.1%}")
-            lines.append("")
 
     # ── 5. Comparative Analysis ──────────────────────────────────────────
     if mode == "comparative" and len(areas_data) > 1:
@@ -1327,12 +1295,6 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
             "Zone-level panel showing BCR, FAR, height variability, and frontal area index.",
         "urban_morphology/maps/lisa_clusters_bcr":
             "LISA cluster map for BCR identifying statistically significant spatial clusters.",
-        "patch_selection/tile_clusters":
-            "Tile-level k-means cluster assignments for CFD patch selection.",
-        "patch_selection/pca_scatter":
-            "PCA scatter plot of tile features coloured by cluster membership.",
-        "patch_selection/feature_distributions":
-            "Feature distributions across morphometric clusters.",
     }
 
     with PdfPages(output_path) as pdf:
@@ -1513,9 +1475,6 @@ def generate_pdf(areas_data: List[Dict[str, Any]], output_path: Path,
                     "morphology_metrics/morphology_distributions",
                     "urban_morphology/maps/zone_metrics_panel",
                     "urban_morphology/maps/lisa_clusters_bcr",
-                    "patch_selection/tile_clusters",
-                    "patch_selection/pca_scatter",
-                    "patch_selection/feature_distributions",
                 ]
                 for key in sorted(figs.keys()):
                     if "street_svf" in key and key not in priority:
