@@ -411,12 +411,15 @@ recirculation zones that CFD will quantify.
 
 ### 6.1 Sampling design
 
-Each CFD simulation corresponds to one 100 m × 100 m **analysis patch**
-of interest, embedded in a 250 m-radius circular domain that provides
-flow-development context (per Blocken 2015 and COST Action 732). To
-characterise the morphological diversity of the five sites with a
-finite simulation budget, patches are allocated across **twelve
-stratification bins**:
+Each CFD simulation corresponds to one **analysis patch** of interest
+— a 100 m-diameter circle (radius 50 m, area ≈ 7 854 m²) — embedded in
+a 250 m-radius circular domain that provides flow-development context
+(per Blocken 2015 and COST Action 732). The circular patch shape
+matches the cylindrical symmetry of the CFD domain, avoids corner
+artefacts in morphometric averaging, and produces isotropic coverage
+independent of building-grid orientation. To characterise the
+morphological diversity of the five sites with a finite simulation
+budget, patches are allocated across **twelve stratification bins**:
 
 - SVF: 3 bins (SVF < 0.15, 0.15 ≤ SVF < 0.30, SVF ≥ 0.30)
 - Slope: 2 bins (< 15°, ≥ 15°)
@@ -433,8 +436,10 @@ A cell is an eligible patch centre if:
    (the extended buildings from Section 3.2). Measured as the fraction
    of the circular domain that intersects the convex hull of the
    extended footprints; threshold 0.7.
-2. Within the 100 m analysis patch, building footprint coverage
-   (∑ intersection area ÷ 100 m²) ≥ 0.5.
+2. Within the 100 m-diameter circular analysis patch, building
+   footprint coverage (∑ intersection area ÷ π·50² ≈ 7 854 m²) ≥ 0.5.
+   This also implicitly rejects patches clipped by the site boundary,
+   where the missing area fails the coverage threshold.
 3. All three stratification indicators are non-null.
 
 Filter outcomes per site:
@@ -464,7 +469,12 @@ maximin geographic distance** starting from the two most distant
 eligible cells; subsequent picks maximise minimum distance to already-
 selected patches (and to patches of other strata selected earlier, so
 that the cross-stratum spacing constraint is respected). Minimum
-spacing: 80 m.
+spacing: 80 m between patch centres. With 100 m-diameter patches, two
+patches at the minimum centre-to-centre distance overlap in a lens of
+≈ 817 m² (≈ 10.4 % of each patch area); this residual overlap is
+accepted because the patches are evaluated independently in separate
+CFD simulations and no joint statistics are computed over overlapping
+footprints.
 
 **Phase 2 — Campaign (incremental to 22–25 patches per site).** Pilot
 patches are held fixed and treated as immovable seeds; additional
@@ -493,8 +503,9 @@ over the full grid-cell cloud for (SVF, slope) and (SVF, λp) axes.
 Dotted lines mark stratum boundaries. (c) Horizontal bar chart of
 patches per stratum, with segments coloured by site; numeric labels
 give the stratum total. (d) Per-site maps showing analysis-patch
-locations as coloured squares over grey building footprints. All five
-sites shown at consistent visual scale with 200 m scale bars.
+locations as coloured 100 m-diameter circles over grey building
+footprints. All five sites shown at consistent visual scale with 200 m
+scale bars.
 
 ![Figure: stratum heatmap.](figures/fig_strata_heatmap.png)
 
@@ -595,8 +606,8 @@ must be rebuilt from INMET data before analysis).
   via `pyvista` (fallback), directory traversal for per-site campaigns.
 - **`aggregate.py`** — spatial aggregation onto the morphometric grid.
   Primary function `aggregate_to_grid()` maps CFD samples onto individual
-  10 m cells within the 100 m analysis patch (the scientifically
-  defensible zone per Blocken 2015). `aggregate_to_domain()` is a
+  10 m cells whose centroid falls inside the 100 m-diameter circular
+  analysis patch (the scientifically defensible zone per Blocken 2015). `aggregate_to_domain()` is a
   supplementary function that includes the full 250 m radius for
   robustness checks.
 - **`metrics.py`** — health-relevant scalar quantities:
@@ -624,7 +635,8 @@ meshing, post-processing, and convergence targets) is documented in
 contract:
 
 - **Simulation domain:** cylindrical, 250 m radius, ≥ 6 × H_max height
-  (≥ 90 m). Pedestrian sampling only valid within the central 100 m.
+  (≥ 90 m). Pedestrian sampling only valid within the central 100 m-
+  diameter circular analysis patch.
 - **Turbulence model:** k-ω SST (standard RANS for ABL flows at this
   scale).
 - **Inlet:** logarithmic velocity profile, suburban roughness class
