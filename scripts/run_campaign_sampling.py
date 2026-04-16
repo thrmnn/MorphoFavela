@@ -53,6 +53,7 @@ _git_hash = _pilot._git_hash
 _safe_float = _pilot._safe_float
 SITE_PRESETS = _pilot.SITE_PRESETS
 CONFIG = _pilot.CONFIG
+PATCH_RADIUS_M = _pilot.PATCH_RADIUS_M
 
 from src.cartography import (  # noqa: E402
     add_north_arrow,
@@ -381,14 +382,12 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
     (out_dir / "figures").mkdir(exist_ok=True)
     (out_dir / "patches").mkdir(exist_ok=True)
 
-    half = config["analysis_patch_size"] / 2
     r = config["cfd_domain_radius"]
 
-    # GeoPackage — analysis patches
+    # GeoPackage — analysis patches (100 m-diameter circles)
     patches_out = all_patches.copy()
     patches_out["geometry"] = [
-        box(row["centroid_x"] - half, row["centroid_y"] - half,
-            row["centroid_x"] + half, row["centroid_y"] + half)
+        Point(row["centroid_x"], row["centroid_y"]).buffer(PATCH_RADIUS_M)
         for _, row in all_patches.iterrows()
     ]
     out_cols = [
@@ -506,24 +505,23 @@ def _generate_campaign_figures(
     if dtm_path.exists():
         add_terrain_contours(ax, dtm_path, alpha=0.2)
 
-    half = config["analysis_patch_size"] / 2
     pilots = all_patches[all_patches["is_pilot"] == True]
     new_patches = all_patches[all_patches["is_pilot"] == False]
 
-    # Pilot patches — solid border
+    # Pilot patches — solid circle, 100 m diameter
     for _, row in pilots.iterrows():
         cx, cy = row["centroid_x"], row["centroid_y"]
-        ax.add_patch(plt.Rectangle(
-            (cx - half, cy - half), config["analysis_patch_size"], config["analysis_patch_size"],
+        ax.add_patch(plt.Circle(
+            (cx, cy), PATCH_RADIUS_M,
             linewidth=1.2, edgecolor="#1565c0", facecolor="#1565c0", alpha=0.15, zorder=4,
         ))
         ax.plot(cx, cy, "o", color="#1565c0", markersize=4, zorder=6)
 
-    # New patches — dashed border
+    # New patches — dashed circle, 100 m diameter
     for _, row in new_patches.iterrows():
         cx, cy = row["centroid_x"], row["centroid_y"]
-        ax.add_patch(plt.Rectangle(
-            (cx - half, cy - half), config["analysis_patch_size"], config["analysis_patch_size"],
+        ax.add_patch(plt.Circle(
+            (cx, cy), PATCH_RADIUS_M,
             linewidth=1.5, edgecolor="#d62728", facecolor="#d62728", alpha=0.12,
             linestyle="--", zorder=5,
         ))
@@ -616,8 +614,8 @@ def _generate_campaign_figures(
                 nearby = nearby[nearby.intersects(vbox)]
                 nearby.plot(ax=ax, facecolor="#d0d0d0", edgecolor="#666666", linewidth=0.3, zorder=1)
 
-            ax.add_patch(plt.Rectangle(
-                (cx - half, cy - half), config["analysis_patch_size"], config["analysis_patch_size"],
+            ax.add_patch(plt.Circle(
+                (cx, cy), PATCH_RADIUS_M,
                 linewidth=1.5, edgecolor="#d62728", facecolor="none", linestyle="--", zorder=5,
             ))
             ax.add_patch(plt.Circle(

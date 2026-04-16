@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import subprocess
 import sys
 import time
@@ -29,6 +30,12 @@ import rasterio
 from rasterio.mask import mask as rio_mask
 from scipy.spatial.distance import cdist
 from shapely.geometry import Point, box, mapping
+
+# Analysis patch geometry: 100 m-diameter circle centred on the patch point.
+# Circles (not squares) give isotropic morphometric averaging and match the
+# cylindrical symmetry of the 250 m CFD domain. See docs/technical_report §6.
+PATCH_RADIUS_M = 50.0
+PATCH_AREA_M2 = math.pi * PATCH_RADIUS_M**2  # ≈ 7853.98 m²
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -75,7 +82,7 @@ CONFIG = {
     "lambda_p_labels": ["λp<0.5", "λp≥0.5"],
 
     # --- Domain geometry ---
-    "analysis_patch_size": 100,       # metres, square analysis zone side
+    "analysis_patch_size": 100,       # metres, diameter of circular analysis zone
     "cfd_domain_radius": 250,         # metres, circular simulation domain
     "blocken_fetch_multiple": 5,      # min fetch = this * H_max per patch
 
@@ -395,11 +402,10 @@ def exclude_edges(
     Two-pass filter:
       1. Domain data coverage — 250 m circle must overlap ≥70 % of the
          building-data convex hull.
-      2. Building coverage — 100 m analysis patch must have ≥50 % footprint
-         coverage.
+      2. Building coverage — 100 m-diameter circular analysis patch must
+         have ≥50 % footprint coverage.
     """
     radius = config["cfd_domain_radius"]
-    patch_size = config["analysis_patch_size"]
     min_bld_cov = config["min_building_coverage"]
     min_dom_cov = config["min_domain_data_coverage"]
 
@@ -441,18 +447,16 @@ def exclude_edges(
 
     # --- Pass 2: building coverage in analysis patches ---
     logger.info(
-        "Computing building coverage in %d m patches (%d candidates)...",
-        patch_size,
+        "Computing building coverage in %.0f m-diameter circular patches (%d candidates)...",
+        2 * PATCH_RADIUS_M,
         len(eligible),
     )
     bld_sindex = buildings.sindex
-    half = patch_size / 2
-    patch_area = patch_size**2
     bld_cov = np.zeros(len(eligible))
 
     for idx, (_, row) in enumerate(eligible.iterrows()):
         cx, cy = row["centroid_x"], row["centroid_y"]
-        patch = box(cx - half, cy - half, cx + half, cy + half)
+        patch = Point(cx, cy).buffer(PATCH_RADIUS_M)
         candidates = list(bld_sindex.intersection(patch.bounds))
         if not candidates:
             continue
@@ -461,7 +465,7 @@ def exclude_edges(
             bgeom = buildings.geometry.iloc[bidx]
             if patch.intersects(bgeom):
                 total += patch.intersection(bgeom).area
-        bld_cov[idx] = total / patch_area
+        bld_cov[idx] = total / PATCH_AREA_M2
 
     eligible["_building_coverage"] = bld_cov
     n_excl_bld = int((bld_cov < min_bld_cov).sum())
@@ -695,7 +699,6 @@ def validate_blocken(
     selected = selected.copy()
     radius = config["cfd_domain_radius"]
     fetch_mult = config["blocken_fetch_multiple"]
-    half = config["analysis_patch_size"] / 2
     bld_sindex = buildings.sindex
 
     # Detect height column in raw buildings
@@ -708,7 +711,7 @@ def validate_blocken(
     h_max_list, req_list, ok_list = [], [], []
     for _, row in selected.iterrows():
         cx, cy = row["centroid_x"], row["centroid_y"]
-        patch = box(cx - half, cy - half, cx + half, cy + half)
+        patch = Point(cx, cy).buffer(PATCH_RADIUS_M)
         candidates = list(bld_sindex.intersection(patch.bounds))
         h_max = 0.0
         if candidates and height_col:
@@ -812,7 +815,8 @@ def export_patch_data(
             "center_x": float(cx),
             "center_y": float(cy),
             "stratum_id": str(row["stratum_id"]),
-            "analysis_patch_size": config["analysis_patch_size"],
+            "analysis_patch_shape": "circle",
+            "analysis_patch_diameter": config["analysis_patch_size"],
             "cfd_domain_radius": radius,
             config["col_svf"]: _safe_float(row, config["col_svf"]),
             config["col_lambda_p"]: _safe_float(row, config["col_lambda_p"]),
@@ -917,15 +921,13 @@ def generate_figure_map(
     if dtm_path.exists():
         add_terrain_contours(ax, dtm_path, alpha=0.2)
 
-    # Analysis patches (red dashed)
-    half = config["analysis_patch_size"] / 2
+    # Analysis patches (red dashed circles, 100 m diameter)
     for _, row in selected.iterrows():
         cx, cy = row["centroid_x"], row["centroid_y"]
         ax.add_patch(
-            plt.Rectangle(
-                (cx - half, cy - half),
-                config["analysis_patch_size"],
-                config["analysis_patch_size"],
+            plt.Circle(
+                (cx, cy),
+                PATCH_RADIUS_M,
                 linewidth=1.5,
                 edgecolor="#d62728",
                 facecolor="none",
@@ -984,7 +986,7 @@ def generate_figure_map(
                 color="#d62728",
                 linestyle="--",
                 lw=1.5,
-                label=f"{config['analysis_patch_size']}m analysis patch",
+                label=f"{int(2 * PATCH_RADIUS_M)}m analysis patch (⌀)",
             ),
             plt.Line2D(
                 [0],
@@ -1120,7 +1122,6 @@ def generate_figure_context(
     axes = np.atleast_2d(axes).flat
 
     radius = config["cfd_domain_radius"]
-    half = config["analysis_patch_size"] / 2
     view_half = 300
     bld_sindex = buildings.sindex
 
@@ -1141,12 +1142,11 @@ def generate_figure_context(
                 zorder=1,
             )
 
-        # Analysis box
+        # Analysis patch (circle, 100 m diameter)
         ax.add_patch(
-            plt.Rectangle(
-                (cx - half, cy - half),
-                config["analysis_patch_size"],
-                config["analysis_patch_size"],
+            plt.Circle(
+                (cx, cy),
+                PATCH_RADIUS_M,
                 linewidth=1.5,
                 edgecolor="#d62728",
                 facecolor="none",
@@ -1396,18 +1396,12 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
     (output_dir / "figures").mkdir(exist_ok=True)
     (output_dir / "patches").mkdir(exist_ok=True)
 
-    half = config["analysis_patch_size"] / 2
     r = config["cfd_domain_radius"]
 
     # -- GeoPackage (two layers) --
     patches_gdf = selected.copy()
     patches_gdf["geometry"] = [
-        box(
-            row["centroid_x"] - half,
-            row["centroid_y"] - half,
-            row["centroid_x"] + half,
-            row["centroid_y"] + half,
-        )
+        Point(row["centroid_x"], row["centroid_y"]).buffer(PATCH_RADIUS_M)
         for _, row in selected.iterrows()
     ]
 
