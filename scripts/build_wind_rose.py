@@ -311,6 +311,96 @@ def from_inmet_csv(
     }
 
 
+def from_iowa_asos_csv(
+    csv_path: Path,
+    station_id: str,
+    station_name: str,
+    year_start: Optional[int] = None,
+    year_end: Optional[int] = None,
+) -> dict:
+    """Build a wind rose from an Iowa State ASOS archive CSV (METAR).
+
+    Download URL pattern:
+        https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py
+            ?station={ID}&data=drct&data=sknt
+            &year1=2015&month1=1&day1=1
+            &year2=2025&month2=1&day2=1
+            &tz=Etc/UTC&format=onlycomma&latlon=yes&missing=M&trace=T
+
+    Columns produced by Iowa ASOS:
+        station, valid (UTC), lon, lat, drct (degrees), sknt (knots)
+
+    Missing values encoded as 'M'. Speed in knots → convert to m/s.
+    Anemometer height is the METAR standard 10 m for airport stations.
+    """
+    df = pd.read_csv(csv_path, na_values=["M"])
+    required = {"valid", "drct", "sknt"}
+    if not required.issubset(df.columns):
+        raise ValueError(
+            f"Iowa ASOS CSV missing expected columns {required}. "
+            f"Got: {sorted(df.columns)}"
+        )
+
+    # Station coords carried per-row in the ASOS schema
+    lat = float(df["lat"].iloc[0]) if "lat" in df.columns and len(df) else None
+    lon = float(df["lon"].iloc[0]) if "lon" in df.columns and len(df) else None
+    station_coords = (lat, lon) if lat is not None and lon is not None else None
+
+    df["valid"] = pd.to_datetime(df["valid"], errors="coerce")
+    if year_start:
+        df = df[df["valid"].dt.year >= year_start]
+    if year_end:
+        df = df[df["valid"].dt.year <= year_end]
+
+    tw_start = tw_end = None
+    if len(df) > 0:
+        tw_start = df["valid"].min().date().isoformat()
+        tw_end = df["valid"].max().date().isoformat()
+
+    df["sknt"] = pd.to_numeric(df["sknt"], errors="coerce")
+    df["drct"] = pd.to_numeric(df["drct"], errors="coerce")
+    df["u_ms"] = df["sknt"] * 0.514444  # knots → m/s
+
+    df = df.dropna(subset=["u_ms"])
+    n_total = len(df)
+
+    # Calm: |U| < 0.5 m/s OR direction missing
+    calm_mask = (df["u_ms"] < 0.5) | df["drct"].isna()
+    n_calm = int(calm_mask.sum())
+    active = df[~calm_mask].copy()
+
+    active["cardinal"] = active["drct"].apply(deg_to_cardinal)
+    freq = active["cardinal"].value_counts(normalize=True).to_dict()
+    speed = active.groupby("cardinal")["u_ms"].mean().to_dict()
+
+    frequencies = {d: float(freq.get(d, 0.0)) for d in WIND_DIRECTIONS_8}
+    mean_speeds = {d: float(speed.get(d, 0.0)) for d in WIND_DIRECTIONS_8}
+
+    period_str = ""
+    if tw_start and tw_end:
+        period_str = f" {tw_start[:4]}–{tw_end[:4]}"
+
+    source = (
+        f"Iowa ASOS {station_name}{period_str}; n={n_total:,} obs "
+        f"({n_calm:,} calm below 0.5 m/s or null direction, excluded)"
+    )
+
+    return {
+        "frequencies": frequencies,
+        "mean_speeds": mean_speeds,
+        "source": source,
+        "reference_height_m": 10.0,
+        "station_id": station_id,
+        "station_name": station_name,
+        "station_coords": list(station_coords) if station_coords else None,
+        "time_window_start": tw_start,
+        "time_window_end": tw_end,
+        "n_observations": n_total,
+        "calm_fraction": float(n_calm / n_total) if n_total else None,
+        "quality_flag": "measured",
+    }
+
+
 def from_template(site: str) -> dict:
     """Return the Rio-coastal climatological prior, enriched with the
     site-specific station recommendation + exposure class + the expected
@@ -429,6 +519,10 @@ def main():
         help="INMET observations CSV (preferred — real measured data)",
     )
     parser.add_argument(
+        "--asos-csv", type=Path, default=None,
+        help="Iowa ASOS METAR CSV (for Maré / SBGL Galeão).",
+    )
+    parser.add_argument(
         "--station-id", default=None,
         help="INMET station code (e.g., A652). Defaults to the site's "
              "recommended station from SITE_PROFILES.",
@@ -453,16 +547,18 @@ def main():
     )
     args = parser.parse_args()
 
-    if not args.inmet_csv and not args.from_template:
-        parser.error("Must provide either --inmet-csv <path> or --from-template")
+    if not any([args.inmet_csv, args.asos_csv, args.from_template]):
+        parser.error(
+            "Must provide --inmet-csv <path>, --asos-csv <path>, or --from-template"
+        )
 
     sites = list(SITE_PROFILES) if args.site == "all" else [args.site]
 
     for site in sites:
         profile = SITE_PROFILES[site]
+        station_id = args.station_id or profile.recommended_station_id
+        station_name = args.station_name or profile.recommended_station_name
         if args.inmet_csv:
-            station_id = args.station_id or profile.recommended_station_id
-            station_name = args.station_name or profile.recommended_station_name
             coords = None
             if args.station_lat is not None and args.station_lon is not None:
                 coords = (args.station_lat, args.station_lon)
@@ -473,6 +569,14 @@ def main():
                 station_id=station_id,
                 station_name=station_name,
                 station_coords=coords,
+                year_start=args.year_start,
+                year_end=args.year_end,
+            )
+        elif args.asos_csv:
+            rose = from_iowa_asos_csv(
+                args.asos_csv,
+                station_id=station_id,
+                station_name=station_name,
                 year_start=args.year_start,
                 year_end=args.year_end,
             )
