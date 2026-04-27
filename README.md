@@ -51,301 +51,143 @@ Iowa ASOS METAR (Galeão SBGL for Maré) ───────┘               
 
 Stations: A652 Forte de Copacabana → vidigal/rocinha · A636 Jacarepaguá → riodaspedras · A621 Vila Militar → complexo_do_alemao · SBGL Galeão → maré.
 
-## CFD Sampling Campaign
+## Pipeline walkthrough — vidigal end-to-end
 
-Stratified sampling pipeline for CFD wind simulations across 5 informal settlements:
+This is the canonical "I just cloned the repo, run the pipeline on
+one site" path. Substitute another site name for `vidigal` to repeat.
+
+### 1. Environment
 
 ```bash
-# 1. Build extended building + DTM context (city-wide data, 300m buffer)
-python scripts/build_extended_context.py --area {site} --buffer 300
+git clone https://github.com/thrmnn/MorphoFavela.git && cd MorphoFavela
+conda create -n IVF python=3.11 && conda activate IVF
+pip install -e ".[dev]"
+```
 
-# 2. Run pilot sampling (12-strata, 12-15 patches per site)
-python scripts/run_pilot_sampling.py --site {site} \
-  --buildings data/{site}/buildings_extended_300m.gpkg \
-  --dtm data/{site}/dtm_extended_300m.tif
+GDAL / GEOS native libraries must be present (`apt install libgdal-dev`
+on Linux, `brew install gdal` on macOS) before `pip install`.
+For GPU SVF: `pip install -e ".[gpu]"`.
 
-# 3. Scale to full campaign (SVF-priority weighting, adds ~10 patches per site)
+### 2. Inputs
+
+Place the per-site shapefile + DTM under `data/vidigal/` per the
+contract in [`data/README.md`](data/README.md). At minimum:
+
+```
+data/vidigal/raw/vidigal_buildings.shp   # footprints with height attrs
+data/vidigal/dtm_extended_300m.tif       # manually clipped from RJ DTM
+```
+
+### 3. Wind input (one-off, shared by all sites)
+
+```bash
+python scripts/download_inmet_zips.py \
+    --years 2015 2016 2017 2018 2019 2020 2021 2022 2023 2024 \
+    --out-dir data/inmet/raw
+
+python scripts/extract_inmet_stations.py \
+    --zips-dir data/inmet/raw --out-dir data/inmet/processed \
+    --stations A652 A636 A621 A602
+
+python scripts/build_wind_rose.py --site vidigal \
+    --inmet-csv data/inmet/processed/concat/A652_2015_2024.csv
+```
+
+Result: `data/vidigal/wind_rose.json` (used later for annual weighting
+of CFD outputs).
+
+### 4. Extended morphometric context
+
+```bash
+python scripts/build_extended_context.py --area vidigal --buffer 300
+```
+
+Result: `data/vidigal/buildings_extended_300m.gpkg`. The 300 m buffer
+ensures CFD patches near the favela edge see the surrounding urban
+fabric.
+
+### 5. Per-feature analyses (independent — run in parallel if you like)
+
+```bash
+python scripts/run_svf_v2.py            --area vidigal --spacing 2.0
+python scripts/compute_solar_access.py  --area vidigal --threshold 2.0
+python scripts/compute_sectional_porosity.py --area vidigal --grid-spacing 2.0
+python scripts/compute_urban_morphology.py   --area vidigal
+python scripts/run_morphometric_audit.py     --area vidigal
+```
+
+Outputs land in `outputs/vidigal/` — see
+[`src/svf_v2/README.md`](src/svf_v2/README.md),
+[`src/solar/README.md`](src/solar/README.md), and
+[`src/morphometry/README.md`](src/morphometry/README.md) for
+per-module details on what each writes.
+
+### 6. CFD patch sampling
+
+```bash
+python scripts/run_pilot_sampling.py --site vidigal \
+    --buildings data/vidigal/buildings_extended_300m.gpkg \
+    --dtm data/vidigal/dtm_extended_300m.tif
+
 python scripts/run_campaign_sampling.py
 ```
 
-Results: 119 patches (5 sites × ~24 patches), each with per-patch building footprints,
-terrain clip, and metadata ready for OpenFOAM case setup. Outputs in
-`outputs/{site}/sampling_cfd/campaign_sampling/` and cross-site summary in
-`outputs/comparative/final_allocation/`.
+Result: 22 patches under
+`outputs/vidigal/sampling_cfd/campaign_sampling/patches/{PATCH_ID}/`,
+each with `buildings.gpkg`, `terrain.tif`, and `patch_meta.json`.
 
-## Paper Figures
+### 7. CFD execution (separate repo)
 
-Publication figures for the Nature Cities submission are in `outputs/paper_figures/`.
-Each script is standalone and regenerable from pipeline outputs:
+CFD runs live in `~/Airflow`. Drop the patch artefacts in there and
+submit:
+
+```bash
+# ~/Airflow:
+scripts/hpc/submit_patch_chain.sh VDG-P07
+```
+
+Results return at `data/vidigal/cfd_results/{patch_id}/{wind_dir}/`
+per the contract in
+[`src/cfd_integration/README.md`](src/cfd_integration/README.md).
+
+### 8. Annualised aggregation
+
+Once CFD outputs land:
+
+```python
+from src.cfd_integration.io import load_campaign_results
+from src.cfd_integration.weighting import weighted_by_wind_rose
+
+campaign = load_campaign_results("vidigal")
+annual = weighted_by_wind_rose(campaign, "data/vidigal/wind_rose.json")
+```
+
+### 9. Paper figures
 
 ```bash
 for f in outputs/paper_figures/fig*.py; do python3 "$f"; done
 ```
 
-See `outputs/paper_figures/README.md` for per-figure documentation.
+Outputs land in `outputs/paper_figures/exports/` (PNG + SVG); the
+PNGs already published in the technical report live in
+`docs/technical_report/figures/`.
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.11+
-- Conda (recommended) or virtual environment
-
-### Setup
-
-**Using Conda:**
 ```bash
-conda create -n IVF python=3.11
-conda activate IVF
-pip install -r requirements.txt
+git clone https://github.com/thrmnn/MorphoFavela.git && cd MorphoFavela
+conda create -n IVF python=3.11 && conda activate IVF
+pip install -e ".[dev]"          # add ".[gpu]" for PyTorch3D-backed SVF
 ```
 
-**Using Virtual Environment:**
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
+GDAL / GEOS native libraries are required (`apt install libgdal-dev`
+on Linux, `brew install gdal` on macOS). See
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for pre-commit setup and the
+test/lint workflow.
 
-### Activating the Environment (Start of Each Session)
-
-**Important**: Before running any analysis, activate the conda environment:
-
-```bash
-# Source conda activation script
-source ../conda_activate.sh
-
-# Activate the IVF conda environment
-conda activate IVF
-```
-
-This should be done at the start of every new session before running any scripts.
-
-## Quick Start
-
-1. **Prepare your data:**
-   ```bash
-   mkdir -p data/raw
-   # Copy your building footprints file to data/raw/
-   ```
-
-2. **Run the analysis:**
-   
-   **Basic morphometric analysis:**
-   ```bash
-   python scripts/calculate_metrics.py
-   ```
-   
-   **Extended morphology metrics (25 indicators):**
-   ```bash
-   python scripts/calculate_morphology_metrics.py --area vidigal_tls
-   ```
-   
-   **Morphology risk mapping (spatial risk hotspots):**
-   ```bash
-   python scripts/analyze_morphology_risk.py --area vidigal_tls --hotspots --streets data/vidigal_tls/raw/roads_vidigal.shp
-   ```
-   
-   **Sky View Factor (SVF v2) computation:**
-   ```bash
-   python scripts/run_svf_v2.py --area vidigal_tls --spacing 2.0
-   ```
-   
-   **Solar Access computation:**
-   ```bash
-   python scripts/compute_solar_access.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --threshold 3.0
-   ```
-   
-   **Sky Exposure Plane Exceedance analysis (unified):**
-   ```bash
-   # Building-level only (no roads required)
-   python scripts/analyze_sky_exposure_streets.py --stl data/vidigal_tls/raw/full_scan.stl --footprints data/vidigal_tls/raw/vidigal_buildings.shp --ruleset rio --area vidigal_tls
-   
-   # Building-level + Street-level (with road network)
-   python scripts/analyze_sky_exposure_streets.py --stl data/vidigal_tls/raw/full_scan.stl --roads data/vidigal_tls/raw/roads_vidigal.shp --footprints data/vidigal_tls/raw/vidigal_buildings.shp --ruleset rio --area vidigal_tls --spacing 5.0
-   ```
-   
-   **Sectional Porosity computation:**
-   ```bash
-   python scripts/compute_sectional_porosity.py --footprints data/raw/vidigal_buildings.shp --grid-spacing 2.0 --height 1.5 --buffer 0.25
-   ```
-   
-   **Occupancy Density Proxy computation:**
-   ```bash
-   python scripts/compute_occupancy_density.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-size 50.0
-   ```
-   
-   **Morphological Environmental Deprivation Index (Unit-level):**
-   ```bash
-   python scripts/compute_deprivation_index.py --units outputs/density/density_proxy.gpkg --solar outputs/solar/solar_access.npy --svf outputs/svf/svf.npy --porosity outputs/porosity/porosity.npy --density outputs/density/density_proxy.gpkg
-   ```
-   
-   **Morphological Environmental Deprivation Index (Raster-based):**
-   ```bash
-   python scripts/compute_deprivation_index_raster.py --solar outputs/solar/solar_access.npy --svf outputs/svf/svf.npy --porosity outputs/porosity/porosity.npy --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --units outputs/density/density_proxy.gpkg
-   ```
-   
-   **Comparative Analysis (Formal vs Informal):**
-   ```bash
-   python scripts/compare_areas.py
-   ```
-   Generates comprehensive PDF report comparing Vidigal_TLS and Copacabana across all metrics with statistical tests and visualizations.
-
-3. **Check results:**
-   - `outputs/buildings_with_metrics.gpkg` - Enhanced dataset
-   - `outputs/summary_stats.csv` - Summary statistics
-   - `outputs/svf/` - SVF computation results (grid-based)
-   - `outputs/svf_streets/` - Street-level SVF computation results
-   - `outputs/solar/` - Solar access computation results
-   - `outputs/sky_exposure/` - Sky exposure plane exceedance analysis results
-   - `outputs/porosity/` - Sectional porosity computation results
-   - `outputs/density/` - Occupancy density proxy results
-   - `outputs/deprivation/` - Unit-level deprivation index results
-   - `outputs/deprivation_raster/` - Raster-based deprivation index results
-   - `outputs/comparative/` - Comparative analysis results (PDF report, tables, visualizations)
-   - `outputs/maps/` - All visualization files
-
-## Input Data Requirements
-
-### Basic Morphometric Analysis
-
-**File Format:**
-- Supported: `.gpkg`, `.geojson`, or `.shp`
-- The script automatically finds the first geospatial file in `data/raw/`
-
-**Required Attributes:**
-
-**Standard format:**
-- `base_height`: Elevation of building base (meters)
-- `top_height`: Elevation of building top (meters)
-
-**Alternative format (automatically converted):**
-- `base`: Base elevation (meters)
-- `altura`: Relative building height (meters)
-
-### Sky View Factor (SVF) and Solar Access Computation
-
-**Required Files:**
-- **STL mesh**: Combined 3D scene containing both terrain and buildings (`.stl` file)
-- **Building footprints** (optional): Shapefile for masking building interiors from ground-level analysis
-
-**Methodology**: 
-- **SVF**: Computes Sky View Factor using a discretized hemispherical dome approach. The sky is divided into equal-area patches, and ray-casting is used to determine how much of the sky is visible from each ground point. Uses `pyviewfactor`-style geometric visibility testing.
-- **Solar Access**: Computes hours of direct sunlight by casting rays toward sun positions for winter solstice. Uses `pvlib` for accurate solar position calculations.
-
-Both analyses:
-- Exclude building interiors (only compute for ground-level points)
-- Use the same ground mask logic for consistency
-- Support progress monitoring during computation
-
-### Sky Exposure Plane Exceedance Analysis
-
-**Required Files:**
-- **STL mesh**: Combined 3D scene containing both terrain and buildings (`.stl` file)
-- **Building footprints**: Shapefile with building footprint polygons
-
-**Methodology**: 
-The sky exposure plane is an environmental performance envelope that defines the maximum allowable built form based on:
-- **Base height**: Minimum height allowed before sky plane applies (typically 6-9m for 2-3 floors)
-- **Setbacks**: Front (5m) and side/rear (3m) setbacks from footprint boundaries
-- **Sky plane angle**: Inclined plane rising from setback lines at specified angle (typically 45°)
-
-The analysis quantifies how much built volume exceeds this envelope, evaluating environmental implications (solar access and ventilation), NOT legal code compliance.
-
-**Parameters:**
-- `--angle`: Sky exposure plane angle in degrees (default: 45.0°)
-- `--base-height`: Base height before sky plane applies (default: 7.5m, range: 6-9m)
-- `--front-setback`: Front setback distance (default: 5.0m)
-- `--side-setback`: Side/rear setback distance (default: 3.0m)
-
-### Coordinate System
-- Projected CRS required (UTM preferred) for accurate area calculations
-- The script validates CRS before processing
-
-## Metrics Calculated
-
-The pipeline calculates 6 fundamental morphometric metrics:
-
-1. **height**: Building height (top_height - base_height) in meters
-2. **area**: Footprint area in m²
-3. **volume**: Building volume (area × height) in m³
-4. **perimeter**: Footprint perimeter in meters
-5. **hw_ratio**: Street canyon ratio (height/width) - building height divided by building width
-6. **inter_building_distance**: Distance to nearest neighbor building (m) - minimum distance between building boundaries. Calculated using spatial indexing for efficient computation on large datasets.
-
-## Output Files
-
-### Data Outputs
-- `buildings_with_metrics.gpkg`: Enhanced dataset with all calculated metrics
-- `summary_stats.csv`: Descriptive statistics (mean, std, min, max, quartiles)
-
-### Visualizations
-- `height_volume_maps.png`: Height, volume, and inter-building distance thematic maps
-- `multi_panel_summary.png`: Multi-panel grid showing all key metrics (2×3 when inter-building distance is available)
-- `statistical_distributions.png`: Histograms and box plots for all metrics
-- `scatter_plots.png`: Relationships between metrics including inter-building distance
-
-### SVF Outputs (`outputs/svf/`)
-- `svf.npy`: 2D NumPy array of SVF values (NaN for building points)
-- `svf.csv`: CSV file with columns: x, y, svf (only ground points)
-- `svf_heatmap.png`: Top-down SVF heatmap visualization (0-1 scale)
-- `svf_histogram.png`: Histogram of SVF value distribution
-- `ground_mask_debug.png`: Debug plot showing ground points and building footprints
-
-### Solar Access Outputs (`outputs/solar/`)
-- `solar_access_heatmap.png`: Hours of direct sunlight heatmap
-- `solar_access_threshold.png`: Binary classification map (red: <threshold, green: ≥threshold)
-- `ground_mask_debug.png`: Debug plot showing ground points and building footprints
-
-### Sky Exposure Plane Exceedance Outputs (`outputs/sky_exposure/`)
-- `exceedance_map.png`: Plan view map showing buildings colored by exceedance ratio (%)
-- `section_1.png`, `section_2.png`, `section_3.png`: Vertical sections showing actual built form vs sky exposure plane envelope
-- `exceedance_results.csv`: Detailed exceedance metrics per building (total volume, exceeding volume, exceedance ratio, max exceedance height)
-
-## Configuration
-
-Edit `src/config.py` to customize:
-
-### Filtering Parameters
-```python
-MAX_FILTER_HEIGHT = 20.0      # Maximum building height (m)
-MAX_FILTER_AREA = 500.0      # Maximum footprint area (m²)
-MAX_FILTER_VOLUME = 3000.0   # Maximum building volume (m³)
-MAX_FILTER_HW_RATIO = 100.0  # Maximum h/w ratio
-HEIGHT_AREA_PERCENTILE = 99.0  # Percentile for height/area outlier filtering
-```
-
-### Visualization Settings
-```python
-DPI = 300                    # Output resolution
-FIGURE_SIZE = (12, 8)        # Figure dimensions
-COLORMAP_HEIGHT = "viridis"  # Colormap for height maps
-COLORMAP_VOLUME = "plasma"   # Colormap for volume maps
-```
-
-### SVF and Solar Access Computation
-
-Both scripts are configured via command-line arguments:
-
-**SVF Script:**
-- `--grid-spacing`: Grid resolution in meters (e.g., 5.0m)
-- `--height`: Evaluation height above ground (e.g., 0.5m)
-- `--sky-patches`: Number of sky patches for hemisphere discretization (e.g., 145 or 290)
-- `--footprints`: Optional path to building footprints shapefile
-- `--buffer-distance`: Buffer distance for building footprints (default: 0.25m)
-
-**Solar Access Script:**
-- `--grid-spacing`: Grid resolution in meters (e.g., 5.0m)
-- `--height`: Evaluation height above ground (e.g., 0.5m)
-- `--threshold`: Solar access threshold in hours (default: 2.0h)
-- `--timestep`: Solar calculation time step in minutes (default: 60)
-- `--latitude` / `--longitude`: Site coordinates (default: Rio de Janeiro)
-- `--footprints`: Optional path to building footprints shapefile
-- `--buffer-distance`: Buffer distance for building footprints (default: 0.25m)
-
-See `python scripts/compute_svf.py --help` and `python scripts/compute_solar_access.py --help` for all options.
-
-Set any filter to `None` to disable it.
+The full input contract — what each `data/{site}/` subdirectory must
+contain and where each file comes from — is documented in
+[`data/README.md`](data/README.md).
 
 ## Project Structure
 
@@ -391,100 +233,47 @@ IVF/
     └── archive/                          # Superseded planning + summary docs
 ```
 
-## Filtering Pipeline
+## Configuration + per-module details
 
-**Note**: Filtering is only applied to **informal settlements** (e.g., Vidigal_TLS). **Formal settlements** (e.g., Copacabana) skip all filtering to preserve the complete dataset.
+- **Filtering thresholds** for morphometric analysis (height /
+  area / volume / h/w-ratio caps, percentile filters): `src/config.py`.
+- **Per-feature internals** — methodology, output schema, public
+  API:
+  - [`src/svf_v2/README.md`](src/svf_v2/README.md) — Sky View Factor
+  - [`src/solar/README.md`](src/solar/README.md) — Solar access (ground + façade)
+  - [`src/morphometry/README.md`](src/morphometry/README.md) — 12-indicator 10 m grid + audit pipeline
+  - [`src/cfd_integration/README.md`](src/cfd_integration/README.md) — CFD I/O contract + wind-rose weighting
+  - [`src/visualization/README.md`](src/visualization/README.md) — building / zone-level chart helpers
+- **Paper figures** (Nature Cities): see
+  [`outputs/paper_figures/README.md`](outputs/paper_figures/README.md).
+- **Pinned dependencies**: see [`pyproject.toml`](pyproject.toml).
+- **Linting + formatting**: ruff is gating CI; configuration is in
+  the `[tool.ruff]` section of `pyproject.toml`.
 
-For informal areas, the pipeline applies filters in the following order:
+## Documentation
 
-1. **Height filter**: Removes buildings exceeding maximum height
-2. **Metrics calculation**: Computes all morphometric metrics
-3. **Area filter**: Removes buildings exceeding maximum area
-4. **Volume filter**: Removes buildings exceeding maximum volume
-5. **H/W ratio filter**: Removes buildings with extreme h/w ratios
-6. **Height/area ratio filter**: Removes outliers using percentile-based method
-
-## Dependencies
-
-- `geopandas>=0.14.0` - Geospatial data handling
-- `shapely>=2.0.0` - Geometric operations
-- `numpy>=1.24.0` - Numerical computing
-- `pandas>=2.0.0` - Data manipulation
-- `matplotlib>=3.7.0` - Visualization
-- `tqdm>=4.65.0` - Progress bars
-- `pyviewfactor>=1.0.0` - View factor computation (for SVF)
-- `pyvista>=0.32.0` - 3D geometry handling and ray tracing
-- `pvlib>=0.10.0` - Solar position calculations (for solar access)
-
-## Usage Examples
-
-### Basic Morphometric Analysis
-```bash
-python scripts/calculate_metrics.py
-```
-
-### SVF Computation (v2)
-```bash
-python scripts/run_svf_v2.py --area vidigal_tls --spacing 2.0
-```
-
-### Solar Access Computation
-```bash
-python scripts/compute_solar_access.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-spacing 5.0 --height 0.5 --threshold 3.0
-```
-
-### Sky Exposure Plane Exceedance Analysis (Unified)
-```bash
-# Building-level only
-python scripts/analyze_sky_exposure_streets.py --stl data/vidigal_tls/raw/full_scan.stl --footprints data/vidigal_tls/raw/vidigal_buildings.shp --ruleset rio --area vidigal_tls
-
-# Building-level + Street-level (with road network)
-python scripts/analyze_sky_exposure_streets.py --stl data/vidigal_tls/raw/full_scan.stl --roads data/vidigal_tls/raw/roads_vidigal.shp --footprints data/vidigal_tls/raw/vidigal_buildings.shp --ruleset rio --area vidigal_tls --spacing 5.0
-```
-
-### Sectional Porosity Computation
-```bash
-python scripts/compute_sectional_porosity.py --footprints data/raw/vidigal_buildings.shp --grid-spacing 2.0 --height 1.5 --buffer 0.25
-```
-
-### Occupancy Density Proxy Computation
-```bash
-python scripts/compute_occupancy_density.py --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --grid-size 50.0
-```
-
-### Morphological Environmental Deprivation Index (Unit-level)
-```bash
-python scripts/compute_deprivation_index.py --units outputs/density/density_proxy.gpkg --solar outputs/solar/solar_access.npy --svf outputs/svf/svf.npy --porosity outputs/porosity/porosity.npy --density outputs/density/density_proxy.gpkg
-```
-
-### Morphological Environmental Deprivation Index (Raster-based)
-```bash
-python scripts/compute_deprivation_index_raster.py --solar outputs/solar/solar_access.npy --svf outputs/svf/svf.npy --porosity outputs/porosity/porosity.npy --stl data/raw/full_scan.stl --footprints data/raw/vidigal_buildings.shp --units outputs/density/density_proxy.gpkg
-```
-
-### Custom Configuration
-1. Edit `src/config.py` to adjust filtering thresholds for morphometric analysis
-2. Use command-line arguments to configure SVF and solar access parameters
-3. Run the scripts as normal
-
-## Data Validation
-
-The pipeline automatically validates:
-- Required columns (height attributes)
-- Coordinate Reference System (CRS)
-- Geometry validity
-- Data quality (null values, invalid heights)
-
-Warnings are logged for non-critical issues; critical errors stop processing.
+- **Technical report** (canonical project description, distributed
+  with the code): [`docs/technical_report/technical_report.md`](docs/technical_report/technical_report.md)
+  + [`.pdf`](docs/technical_report/technical_report.pdf). Rebuild
+  with `python docs/technical_report/build_pdf.py`.
+- **Roadmap + project status**: [`ROADMAP.md`](ROADMAP.md).
+- **Changelog**: [`CHANGELOG.md`](CHANGELOG.md).
+- **Per-feature usage guides**: [`docs/guides/`](docs/guides/).
+- **Superseded planning docs** (kept for archaeology, not a
+  current reference): [`docs/archive/`](docs/archive/).
 
 ## Contributing
 
-This is a research project. For questions or issues, please contact the project maintainer.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for development
+environment setup, the test/lint workflow, commit conventions,
+and the technical-report sync rule.
 
 ## License
 
-See LICENSE file for details.
+[MIT](LICENSE).
 
 ## Citation
 
-If you use this code in your research, please cite appropriately.
+See [`CITATION.cff`](CITATION.cff) — GitHub renders a "Cite this
+repository" button from this file. The Nature Cities article DOI
+will be added once published.
