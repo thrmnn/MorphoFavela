@@ -16,6 +16,41 @@ A Python pipeline for calculating morphometric metrics from building footprints 
 
 See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Current status**: Phases 1-4 complete. Phase 5 (CFD campaign) — 119 patches allocated across 5 sites, ready for OpenFOAM simulations. Paper figures for Nature Cities submission complete.
 
+## Repository Map
+
+This repo handles morphometric analysis, sampling, wind input data, and paper
+figures. CFD simulations themselves run in a separate repo.
+
+| Concern | Location |
+|---|---|
+| **Morphometric analysis** | `src/`, `scripts/calculate_*.py`, `scripts/run_svf_v2.py`, … |
+| **CFD patch sampling** (5 sites × 119 patches) | `scripts/run_pilot_sampling.py`, `scripts/run_campaign_sampling.py` |
+| **CFD I/O contract** (what CFD must produce, how we ingest) | `src/cfd_integration/README.md` |
+| **CFD simulation execution** | **Separate repo at `~/Airflow`** (OpenFOAM + SLURM on MIT ORCD) |
+| **Wind input** (boundary conditions, annual weighting) | `scripts/build_wind_rose.py`, `scripts/extract_inmet_stations.py` → `data/{site}/wind_rose.json` |
+| **Technical report** (canonical deliverable) | `docs/technical_report/technical_report.md` (and `.pdf`) |
+| **Paper figures** (Nature Cities) | `outputs/paper_figures/` |
+
+**End-to-end pipeline order** (per site):
+
+1. `scripts/build_extended_context.py --area {site} --buffer 300` — clip city-wide buildings + DTM to a 300 m buffer.
+2. Per-feature analyses (independent, can run in parallel):
+   `run_svf_v2.py`, `compute_solar_access.py`, `compute_sectional_porosity.py`,
+   `compute_occupancy_density.py`, `compute_urban_morphology.py`.
+3. `scripts/run_pilot_sampling.py` → `scripts/run_campaign_sampling.py` — stratify on SVF × slope × λp, allocate 22-25 patches per site.
+4. **CFD execution** lives in `~/Airflow` (`scripts/hpc/submit_patch_chain.sh PATCH_ID`). Returns `data/{site}/cfd_results/{patch_id}/{wind_dir}/`.
+5. `src/cfd_integration/` ingests CFD outputs and weights them by the site's wind rose.
+
+**Wind input flow** (one-time, per site):
+
+```
+INMET BDMEP yearly ZIPs (Brazilian network) ──┐
+                                              ├─→ build_wind_rose.py ──→ data/{site}/wind_rose.json
+Iowa ASOS METAR (Galeão SBGL for Maré) ───────┘                          (used for §5 weighting)
+```
+
+Stations: A652 Forte de Copacabana → vidigal/rocinha · A636 Jacarepaguá → riodaspedras · A621 Vila Militar → complexo_do_alemao · SBGL Galeão → maré.
+
 ## CFD Sampling Campaign
 
 Stratified sampling pipeline for CFD wind simulations across 5 informal settlements:
@@ -316,45 +351,44 @@ Set any filter to `None` to disable it.
 
 ```
 IVF/
-├── README.md                 # This file
-├── requirements.txt          # Python dependencies
-├── .gitignore               # Git ignore rules
-├── claude.md                # AI context documentation
+├── README.md, ROADMAP.md, CLAUDE.md      # Entry points (see also Repository Map above)
 │
-├── data/                    # NOT tracked in git
-│   ├── raw/                 # Input data directory
-│   └── README.md            # Data documentation
+├── src/                                  # Library code (importable)
+│   ├── morphometry/                      # Core morphometric metrics
+│   ├── svf_v2/                           # GPU sky-view-factor computation
+│   ├── solar/                            # Façade + ground solar access
+│   ├── cfd_integration/                  # CFD I/O contract, wind weighting (see its README)
+│   ├── visualization/                    # Map + chart helpers
+│   ├── urban_morphology.py               # BCR, FAR, λp, λf
+│   ├── typology.py                       # Settlement typology
+│   ├── exposure.py                       # Sky-exposure-plane exceedance
+│   ├── spatial_analysis.py               # Moran's I, LISA, Gi*
+│   └── config.py                         # Filtering thresholds + plot settings
 │
-├── src/                     # Source code
-│   ├── __init__.py
-│   ├── config.py            # Configuration settings
-│   ├── metrics.py           # Metrics calculation & validation
-│   ├── morphology_metrics.py # Extended morphology (25 indicators)
-│   ├── spatial_analysis.py  # Spatial statistics (Moran's I, LISA, Gi*)
-│   ├── urban_morphology.py  # Zone-level morphology (BCR, FAR, lambda_f)
-│   ├── typology.py          # Settlement typology classification
-│   ├── visualize.py         # Visualization functions
-│   ├── svf_utils.py         # Shared utilities for SVF and solar access
-│   └── svf_v2/              # SVF v2 modular implementation
+├── scripts/                              # Executable entry points
+│   ├── build_extended_context.py         # 300 m buffer per site (run first)
+│   ├── run_svf_v2.py                     # SVF (GPU)
+│   ├── compute_solar_access.py           # Ground solar
+│   ├── run_facade_solar.py               # Façade solar
+│   ├── compute_sectional_porosity.py     # Porosity
+│   ├── compute_occupancy_density.py      # Density proxy
+│   ├── compute_urban_morphology.py       # Zone-level metrics
+│   ├── analyze_sky_exposure_streets.py   # Sky exposure plane
+│   ├── compute_deprivation_index*.py     # Combined indices
+│   ├── compare_areas.py                  # Formal vs informal report
+│   ├── run_pilot_sampling.py             # 12-stratum CFD pilot (12-15 patches)
+│   ├── run_campaign_sampling.py          # Full CFD campaign top-up (22-25 patches)
+│   ├── build_wind_rose.py                # INMET / Iowa ASOS → wind_rose.json
+│   ├── extract_inmet_stations.py         # Pull station CSVs from yearly INMET ZIPs
+│   ├── hpc/                              # SLURM helpers (most CFD HPC code is in ~/Airflow)
+│   └── data_utils/, debug/               # Small helpers
 │
-├── scripts/                 # Executable scripts
-│   ├── run_svf_v2.py       # SVF v2 computation (main entry point)
-│   ├── calculate_metrics.py # Basic morphometric analysis
-│   ├── compute_urban_morphology.py  # Zone-level urban morphology
-│   ├── classify_typology.py # Settlement typology classification
-│   ├── compare_areas.py     # Formal vs informal comparison
-│   ├── compute_solar_access.py  # Solar access computation
-│   ├── analyze_sky_exposure_streets.py  # Sky exposure exceedance
-│   ├── compute_sectional_porosity.py  # Sectional porosity
-│   ├── compute_occupancy_density.py  # Occupancy density proxy
-│   ├── compute_deprivation_index.py  # Unit-level deprivation index
-│   ├── compute_deprivation_index_raster.py  # Raster-based deprivation
-│   └── archive/             # Legacy scripts (superseded by v2)
-│
-└── outputs/                 # NOT tracked in git
-    ├── buildings_with_metrics.gpkg
-    ├── summary_stats.csv
-    └── maps/                 # Visualization outputs
+├── data/        # gitignored — site rasters, footprints, INMET ZIPs, wind roses
+├── outputs/     # gitignored — analysis artefacts (paper_figures/*.py is tracked)
+└── docs/
+    ├── technical_report/                 # Canonical deliverable (md + pdf)
+    ├── guides/                           # Per-feature usage guides
+    └── archive/                          # Superseded planning + summary docs
 ```
 
 ## Filtering Pipeline
