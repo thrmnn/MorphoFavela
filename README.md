@@ -237,6 +237,9 @@ IVF/
 
 - **Filtering thresholds** for morphometric analysis (height /
   area / volume / h/w-ratio caps, percentile filters): `src/config.py`.
+- **Script index** — every entry-point in `scripts/`, grouped by
+  pipeline stage with its library backing:
+  [`scripts/README.md`](scripts/README.md).
 - **Per-feature internals** — methodology, output schema, public
   API:
   - [`src/svf_v2/README.md`](src/svf_v2/README.md) — Sky View Factor

@@ -1,0 +1,128 @@
+# `scripts/`
+
+Executable entry points for the IVF pipeline. Library code lives in
+`src/`; everything in this directory wraps a function in `src/`
+behind argparse.
+
+## How to read this index
+
+Scripts are grouped by stage of the pipeline (the same order as the
+walkthrough in the top-level [`README.md`](../README.md)). Each
+entry lists:
+
+- **Purpose** — one line.
+- **Library backing** — which `src/` module does the real work.
+- **Typical invocation** — short example.
+
+When you add a new entry-point script, add a row here.
+
+---
+
+## Stage 1 — Per-site context preparation
+
+| Script | Purpose | Library |
+|---|---|---|
+| `build_extended_context.py` | Clip city-wide buildings + DTM to favela boundary + 300 m buffer | `src/svf_v2/paths` |
+| `download_inmet_zips.py` | Robust resumable downloader for INMET BDMEP yearly archives | (urllib only) |
+| `extract_inmet_stations.py` | Pull per-station CSVs out of yearly INMET ZIPs and concatenate | (zipfile / pandas only) |
+| `build_wind_rose.py` | Build `data/{site}/wind_rose.json` from INMET CSV or Iowa ASOS METAR | `src.cfd_integration.schema` |
+
+```bash
+# Wind input pipeline (one-off, shared by all sites):
+python scripts/download_inmet_zips.py --years 2015..2024 --out-dir data/inmet/raw
+python scripts/extract_inmet_stations.py --zips-dir data/inmet/raw --out-dir data/inmet/processed --stations A652 A636 A621 A602
+python scripts/build_wind_rose.py --site vidigal --inmet-csv data/inmet/processed/concat/A652_2015_2024.csv
+```
+
+---
+
+## Stage 2 — Per-feature morphometric analyses
+
+These are **independent** — run in any order or parallel.
+
+| Script | Purpose | Library |
+|---|---|---|
+| `calculate_morphology_metrics.py` | Basic + extended morphology metrics (height, area, λp, λf, σH …) | `src.metrics`, `src.morphology_metrics` |
+| `compute_urban_morphology.py` | Zone-level metrics: BCR, FAR, plot ratio, frontal area | `src.urban_morphology` |
+| `run_svf_v2.py` | Sky View Factor (GPU-capable) on a 2 D ground grid | `src.svf_v2` |
+| `compute_solar_access.py` | Hours of direct sun on the winter-solstice ground grid | `src.solar` |
+| `run_facade_solar.py` | Per-storey façade solar exposure + WHO threshold compliance | `src.solar.facade` |
+| `generate_facade_solar_report.py` | Interactive HTML dashboard from `run_facade_solar` output | (matplotlib + plotly) |
+| `compute_sectional_porosity.py` | Plan-view void fraction at z = 1.5 m as a wind-access proxy | (geopandas / shapely) |
+| `compute_occupancy_density.py` | Built-volume / open-space ratio per analysis unit | `src.svf_v2.utils` |
+| `analyze_morphology_risk.py` | Hotspot / cluster maps from morphology metrics | `src.spatial_analysis` |
+| `classify_typology.py` | Settlement typology k-means clustering | `src.typology` |
+| `plot_street_svf_distribution.py` | Histogram of street-level SVF for one or many sites | `src.svf_v2` |
+| `plot_street_svf_with_isolines.py` | Street SVF overlaid on DTM hillshade + contours | `src.svf_v2` |
+
+---
+
+## Stage 3 — Per-feature combined indices + reports
+
+| Script | Purpose | Library |
+|---|---|---|
+| `compute_deprivation_index.py` | Unit-level morphological environmental deprivation index | `src.exposure`, `src.solar` |
+| `compute_deprivation_index_raster.py` | Raster (continuous) version of the deprivation index | `src.exposure`, `src.solar` |
+| `run_morphometric_audit.py` | One-shot per-site audit: figures + PDF report | `src.morphometry` |
+| `run_area_analyses.py` | Convenience: chains SVF + solar + porosity + density for one area | (calls other scripts) |
+| `compare_areas.py` | Formal-vs-informal comparison report (statistical tests + PDF) | `src.metrics`, scipy.stats |
+| `generate_report.py` | Single-area or comparative PDF report | `src.morphometry.report` |
+
+---
+
+## Stage 4 — CFD patch sampling
+
+| Script | Purpose | Library |
+|---|---|---|
+| `run_pilot_sampling.py` | Stratified 12-strata pilot batch (12-15 patches per site) | `src.morphometry` (sampling logic in script) |
+| `run_campaign_sampling.py` | Incremental top-up to 22-25 patches per site (SVF-priority) | (sampling logic in script) |
+
+CFD execution itself happens in the separate `~/Airflow` repo — see
+the top-level `README.md` Repository Map.
+
+---
+
+## Subdirectories
+
+- `scripts/hpc/` — small SLURM helpers; the bulk of the HPC code is
+  in the `~/Airflow` repo (mesh, solve, postprocess, submit).
+- `scripts/data_utils/` — small shared loaders for repeated ad-hoc
+  ingestion.
+- `scripts/debug/` — one-off diagnostics that aren't part of the
+  pipeline.
+- `scripts/shell/` — bash one-liners (deprecated; kept for
+  archaeology).
+
+---
+
+## Known issues / candidates for cleanup
+
+The following scripts are **broken** (import a module that no
+longer exists) and have not yet been removed pending a decision on
+whether the missing functionality should be restored.
+
+| Script | Symptom | Orphaned reference |
+|---|---|---|
+| `compute_solar_access_streets.py` | Import error on launch | `from scripts.compute_svf_streets import …` (file deleted) |
+| `analyze_sky_exposure_streets.py` | Import error on launch | `from scripts.analyze_sky_exposure import …` (file deleted) |
+| `compute_deprivation_streets.py` | Runtime fails: prerequisite outputs come from the two broken scripts above | Indirect |
+
+The street-level SVF + solar + sky-exposure functionality referenced
+by these scripts was previously provided by two scripts that were
+removed when `src/svf_v2/` was introduced. The library functions
+(`src.solar.compute.compute_solar_access_streets`,
+`src.svf_v2.sample_street_points`) still exist — these scripts need
+to be either rewritten as thin CLI wrappers around the library or
+deleted. **TODO** for a follow-up consolidation pass; flagging here
+so the broken state is at least documented.
+
+There are also two pairs of scripts whose functional overlap should
+be reviewed:
+
+- `compute_deprivation_index.py` (unit-level, 621 lines) vs
+  `compute_deprivation_index_raster.py` (raster, 759 lines) — both
+  compute the same combined index at different resolutions; consider
+  merging on a `--resolution {unit,raster}` flag.
+- `compute_solar_access.py` (ground grid, 451 lines) — fine
+  on its own; the broken `_streets.py` sibling should be deleted
+  or merged.
