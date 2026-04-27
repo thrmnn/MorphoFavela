@@ -27,7 +27,7 @@ figures. CFD simulations themselves run in a separate repo.
 | **CFD patch sampling** (5 sites × 119 patches) | `scripts/run_pilot_sampling.py`, `scripts/run_campaign_sampling.py` |
 | **CFD I/O contract** (what CFD must produce, how we ingest) | `src/cfd_integration/README.md` |
 | **CFD simulation execution** | **Separate repo at `~/Airflow`** (OpenFOAM + SLURM on MIT ORCD) |
-| **Wind input** (boundary conditions, annual weighting) | `scripts/build_wind_rose.py`, `scripts/extract_inmet_stations.py` → `data/{site}/wind_rose.json` |
+| **Wind input** (boundary conditions, annual weighting) | `scripts/download_inmet_zips.py` → `scripts/extract_inmet_stations.py` → `scripts/build_wind_rose.py` → `data/{site}/wind_rose.json` |
 | **Technical report** (canonical deliverable) | `docs/technical_report/technical_report.md` (and `.pdf`) |
 | **Paper figures** (Nature Cities) | `outputs/paper_figures/` |
 

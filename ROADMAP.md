@@ -396,15 +396,33 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
 
 ---
 
-## Phase 6: CFD Simulations (in other repo)
+## Phase 6: CFD Simulations (in other repo at ~/Airflow)
 
-### Next steps (handled in the CFD repo)
-- [ ] OpenFOAM case setup from per-patch exports
-- [ ] Inlet profiles from INMET wind rose data (8 directions)
-- [ ] Mesh convergence study on the test patch
-- [ ] Submit full 119-patch campaign to HPC (MIT ORCD)
+### Wind input ✅ COMPLETE (2026-04-27)
+- [x] Iowa State ASOS METAR ingestion for SBGL Galeão (Maré)
+- [x] INMET BDMEP yearly ZIP downloader (`scripts/download_inmet_zips.py`) +
+      per-station extractor (`scripts/extract_inmet_stations.py`)
+- [x] Measured wind roses for all 5 sites, full 2015–2024 window,
+      n = 64,088–89,439 hourly records per station, `quality_flag: "measured"`
+- [x] Figure S5 in technical report §2.3
+
+### Pilot patch in Airflow ✅ READY
+- [x] Vidigal patch VDG-P07 placed in `~/Airflow/cases/VDG-P07/`
+      (buildings.gpkg + terrain.tif + patch_meta.json), preflight 7/7
+- [x] Airflow build_patch_case.py + preflight.py + write_summary.py
+      updated to read circular `analysis_patch_diameter` (was hardcoded
+      to old square `analysis_patch_size`)
+
+### Next steps (in ~/Airflow)
+- [ ] Submit VDG-P07 mesh + 8-direction wind campaign to MIT ORCD
+- [ ] Validate end-to-end pipeline on VDG-P07 results
+- [ ] Submit remaining 118 patches incrementally
 - [ ] Post-processing: wind velocity at pedestrian height, aggregate to grid cells
-- [ ] Integrate CFD results back into this repo's morphometric dataset
+
+### Next steps (in this repo)
+- [ ] Ingest CFD results via `src/cfd_integration/` (already implemented +
+      tested; awaiting first real campaign output)
+- [ ] Annual-weighted maps using the new measured wind roses
 
 ---
 
