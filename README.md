@@ -185,6 +185,13 @@ on Linux, `brew install gdal` on macOS). See
 [`CONTRIBUTING.md`](CONTRIBUTING.md) for pre-commit setup and the
 test/lint workflow.
 
+After `pip install -e .` the most-used scripts are available as
+`ivf-*` console commands (e.g. `ivf-svf --area vidigal`,
+`ivf-wind-rose --site maré --asos-csv ...`). The walkthrough below
+uses `python scripts/foo.py` form for clarity, but the two
+invocations are interchangeable. See
+[`scripts/README.md`](scripts/README.md) for the full mapping.
+
 The full input contract — what each `data/{site}/` subdirectory must
 contain and where each file comes from — is documented in
 [`data/README.md`](data/README.md).

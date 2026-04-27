@@ -4,6 +4,18 @@ Executable entry points for the IVF pipeline. Library code lives in
 `src/`; everything in this directory wraps a function in `src/`
 behind argparse.
 
+After `pip install -e .` the high-traffic scripts are also exposed as
+`ivf-*` console commands. Both forms below are equivalent:
+
+```bash
+python scripts/run_svf_v2.py --area vidigal   # always works
+ivf-svf --area vidigal                         # after pip install -e .
+```
+
+The console-script aliases registered in `pyproject.toml` are
+listed in the table headers below (in the **CLI** column where
+applicable).
+
 ## How to read this index
 
 Scripts are grouped by stage of the pipeline (the same order as the
@@ -20,12 +32,12 @@ When you add a new entry-point script, add a row here.
 
 ## Stage 1 — Per-site context preparation
 
-| Script | Purpose | Library |
-|---|---|---|
-| `build_extended_context.py` | Clip city-wide buildings + DTM to favela boundary + 300 m buffer | `src/svf_v2/paths` |
-| `download_inmet_zips.py` | Robust resumable downloader for INMET BDMEP yearly archives | (urllib only) |
-| `extract_inmet_stations.py` | Pull per-station CSVs out of yearly INMET ZIPs and concatenate | (zipfile / pandas only) |
-| `build_wind_rose.py` | Build `data/{site}/wind_rose.json` from INMET CSV or Iowa ASOS METAR | `src.cfd_integration.schema` |
+| Script | CLI | Purpose | Library |
+|---|---|---|---|
+| `build_extended_context.py` | `ivf-context` | Clip city-wide buildings + DTM to favela boundary + 300 m buffer | `src/svf_v2/paths` |
+| `download_inmet_zips.py` | `ivf-download-inmet` | Robust resumable downloader for INMET BDMEP yearly archives | (urllib only) |
+| `extract_inmet_stations.py` | `ivf-extract-inmet` | Pull per-station CSVs out of yearly INMET ZIPs and concatenate | (zipfile / pandas only) |
+| `build_wind_rose.py` | `ivf-wind-rose` | Build `data/{site}/wind_rose.json` from INMET CSV or Iowa ASOS METAR | `src.cfd_integration.schema` |
 
 ```bash
 # Wind input pipeline (one-off, shared by all sites):
@@ -40,42 +52,42 @@ python scripts/build_wind_rose.py --site vidigal --inmet-csv data/inmet/processe
 
 These are **independent** — run in any order or parallel.
 
-| Script | Purpose | Library |
-|---|---|---|
-| `calculate_morphology_metrics.py` | Basic + extended morphology metrics (height, area, λp, λf, σH …) | `src.metrics`, `src.morphology_metrics` |
-| `compute_urban_morphology.py` | Zone-level metrics: BCR, FAR, plot ratio, frontal area | `src.urban_morphology` |
-| `run_svf_v2.py` | Sky View Factor (GPU-capable) on a 2 D ground grid | `src.svf_v2` |
-| `compute_solar_access.py` | Hours of direct sun on the winter-solstice ground grid | `src.solar` |
-| `run_facade_solar.py` | Per-storey façade solar exposure + WHO threshold compliance | `src.solar.facade` |
-| `generate_facade_solar_report.py` | Interactive HTML dashboard from `run_facade_solar` output | (matplotlib + plotly) |
-| `compute_sectional_porosity.py` | Plan-view void fraction at z = 1.5 m as a wind-access proxy | (geopandas / shapely) |
-| `compute_occupancy_density.py` | Built-volume / open-space ratio per analysis unit | `src.svf_v2.utils` |
-| `analyze_morphology_risk.py` | Hotspot / cluster maps from morphology metrics | `src.spatial_analysis` |
-| `classify_typology.py` | Settlement typology k-means clustering | `src.typology` |
-| `plot_street_svf_distribution.py` | Histogram of street-level SVF for one or many sites | `src.svf_v2` |
-| `plot_street_svf_with_isolines.py` | Street SVF overlaid on DTM hillshade + contours | `src.svf_v2` |
+| Script | CLI | Purpose | Library |
+|---|---|---|---|
+| `calculate_morphology_metrics.py` | — | Basic + extended morphology metrics (height, area, λp, λf, σH …) | `src.metrics`, `src.morphology_metrics` |
+| `compute_urban_morphology.py` | — | Zone-level metrics: BCR, FAR, plot ratio, frontal area | `src.urban_morphology` |
+| `run_svf_v2.py` | `ivf-svf` | Sky View Factor (GPU-capable) on a 2 D ground grid | `src.svf_v2` |
+| `compute_solar_access.py` | `ivf-solar` | Hours of direct sun on the winter-solstice ground grid | `src.solar` |
+| `run_facade_solar.py` | `ivf-facade-solar` | Per-storey façade solar exposure + WHO threshold compliance | `src.solar.facade` |
+| `generate_facade_solar_report.py` | — | Interactive HTML dashboard from `run_facade_solar` output | (matplotlib + plotly) |
+| `compute_sectional_porosity.py` | — | Plan-view void fraction at z = 1.5 m as a wind-access proxy | (geopandas / shapely) |
+| `compute_occupancy_density.py` | — | Built-volume / open-space ratio per analysis unit | `src.svf_v2.utils` |
+| `analyze_morphology_risk.py` | — | Hotspot / cluster maps from morphology metrics | `src.spatial_analysis` |
+| `classify_typology.py` | — | Settlement typology k-means clustering | `src.typology` |
+| `plot_street_svf_distribution.py` | — | Histogram of street-level SVF for one or many sites | `src.svf_v2` |
+| `plot_street_svf_with_isolines.py` | — | Street SVF overlaid on DTM hillshade + contours | `src.svf_v2` |
 
 ---
 
 ## Stage 3 — Per-feature combined indices + reports
 
-| Script | Purpose | Library |
-|---|---|---|
-| `compute_deprivation_index.py` | Unit-level morphological environmental deprivation index | `src.exposure`, `src.solar` |
-| `compute_deprivation_index_raster.py` | Raster (continuous) version of the deprivation index | `src.exposure`, `src.solar` |
-| `run_morphometric_audit.py` | One-shot per-site audit: figures + PDF report | `src.morphometry` |
-| `run_area_analyses.py` | Convenience: chains SVF + solar + porosity + density for one area | (calls other scripts) |
-| `compare_areas.py` | Formal-vs-informal comparison report (statistical tests + PDF) | `src.metrics`, scipy.stats |
-| `generate_report.py` | Single-area or comparative PDF report | `src.morphometry.report` |
+| Script | CLI | Purpose | Library |
+|---|---|---|---|
+| `compute_deprivation_index.py` | — | Unit-level morphological environmental deprivation index | `src.exposure`, `src.solar` |
+| `compute_deprivation_index_raster.py` | — | Raster (continuous) version of the deprivation index | `src.exposure`, `src.solar` |
+| `run_morphometric_audit.py` | `ivf-morphometry` | One-shot per-site audit: figures + PDF report | `src.morphometry` |
+| `run_area_analyses.py` | — | Convenience: chains SVF + solar + porosity + density for one area | (calls other scripts) |
+| `compare_areas.py` | `ivf-compare` | Formal-vs-informal comparison report (statistical tests + PDF) | `src.metrics`, scipy.stats |
+| `generate_report.py` | — | Single-area or comparative PDF report | `src.morphometry.report` |
 
 ---
 
 ## Stage 4 — CFD patch sampling
 
-| Script | Purpose | Library |
-|---|---|---|
-| `run_pilot_sampling.py` | Stratified 12-strata pilot batch (12-15 patches per site) | `src.morphometry` (sampling logic in script) |
-| `run_campaign_sampling.py` | Incremental top-up to 22-25 patches per site (SVF-priority) | (sampling logic in script) |
+| Script | CLI | Purpose | Library |
+|---|---|---|---|
+| `run_pilot_sampling.py` | `ivf-pilot-sampling` | Stratified 12-strata pilot batch (12-15 patches per site) | `src.morphometry` (sampling logic in script) |
+| `run_campaign_sampling.py` | `ivf-campaign-sampling` | Incremental top-up to 22-25 patches per site (SVF-priority) | (sampling logic in script) |
 
 CFD execution itself happens in the separate `~/Airflow` repo — see
 the top-level `README.md` Repository Map.

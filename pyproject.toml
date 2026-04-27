@@ -41,7 +41,23 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src*"]
+include = ["src*", "scripts*"]
+
+[project.scripts]
+# Per-site context preparation
+ivf-context = "scripts.build_extended_context:main"
+ivf-download-inmet = "scripts.download_inmet_zips:main"
+ivf-extract-inmet = "scripts.extract_inmet_stations:main"
+ivf-wind-rose = "scripts.build_wind_rose:main"
+# Per-feature analyses
+ivf-svf = "scripts.run_svf_v2:main"
+ivf-solar = "scripts.compute_solar_access:main"
+ivf-facade-solar = "scripts.run_facade_solar:main"
+ivf-morphometry = "scripts.run_morphometric_audit:main"
+ivf-compare = "scripts.compare_areas:main"
+# CFD patch sampling
+ivf-pilot-sampling = "scripts.run_pilot_sampling:main"
+ivf-campaign-sampling = "scripts.run_campaign_sampling:main"
 
 [tool.pytest.ini_options]
 markers = [
