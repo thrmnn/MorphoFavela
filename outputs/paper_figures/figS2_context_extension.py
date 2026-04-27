@@ -9,12 +9,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fig_style import *
-
 import geopandas as gpd
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
+from fig_style import *
 
 
 def main():
@@ -33,11 +31,7 @@ def main():
         buffer_geom = boundary_geom.buffer(300)
 
         # Context buildings (outside boundary)
-        ctx = (
-            bld[bld["_source"] == "context"]
-            if "_source" in bld.columns
-            else bld.iloc[0:0]
-        )
+        ctx = bld[bld["_source"] == "context"] if "_source" in bld.columns else bld.iloc[0:0]
         site_bld = bld[bld["_source"] == "site"] if "_source" in bld.columns else bld
 
         ctx.plot(
@@ -57,9 +51,7 @@ def main():
             zorder=3,
         )
 
-        boundary.boundary.plot(
-            ax=ax, color="k", linewidth=0.6, linestyle="--", zorder=4
-        )
+        boundary.boundary.plot(ax=ax, color="k", linewidth=0.6, linestyle="--", zorder=4)
         gpd.GeoSeries([buffer_geom], crs=bld.crs).boundary.plot(
             ax=ax,
             color="#44AA99",
@@ -145,9 +137,7 @@ def main():
         # Load buildings for context
         try:
             bld_orig = load_buildings("vidigal", extended=False)
-            bld_orig.plot(
-                ax=ax, facecolor="#d0d0d0", edgecolor="#999", linewidth=0.05, alpha=0.5
-            )
+            bld_orig.plot(ax=ax, facecolor="#d0d0d0", edgecolor="#999", linewidth=0.05, alpha=0.5)
         except Exception:
             pass
 
@@ -160,9 +150,7 @@ def main():
                 else ctx.iloc[0:0]
             )
             if not ctx_only.empty:
-                ctx_only.plot(
-                    ax=ax, facecolor="#DDCC77", edgecolor="none", alpha=0.3, zorder=1
-                )
+                ctx_only.plot(ax=ax, facecolor="#DDCC77", edgecolor="none", alpha=0.3, zorder=1)
 
         # Current patches
         for _, row in patches_now.iterrows():

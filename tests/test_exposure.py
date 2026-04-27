@@ -18,7 +18,6 @@ from src.exposure import (
     plot_exposure_panel,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -144,9 +143,7 @@ class TestComputeZoneSolarDeficit:
 
     def test_explicit_reference(self, two_zones, solar_points):
         """With reference_hours=10, zone0 deficit = 1 - 4/10 = 0.6."""
-        result = compute_zone_solar_deficit(
-            two_zones, solar_points, reference_hours=10.0
-        )
+        result = compute_zone_solar_deficit(two_zones, solar_points, reference_hours=10.0)
         zone0 = result.loc[result["zone_id"] == 0].iloc[0]
         assert math.isclose(zone0["solar_deficit"], 0.6, rel_tol=1e-6)
 
@@ -414,17 +411,13 @@ class TestPlotExposurePanel:
 class TestPlotExposureBivariate:
     def test_creates_file(self, zone_gdf_with_metrics, tmp_path):
         out = tmp_path / "bivariate.png"
-        plot_exposure_bivariate(
-            zone_gdf_with_metrics, out, "solar_deficit", "svf_deficit"
-        )
+        plot_exposure_bivariate(zone_gdf_with_metrics, out, "solar_deficit", "svf_deficit")
         assert out.exists()
         assert out.stat().st_size > 0
 
     def test_missing_column_skips(self, zone_gdf_with_metrics, tmp_path):
         out = tmp_path / "bivariate_missing.png"
-        plot_exposure_bivariate(
-            zone_gdf_with_metrics, out, "nonexistent", "svf_deficit"
-        )
+        plot_exposure_bivariate(zone_gdf_with_metrics, out, "nonexistent", "svf_deficit")
         # Should not raise, file may or may not exist
 
     def test_with_boundary_and_footprints(self, zone_gdf_with_metrics, tmp_path):

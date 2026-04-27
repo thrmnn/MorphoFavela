@@ -1,8 +1,8 @@
 """Tests for src/visualization/morphology.py."""
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
-import geopandas as gpd
 import pytest
 from shapely.geometry import box
 
@@ -14,7 +14,6 @@ from src.visualization.morphology import (
     plot_typology_map,
     plot_zone_metrics_panel,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

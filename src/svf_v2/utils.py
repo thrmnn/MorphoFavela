@@ -5,15 +5,17 @@ Mesh loading, terrain extraction, building footprint handling, and
 ground point generation.
 """
 
+from pathlib import Path
+
+import geopandas as gpd
+import matplotlib.pyplot as plt
 import numpy as np
 import pyvista as pv
-import geopandas as gpd
-from pathlib import Path
 from shapely.geometry import Point
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-from src.config import MAX_FILTER_AREA, is_informal_area, BUILDING_CLUSTER_BUFFER
 from shapely.ops import unary_union
+from tqdm import tqdm
+
+from src.config import BUILDING_CLUSTER_BUFFER, MAX_FILTER_AREA, is_informal_area
 
 
 def load_mesh(stl_path: Path) -> pv.PolyData:

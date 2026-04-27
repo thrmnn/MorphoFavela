@@ -12,12 +12,13 @@ Usage:
         --output outputs/riodaspedras/svf_streets/street_svf_distribution.png
 """
 
-import numpy as np
-import geopandas as gpd
-import matplotlib.pyplot as plt
-from pathlib import Path
 import argparse
 import sys
+from pathlib import Path
+
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -57,9 +58,7 @@ def create_street_svf_distribution(
 
     ax.set_xlabel("SVF Value", fontsize=12)
     ax.set_ylabel("Proportion of street network (%)", fontsize=12)
-    ax.set_title(
-        "Distribution of Street-Level SVF Values", fontsize=14, fontweight="bold"
-    )
+    ax.set_title("Distribution of Street-Level SVF Values", fontsize=14, fontweight="bold")
     ax.set_xlim(0, 1)
     ax.grid(True, alpha=0.3)
 
@@ -142,11 +141,7 @@ def main():
     elif args.area:
         from src.config import get_area_output_dir
 
-        output_path = (
-            get_area_output_dir(args.area)
-            / "svf_streets"
-            / "street_svf_distribution.png"
-        )
+        output_path = get_area_output_dir(args.area) / "svf_streets" / "street_svf_distribution.png"
     else:
         output_path = input_path.parent / "street_svf_distribution.png"
 

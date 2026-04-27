@@ -1,7 +1,7 @@
 """Integration tests for visual inspection outputs (per area)."""
 
-import pyvista as pv
 import pytest
+import pyvista as pv
 
 
 @pytest.mark.integration
@@ -29,9 +29,10 @@ class TestSTLExportPerArea:
 @pytest.mark.integration
 class TestAlignmentPlotPerArea:
     def test_alignment_plot(self, area_name, area_paths, area_scene, tmp_path):
-        from src.svf_v2.io import plot_alignment_check
         import geopandas as gpd
         import rasterio
+
+        from src.svf_v2.io import plot_alignment_check
 
         _, _, gdf = area_scene
         _, _, roads_path = area_paths

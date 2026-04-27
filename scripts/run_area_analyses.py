@@ -15,7 +15,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.config import get_area_data_dir, get_area_analysis_dir
+from src.config import get_area_analysis_dir, get_area_data_dir
 
 
 def find_data_files(area_data_dir):
@@ -113,7 +113,7 @@ def main():
         print(f"ERROR: No building footprints found in {area_data_dir}")
         sys.exit(1)
 
-    print(f"\nFound data files:")
+    print("\nFound data files:")
     print(f"  STL: {stl_file.name}")
     print(f"  Footprints: {footprints_file.name}")
 
@@ -151,9 +151,7 @@ def main():
         print("Warning: SVF computation failed, continuing...")
 
     # 2.1. Street-Level SVF (if road network available)
-    roads_files = list(area_data_dir.glob("*road*.shp")) + list(
-        area_data_dir.glob("*road*.gpkg")
-    )
+    roads_files = list(area_data_dir.glob("*road*.shp")) + list(area_data_dir.glob("*road*.gpkg"))
     dtm_files = list(area_data_dir.glob("*.tif")) + list(area_data_dir.glob("*.tiff"))
 
     if roads_files:
@@ -248,9 +246,7 @@ def main():
         print("Warning: Density computation failed, continuing...")
 
     # 6. Sky Exposure Plane Exceedance (Unified: Building-level + Street-level if roads available)
-    roads_files = list(area_data_dir.glob("*road*.shp")) + list(
-        area_data_dir.glob("*road*.gpkg")
-    )
+    roads_files = list(area_data_dir.glob("*road*.shp")) + list(area_data_dir.glob("*road*.gpkg"))
 
     sky_exposure_output = get_area_analysis_dir(area, "sky_exposure_streets")
     cmd = [
@@ -270,14 +266,12 @@ def main():
 
     if roads_files:
         roads_file = roads_files[0]
-        cmd.extend(
-            ["--roads", str(roads_file), "--spacing", "5.0", "--search-radius", "75.0"]
-        )
+        cmd.extend(["--roads", str(roads_file), "--spacing", "5.0", "--search-radius", "75.0"])
         description = "Sky Exposure Plane Exceedance (Building-level + Street-level)"
     else:
         description = "Sky Exposure Plane Exceedance (Building-level only)"
-        print(f"\nNo road network found - computing building-level exceedance only")
-        print(f"  Looking for files matching: *road*.shp or *road*.gpkg")
+        print("\nNo road network found - computing building-level exceedance only")
+        print("  Looking for files matching: *road*.shp or *road*.gpkg")
 
     if not run_command(cmd, description):
         print("Warning: Sky exposure analysis failed, continuing...")
@@ -313,7 +307,7 @@ def main():
             print("Warning: Deprivation index computation failed")
     else:
         print("\nSkipping Deprivation Index: Required inputs not available")
-        print(f"  Need: svf.npy, solar_access.npy, porosity.npy")
+        print("  Need: svf.npy, solar_access.npy, porosity.npy")
 
     print(f"\n{'=' * 60}")
     print(f"All analyses completed for {area.upper()}")

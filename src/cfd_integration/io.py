@@ -18,11 +18,11 @@ from typing import Optional
 import pandas as pd
 
 from src.cfd_integration.schema import (
+    WIND_DIRECTIONS_8,
     CFDCampaignResult,
     CFDPatchResult,
     PatchSimulationMetadata,
     WindRose,
-    WIND_DIRECTIONS_8,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,12 +92,12 @@ def load_patch_vtu(vtu_path: Path) -> pd.DataFrame:
     """
     try:
         import pyvista as pv
-    except ImportError:
+    except ImportError as exc:
         raise ImportError(
             "pyvista is required for .vtu loading. "
             "Install with: pip install pyvista. "
             "Alternatively, have the OpenFOAM agent export sample_points.csv directly."
-        )
+        ) from exc
 
     mesh = pv.read(str(vtu_path))
     points = mesh.points

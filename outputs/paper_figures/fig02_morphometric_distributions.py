@@ -9,10 +9,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fig_style import *
-
 import matplotlib.pyplot as plt
 import numpy as np
+from fig_style import *
 
 
 def main():
@@ -86,9 +85,7 @@ def main():
         for i, (vals, pos) in enumerate(zip(data, positions)):
             q1, med, q3 = np.percentile(vals, [25, 50, 75])
             ax.vlines(pos, q1, q3, color="k", linewidth=1.0, zorder=5)
-            ax.scatter(
-                pos, med, color="white", s=10, zorder=6, edgecolors="k", linewidths=0.4
-            )
+            ax.scatter(pos, med, color="white", s=10, zorder=6, edgecolors="k", linewidths=0.4)
 
         # Threshold lines
         if col in thresholds:

@@ -12,15 +12,15 @@ import logging
 import numpy as np
 import pyvista as pv
 
-from src.solar.sun import (
-    compute_sun_positions,
-    sun_position_to_direction,
-    REFERENCE_DATES,
-    DEFAULT_LATITUDE,
-    DEFAULT_LONGITUDE,
-)
 from src.solar.compute import compute_sunlit_matrix
 from src.solar.irradiance import compute_daily_irradiance_array
+from src.solar.sun import (
+    DEFAULT_LATITUDE,
+    DEFAULT_LONGITUDE,
+    REFERENCE_DATES,
+    compute_sun_positions,
+    sun_position_to_direction,
+)
 
 logger = logging.getLogger(__name__)
 

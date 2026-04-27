@@ -17,7 +17,6 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
-import numpy as np
 import pandas as pd
 import pyvista as pv
 
@@ -66,9 +65,7 @@ def generate_3d_html(facade_gdf, scene_mesh, output_path, area):
     max_pts = 50000
     if len(facade_gdf) > max_pts:
         df = facade_gdf.sample(max_pts, random_state=42).copy()
-        logger.info(
-            "  Subsampled %d -> %d points for 3D view", len(facade_gdf), max_pts
-        )
+        logger.info("  Subsampled %d -> %d points for 3D view", len(facade_gdf), max_pts)
     else:
         df = facade_gdf.copy()
 
@@ -280,9 +277,7 @@ def generate_summary_html(
 
     # Azimuth stats (bin by 45 degrees)
     facade_gdf = facade_gdf.copy()
-    facade_gdf["az_bin"] = ((facade_gdf["facade_azimuth"] + 22.5) // 45 * 45).astype(
-        int
-    ) % 360
+    facade_gdf["az_bin"] = ((facade_gdf["facade_azimuth"] + 22.5) // 45 * 45).astype(int) % 360
     az_labels = {
         0: "N",
         45: "NE",
@@ -294,9 +289,7 @@ def generate_summary_html(
         315: "NW",
     }
     az_stats = (
-        facade_gdf.groupby("az_bin")["facade_sunlit_hours"]
-        .agg(["mean", "count"])
-        .reset_index()
+        facade_gdf.groupby("az_bin")["facade_sunlit_hours"].agg(["mean", "count"]).reset_index()
     )
     az_stats["direction"] = az_stats["az_bin"].map(az_labels)
 

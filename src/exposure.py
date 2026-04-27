@@ -77,11 +77,7 @@ def compute_zone_solar_deficit(
         return zones
 
     # Ensure matching CRS
-    if (
-        solar_gdf.crs is not None
-        and zones.crs is not None
-        and solar_gdf.crs != zones.crs
-    ):
+    if solar_gdf.crs is not None and zones.crs is not None and solar_gdf.crs != zones.crs:
         solar_gdf = solar_gdf.to_crs(zones.crs)
 
     joined = gpd.sjoin(
@@ -113,9 +109,7 @@ def compute_zone_solar_deficit(
     if reference_hours <= 0:
         reference_hours = 1.0
 
-    zones["solar_deficit"] = (1.0 - zones["mean_solar"] / reference_hours).clip(
-        0.0, 1.0
-    )
+    zones["solar_deficit"] = (1.0 - zones["mean_solar"] / reference_hours).clip(0.0, 1.0)
 
     logger.info(
         "Solar deficit computed for %d zones (reference=%.1f h).",
@@ -187,9 +181,7 @@ def compute_zone_svf_deficit(
 
     zones["svf_deficit"] = (1.0 - zones["mean_svf"]).clip(0.0, 1.0)
 
-    logger.info(
-        "SVF deficit computed for %d zones.", zones["svf_deficit"].notna().sum()
-    )
+    logger.info("SVF deficit computed for %d zones.", zones["svf_deficit"].notna().sum())
     return zones
 
 
@@ -232,20 +224,14 @@ def compute_zone_building_density(
         logger.warning("No footprints provided -- density columns set to zero.")
         return zones
 
-    if (
-        footprints_gdf.crs is not None
-        and zones.crs is not None
-        and footprints_gdf.crs != zones.crs
-    ):
+    if footprints_gdf.crs is not None and zones.crs is not None and footprints_gdf.crs != zones.crs:
         footprints_gdf = footprints_gdf.to_crs(zones.crs)
 
     # Prepare footprints: keep only geometry and height
     fp = footprints_gdf.copy()
     if height_col not in fp.columns:
         fp[height_col] = 1.0  # default to 1 m if no height data
-        logger.warning(
-            "Height column '%s' not found -- defaulting to 1.0 m.", height_col
-        )
+        logger.warning("Height column '%s' not found -- defaulting to 1.0 m.", height_col)
 
     # Replace invalid heights
     fp[height_col] = fp[height_col].replace([np.inf, -np.inf], np.nan).fillna(1.0)
@@ -271,9 +257,7 @@ def compute_zone_building_density(
         zones["built_volume"] = 0.0
         zones["open_space_ratio"] = 1.0
         zones["density_ratio"] = 0.0
-        logger.warning(
-            "Overlay returned no intersections -- density columns set to zero."
-        )
+        logger.warning("Overlay returned no intersections -- density columns set to zero.")
         return zones
 
     # Compute clipped footprint area and volume
@@ -358,9 +342,7 @@ def compute_exposure_index(
     available = {name: col for name, col in metrics.items() if col in zones.columns}
     if not available:
         zones["exposure_index"] = np.nan
-        logger.warning(
-            "None of the requested metric columns found -- exposure_index set to NaN."
-        )
+        logger.warning("None of the requested metric columns found -- exposure_index set to NaN.")
         return zones
 
     # Resolve weights
@@ -475,9 +457,7 @@ def plot_exposure_panel(
 
     # Filter to available columns
     available = [
-        (col, cmap, title)
-        for col, cmap, title in metrics_to_plot
-        if col in plot_gdf.columns
+        (col, cmap, title) for col, cmap, title in metrics_to_plot if col in plot_gdf.columns
     ]
     if not available:
         logger.warning("No metric columns found for exposure panel -- skipping.")
@@ -675,9 +655,7 @@ def plot_exposure_bivariate(
     gdf_valid = gdf.loc[valid_mask].copy()
 
     if len(gdf_valid) < n_classes:
-        logger.warning(
-            "Too few valid zones (%d) for bivariate plot -- skipping.", len(gdf_valid)
-        )
+        logger.warning("Too few valid zones (%d) for bivariate plot -- skipping.", len(gdf_valid))
         return output_path
 
     # Quantile classification
@@ -729,9 +707,7 @@ def plot_exposure_bivariate(
             zorder=1,
         )
 
-    gdf_valid.plot(
-        ax=ax_map, color=colors, edgecolor="#777777", linewidth=0.3, zorder=2
-    )
+    gdf_valid.plot(ax=ax_map, color=colors, edgecolor="#777777", linewidth=0.3, zorder=2)
 
     if boundary_gdf is not None:
         add_settlement_boundary(ax_map, boundary_gdf)

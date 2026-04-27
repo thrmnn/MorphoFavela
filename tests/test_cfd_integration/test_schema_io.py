@@ -2,15 +2,14 @@
 
 import json
 
-import numpy as np
 import pandas as pd
 import pytest
 
 from src.cfd_integration.io import load_patch_csv
 from src.cfd_integration.schema import (
+    WIND_DIRECTIONS_8,
     CFDPatchResult,
     PatchSimulationMetadata,
-    WIND_DIRECTIONS_8,
     WindRose,
 )
 

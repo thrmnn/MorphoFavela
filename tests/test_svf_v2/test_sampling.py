@@ -1,14 +1,14 @@
 """Tests for src/svf_v2/sampling.py."""
 
-import numpy as np
 import geopandas as gpd
+import numpy as np
 import pytest
-from shapely.geometry import LineString, Point, Polygon, MultiPolygon
+from shapely.geometry import LineString, MultiPolygon, Point, Polygon
 
 from src.svf_v2.sampling import (
-    _sample_points_along_line,
-    _outward_normal_2d,
     _offset_points_outside_buildings,
+    _outward_normal_2d,
+    _sample_points_along_line,
 )
 
 

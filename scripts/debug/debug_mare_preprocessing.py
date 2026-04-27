@@ -20,19 +20,18 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Patch
-from shapely.ops import unary_union
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import (
-    MAX_FILTER_AREA,
     BUILDING_CLUSTER_BUFFER,
+    MAX_FILTER_AREA,
     get_area_output_dir,
     is_informal_area,
 )
-from src.svf_v2.utils import filter_buildings
 from src.svf_v2.paths import resolve_boundary, resolve_paths
+from src.svf_v2.utils import filter_buildings
 
 
 def main():
@@ -102,7 +101,7 @@ def main():
         else gpd.GeoDataFrame()
     )
 
-    print(f"\n--- Extrusion validity (SVF mode) ---")
+    print("\n--- Extrusion validity (SVF mode) ---")
     print(f"  Missing/zero height: {len(skipped_height):,}")
     extrudable = len(kept_final) - len(skipped_height)
     print(f"  Will be extruded: {extrudable:,}")

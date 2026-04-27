@@ -8,17 +8,16 @@ Usage:
     python scripts/compare_areas.py
 """
 
-import numpy as np
-import pandas as pd
+import logging
+import sys
+from pathlib import Path
+
 import geopandas as gpd
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
+import numpy as np
+import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib import font_manager
 from matplotlib.image import imread
-from pathlib import Path
-import sys
-import logging
 from scipy import stats
 
 # Set up clean academic design style
@@ -59,7 +58,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src.config import (
     get_area_analysis_dir,
     get_comparative_analysis_dir,
-    SUPPORTED_AREAS,
     is_formal_area,
 )
 
@@ -93,9 +91,7 @@ def load_area_data(area: str) -> dict:
 
         # Building density (buildings per km²)
         area_km2 = data["study_area_m2"] / 1e6
-        data["building_density"] = (
-            data["building_count"] / area_km2 if area_km2 > 0 else 0
-        )
+        data["building_density"] = data["building_count"] / area_km2 if area_km2 > 0 else 0
     else:
         logger.warning(f"  Metrics file not found: {metrics_file}")
         data["buildings"] = None
@@ -127,27 +123,21 @@ def load_area_data(area: str) -> dict:
     for street_type in ["svf_streets", "solar_streets"]:
         street_dir = get_area_analysis_dir(area, street_type)
         points_file = (
-            street_dir
-            / f"street_{'svf' if 'svf' in street_type else 'solar'}_points.gpkg"
+            street_dir / f"street_{'svf' if 'svf' in street_type else 'solar'}_points.gpkg"
         )
         segments_file = (
-            street_dir
-            / f"street_{'svf' if 'svf' in street_type else 'solar'}_segments.gpkg"
+            street_dir / f"street_{'svf' if 'svf' in street_type else 'solar'}_segments.gpkg"
         )
 
         if points_file.exists():
             data[f"{street_type}_points"] = gpd.read_file(points_file)
-            logger.info(
-                f"  Loaded {street_type} points: {len(data[f'{street_type}_points'])}"
-            )
+            logger.info(f"  Loaded {street_type} points: {len(data[f'{street_type}_points'])}")
         else:
             data[f"{street_type}_points"] = None
 
         if segments_file.exists():
             data[f"{street_type}_segments"] = gpd.read_file(segments_file)
-            logger.info(
-                f"  Loaded {street_type} segments: {len(data[f'{street_type}_segments'])}"
-            )
+            logger.info(f"  Loaded {street_type} segments: {len(data[f'{street_type}_segments'])}")
         else:
             data[f"{street_type}_segments"] = None
 
@@ -158,30 +148,22 @@ def load_area_data(area: str) -> dict:
 
     if deprivation_points_file.exists():
         data["deprivation_streets_points"] = gpd.read_file(deprivation_points_file)
-        logger.info(
-            f"  Loaded deprivation points: {len(data['deprivation_streets_points'])}"
-        )
+        logger.info(f"  Loaded deprivation points: {len(data['deprivation_streets_points'])}")
     else:
-        logger.warning(
-            f"  Deprivation points file not found: {deprivation_points_file}"
-        )
-        logger.warning(f"  Run compute_deprivation_streets.py to generate this data")
+        logger.warning(f"  Deprivation points file not found: {deprivation_points_file}")
+        logger.warning("  Run compute_deprivation_streets.py to generate this data")
         data["deprivation_streets_points"] = None
 
     if deprivation_segments_file.exists():
         data["deprivation_streets_segments"] = gpd.read_file(deprivation_segments_file)
-        logger.info(
-            f"  Loaded deprivation segments: {len(data['deprivation_streets_segments'])}"
-        )
+        logger.info(f"  Loaded deprivation segments: {len(data['deprivation_streets_segments'])}")
     else:
         data["deprivation_streets_segments"] = None
 
     return data
 
 
-def compare_morphometric_metrics(
-    vidigal_data: dict, copacabana_data: dict
-) -> pd.DataFrame:
+def compare_morphometric_metrics(vidigal_data: dict, copacabana_data: dict) -> pd.DataFrame:
     """Compare morphometric metrics between areas."""
     logger.info("Comparing morphometric metrics...")
 
@@ -197,10 +179,7 @@ def compare_morphometric_metrics(
     comparison = []
 
     for metric in metrics:
-        if (
-            vidigal_data["buildings"] is not None
-            and metric in vidigal_data["buildings"].columns
-        ):
+        if vidigal_data["buildings"] is not None and metric in vidigal_data["buildings"].columns:
             vidigal_vals = vidigal_data["buildings"][metric].dropna()
             copa_vals = (
                 copacabana_data["buildings"][metric].dropna()
@@ -235,7 +214,7 @@ def compare_morphometric_metrics(
                     )
                     row["p_value"] = p_value
                     row["significant"] = p_value < 0.05
-                except:
+                except Exception:
                     row["p_value"] = np.nan
                     row["significant"] = False
 
@@ -247,10 +226,8 @@ def compare_morphometric_metrics(
             "metric": "building_count",
             "vidigal_mean": vidigal_data["building_count"],
             "copa_mean": copacabana_data["building_count"],
-            "difference_mean": copacabana_data["building_count"]
-            - vidigal_data["building_count"],
-            "ratio_mean": copacabana_data["building_count"]
-            / vidigal_data["building_count"]
+            "difference_mean": copacabana_data["building_count"] - vidigal_data["building_count"],
+            "ratio_mean": copacabana_data["building_count"] / vidigal_data["building_count"]
             if vidigal_data["building_count"] > 0
             else np.nan,
         }
@@ -263,8 +240,7 @@ def compare_morphometric_metrics(
             "copa_mean": copacabana_data["building_density"],
             "difference_mean": copacabana_data["building_density"]
             - vidigal_data["building_density"],
-            "ratio_mean": copacabana_data["building_density"]
-            / vidigal_data["building_density"]
+            "ratio_mean": copacabana_data["building_density"] / vidigal_data["building_density"]
             if vidigal_data["building_density"] > 0
             else np.nan,
         }
@@ -273,9 +249,7 @@ def compare_morphometric_metrics(
     return pd.DataFrame(comparison)
 
 
-def compare_raster_metrics(
-    vidigal_data: dict, copacabana_data: dict, raster_type: str
-) -> dict:
+def compare_raster_metrics(vidigal_data: dict, copacabana_data: dict, raster_type: str) -> dict:
     """Compare raster-based metrics between areas."""
     vid_raster = vidigal_data.get(raster_type)
     copa_raster = copacabana_data.get(raster_type)
@@ -310,9 +284,7 @@ def compare_raster_metrics(
         "copa_q10": np.percentile(copa_valid, 10),
         "copa_q90": np.percentile(copa_valid, 90),
         "difference_mean": copa_valid.mean() - vid_valid.mean(),
-        "ratio_mean": copa_valid.mean() / vid_valid.mean()
-        if vid_valid.mean() > 0
-        else np.nan,
+        "ratio_mean": copa_valid.mean() / vid_valid.mean() if vid_valid.mean() > 0 else np.nan,
         "vidigal_area_m2": vid_area,
         "copa_area_m2": copa_area,
         "area_ratio": copa_area / vid_area if vid_area > 0 else np.nan,
@@ -320,9 +292,7 @@ def compare_raster_metrics(
 
     # Statistical test with effect size
     try:
-        stat, p_value = stats.mannwhitneyu(
-            vid_valid, copa_valid, alternative="two-sided"
-        )
+        stat, p_value = stats.mannwhitneyu(vid_valid, copa_valid, alternative="two-sided")
         comparison["p_value"] = p_value
         comparison["significant"] = p_value < 0.05
 
@@ -339,7 +309,7 @@ def compare_raster_metrics(
             comparison["effect_interpretation"] = "medium"
         else:
             comparison["effect_interpretation"] = "large"
-    except Exception as e:
+    except Exception:
         comparison["p_value"] = np.nan
         comparison["significant"] = False
         comparison["effect_size"] = np.nan
@@ -347,38 +317,20 @@ def compare_raster_metrics(
 
     # Threshold-based comparisons (specific to metric type)
     if raster_type == "svf":
-        comparison["vidigal_low_svf_fraction"] = (vid_valid < 0.5).sum() / len(
-            vid_valid
-        )
+        comparison["vidigal_low_svf_fraction"] = (vid_valid < 0.5).sum() / len(vid_valid)
         comparison["copa_low_svf_fraction"] = (copa_valid < 0.5).sum() / len(copa_valid)
-        comparison["vidigal_high_svf_fraction"] = (vid_valid > 0.7).sum() / len(
-            vid_valid
-        )
-        comparison["copa_high_svf_fraction"] = (copa_valid > 0.7).sum() / len(
-            copa_valid
-        )
+        comparison["vidigal_high_svf_fraction"] = (vid_valid > 0.7).sum() / len(vid_valid)
+        comparison["copa_high_svf_fraction"] = (copa_valid > 0.7).sum() / len(copa_valid)
 
     elif raster_type == "solar":
-        comparison["vidigal_solar_deficit_fraction"] = (vid_valid < 2.0).sum() / len(
-            vid_valid
-        )
-        comparison["copa_solar_deficit_fraction"] = (copa_valid < 2.0).sum() / len(
-            copa_valid
-        )
-        comparison["vidigal_acceptable_solar_fraction"] = (
-            vid_valid >= 3.0
-        ).sum() / len(vid_valid)
-        comparison["copa_acceptable_solar_fraction"] = (copa_valid >= 3.0).sum() / len(
-            copa_valid
-        )
+        comparison["vidigal_solar_deficit_fraction"] = (vid_valid < 2.0).sum() / len(vid_valid)
+        comparison["copa_solar_deficit_fraction"] = (copa_valid < 2.0).sum() / len(copa_valid)
+        comparison["vidigal_acceptable_solar_fraction"] = (vid_valid >= 3.0).sum() / len(vid_valid)
+        comparison["copa_acceptable_solar_fraction"] = (copa_valid >= 3.0).sum() / len(copa_valid)
 
     elif raster_type == "porosity":
-        comparison["vidigal_low_porosity_fraction"] = (vid_valid < 0.3).sum() / len(
-            vid_valid
-        )
-        comparison["copa_low_porosity_fraction"] = (copa_valid < 0.3).sum() / len(
-            copa_valid
-        )
+        comparison["vidigal_low_porosity_fraction"] = (vid_valid < 0.3).sum() / len(vid_valid)
+        comparison["copa_low_porosity_fraction"] = (copa_valid < 0.3).sum() / len(copa_valid)
 
     elif raster_type == "deprivation_raster":
         # Classify into percentiles
@@ -387,18 +339,18 @@ def compare_raster_metrics(
         copa_p90 = np.percentile(copa_valid, 90)
         copa_p80 = np.percentile(copa_valid, 80)
 
-        comparison["vidigal_extreme_hotspot_fraction"] = (
-            vid_valid >= vid_p90
-        ).sum() / len(vid_valid)
-        comparison["copa_extreme_hotspot_fraction"] = (
-            copa_valid >= copa_p90
-        ).sum() / len(copa_valid)
-        comparison["vidigal_high_deprivation_fraction"] = (
-            vid_valid >= vid_p80
-        ).sum() / len(vid_valid)
-        comparison["copa_high_deprivation_fraction"] = (
-            copa_valid >= copa_p80
-        ).sum() / len(copa_valid)
+        comparison["vidigal_extreme_hotspot_fraction"] = (vid_valid >= vid_p90).sum() / len(
+            vid_valid
+        )
+        comparison["copa_extreme_hotspot_fraction"] = (copa_valid >= copa_p90).sum() / len(
+            copa_valid
+        )
+        comparison["vidigal_high_deprivation_fraction"] = (vid_valid >= vid_p80).sum() / len(
+            vid_valid
+        )
+        comparison["copa_high_deprivation_fraction"] = (copa_valid >= copa_p80).sum() / len(
+            copa_valid
+        )
 
     return comparison
 
@@ -418,9 +370,7 @@ def calculate_effect_size(vals1: np.ndarray, vals2: np.ndarray) -> float:
     return (mean2 - mean1) / pooled_std
 
 
-def compare_street_metrics(
-    vidigal_data: dict, copacabana_data: dict, street_type: str
-) -> dict:
+def compare_street_metrics(vidigal_data: dict, copacabana_data: dict, street_type: str) -> dict:
     """Compare street-level metrics between areas (SVF or solar along street centerlines)."""
     key_points = f"{street_type}_points"
     key_segments = f"{street_type}_segments"
@@ -484,9 +434,7 @@ def compare_street_metrics(
         "copa_q10": np.percentile(copa_vals, 10),
         "copa_q90": np.percentile(copa_vals, 90),
         "difference_mean": copa_vals.mean() - vid_vals.mean(),
-        "ratio_mean": copa_vals.mean() / vid_vals.mean()
-        if vid_vals.mean() > 0
-        else np.nan,
+        "ratio_mean": copa_vals.mean() / vid_vals.mean() if vid_vals.mean() > 0 else np.nan,
     }
 
     # Statistical test with effect size
@@ -508,7 +456,7 @@ def compare_street_metrics(
             comparison["effect_interpretation"] = "medium"
         else:
             comparison["effect_interpretation"] = "large"
-    except Exception as e:
+    except Exception:
         comparison["p_value"] = np.nan
         comparison["significant"] = False
         comparison["effect_size"] = np.nan
@@ -521,12 +469,8 @@ def compare_street_metrics(
         comparison["vidigal_high_svf_fraction"] = (vid_vals > 0.7).sum() / len(vid_vals)
         comparison["copa_high_svf_fraction"] = (copa_vals > 0.7).sum() / len(copa_vals)
     elif "solar" in street_type:
-        comparison["vidigal_solar_deficit_fraction"] = (vid_vals < 2.0).sum() / len(
-            vid_vals
-        )
-        comparison["copa_solar_deficit_fraction"] = (copa_vals < 2.0).sum() / len(
-            copa_vals
-        )
+        comparison["vidigal_solar_deficit_fraction"] = (vid_vals < 2.0).sum() / len(vid_vals)
+        comparison["copa_solar_deficit_fraction"] = (copa_vals < 2.0).sum() / len(copa_vals)
         comparison["vidigal_below_3h_fraction"] = (vid_vals < 3.0).sum() / len(vid_vals)
         comparison["copa_below_3h_fraction"] = (copa_vals < 3.0).sum() / len(copa_vals)
 
@@ -541,10 +485,7 @@ def compare_street_deprivation(vidigal_data: dict, copacabana_data: dict) -> dic
     if vid_dep is None or copa_dep is None:
         return None
 
-    if (
-        "deprivation_index" not in vid_dep.columns
-        or "deprivation_index" not in copa_dep.columns
-    ):
+    if "deprivation_index" not in vid_dep.columns or "deprivation_index" not in copa_dep.columns:
         return None
 
     vid_vals = vid_dep["deprivation_index"].dropna().values
@@ -572,9 +513,7 @@ def compare_street_deprivation(vidigal_data: dict, copacabana_data: dict) -> dic
         "copa_q10": np.percentile(copa_vals, 10),
         "copa_q90": np.percentile(copa_vals, 90),
         "difference_mean": copa_vals.mean() - vid_vals.mean(),
-        "ratio_mean": copa_vals.mean() / vid_vals.mean()
-        if vid_vals.mean() > 0
-        else np.nan,
+        "ratio_mean": copa_vals.mean() / vid_vals.mean() if vid_vals.mean() > 0 else np.nan,
     }
 
     # Statistical test with effect size
@@ -594,25 +533,17 @@ def compare_street_deprivation(vidigal_data: dict, copacabana_data: dict) -> dic
             comparison["effect_interpretation"] = "medium"
         else:
             comparison["effect_interpretation"] = "large"
-    except Exception as e:
+    except Exception:
         comparison["p_value"] = np.nan
         comparison["significant"] = False
         comparison["effect_size"] = np.nan
         comparison["effect_interpretation"] = "N/A"
 
     # Threshold-based comparisons
-    comparison["vidigal_high_deprivation_fraction"] = (vid_vals >= 0.5).sum() / len(
-        vid_vals
-    )
-    comparison["copa_high_deprivation_fraction"] = (copa_vals >= 0.5).sum() / len(
-        copa_vals
-    )
-    comparison["vidigal_extreme_deprivation_fraction"] = (vid_vals >= 0.7).sum() / len(
-        vid_vals
-    )
-    comparison["copa_extreme_deprivation_fraction"] = (copa_vals >= 0.7).sum() / len(
-        copa_vals
-    )
+    comparison["vidigal_high_deprivation_fraction"] = (vid_vals >= 0.5).sum() / len(vid_vals)
+    comparison["copa_high_deprivation_fraction"] = (copa_vals >= 0.5).sum() / len(copa_vals)
+    comparison["vidigal_extreme_deprivation_fraction"] = (vid_vals >= 0.7).sum() / len(vid_vals)
+    comparison["copa_extreme_deprivation_fraction"] = (copa_vals >= 0.7).sum() / len(copa_vals)
 
     return comparison
 
@@ -654,10 +585,7 @@ def create_comparison_visualizations(
         ax = axes[idx // 3, idx % 3]
         ax.set_facecolor("white")
 
-        if (
-            vidigal_data["buildings"] is not None
-            and metric in vidigal_data["buildings"].columns
-        ):
+        if vidigal_data["buildings"] is not None and metric in vidigal_data["buildings"].columns:
             vid_vals = vidigal_data["buildings"][metric].dropna()
             copa_vals = (
                 copacabana_data["buildings"][metric].dropna()
@@ -731,8 +659,7 @@ def create_comparison_visualizations(
     metrics_to_plot = [
         m
         for m in metrics
-        if vidigal_data["buildings"] is not None
-        and m in vidigal_data["buildings"].columns
+        if vidigal_data["buildings"] is not None and m in vidigal_data["buildings"].columns
     ]
     data_to_plot = []
     labels = []
@@ -804,7 +731,6 @@ def create_comparison_visualizations(
     }
 
     # Use clean colormap (grayscale with accent)
-    from matplotlib.colors import LinearSegmentedColormap
     import matplotlib
 
     clean_cmap = matplotlib.colormaps.get_cmap("viridis").copy()
@@ -822,9 +748,7 @@ def create_comparison_visualizations(
 
             # Create figure with appropriate width based on aspect ratios
             # Give each subplot enough space for its aspect ratio
-            total_width = (
-                max(vid_aspect, copa_aspect) * 2 * 3
-            )  # 3 inches per unit height
+            total_width = max(vid_aspect, copa_aspect) * 2 * 3  # 3 inches per unit height
             fig_height = 6
             fig = plt.figure(figsize=(total_width, fig_height))
             fig.patch.set_facecolor("white")
@@ -987,12 +911,8 @@ def create_comparison_visualizations(
     # Load existing maps that already include building footprints
 
     # SVF streets - load existing maps
-    vid_svf_map_path = (
-        get_area_analysis_dir("vidigal_tls", "svf_streets") / "street_svf_map.png"
-    )
-    copa_svf_map_path = (
-        get_area_analysis_dir("copacabana", "svf_streets") / "street_svf_map.png"
-    )
+    vid_svf_map_path = get_area_analysis_dir("vidigal_tls", "svf_streets") / "street_svf_map.png"
+    copa_svf_map_path = get_area_analysis_dir("copacabana", "svf_streets") / "street_svf_map.png"
 
     if vid_svf_map_path.exists() and copa_svf_map_path.exists():
         vid_svf_img = imread(vid_svf_map_path)
@@ -1035,9 +955,7 @@ def create_comparison_visualizations(
         figs.append(("svf_streets_side_by_side", fig))
 
     # Solar streets - load existing maps
-    vid_solar_map_path = (
-        get_area_analysis_dir("vidigal", "solar_streets") / "street_solar_map.png"
-    )
+    vid_solar_map_path = get_area_analysis_dir("vidigal", "solar_streets") / "street_solar_map.png"
     copa_solar_map_path = (
         get_area_analysis_dir("copacabana", "solar_streets") / "street_solar_map.png"
     )
@@ -1100,43 +1018,32 @@ def create_comparison_visualizations(
             and "deprivation_index" in copa_dep_points.columns
         ):
             # Aggregate points to segments for visualization
-            if (
-                "segment_idx" in vid_dep_points.columns
-                and "segment_idx" in copa_dep_points.columns
-            ):
+            if "segment_idx" in vid_dep_points.columns and "segment_idx" in copa_dep_points.columns:
                 vid_dep_segments = (
                     vid_dep_points.groupby("segment_idx")["deprivation_index"]
                     .agg(["mean", "std", "count"])
                     .reset_index()
                 )
-                vid_dep_segments.rename(
-                    columns={"mean": "deprivation_mean"}, inplace=True
-                )
+                vid_dep_segments.rename(columns={"mean": "deprivation_mean"}, inplace=True)
                 vid_svf_seg = vidigal_data.get("svf_streets_segments")
                 if vid_svf_seg is not None and "segment_idx" in vid_svf_seg.columns:
                     vid_dep_segments = vid_svf_seg[["segment_idx", "geometry"]].merge(
                         vid_dep_segments, on="segment_idx", how="inner"
                     )
-                    vid_dep_segments = gpd.GeoDataFrame(
-                        vid_dep_segments, crs=vid_svf_seg.crs
-                    )
+                    vid_dep_segments = gpd.GeoDataFrame(vid_dep_segments, crs=vid_svf_seg.crs)
 
                 copa_dep_segments = (
                     copa_dep_points.groupby("segment_idx")["deprivation_index"]
                     .agg(["mean", "std", "count"])
                     .reset_index()
                 )
-                copa_dep_segments.rename(
-                    columns={"mean": "deprivation_mean"}, inplace=True
-                )
+                copa_dep_segments.rename(columns={"mean": "deprivation_mean"}, inplace=True)
                 copa_svf_seg = copacabana_data.get("svf_streets_segments")
                 if copa_svf_seg is not None and "segment_idx" in copa_svf_seg.columns:
                     copa_dep_segments = copa_svf_seg[["segment_idx", "geometry"]].merge(
                         copa_dep_segments, on="segment_idx", how="inner"
                     )
-                    copa_dep_segments = gpd.GeoDataFrame(
-                        copa_dep_segments, crs=copa_svf_seg.crs
-                    )
+                    copa_dep_segments = gpd.GeoDataFrame(copa_dep_segments, crs=copa_svf_seg.crs)
 
     if (
         vid_dep_segments is not None
@@ -1163,7 +1070,6 @@ def create_comparison_visualizations(
             )
 
             # Use reversed colormap (higher = more deprived = darker)
-            from matplotlib.colors import ListedColormap
             import matplotlib
 
             dep_cmap = matplotlib.colormaps.get_cmap("RdYlGn_r").copy()
@@ -1935,9 +1841,7 @@ def generate_pdf_report(
                 # Style the table
                 for i in range(len(cols)):
                     table[(0, i)].set_facecolor(SWISS_COLORS["light_gray"])
-                    table[(0, i)].set_text_props(
-                        weight="bold", color=SWISS_COLORS["text"]
-                    )
+                    table[(0, i)].set_text_props(weight="bold", color=SWISS_COLORS["text"])
                     table[(0, i)].set_edgecolor(SWISS_COLORS["secondary"])
 
                 for i in range(1, len(street_stats) + 1):
@@ -2020,9 +1924,7 @@ def generate_pdf_report(
                 # Style the table
                 for i in range(len(cols)):
                     table[(0, i)].set_facecolor(SWISS_COLORS["light_gray"])
-                    table[(0, i)].set_text_props(
-                        weight="bold", color=SWISS_COLORS["text"]
-                    )
+                    table[(0, i)].set_text_props(weight="bold", color=SWISS_COLORS["text"])
                     table[(0, i)].set_edgecolor(SWISS_COLORS["secondary"])
 
                 for i in range(1, len(raster_stats) + 1):
@@ -2051,12 +1953,8 @@ def compare_zone_metrics(area1_data: dict, area2_data: dict) -> list[dict] | Non
     area1_name = area1_data["area"]
     area2_name = area2_data["area"]
 
-    zone1_path = (
-        get_area_analysis_dir(area1_name, "urban_morphology") / "zone_metrics.gpkg"
-    )
-    zone2_path = (
-        get_area_analysis_dir(area2_name, "urban_morphology") / "zone_metrics.gpkg"
-    )
+    zone1_path = get_area_analysis_dir(area1_name, "urban_morphology") / "zone_metrics.gpkg"
+    zone2_path = get_area_analysis_dir(area2_name, "urban_morphology") / "zone_metrics.gpkg"
 
     if not zone1_path.exists() or not zone2_path.exists():
         logger.warning(
@@ -2130,12 +2028,8 @@ def compare_moran_summary(area1_data: dict, area2_data: dict) -> pd.DataFrame | 
     area1_name = area1_data["area"]
     area2_name = area2_data["area"]
 
-    moran1_path = (
-        get_area_analysis_dir(area1_name, "urban_morphology") / "moran_summary.csv"
-    )
-    moran2_path = (
-        get_area_analysis_dir(area2_name, "urban_morphology") / "moran_summary.csv"
-    )
+    moran1_path = get_area_analysis_dir(area1_name, "urban_morphology") / "moran_summary.csv"
+    moran2_path = get_area_analysis_dir(area2_name, "urban_morphology") / "moran_summary.csv"
 
     if not moran1_path.exists() or not moran2_path.exists():
         logger.warning(
@@ -2180,14 +2074,10 @@ def compare_cluster_composition(areas: list[dict]) -> pd.DataFrame | None:
     Returns a DataFrame with areas as rows and cluster labels as columns, or
     *None* if the file does not exist.
     """
-    clusters_path = (
-        get_comparative_analysis_dir() / "typology" / "typology_clusters.gpkg"
-    )
+    clusters_path = get_comparative_analysis_dir() / "typology" / "typology_clusters.gpkg"
 
     if not clusters_path.exists():
-        logger.warning(
-            "Typology clusters file not found: %s -- skipping.", clusters_path
-        )
+        logger.warning("Typology clusters file not found: %s -- skipping.", clusters_path)
         return None
 
     gdf = gpd.read_file(clusters_path)
@@ -2205,9 +2095,7 @@ def compare_cluster_composition(areas: list[dict]) -> pd.DataFrame | None:
             break
 
     if area_col is None:
-        logger.warning(
-            "No area identifier column found in typology clusters -- skipping."
-        )
+        logger.warning("No area identifier column found in typology clusters -- skipping.")
         return None
 
     # Compute cross-tabulation (counts), then normalise to percentages per area
@@ -2273,34 +2161,26 @@ def main():
         zone_metrics_result = compare_zone_metrics(vidigal_data, copacabana_data)
         if zone_metrics_result is not None:
             zone_df = pd.DataFrame(zone_metrics_result)
-            zone_df.to_csv(
-                output_dir / "tables" / "comparison_zone_metrics.csv", index=False
-            )
+            zone_df.to_csv(output_dir / "tables" / "comparison_zone_metrics.csv", index=False)
             logger.info(
                 "Saved zone metrics comparison to %s",
                 output_dir / "tables" / "comparison_zone_metrics.csv",
             )
         else:
-            logger.warning(
-                "Zone metrics comparison returned no results -- skipping CSV."
-            )
+            logger.warning("Zone metrics comparison returned no results -- skipping CSV.")
     except Exception:
         logger.exception("Failed to compare zone metrics -- skipping.")
 
     try:
         moran_result = compare_moran_summary(vidigal_data, copacabana_data)
         if moran_result is not None:
-            moran_result.to_csv(
-                output_dir / "tables" / "comparison_moran_summary.csv", index=False
-            )
+            moran_result.to_csv(output_dir / "tables" / "comparison_moran_summary.csv", index=False)
             logger.info(
                 "Saved Moran summary comparison to %s",
                 output_dir / "tables" / "comparison_moran_summary.csv",
             )
         else:
-            logger.warning(
-                "Moran summary comparison returned no results -- skipping CSV."
-            )
+            logger.warning("Moran summary comparison returned no results -- skipping CSV.")
     except Exception:
         logger.exception("Failed to compare Moran summaries -- skipping.")
 
@@ -2323,9 +2203,7 @@ def main():
     # Save raster comparisons
     if raster_comparisons:
         raster_df = pd.DataFrame(list(raster_comparisons.values()))
-        raster_df.to_csv(
-            output_dir / "tables" / "comparison_environmental_stats.csv", index=False
-        )
+        raster_df.to_csv(output_dir / "tables" / "comparison_environmental_stats.csv", index=False)
         logger.info(
             f"Saved environmental comparison to {output_dir / 'tables' / 'comparison_environmental_stats.csv'}"
         )
@@ -2333,9 +2211,7 @@ def main():
     # Save street-level comparisons
     if street_comparisons:
         street_df = pd.DataFrame(list(street_comparisons.values()))
-        street_df.to_csv(
-            output_dir / "tables" / "comparison_street_level_stats.csv", index=False
-        )
+        street_df.to_csv(output_dir / "tables" / "comparison_street_level_stats.csv", index=False)
         logger.info(
             f"Saved street-level comparison to {output_dir / 'tables' / 'comparison_street_level_stats.csv'}"
         )

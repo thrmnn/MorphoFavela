@@ -437,9 +437,7 @@ def compute_zone_metrics(
             "Repairing %d invalid building geometries with buffer(0).",
             invalid_mask.sum(),
         )
-        buildings.loc[invalid_mask, "geometry"] = buildings.loc[
-            invalid_mask, "geometry"
-        ].buffer(0)
+        buildings.loc[invalid_mask, "geometry"] = buildings.loc[invalid_mask, "geometry"].buffer(0)
 
     result = compute_bcr(buildings, zones)
     result = compute_far(buildings, result, floor_height=floor_height)

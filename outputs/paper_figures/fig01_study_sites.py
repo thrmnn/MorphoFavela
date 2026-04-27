@@ -9,14 +9,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fig_style import *
-
 import geopandas as gpd
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
+from fig_style import *
 
 
 def main():
@@ -51,9 +49,7 @@ def main():
             # Try matching from all_favelas
             for name_candidate in [site.upper(), site.replace("_", " ").upper()]:
                 match = all_favelas[
-                    all_favelas["nome"]
-                    .str.upper()
-                    .str.contains(name_candidate, na=False)
+                    all_favelas["nome"].str.upper().str.contains(name_candidate, na=False)
                 ]
                 if not match.empty:
                     boundaries[site] = match
@@ -77,9 +73,9 @@ def main():
             with rasterio.open(rj_dtm_path) as src:
                 # Read a decimated version for the overview
                 factor = 4
-                dtm = src.read(
-                    1, out_shape=(src.height // factor, src.width // factor)
-                ).astype(float)
+                dtm = src.read(1, out_shape=(src.height // factor, src.width // factor)).astype(
+                    float
+                )
                 nodata = src.nodata
                 if nodata is not None:
                     dtm[dtm == nodata] = np.nan
@@ -100,9 +96,7 @@ def main():
             print(f"  Hillshade failed: {e}")
 
     # All favela boundaries as light gray
-    all_favelas.plot(
-        ax=ax_main, facecolor="none", edgecolor="#cccccc", linewidth=0.15, zorder=1
-    )
+    all_favelas.plot(ax=ax_main, facecolor="none", edgecolor="#cccccc", linewidth=0.15, zorder=1)
 
     # Highlight campaign sites
     for site in SITE_ORDER:

@@ -16,8 +16,8 @@ from typing import Optional
 
 import geopandas as gpd
 import matplotlib as mpl
-import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
+import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
 from matplotlib.colors import Normalize, TwoSlopeNorm

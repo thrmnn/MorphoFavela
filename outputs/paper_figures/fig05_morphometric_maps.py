@@ -17,13 +17,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fig_style import *
-
-import geopandas as gpd
-import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
+from fig_style import *
 
 
 def main():

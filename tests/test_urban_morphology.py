@@ -19,7 +19,6 @@ from src.urban_morphology import (
     create_analysis_zones,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -260,9 +259,5 @@ class TestComputeZoneMetrics:
         bcr_only = compute_bcr(four_buildings, single_zone)
         far_only = compute_far(four_buildings, single_zone, floor_height=3.0)
 
-        assert math.isclose(
-            combined.loc[0, "bcr"], bcr_only.loc[0, "bcr"], rel_tol=1e-9
-        )
-        assert math.isclose(
-            combined.loc[0, "far"], far_only.loc[0, "far"], rel_tol=1e-9
-        )
+        assert math.isclose(combined.loc[0, "bcr"], bcr_only.loc[0, "bcr"], rel_tol=1e-9)
+        assert math.isclose(combined.loc[0, "far"], far_only.loc[0, "far"], rel_tol=1e-9)

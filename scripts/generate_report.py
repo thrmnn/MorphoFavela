@@ -12,7 +12,6 @@ Usage:
 """
 
 import argparse
-import json
 import logging
 import sys
 import textwrap
@@ -31,21 +30,21 @@ from matplotlib.image import imread
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.cartography import apply_publication_style
 from src.config import (
-    SUPPORTED_AREAS,
-    EXPECTED_CRS,
-    MIN_BUILDING_AREA,
-    MAX_FILTER_HEIGHT,
-    MAX_FILTER_AREA,
-    MAX_FILTER_VOLUME,
     BUILDING_CLUSTER_BUFFER,
     DPI,
-    get_area_output_dir,
+    EXPECTED_CRS,
+    MAX_FILTER_AREA,
+    MAX_FILTER_HEIGHT,
+    MAX_FILTER_VOLUME,
+    MIN_BUILDING_AREA,
+    SUPPORTED_AREAS,
     get_area_analysis_dir,
+    get_area_output_dir,
     get_comparative_analysis_dir,
     is_formal_area,
 )
-from src.cartography import apply_publication_style
 
 # ── Logging ──────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -178,9 +177,7 @@ def collect_area_data(area: str) -> Dict[str, Any]:
         bounds = gdf.total_bounds  # minx, miny, maxx, maxy
         out["study_area_m2"] = (bounds[2] - bounds[0]) * (bounds[3] - bounds[1])
         area_km2 = out["study_area_m2"] / 1e6
-        out["building_density"] = (
-            out["building_count"] / area_km2 if area_km2 > 0 else 0
-        )
+        out["building_density"] = out["building_count"] / area_km2 if area_km2 > 0 else 0
         logger.info("  buildings: %d", out["building_count"])
 
         # ── Building height statistics ──────────────────────────────────
@@ -267,9 +264,7 @@ def collect_area_data(area: str) -> Dict[str, Any]:
                 out["svf_seg_range_mean"] = float(svf_range_vals.mean())
             if "n_points" in seg.columns:
                 n_single = int((seg["n_points"] == 1).sum())
-                out["svf_seg_pct_single_pt"] = (
-                    100.0 * n_single / len(seg) if len(seg) else 0.0
-                )
+                out["svf_seg_pct_single_pt"] = 100.0 * n_single / len(seg) if len(seg) else 0.0
 
             logger.info("  SVF segments: %d rows from %s", len(seg), fname)
             break
@@ -407,9 +402,7 @@ def _narrative_summary(d: Dict[str, Any]) -> str:
     bcr = d.get("zone_bcr_mean")
     far = d.get("zone_far_mean")
     if bcr is not None and far is not None:
-        parts.append(
-            f"Zone-level analysis yields a mean BCR of {bcr:.3f} and FAR of {far:.3f}."
-        )
+        parts.append(f"Zone-level analysis yields a mean BCR of {bcr:.3f} and FAR of {far:.3f}.")
 
     sigma_h = d.get("zone_sigma_h_mean")
     lambda_f = d.get("zone_lambda_f_mean")
@@ -638,13 +631,9 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
             lines.append(f"- **Mean SVF:** {_fmt(d['svf_mean'])}")
             lines.append(f"- **Median SVF:** {_fmt(d['svf_median'])}")
             lines.append(f"- **Std SVF:** {_fmt(d['svf_std'])}")
-            lines.append(
-                f"- **Range:** {_fmt(d['svf_min'])} \u2013 {_fmt(d['svf_max'])}"
-            )
+            lines.append(f"- **Range:** {_fmt(d['svf_min'])} \u2013 {_fmt(d['svf_max'])}")
             if d.get("svf_segments") is not None:
-                lines.append(
-                    f"- **Street segments analysed:** {len(d['svf_segments']):,}"
-                )
+                lines.append(f"- **Street segments analysed:** {len(d['svf_segments']):,}")
 
             # Segment length diagnostics
             if d.get("svf_seg_count") is not None:
@@ -655,22 +644,14 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
                     f"{d['svf_seg_length_mean']:.1f} m / "
                     f"{d['svf_seg_length_median']:.1f} m"
                 )
-                lines.append(
-                    f"- **Very short segments (<10 m):** {d['svf_seg_pct_short']:.1f}%"
-                )
-                lines.append(
-                    f"- **Long segments (>100 m):** {d['svf_seg_pct_long']:.1f}%"
-                )
+                lines.append(f"- **Very short segments (<10 m):** {d['svf_seg_pct_short']:.1f}%")
+                lines.append(f"- **Long segments (>100 m):** {d['svf_seg_pct_long']:.1f}%")
                 if d.get("svf_seg_range_mean") is not None:
                     lines.append(
-                        f"- **Mean within-segment SVF range:** "
-                        f"{d['svf_seg_range_mean']:.3f}"
+                        f"- **Mean within-segment SVF range:** {d['svf_seg_range_mean']:.3f}"
                     )
                 if d.get("svf_seg_pct_single_pt") is not None:
-                    lines.append(
-                        f"- **Single-point segments:** "
-                        f"{d['svf_seg_pct_single_pt']:.1f}%"
-                    )
+                    lines.append(f"- **Single-point segments:** {d['svf_seg_pct_single_pt']:.1f}%")
             lines.append("")
 
         # 4.x.3 Zone-level metrics
@@ -725,9 +706,7 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
         lines.append("| " + " | ".join(header_cols) + " |")
         lines.append(
             "|:"
-            + "|".join(
-                ["------" + (":" if i > 0 else "") for i in range(len(header_cols))]
-            )
+            + "|".join(["------" + (":" if i > 0 else "") for i in range(len(header_cols))])
             + "|"
         )
 
@@ -782,9 +761,7 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
                     "consistent with compact urban morphology."
                 )
             else:
-                issues.append(
-                    f"Moderate SVF ({svf:.3f}) indicates reasonable sky exposure."
-                )
+                issues.append(f"Moderate SVF ({svf:.3f}) indicates reasonable sky exposure.")
 
         # BCR interpretation
         bcr = d.get("zone_bcr_mean")
@@ -844,10 +821,7 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
     lines.append("")
 
     lines.append("---\n")
-    lines.append(
-        f"*Report generated on {now} by `scripts/generate_report.py` "
-        f"| IVF Project, MIT*"
-    )
+    lines.append(f"*Report generated on {now} by `scripts/generate_report.py` | IVF Project, MIT*")
 
     return "\n".join(lines)
 
@@ -908,9 +882,7 @@ def _pdf_base_page(pdf: PdfPages, area_label: str = "") -> plt.Figure:
     fig.patch.set_facecolor("white")
 
     # ── Top accent line (thin) ──────────────────────────────────────
-    ax_top = fig.add_axes(
-        [MARGIN["left"], 0.955, MARGIN["right"] - MARGIN["left"], 0.002]
-    )
+    ax_top = fig.add_axes([MARGIN["left"], 0.955, MARGIN["right"] - MARGIN["left"], 0.002])
     ax_top.add_patch(Rectangle((0, 0), 1, 1, facecolor=SWISS["accent"]))
     ax_top.axis("off")
 
@@ -1038,9 +1010,7 @@ def _pdf_title_page(pdf: PdfPages, areas_data: List[Dict], mode: str):
     plt.close(fig)
 
 
-def _pdf_text_page(
-    pdf: PdfPages, title: str, text_lines: List[str], area_label: str = ""
-):
+def _pdf_text_page(pdf: PdfPages, title: str, text_lines: List[str], area_label: str = ""):
     """Render a page of text content with proper word wrapping."""
     fig = _pdf_base_page(pdf, area_label=area_label)
     ax = fig.add_axes([0, 0, 1, 1])
@@ -1163,9 +1133,7 @@ def _pdf_table_page(
                 )
             )
         elif display_df[col].dtype in [np.int64, np.int32, int]:
-            display_df[col] = display_df[col].apply(
-                lambda x: f"{x:,}" if pd.notna(x) else "N/A"
-            )
+            display_df[col] = display_df[col].apply(lambda x: f"{x:,}" if pd.notna(x) else "N/A")
 
     cell_text = display_df.values.tolist()
     col_labels = list(display_df.columns)
@@ -1230,7 +1198,6 @@ def _pdf_figure_page(
     area_label : str
         Area name for the footer.
     """
-    from matplotlib.patches import FancyBboxPatch, Rectangle
 
     fig = _pdf_base_page(pdf, area_label=area_label)
 
@@ -1271,9 +1238,7 @@ def _pdf_figure_page(
         elif aspect >= 0.8:
             # Near-square: slight inset
             inset = 0.02
-            ax = fig.add_axes(
-                [img_left + inset, img_bottom, img_width - 2 * inset, img_height]
-            )
+            ax = fig.add_axes([img_left + inset, img_bottom, img_width - 2 * inset, img_height])
         else:
             # Portrait: center with margin
             w = img_width * 0.75
@@ -1548,16 +1513,11 @@ def generate_pdf(
 
                 summary_lines.append("**Key Metrics:**")
                 summary_lines.append(f"  Buildings: {d['building_count']:,}")
-                summary_lines.append(
-                    f"  Study area: {d['study_area_m2'] / 1e6:.2f} km\u00b2"
-                )
-                summary_lines.append(
-                    f"  Density: {d['building_density']:,.0f} buildings/km\u00b2"
-                )
+                summary_lines.append(f"  Study area: {d['study_area_m2'] / 1e6:.2f} km\u00b2")
+                summary_lines.append(f"  Density: {d['building_density']:,.0f} buildings/km\u00b2")
                 if d.get("height_mean") is not None:
                     summary_lines.append(
-                        f"  Mean height: {d['height_mean']:.1f} m "
-                        f"(max {d['height_max']:.1f} m)"
+                        f"  Mean height: {d['height_mean']:.1f} m (max {d['height_max']:.1f} m)"
                     )
                 if d.get("svf_mean") is not None:
                     summary_lines.append(
@@ -1567,14 +1527,10 @@ def generate_pdf(
                 if d.get("zone_bcr_mean") is not None:
                     summary_lines.append(f"  Mean BCR: {d['zone_bcr_mean']:.3f}")
                 if d.get("zone_lambda_f_mean") is not None:
-                    summary_lines.append(
-                        f"  Mean \u03bb_f: {d['zone_lambda_f_mean']:.3f}"
-                    )
+                    summary_lines.append(f"  Mean \u03bb_f: {d['zone_lambda_f_mean']:.3f}")
                 summary_lines.append("")
 
-                _pdf_text_page(
-                    pdf, "Executive Summary", summary_lines, area_label=area_footer
-                )
+                _pdf_text_page(pdf, "Executive Summary", summary_lines, area_label=area_footer)
 
         # ── Methodology text + diagram ───────────────────────────────────
         if _want("methodology"):
@@ -1604,9 +1560,7 @@ def generate_pdf(
                 "PCA + k-means clustering; representative patch selection for "
                 "OpenFOAM simulation.",
             ]
-            _pdf_text_page(
-                pdf, "Methodology & Workflow", method_lines, area_label=area_footer
-            )
+            _pdf_text_page(pdf, "Methodology & Workflow", method_lines, area_label=area_footer)
             _pdf_methodology_diagram(pdf, area_label=area_footer)
 
         # ── Theory / metric definitions ──────────────────────────────────
@@ -1665,9 +1619,7 @@ def generate_pdf(
                         display = display.reset_index()
                         display["Metric"] = display["Metric"].map(lambda x: _label(x))
                         stat_rows = ["count", "mean", "std", "min", "50%", "max"]
-                        keep_cols = ["Metric"] + [
-                            r for r in stat_rows if r in display.columns
-                        ]
+                        keep_cols = ["Metric"] + [r for r in stat_rows if r in display.columns]
                         display = display[keep_cols]
                         col_rename = {
                             "count": "Count",
@@ -1788,17 +1740,13 @@ def generate_pdf(
                     val = d.get(key)
                     if key == "study_area_m2" and val is not None:
                         val = val / 1e6
-                    if val is not None and not (
-                        isinstance(val, float) and np.isnan(val)
-                    ):
+                    if val is not None and not (isinstance(val, float) and np.isnan(val)):
                         row[_area_name(d["area"])] = val
                     else:
                         row[_area_name(d["area"])] = "N/A"
                 rows.append(row)
             comp_df = pd.DataFrame(rows)
-            _pdf_table_page(
-                pdf, "Comparative Analysis", comp_df, area_label=area_footer
-            )
+            _pdf_table_page(pdf, "Comparative Analysis", comp_df, area_label=area_footer)
 
     logger.info("PDF saved: %s", output_path)
 
@@ -1821,9 +1769,7 @@ def main():
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--area", type=str, help="Single area name")
-    group.add_argument(
-        "--areas", type=str, help="Comma-separated area names for comparative mode"
-    )
+    group.add_argument("--areas", type=str, help="Comma-separated area names for comparative mode")
     parser.add_argument(
         "--mode",
         choices=["single", "comparative"],

@@ -5,17 +5,16 @@ Tregenza equal-area sky subdivision implemented in src/svf_v2/compute.py.
 """
 
 import numpy as np
-import pyvista as pv
 import pytest
+import pyvista as pv
 
 from src.svf_v2.compute import (
-    generate_tregenza_patches,
-    generate_sky_directions,
-    compute_svf_raycasting,
-    compute_svf,
     TREGENZA_BANDS,
+    compute_svf,
+    compute_svf_raycasting,
+    generate_sky_directions,
+    generate_tregenza_patches,
 )
-
 
 # -----------------------------------------------------------------------
 # Fixtures

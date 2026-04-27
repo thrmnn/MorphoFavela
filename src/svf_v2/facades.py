@@ -7,10 +7,11 @@ facing open sky has SVF ~ 0.5 (upper half of the forward hemisphere is sky;
 lower half is ground).
 """
 
-import numpy as np
-import geopandas as gpd
-import pyvista as pv
 import logging
+
+import geopandas as gpd
+import numpy as np
+import pyvista as pv
 
 from src.svf_v2.compute import compute_svf_raycasting, generate_sky_directions
 

@@ -1,16 +1,15 @@
 """Tests for src/solar/compute.py — ray-casting solar access computation."""
 
-import numpy as np
 import geopandas as gpd
+import numpy as np
 
 from src.solar.compute import (
-    compute_sunlit_matrix,
-    compute_solar_access_streets,
     _build_obb_tree,
     _ray_hits,
+    compute_solar_access_streets,
+    compute_sunlit_matrix,
 )
 from src.solar.sun import sun_position_to_direction
-
 
 # ===================================================================
 # Tests: low-level ray helpers

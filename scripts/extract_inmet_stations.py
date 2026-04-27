@@ -96,9 +96,7 @@ def concat_station_across_years(
                 # Skip 9 lines (8 metadata + 1 column header)
                 lines = data.splitlines(keepends=True)
                 out.write(b"".join(lines[9:]))
-    logger.info(
-        "concatenated %s from %d years -> %s", station, len(per_year_files), out_path
-    )
+    logger.info("concatenated %s from %d years -> %s", station, len(per_year_files), out_path)
     return out_path
 
 

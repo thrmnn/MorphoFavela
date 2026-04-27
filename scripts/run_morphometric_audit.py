@@ -22,7 +22,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import get_area_output_dir, is_informal_area  # noqa: E402
-from src.svf_v2.paths import resolve_paths, resolve_boundary  # noqa: E402
+from src.svf_v2.paths import resolve_boundary, resolve_paths  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -122,15 +122,11 @@ def run_audit(
 
     # ── 1. Load data ────────────────────────────────────────────────
     logger.info("=" * 60)
-    logger.info(
-        "MORPHOMETRIC AUDIT: %s%s", area, f" ({output_suffix})" if output_suffix else ""
-    )
+    logger.info("MORPHOMETRIC AUDIT: %s%s", area, f" ({output_suffix})" if output_suffix else "")
     logger.info("=" * 60)
 
-    buildings, streets, boundary, dtm_path, svf_points, scene_stl, streets_svf = (
-        load_data(
-            area, buildings_override=buildings_override, dtm_override=dtm_override
-        )
+    buildings, streets, boundary, dtm_path, svf_points, scene_stl, streets_svf = load_data(
+        area, buildings_override=buildings_override, dtm_override=dtm_override
     )
     n_buildings = len(buildings)
     logger.info("Buildings: %d, Streets: %d segments", n_buildings, len(streets))
@@ -234,14 +230,14 @@ def run_audit(
     if not skip_figures:
         logger.info("Generating publication figures...")
         from src.morphometry.figures import (
-            figure_site_overview,
             figure_building_heights,
-            figure_street_svf_map,
-            figure_svf_map,
-            figure_morphometric_panel,
-            figure_svf_slope_scatter,
             figure_correlation_matrix,
             figure_distributions,
+            figure_morphometric_panel,
+            figure_site_overview,
+            figure_street_svf_map,
+            figure_svf_map,
+            figure_svf_slope_scatter,
         )
 
         area_display = area.replace("_", " ").title()
@@ -285,9 +281,7 @@ def run_audit(
             (
                 "morphometric_panel",
                 "fig05_morphometric_panel.png",
-                lambda p: figure_morphometric_panel(
-                    grid, buildings, p, area_name=area_display
-                ),
+                lambda p: figure_morphometric_panel(grid, buildings, p, area_name=area_display),
             ),
             (
                 "svf_slope_scatter",

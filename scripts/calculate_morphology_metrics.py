@@ -20,31 +20,31 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import (
-    RAW_DATA,
-    OUTPUTS_DIR,
-    MAX_FILTER_HEIGHT,
-    MAX_FILTER_AREA,
-    MAX_FILTER_VOLUME,
-    MAX_FILTER_HW_RATIO,
-    MAX_HEIGHT_AREA_RATIO,
     HEIGHT_AREA_PERCENTILE,
-    get_area_data_dir,
+    MAX_FILTER_AREA,
+    MAX_FILTER_HEIGHT,
+    MAX_FILTER_HW_RATIO,
+    MAX_FILTER_VOLUME,
+    MAX_HEIGHT_AREA_RATIO,
+    OUTPUTS_DIR,
+    RAW_DATA,
     get_area_analysis_dir,
+    get_area_data_dir,
     is_formal_area,
 )
 from src.metrics import (
     calculate_basic_metrics,
-    validate_footprints,
     normalize_height_columns,
+    validate_footprints,
 )
 from src.morphology_metrics import calculate_morphology_metrics
 from src.visualization import (
-    create_metric_map,
     create_metric_distributions,
-    create_thematic_maps,
+    create_metric_map,
     create_multi_panel_summary,
-    create_statistical_distributions,
     create_scatter_plots,
+    create_statistical_distributions,
+    create_thematic_maps,
 )
 
 # Setup logging
@@ -61,15 +61,11 @@ def generate_summary_stats(gdf: gpd.GeoDataFrame, metrics: list[str]) -> pd.Data
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Calculate extended morphology metrics"
-    )
+    parser = argparse.ArgumentParser(description="Calculate extended morphology metrics")
     parser.add_argument(
         "--area", type=str, default=None, help="Area name (vidigal_tls, riodaspedras)"
     )
-    parser.add_argument(
-        "--input", type=str, default=None, help="Input footprints file path"
-    )
+    parser.add_argument("--input", type=str, default=None, help="Input footprints file path")
     parser.add_argument("--output", type=str, default=None, help="Output directory")
     parser.add_argument(
         "--streets",
@@ -139,8 +135,7 @@ def main() -> None:
             i
             for i in issues
             if any(
-                keyword in i.lower()
-                for keyword in ["missing", "crs", "geometry", "null values"]
+                keyword in i.lower() for keyword in ["missing", "crs", "geometry", "null values"]
             )
         ]
         if critical_issues:
@@ -159,13 +154,9 @@ def main() -> None:
     if args.area:
         if is_formal_area(args.area):
             apply_filtering = False
-            logger.info(
-                f"Formal area detected ({args.area}): Skipping building filters"
-            )
+            logger.info(f"Formal area detected ({args.area}): Skipping building filters")
         else:
-            logger.info(
-                f"Informal area detected ({args.area}): Applying building filters"
-            )
+            logger.info(f"Informal area detected ({args.area}): Applying building filters")
 
     # 3.1 Height filter (informal only)
     if apply_filtering and MAX_FILTER_HEIGHT is not None:
@@ -175,9 +166,7 @@ def main() -> None:
         buildings = buildings.drop(columns=["_temp_height"])
         removed = initial_count - len(buildings)
         if removed > 0:
-            logger.info(
-                f"Filtered out {removed} buildings with height > {MAX_FILTER_HEIGHT}m"
-            )
+            logger.info(f"Filtered out {removed} buildings with height > {MAX_FILTER_HEIGHT}m")
 
     # 4. Basic metrics (needed for some morphology metrics)
     logger.info("Calculating basic metrics...")
@@ -189,47 +178,27 @@ def main() -> None:
         buildings = buildings[buildings["area"] <= MAX_FILTER_AREA].copy()
         removed = initial_count - len(buildings)
         if removed > 0:
-            logger.info(
-                f"Filtered out {removed} buildings with area > {MAX_FILTER_AREA}m²"
-            )
+            logger.info(f"Filtered out {removed} buildings with area > {MAX_FILTER_AREA}m²")
 
     # 4.2 Volume filter
-    if (
-        apply_filtering
-        and MAX_FILTER_VOLUME is not None
-        and "volume" in buildings.columns
-    ):
+    if apply_filtering and MAX_FILTER_VOLUME is not None and "volume" in buildings.columns:
         initial_count = len(buildings)
         buildings = buildings[buildings["volume"] <= MAX_FILTER_VOLUME].copy()
         removed = initial_count - len(buildings)
         if removed > 0:
-            logger.info(
-                f"Filtered out {removed} buildings with volume > {MAX_FILTER_VOLUME}m³"
-            )
+            logger.info(f"Filtered out {removed} buildings with volume > {MAX_FILTER_VOLUME}m³")
 
     # 4.3 H/W ratio filter
-    if (
-        apply_filtering
-        and MAX_FILTER_HW_RATIO is not None
-        and "hw_ratio" in buildings.columns
-    ):
+    if apply_filtering and MAX_FILTER_HW_RATIO is not None and "hw_ratio" in buildings.columns:
         initial_count = len(buildings)
         hw_valid = buildings["hw_ratio"].notna()
-        buildings = buildings[
-            (~hw_valid) | (buildings["hw_ratio"] <= MAX_FILTER_HW_RATIO)
-        ].copy()
+        buildings = buildings[(~hw_valid) | (buildings["hw_ratio"] <= MAX_FILTER_HW_RATIO)].copy()
         removed = initial_count - len(buildings)
         if removed > 0:
-            logger.info(
-                f"Filtered out {removed} buildings with h/w ratio > {MAX_FILTER_HW_RATIO}"
-            )
+            logger.info(f"Filtered out {removed} buildings with h/w ratio > {MAX_FILTER_HW_RATIO}")
 
     # 4.4 Height/area outlier filter
-    if (
-        apply_filtering
-        and "height" in buildings.columns
-        and "area" in buildings.columns
-    ):
+    if apply_filtering and "height" in buildings.columns and "area" in buildings.columns:
         initial_count = len(buildings)
         buildings["height_area_ratio"] = buildings["height"] / buildings["area"]
         valid_mask = buildings["height_area_ratio"].notna() & (buildings["area"] > 0)
@@ -242,19 +211,13 @@ def main() -> None:
                 f"Filtered height/area outliers using {HEIGHT_AREA_PERCENTILE}th percentile (threshold: {threshold:.4f})"
             )
         elif MAX_HEIGHT_AREA_RATIO is not None:
-            buildings = buildings[
-                buildings["height_area_ratio"] <= MAX_HEIGHT_AREA_RATIO
-            ].copy()
-            logger.info(
-                f"Filtered height/area outliers (max ratio: {MAX_HEIGHT_AREA_RATIO})"
-            )
+            buildings = buildings[buildings["height_area_ratio"] <= MAX_HEIGHT_AREA_RATIO].copy()
+            logger.info(f"Filtered height/area outliers (max ratio: {MAX_HEIGHT_AREA_RATIO})")
         if "height_area_ratio" in buildings.columns:
             buildings = buildings.drop(columns=["height_area_ratio"])
         removed = initial_count - len(buildings)
         if removed > 0:
-            logger.info(
-                f"Filtered out {removed} buildings with extreme height/area ratios"
-            )
+            logger.info(f"Filtered out {removed} buildings with extreme height/area ratios")
 
     # 5. Extended morphology metrics (unless --basic-only)
     if not args.basic_only:
@@ -263,9 +226,7 @@ def main() -> None:
             streets_path = Path(args.streets)
             if streets_path.exists():
                 streets = gpd.read_file(streets_path)
-                logger.info(
-                    f"Loaded streets from {streets_path} ({len(streets)} features)"
-                )
+                logger.info(f"Loaded streets from {streets_path} ({len(streets)} features)")
             else:
                 logger.warning(f"Streets file not found: {streets_path}")
 
@@ -286,9 +247,7 @@ def main() -> None:
         analysis_type = "metrics" if args.basic_only else "morphology_metrics"
         output_base = get_area_analysis_dir(args.area, analysis_type)
     else:
-        output_base = OUTPUTS_DIR / (
-            "metrics" if args.basic_only else "morphology_metrics"
-        )
+        output_base = OUTPUTS_DIR / ("metrics" if args.basic_only else "morphology_metrics")
     output_base.mkdir(parents=True, exist_ok=True)
 
     # 7. Save GeoPackage
@@ -315,9 +274,7 @@ def main() -> None:
 
         create_thematic_maps(buildings, maps_dir / "height_volume_maps.png")
         create_multi_panel_summary(buildings, maps_dir / "multi_panel_summary.png")
-        create_statistical_distributions(
-            buildings, maps_dir / "statistical_distributions.png"
-        )
+        create_statistical_distributions(buildings, maps_dir / "statistical_distributions.png")
         create_scatter_plots(buildings, maps_dir / "scatter_plots.png")
     else:
         # Extended morphology: per-metric maps

@@ -4,14 +4,13 @@ import numpy as np
 import pytest
 
 from src.solar.irradiance import (
-    direct_normal_irradiance,
-    direct_horizontal_irradiance,
-    diffuse_horizontal_irradiance,
-    compute_instantaneous_ghi,
-    integrate_daily_irradiance,
     compute_daily_irradiance_array,
+    compute_instantaneous_ghi,
+    diffuse_horizontal_irradiance,
+    direct_horizontal_irradiance,
+    direct_normal_irradiance,
+    integrate_daily_irradiance,
 )
-
 
 # ===================================================================
 # Tests: direct_normal_irradiance (Hottel 1976)

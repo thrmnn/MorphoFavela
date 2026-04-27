@@ -2,11 +2,12 @@
 Test utilities for SVF algorithm testing.
 """
 
+import json
+from pathlib import Path
+from typing import Optional, Tuple
+
 import numpy as np
 import pyvista as pv
-from pathlib import Path
-from typing import Tuple, Optional
-import json
 
 # Optional GPU imports
 try:

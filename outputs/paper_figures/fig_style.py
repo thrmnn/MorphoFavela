@@ -16,7 +16,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
 import numpy as np
 
 # ═══════════════════════════════════════════════════════════════
@@ -273,17 +272,13 @@ def clean_map_axes(ax) -> None:
         spine.set_visible(False)
 
 
-def hillshade(
-    dtm: np.ndarray, res: float, az: float = 315, alt: float = 45
-) -> np.ndarray:
+def hillshade(dtm: np.ndarray, res: float, az: float = 315, alt: float = 45) -> np.ndarray:
     """Compute hillshade from a DTM array."""
     dy, dx = np.gradient(dtm, res)
     slope = np.arctan(np.sqrt(dx**2 + dy**2))
     aspect = np.arctan2(-dx, dy)
     az_r, alt_r = np.radians(az), np.radians(alt)
-    shade = np.sin(alt_r) * np.cos(slope) + np.cos(alt_r) * np.sin(slope) * np.cos(
-        az_r - aspect
-    )
+    shade = np.sin(alt_r) * np.cos(slope) + np.cos(alt_r) * np.sin(slope) * np.cos(az_r - aspect)
     return np.clip(shade, 0, 1)
 
 
@@ -301,9 +296,7 @@ def stat_annotation(ax, text: str, loc: str = "upper left") -> None:
         ha=ha,
         va=va,
         fontsize=5.5,
-        bbox=dict(
-            boxstyle="round,pad=0.3", facecolor="white", alpha=0.8, edgecolor="none"
-        ),
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8, edgecolor="none"),
     )
 
 
@@ -316,9 +309,7 @@ def load_grid(site: str):
     """Load the morphometric grid for a site."""
     import geopandas as gpd
 
-    path = (
-        PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg"
-    )
+    path = PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg"
     if not path.exists():
         raise FileNotFoundError(f"Grid not found: {path}")
     return gpd.read_file(path)
@@ -344,8 +335,9 @@ def load_buildings(site: str, extended: bool = True):
 
 def load_boundary(site: str):
     """Load the favela boundary polygon."""
-    import geopandas as gpd
     import sys
+
+    import geopandas as gpd
 
     sys.path.insert(0, str(PROJECT_ROOT))
     from src.svf_v2.paths import resolve_boundary

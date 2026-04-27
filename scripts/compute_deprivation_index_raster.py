@@ -18,17 +18,18 @@ Usage:
         --units outputs/density/density_proxy.gpkg
 """
 
-import numpy as np
-import pyvista as pv
+import argparse
+import logging
+import sys
+from pathlib import Path
+
 import geopandas as gpd
 import matplotlib.pyplot as plt
-from pathlib import Path
-import argparse
-import sys
-import logging
+import numpy as np
+import pandas as pd
+import pyvista as pv
 from shapely.geometry import Point, box
 from tqdm import tqdm
-import pandas as pd
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -36,9 +37,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import shared utilities
 from src.svf_v2.utils import (
-    load_mesh,
-    load_building_footprints,
     compute_ground_mask,
+    load_building_footprints,
+    load_mesh,
 )
 
 # Setup logging
@@ -164,7 +165,7 @@ def compute_pixel_level_occupancy(
                     * (bounds_3d[3] - bounds_3d[2])
                     * (bounds_3d[5] - bounds_3d[4])
                 )
-        except:
+        except Exception:
             bounds_3d = building_mesh.bounds
             volume = (
                 (bounds_3d[1] - bounds_3d[0])
@@ -276,18 +277,12 @@ def compute_raster_deficits(
     if len(valid_occupancy) > 0:
         # Compute percentile rank for each pixel
         occupancy_flat = occupancy_map.flatten()
-        valid_mask = (
-            ~np.isnan(occupancy_flat)
-            & ~np.isinf(occupancy_flat)
-            & (occupancy_flat >= 0)
-        )
+        valid_mask = ~np.isnan(occupancy_flat) & ~np.isinf(occupancy_flat) & (occupancy_flat >= 0)
 
         if valid_mask.sum() > 0:
             occupancy_score = np.full_like(occupancy_flat, np.nan)
             occupancy_score[valid_mask] = (
-                pd.Series(occupancy_flat[valid_mask])
-                .rank(method="average", pct=True)
-                .values
+                pd.Series(occupancy_flat[valid_mask]).rank(method="average", pct=True).values
             )
             occupancy_score = occupancy_score.reshape(occupancy_map.shape)
         else:
@@ -327,11 +322,7 @@ def compute_hotspot_index_raster(
     hotspot_index = np.clip(hotspot_index, 0.0, 1.0)
 
     # Set NaN where any input is NaN
-    mask = (
-        np.isnan(solar_deficit)
-        | np.isnan(ventilation_deficit)
-        | np.isnan(occupancy_score)
-    )
+    mask = np.isnan(solar_deficit) | np.isnan(ventilation_deficit) | np.isnan(occupancy_score)
     hotspot_index[mask] = np.nan
 
     logger.info(f"  Mean hotspot index: {np.nanmean(hotspot_index):.3f}")
@@ -373,9 +364,7 @@ def apply_building_mask(
     grid_x_flat = X.flatten()
     grid_y_flat = Y.flatten()
 
-    ground_mask_flat = compute_ground_mask(
-        grid_x_flat, grid_y_flat, buffered_footprints
-    )
+    ground_mask_flat = compute_ground_mask(grid_x_flat, grid_y_flat, buffered_footprints)
 
     # Reshape to 2D
     ground_mask = ground_mask_flat.reshape(hotspot_index.shape)
@@ -532,9 +521,7 @@ def plot_classified_raster(
 
     # Custom colorbar
     cbar = plt.colorbar(im, ax=ax, ticks=[-0.5, 0.5, 1.5, 2.5])
-    cbar.set_ticklabels(
-        ["Buildings (masked)", "Baseline", "High Deprivation", "Extreme Hotspot"]
-    )
+    cbar.set_ticklabels(["Buildings (masked)", "Baseline", "High Deprivation", "Extreme Hotspot"])
     cbar.set_label("Hotspot Classification", rotation=270, labelpad=20, fontsize=12)
 
     plt.tight_layout()
@@ -569,9 +556,7 @@ def aggregate_to_units(
     result["hotspot_index_mean"] = 0.0
     result["hotspot_index_max"] = 0.0
 
-    for idx, unit_row in tqdm(
-        result.iterrows(), total=len(result), desc="  Aggregating"
-    ):
+    for idx, unit_row in tqdm(result.iterrows(), total=len(result), desc="  Aggregating"):
         unit_geom = unit_row.geometry
 
         values_in_unit = []
@@ -644,9 +629,7 @@ All metrics are relative and distribution-based. No causality is inferred.
     parser.add_argument(
         "--solar", type=str, required=True, help="Path to solar access raster (.npy)"
     )
-    parser.add_argument(
-        "--svf", type=str, required=True, help="Path to SVF raster (.npy)"
-    )
+    parser.add_argument("--svf", type=str, required=True, help="Path to SVF raster (.npy)")
     parser.add_argument(
         "--porosity", type=str, required=True, help="Path to porosity raster (.npy)"
     )
@@ -739,9 +722,7 @@ All metrics are relative and distribution-based. No causality is inferred.
     # Load rasters with coordinates
     solar_map, solar_x, solar_y = load_raster_with_coords(solar_path, porosity_bounds)
     svf_map, svf_x, svf_y = load_raster_with_coords(svf_path, porosity_bounds)
-    porosity_map, porosity_x, porosity_y = load_raster_with_coords(
-        porosity_path, porosity_bounds
-    )
+    porosity_map, porosity_x, porosity_y = load_raster_with_coords(porosity_path, porosity_bounds)
 
     # Use porosity grid as reference (highest resolution)
     grid_x_coords = porosity_x
@@ -754,9 +735,7 @@ All metrics are relative and distribution-based. No causality is inferred.
 
     # Resample solar and SVF to match porosity grid using coordinate-based lookup
     if solar_map.shape != porosity_map.shape:
-        logger.info(
-            f"Resampling solar map from {solar_map.shape} to {porosity_map.shape}..."
-        )
+        logger.info(f"Resampling solar map from {solar_map.shape} to {porosity_map.shape}...")
         solar_resampled = np.full_like(porosity_map, np.nan)
         for i, y in enumerate(tqdm(porosity_y, desc="  Resampling solar")):
             for j, x in enumerate(porosity_x):
@@ -769,9 +748,7 @@ All metrics are relative and distribution-based. No causality is inferred.
         logger.info(f"  Resampled solar map to {solar_map.shape}")
 
     if svf_map.shape != porosity_map.shape:
-        logger.info(
-            f"Resampling SVF map from {svf_map.shape} to {porosity_map.shape}..."
-        )
+        logger.info(f"Resampling SVF map from {svf_map.shape} to {porosity_map.shape}...")
         svf_resampled = np.full_like(porosity_map, np.nan)
         for i, y in enumerate(tqdm(porosity_y, desc="  Resampling SVF")):
             for j, x in enumerate(porosity_x):
@@ -783,9 +760,7 @@ All metrics are relative and distribution-based. No causality is inferred.
         logger.info(f"  Resampled SVF map to {svf_map.shape}")
 
     # Compute pixel-level occupancy pressure
-    grid_spacing = (
-        grid_x_coords[1] - grid_x_coords[0] if len(grid_x_coords) > 1 else 2.0
-    )
+    grid_spacing = grid_x_coords[1] - grid_x_coords[0] if len(grid_x_coords) > 1 else 2.0
     occupancy_map = compute_pixel_level_occupancy(
         grid_x_coords,
         grid_y_coords,

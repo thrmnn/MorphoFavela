@@ -5,17 +5,18 @@ Everything stays in world coordinates (EPSG:31983 / SIRGAS 2000 UTM 23S).
 No local-coordinate STL translation.
 """
 
-import numpy as np
-import pyvista as pv
-import geopandas as gpd
-import pandas as pd
-import rasterio
-from rasterio.transform import xy
+import logging
 from pathlib import Path
 from typing import Optional, Tuple
+
+import geopandas as gpd
+import numpy as np
+import pandas as pd
+import pyvista as pv
+import rasterio
+from rasterio.transform import xy
+from shapely.geometry import MultiPolygon, Polygon
 from tqdm import tqdm
-from shapely.geometry import Polygon, MultiPolygon
-import logging
 
 logger = logging.getLogger(__name__)
 

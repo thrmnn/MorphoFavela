@@ -13,8 +13,8 @@ import logging
 from pathlib import Path
 
 import geopandas as gpd
-import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
@@ -29,8 +29,8 @@ from src.cartography import (
 )
 from src.config import DPI, FIGURE_SIZE
 from src.solar.sun import (
-    compute_sun_positions,
     REFERENCE_DATES,
+    compute_sun_positions,
 )
 
 logger = logging.getLogger(__name__)

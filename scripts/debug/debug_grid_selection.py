@@ -18,7 +18,6 @@ from pathlib import Path
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.patches import Patch
 from shapely import STRtree
 from shapely.geometry import Point
 

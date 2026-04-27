@@ -9,17 +9,18 @@ Usage:
     python scripts/compute_solar_access.py --stl data/raw/scene.stl --footprints data/raw/buildings.shp --grid-spacing 5.0 --height 0.5
 """
 
-import numpy as np
-import pyvista as pv
-import matplotlib.pyplot as plt
-from pathlib import Path
-import pandas as pd
-from tqdm import tqdm
 import argparse
 import sys
 from datetime import datetime
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import pvlib
+import pyvista as pv
 from matplotlib.colors import ListedColormap
+from tqdm import tqdm
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -27,10 +28,10 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import shared utilities
 from src.svf_v2.utils import (
-    load_mesh,
     extract_terrain_surface,
-    load_building_footprints,
     generate_ground_points,
+    load_building_footprints,
+    load_mesh,
 )
 
 
@@ -56,7 +57,7 @@ def compute_sun_positions(
         - sun_directions: Array of shape (N, 3) with sun direction vectors (normalized)
         - sun_times: Index of valid sun position times
     """
-    print(f"Computing sun positions for winter solstice...")
+    print("Computing sun positions for winter solstice...")
     print(f"  Location: ({latitude:.4f}°, {longitude:.4f}°)")
     print(f"  Time step: {timestep_minutes} minutes")
 
@@ -147,9 +148,7 @@ def compute_solar_access_for_points(
     solar_access_steps = []
 
     # Progress bar
-    pbar = tqdm(
-        total=len(observer_points), desc="Computing solar access", unit="points"
-    )
+    pbar = tqdm(total=len(observer_points), desc="Computing solar access", unit="points")
 
     for observer in observer_points:
         unobstructed_count = 0
@@ -251,9 +250,7 @@ def generate_solar_maps(
 
     ax.set_xlabel("X (meters)", fontsize=12)
     ax.set_ylabel("Y (meters)", fontsize=12)
-    ax.set_title(
-        "Ground-Level Solar Access (Winter Solstice)", fontsize=14, fontweight="bold"
-    )
+    ax.set_title("Ground-Level Solar Access (Winter Solstice)", fontsize=14, fontweight="bold")
     ax.set_aspect("equal")
 
     cbar = plt.colorbar(im, ax=ax)
@@ -301,9 +298,7 @@ def generate_solar_maps(
 
     # Custom colorbar
     cbar = plt.colorbar(im, ax=ax, ticks=[0.25, 0.75])
-    cbar.set_ticklabels(
-        [f"<{threshold_hours}h (deficit)", f"≥{threshold_hours}h (acceptable)"]
-    )
+    cbar.set_ticklabels([f"<{threshold_hours}h (deficit)", f"≥{threshold_hours}h (acceptable)"])
     cbar.set_label("Solar Access Classification", rotation=270, labelpad=20)
 
     plt.tight_layout()
@@ -328,9 +323,7 @@ def generate_solar_maps(
 
 def main():
     """Main execution block."""
-    parser = argparse.ArgumentParser(
-        description="Compute ground-level solar access from STL file"
-    )
+    parser = argparse.ArgumentParser(description="Compute ground-level solar access from STL file")
     parser.add_argument("--stl", type=str, required=True, help="Path to STL file")
     parser.add_argument(
         "--footprints",
@@ -338,9 +331,7 @@ def main():
         default=None,
         help="Path to building footprints shapefile (optional)",
     )
-    parser.add_argument(
-        "--grid-spacing", type=float, default=5.0, help="Grid spacing in meters"
-    )
+    parser.add_argument("--grid-spacing", type=float, default=5.0, help="Grid spacing in meters")
     parser.add_argument(
         "--height",
         type=float,
@@ -448,22 +439,18 @@ def main():
     # Reuses the exact same ground mask logic from SVF computation
     # Function returns: (projected_points, x_coords, y_coords, ground_mask, building_buffer_geom)
     if args.footprints and building_footprints is not None:
-        ground_points, grid_x_coords, grid_y_coords, original_mask, _ = (
-            generate_ground_points(
-                terrain,
-                args.grid_spacing,
-                building_footprints=building_footprints,
-                output_dir=output_dir,
-                building_buffer=args.building_buffer,
-                isolated_buildings=isolated_footprints,
-                area_filtered_buildings=area_filtered_footprints,
-            )
+        ground_points, grid_x_coords, grid_y_coords, original_mask, _ = generate_ground_points(
+            terrain,
+            args.grid_spacing,
+            building_footprints=building_footprints,
+            output_dir=output_dir,
+            building_buffer=args.building_buffer,
+            isolated_buildings=isolated_footprints,
+            area_filtered_buildings=area_filtered_footprints,
         )
     else:
-        ground_points, grid_x_coords, grid_y_coords, original_mask, _ = (
-            generate_ground_points(
-                terrain, args.grid_spacing, building_buffer=args.building_buffer
-            )
+        ground_points, grid_x_coords, grid_y_coords, original_mask, _ = generate_ground_points(
+            terrain, args.grid_spacing, building_buffer=args.building_buffer
         )
 
     print(f"\nTotal grid points: {len(original_mask)}")

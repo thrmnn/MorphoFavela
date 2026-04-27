@@ -7,8 +7,8 @@ import pytest
 @pytest.mark.integration
 class TestSVFGrid:
     def test_svf_grid_10pts(self, area_paths, area_scene):
-        from src.svf_v2.sampling import sample_grid_points
         from src.svf_v2.compute import compute_svf
+        from src.svf_v2.sampling import sample_grid_points
 
         dtm_path = area_paths[0]
         scene_mesh, _, gdf = area_scene
@@ -26,8 +26,8 @@ class TestSVFGrid:
 @pytest.mark.integration
 class TestSVFStreets:
     def test_svf_street_10pts(self, area_paths, area_scene):
-        from src.svf_v2.sampling import sample_street_points
         from src.svf_v2.compute import compute_svf
+        from src.svf_v2.sampling import sample_street_points
 
         dtm_path, _, roads_path = area_paths
         scene_mesh, _, _ = area_scene
@@ -54,8 +54,8 @@ class TestSVFStreets:
 @pytest.mark.integration
 class TestSVFFacades:
     def test_svf_facade_10pts(self, area_paths, area_scene):
-        from src.svf_v2.sampling import sample_facade_points
         from src.svf_v2.facades import compute_facade_svf
+        from src.svf_v2.sampling import sample_facade_points
 
         dtm_path = area_paths[0]
         scene_mesh, _, gdf = area_scene

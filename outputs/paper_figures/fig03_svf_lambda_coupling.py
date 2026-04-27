@@ -10,15 +10,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fig_style import *
-
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
+from fig_style import *
 from scipy import stats
 from scipy.stats import gaussian_kde
-
 
 # ── Typology colors (colorblind-safe, print-friendly) ──
 TYPO_COLORS = {
@@ -252,9 +250,7 @@ def main():
         va="top",
         fontsize=7,
         color="#555555",
-        bbox=dict(
-            boxstyle="round,pad=0.3", facecolor="white", alpha=0.85, edgecolor="none"
-        ),
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.85, edgecolor="none"),
     )
 
     # ── Legend (compact, upper area near annotation) ──

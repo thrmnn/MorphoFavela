@@ -1,8 +1,8 @@
 """Shared fixtures for tests/test_solar/ test suite."""
 
+import geopandas as gpd
 import pytest
 import pyvista as pv
-import geopandas as gpd
 from shapely.geometry import Point
 
 

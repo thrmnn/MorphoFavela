@@ -5,25 +5,26 @@ Tests coordinate system alignment, spatial extent alignment, STL georeferencing,
 and road-building intersection handling.
 """
 
+import sys
+import tempfile
+from pathlib import Path
+
+import geopandas as gpd
 import numpy as np
 import pytest
-import geopandas as gpd
 import pyvista as pv
-from pathlib import Path
-import tempfile
 from shapely.geometry import LineString, box
-import sys
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.data_alignment_utils import (  # noqa: E402
-    check_crs_alignment,
+    ALIGNMENT_TOLERANCE,
     auto_correct_alignment,
+    check_crs_alignment,
     detect_road_building_intersections,
     redirect_roads,
-    ALIGNMENT_TOLERANCE,
 )
 
 try:
@@ -111,9 +112,7 @@ class TestCRSAlignment:
         """Test datasets with same CRS."""
         buildings = gpd.GeoDataFrame(geometry=[box(0, 0, 10, 10)], crs="EPSG:4326")
 
-        roads = gpd.GeoDataFrame(
-            geometry=[LineString([(5, 5), (15, 15)])], crs="EPSG:4326"
-        )
+        roads = gpd.GeoDataFrame(geometry=[LineString([(5, 5), (15, 15)])], crs="EPSG:4326")
 
         datasets = {"buildings": buildings, "roads": roads}
 
@@ -122,9 +121,7 @@ class TestCRSAlignment:
         )  # Large tolerance for overlapping bounds
 
         # CRS should match (no CRS warnings)
-        crs_warnings = [
-            w for w in warnings if "CRS" in w or "coordinate system" in w.lower()
-        ]
+        crs_warnings = [w for w in warnings if "CRS" in w or "coordinate system" in w.lower()]
         assert len(crs_warnings) == 0
 
         # Bounds may differ but should overlap (datasets are in same area)
@@ -151,9 +148,7 @@ class TestCRSAlignment:
         """Test automatic CRS correction."""
         buildings = gpd.GeoDataFrame(geometry=[box(0, 0, 10, 10)], crs="EPSG:4326")
 
-        roads = gpd.GeoDataFrame(
-            geometry=[LineString([(5, 5), (15, 15)])], crs="EPSG:3857"
-        )
+        roads = gpd.GeoDataFrame(geometry=[LineString([(5, 5), (15, 15)])], crs="EPSG:3857")
 
         datasets = {"buildings": buildings, "roads": roads}
 
@@ -171,9 +166,7 @@ class TestSpatialAlignment:
         """Test datasets with aligned bounds."""
         buildings = gpd.GeoDataFrame(geometry=[box(0, 0, 10, 10)], crs="EPSG:4326")
 
-        roads = gpd.GeoDataFrame(
-            geometry=[LineString([(5, 5), (15, 15)])], crs="EPSG:4326"
-        )
+        roads = gpd.GeoDataFrame(geometry=[LineString([(5, 5), (15, 15)])], crs="EPSG:4326")
 
         stl_bounds = (0, 20, 0, 20, 0, 10)  # x_min, x_max, y_min, y_max, z_min, z_max
 
@@ -186,9 +179,7 @@ class TestSpatialAlignment:
         # Should be aligned within tolerance (bounds overlap, centers are close)
         # The datasets overlap, so they should be considered aligned
         # Note: centers differ by ~10m and ~5m, so need tolerance > 10m
-        assert (
-            is_aligned or len([w for w in warnings if "misaligned" in w.lower()]) == 0
-        )
+        assert is_aligned or len([w for w in warnings if "misaligned" in w.lower()]) == 0
 
     def test_misaligned_bounds_detection(self):
         """Test detection of misaligned bounds."""
@@ -212,9 +203,7 @@ class TestSpatialAlignment:
         buildings = gpd.GeoDataFrame(geometry=[box(0, 0, 10, 10)], crs="EPSG:4326")
 
         # Roads offset by 100m
-        roads = gpd.GeoDataFrame(
-            geometry=[LineString([(100, 100), (110, 110)])], crs="EPSG:4326"
-        )
+        roads = gpd.GeoDataFrame(geometry=[LineString([(100, 100), (110, 110)])], crs="EPSG:4326")
 
         datasets = {"buildings": buildings, "roads": roads}
 
@@ -227,10 +216,8 @@ class TestSpatialAlignment:
             (buildings.total_bounds[1] + buildings.total_bounds[3]) / 2,
         )
         roads_center = (
-            (corrected["roads"].total_bounds[0] + corrected["roads"].total_bounds[2])
-            / 2,
-            (corrected["roads"].total_bounds[1] + corrected["roads"].total_bounds[3])
-            / 2,
+            (corrected["roads"].total_bounds[0] + corrected["roads"].total_bounds[2]) / 2,
+            (corrected["roads"].total_bounds[1] + corrected["roads"].total_bounds[3]) / 2,
         )
 
         center_diff = np.sqrt(
@@ -331,9 +318,7 @@ class TestRoadRedirection:
         buildings = gpd.GeoDataFrame(geometry=[box(0, 0, 10, 10)], crs="EPSG:4326")
 
         # Road passes through building
-        roads = gpd.GeoDataFrame(
-            geometry=[LineString([(-5, 5), (15, 5)])], crs="EPSG:4326"
-        )
+        roads = gpd.GeoDataFrame(geometry=[LineString([(-5, 5), (15, 5)])], crs="EPSG:4326")
 
         redirected, intersections = redirect_roads(
             roads, buildings, method="parallel_offset", offset_distance=2.0
@@ -343,9 +328,7 @@ class TestRoadRedirection:
         assert len(intersections) > 0
 
         # Check redirected road doesn't intersect (or has fewer intersections)
-        redirected_intersections = detect_road_building_intersections(
-            redirected, buildings
-        )
+        redirected_intersections = detect_road_building_intersections(redirected, buildings)
         # Parallel offset may not always work perfectly, so check for improvement
         assert len(redirected_intersections) <= len(intersections)
 
@@ -353,9 +336,7 @@ class TestRoadRedirection:
         """Test simple reroute redirection."""
         buildings = gpd.GeoDataFrame(geometry=[box(0, 0, 10, 10)], crs="EPSG:4326")
 
-        roads = gpd.GeoDataFrame(
-            geometry=[LineString([(-5, 5), (15, 5)])], crs="EPSG:4326"
-        )
+        roads = gpd.GeoDataFrame(geometry=[LineString([(-5, 5), (15, 5)])], crs="EPSG:4326")
 
         redirected, intersections = redirect_roads(
             roads, buildings, method="simple_reroute", buffer_distance=2.0
@@ -364,9 +345,7 @@ class TestRoadRedirection:
         assert len(redirected) == len(roads)
 
         # Check redirected road doesn't intersect (or has fewer intersections)
-        redirected_intersections = detect_road_building_intersections(
-            redirected, buildings
-        )
+        redirected_intersections = detect_road_building_intersections(redirected, buildings)
         assert len(redirected_intersections) <= len(intersections)
 
     def test_redirection_preserves_network(self):
@@ -398,9 +377,7 @@ class TestIntegration:
         buildings = gpd.GeoDataFrame(geometry=[box(0, 0, 10, 10)], crs="EPSG:4326")
 
         # Roads offset by 50m
-        roads = gpd.GeoDataFrame(
-            geometry=[LineString([(50, 50), (60, 60)])], crs="EPSG:4326"
-        )
+        roads = gpd.GeoDataFrame(geometry=[LineString([(50, 50), (60, 60)])], crs="EPSG:4326")
 
         datasets = {"buildings": buildings, "roads": roads}
 
@@ -434,9 +411,7 @@ class TestIntegration:
 
         # First align (if needed)
         datasets = {"buildings": buildings, "roads": roads}
-        is_aligned, warnings, corrections = check_crs_alignment(
-            datasets, tolerance=10.0
-        )
+        is_aligned, warnings, corrections = check_crs_alignment(datasets, tolerance=10.0)
 
         if not is_aligned:
             datasets = auto_correct_alignment(datasets, corrections)
@@ -450,9 +425,7 @@ class TestIntegration:
         )
 
         # Verify intersections are reduced (may not be zero due to geometry complexity)
-        final_intersections = detect_road_building_intersections(
-            redirected, datasets["buildings"]
-        )
+        final_intersections = detect_road_building_intersections(redirected, datasets["buildings"])
 
         # Redirection should reduce intersections (may not eliminate all in complex cases)
         assert len(final_intersections) <= len(intersections)

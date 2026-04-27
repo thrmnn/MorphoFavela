@@ -25,6 +25,7 @@ import numpy as np
 import pyvista as pv
 from shapely.geometry import Point
 
+from src.solar.irradiance import compute_daily_irradiance_array
 from src.solar.sun import (
     DEFAULT_DATE,
     DEFAULT_LATITUDE,
@@ -32,7 +33,6 @@ from src.solar.sun import (
     compute_sun_positions,
     sun_position_to_direction,
 )
-from src.solar.irradiance import compute_daily_irradiance_array
 
 logger = logging.getLogger(__name__)
 

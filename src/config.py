@@ -142,9 +142,7 @@ MAX_HEIGHT_AREA_RATIO = None  # Maximum height/area ratio (None to use percentil
 HEIGHT_AREA_PERCENTILE = 99.0  # Percentile for height/area ratio filtering
 
 # Building clustering parameters (for filtering isolated buildings)
-BUILDING_CLUSTER_BUFFER = (
-    15.0  # meters - buffer distance for connected components clustering
-)
+BUILDING_CLUSTER_BUFFER = 15.0  # meters - buffer distance for connected components clustering
 
 # Visualization settings
 DPI = 300

@@ -24,7 +24,6 @@ CSVs out of the yearly ZIPs.
 from __future__ import annotations
 
 import argparse
-import os
 import subprocess
 import time
 import urllib.request

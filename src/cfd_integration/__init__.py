@@ -15,31 +15,31 @@ See `src/cfd_integration/README.md` for the CFD result file format spec
 that the OpenFOAM-side agent is expected to produce.
 """
 
-from src.cfd_integration.schema import (
-    CFDSamplePoint,
-    CFDPatchResult,
-    CFDCampaignResult,
-    WindRose,
-    WIND_DIRECTIONS_8,
-)
-from src.cfd_integration.io import (
-    load_patch_csv,
-    load_patch_vtu,
-    load_campaign_results,
-)
 from src.cfd_integration.aggregate import (
     aggregate_to_grid,
     aggregate_to_patch,
 )
+from src.cfd_integration.io import (
+    load_campaign_results,
+    load_patch_csv,
+    load_patch_vtu,
+)
 from src.cfd_integration.metrics import (
-    velocity_magnitude,
+    ach,
     stagnation_fraction,
     turbulent_intensity,
-    ach,
+    velocity_magnitude,
+)
+from src.cfd_integration.schema import (
+    WIND_DIRECTIONS_8,
+    CFDCampaignResult,
+    CFDPatchResult,
+    CFDSamplePoint,
+    WindRose,
 )
 from src.cfd_integration.weighting import (
-    weighted_by_wind_rose,
     load_wind_rose,
+    weighted_by_wind_rose,
 )
 
 __all__ = [

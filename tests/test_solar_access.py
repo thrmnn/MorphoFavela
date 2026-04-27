@@ -6,14 +6,13 @@ import numpy as np
 import pandas as pd
 import pyvista as pv
 
-from src.solar.sun import compute_sun_positions, sun_position_to_direction
 from src.solar.compute import (
     _build_obb_tree,
     _ray_hits,
     compute_solar_access_streets,
     compute_sunlit_matrix,
 )
-
+from src.solar.sun import compute_sun_positions, sun_position_to_direction
 
 # ---------------------------------------------------------------------------
 # Helpers: synthetic meshes
@@ -32,9 +31,7 @@ def _flat_terrain(size: float = 50.0, n: int = 21) -> pv.PolyData:
     for i in range(n - 1):
         for j in range(n - 1):
             idx = i * n + j
-            faces.extend(
-                [[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]]
-            )
+            faces.extend([[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]])
     return pv.PolyData(points, faces)
 
 
@@ -110,9 +107,7 @@ class TestComputeSunPositions:
     """Test sun position computation."""
 
     def test_returns_list_of_tuples(self):
-        positions = compute_sun_positions(
-            latitude=-22.97, longitude=-43.17, date="2026-06-21"
-        )
+        positions = compute_sun_positions(latitude=-22.97, longitude=-43.17, date="2026-06-21")
         assert isinstance(positions, list)
         assert len(positions) > 0
         for item in positions:
@@ -121,17 +116,13 @@ class TestComputeSunPositions:
 
     def test_all_altitudes_positive(self):
         """All returned positions must have altitude > 0 (sun above horizon)."""
-        positions = compute_sun_positions(
-            latitude=-22.97, longitude=-43.17, date="2026-06-21"
-        )
+        positions = compute_sun_positions(latitude=-22.97, longitude=-43.17, date="2026-06-21")
         for alt, az in positions:
             assert alt > 0, f"Altitude {alt} should be > 0"
 
     def test_azimuths_in_range(self):
         """Azimuths should be in [0, 360)."""
-        positions = compute_sun_positions(
-            latitude=-22.97, longitude=-43.17, date="2026-06-21"
-        )
+        positions = compute_sun_positions(latitude=-22.97, longitude=-43.17, date="2026-06-21")
         for alt, az in positions:
             assert 0 <= az < 360, f"Azimuth {az} out of range"
 
@@ -150,9 +141,7 @@ class TestComputeSunPositions:
         )
         # Winter solstice at lat -23: sunrise ~06:30, sunset ~17:15 local
         # Expect roughly 10-11 valid positions
-        assert 7 <= len(positions) <= 13, (
-            f"Expected 7-13 positions, got {len(positions)}"
-        )
+        assert 7 <= len(positions) <= 13, f"Expected 7-13 positions, got {len(positions)}"
 
     def test_max_altitude_winter_solstice_rio(self):
         """At lat -23 winter solstice, max altitude ~ 43-44 degrees."""

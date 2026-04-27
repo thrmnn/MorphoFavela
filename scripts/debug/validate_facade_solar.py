@@ -16,17 +16,17 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 import pyvista as pv
-from shapely.geometry import Point, box as sbox
+from shapely.geometry import Point
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.cartography import apply_publication_style
 from src.solar.facade import (
-    compute_facade_solar_access,
     aggregate_by_building_floor,
+    compute_facade_solar_access,
     summarize_housing_units,
 )
-from src.cartography import apply_publication_style
 
 # ---------------------------------------------------------------------------
 # Canyon geometry

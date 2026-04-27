@@ -23,7 +23,6 @@ from matplotlib import cm, colors
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fig_style import (  # noqa: E402
-    DPI,
     PROJECT_ROOT,
     SITE_LABELS,
     SITE_ORDER,

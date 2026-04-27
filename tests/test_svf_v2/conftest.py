@@ -1,11 +1,12 @@
 """Shared fixtures for svf_v2 tests."""
 
 import sys
-import numpy as np
-import pyvista as pv
-import geopandas as gpd
-import pytest
 from pathlib import Path
+
+import geopandas as gpd
+import numpy as np
+import pytest
+import pyvista as pv
 from shapely.geometry import Polygon, box
 
 # Ensure project root is on path
@@ -18,8 +19,8 @@ AREAS = ["vidigal_tls", "vidigal", "riodaspedras"]
 
 def _area_data_available(area: str) -> bool:
     """Check if real data files exist for an area."""
-    from src.svf_v2.paths import AREA_FILES
     from src.config import get_area_data_dir
+    from src.svf_v2.paths import AREA_FILES
 
     if area not in AREA_FILES:
         return False

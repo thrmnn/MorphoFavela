@@ -12,10 +12,9 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
-import matplotlib.pyplot as plt
 from shapely.geometry import box
 
 # Add project root to path
@@ -63,9 +62,7 @@ def _normalize_series(series: np.ndarray) -> np.ndarray:
     return out
 
 
-def _compute_risk_index(
-    gdf: gpd.GeoDataFrame, weights: dict[str, float]
-) -> gpd.GeoDataFrame:
+def _compute_risk_index(gdf: gpd.GeoDataFrame, weights: dict[str, float]) -> gpd.GeoDataFrame:
     """
     Compute a composite risk index from multiple morphology metrics.
 
@@ -102,9 +99,7 @@ def _compute_risk_index(
     return gdf
 
 
-def _create_grid(
-    bounds: tuple[float, float, float, float], cell_size: float
-) -> gpd.GeoDataFrame:
+def _create_grid(bounds: tuple[float, float, float, float], cell_size: float) -> gpd.GeoDataFrame:
     """
     Create a regular grid of square cells covering the given bounds.
 
@@ -193,9 +188,7 @@ def _plot_map(
             norm=norm,
         )
     else:
-        gdf.plot(
-            column=column, ax=ax, cmap=cmap, legend=True, legend_kwds={"label": column}
-        )
+        gdf.plot(column=column, ax=ax, cmap=cmap, legend=True, legend_kwds={"label": column})
     ax.set_title(title)
     ax.set_axis_off()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -373,8 +366,8 @@ def _compute_hotspots(grid: gpd.GeoDataFrame, value_col: str) -> gpd.GeoDataFram
         ImportError: If libpysal or esda are not installed.
     """
     try:
-        from libpysal.weights import Queen
         from esda.getisord import G_Local
+        from libpysal.weights import Queen
     except Exception as exc:
         raise ImportError("Hotspot analysis requires libpysal and esda") from exc
 
@@ -394,12 +387,8 @@ def _compute_hotspots(grid: gpd.GeoDataFrame, value_col: str) -> gpd.GeoDataFram
 
     # Classification: 1 = hotspot, -1 = coldspot, 0 = not significant
     grid["hotspot_class"] = 0
-    grid.loc[
-        valid & (grid["hotspot_p"] <= 0.05) & (grid["hotspot_gi"] > 0), "hotspot_class"
-    ] = 1
-    grid.loc[
-        valid & (grid["hotspot_p"] <= 0.05) & (grid["hotspot_gi"] < 0), "hotspot_class"
-    ] = -1
+    grid.loc[valid & (grid["hotspot_p"] <= 0.05) & (grid["hotspot_gi"] > 0), "hotspot_class"] = 1
+    grid.loc[valid & (grid["hotspot_p"] <= 0.05) & (grid["hotspot_gi"] < 0), "hotspot_class"] = -1
     return grid
 
 
@@ -422,19 +411,11 @@ def main() -> None:
     parser.add_argument(
         "--area", type=str, required=True, help="Area name (vidigal_tls, riodaspedras)"
     )
-    parser.add_argument(
-        "--input", type=str, default=None, help="Input morphology GPKG path"
-    )
+    parser.add_argument("--input", type=str, default=None, help="Input morphology GPKG path")
     parser.add_argument("--output", type=str, default=None, help="Output directory")
-    parser.add_argument(
-        "--grid-size", type=float, default=50.0, help="Grid aggregation size (m)"
-    )
-    parser.add_argument(
-        "--hotspots", action="store_true", help="Compute hotspot clusters (Gi*)"
-    )
-    parser.add_argument(
-        "--streets", type=str, default=None, help="Optional streets file path"
-    )
+    parser.add_argument("--grid-size", type=float, default=50.0, help="Grid aggregation size (m)")
+    parser.add_argument("--hotspots", action="store_true", help="Compute hotspot clusters (Gi*)")
+    parser.add_argument("--streets", type=str, default=None, help="Optional streets file path")
     parser.add_argument(
         "--street-spacing", type=float, default=10.0, help="Street sampling spacing (m)"
     )
@@ -451,9 +432,7 @@ def main() -> None:
         raise FileNotFoundError(f"Input not found: {input_path}")
 
     output_base = (
-        Path(args.output)
-        if args.output
-        else get_area_analysis_dir(args.area, "morphology_risk")
+        Path(args.output) if args.output else get_area_analysis_dir(args.area, "morphology_risk")
     )
     output_base.mkdir(parents=True, exist_ok=True)
     maps_dir = output_base / "maps"
@@ -489,12 +468,8 @@ def main() -> None:
                 spacing=args.street_spacing,
             )
             if not street_points.empty:
-                street_points.to_file(
-                    output_base / "street_canyon_hw_points.gpkg", driver="GPKG"
-                )
-                street_grid = gpd.sjoin(
-                    street_points, grid, predicate="intersects", how="left"
-                )
+                street_points.to_file(output_base / "street_canyon_hw_points.gpkg", driver="GPKG")
+                street_grid = gpd.sjoin(street_points, grid, predicate="intersects", how="left")
                 street_grouped = street_grid.groupby("index_right")["street_hw"].mean()
                 grid["street_canyon_hw_mean"] = street_grouped
                 _plot_map(
@@ -528,9 +503,7 @@ def main() -> None:
     if "street_canyon_hw_mean" in grid.columns:
         # Combine grid risk with street canyon H/W to better reflect ventilation risk
         z_risk = _normalize_series(grid["risk_mean"].to_numpy(dtype=float))
-        z_street = _normalize_series(
-            grid["street_canyon_hw_mean"].to_numpy(dtype=float)
-        )
+        z_street = _normalize_series(grid["street_canyon_hw_mean"].to_numpy(dtype=float))
         grid["risk_grid_index"] = z_risk + z_street
         _plot_map(
             grid,

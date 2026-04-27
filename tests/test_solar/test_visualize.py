@@ -8,15 +8,14 @@ the module exists.
 
 from src.solar.visualize import (
     plot_solar_access,
-    plot_solar_seasonal_panel,
-    plot_solar_distribution,
-    plot_solar_dashboard,
-    plot_solar_sun_path,
-    plot_solar_irradiance_map,
-    plot_solar_vs_svf,
     plot_solar_comparison,
+    plot_solar_dashboard,
+    plot_solar_distribution,
+    plot_solar_irradiance_map,
+    plot_solar_seasonal_panel,
+    plot_solar_sun_path,
+    plot_solar_vs_svf,
 )
-
 
 # ===================================================================
 # Tests: plot_solar_access

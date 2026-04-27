@@ -45,9 +45,7 @@ def align_layer_to_dtm(
         ref = gpd.read_file(reference_roads)
         dx = _center(ref.total_bounds)[0] - _center(layer_gdf.total_bounds)[0]
         dy = _center(ref.total_bounds)[1] - _center(layer_gdf.total_bounds)[1]
-        print(
-            f"Applying alignment shift from reference roads: dx={dx:.3f}, dy={dy:.3f}"
-        )
+        print(f"Applying alignment shift from reference roads: dx={dx:.3f}, dy={dy:.3f}")
         aligned = layer_gdf.copy()
         aligned.geometry = aligned.geometry.translate(xoff=dx, yoff=dy)
         return aligned
@@ -98,17 +96,11 @@ def plot_svf_with_isolines(
     building_footprints = None
     if footprints_path and footprints_path.exists():
         building_footprints = gpd.read_file(footprints_path)
-        if (
-            building_footprints.crs
-            and dtm_crs
-            and str(building_footprints.crs) != str(dtm_crs)
-        ):
+        if building_footprints.crs and dtm_crs and str(building_footprints.crs) != str(dtm_crs):
             building_footprints = building_footprints.to_crs(dtm_crs)
         # Buildings should already overlap with DTM (they're in the same CRS)
         if not _bounds_overlap(building_footprints.total_bounds, dtm_bounds):
-            print(
-                "Warning: Building footprints don't overlap with DTM, attempting alignment..."
-            )
+            print("Warning: Building footprints don't overlap with DTM, attempting alignment...")
             building_footprints = align_layer_to_dtm(
                 building_footprints,
                 dtm_bounds=dtm_bounds,
@@ -125,9 +117,7 @@ def plot_svf_with_isolines(
         seg_center = _center(segments.total_bounds)
         dx = build_center[0] - seg_center[0]
         dy = build_center[1] - seg_center[1]
-        print(
-            f"Aligning segments to building footprints center: dx={dx:.3f}, dy={dy:.3f}"
-        )
+        print(f"Aligning segments to building footprints center: dx={dx:.3f}, dy={dy:.3f}")
         segments = segments.copy()
         segments.geometry = segments.geometry.translate(xoff=dx, yoff=dy)
     elif reference_roads and reference_roads.exists():
@@ -137,9 +127,7 @@ def plot_svf_with_isolines(
         )
     else:
         # Last resort: align to DTM center
-        segments = align_layer_to_dtm(
-            segments, dtm_bounds=dtm_bounds, reference_roads=None
-        )
+        segments = align_layer_to_dtm(segments, dtm_bounds=dtm_bounds, reference_roads=None)
 
     # Build X/Y grid for contouring using affine transform
     # Create row and column index arrays
@@ -242,21 +230,15 @@ def plot_svf_with_isolines(
         )
 
         # Count actual contour lines generated (not just collections).
-        n_contour_lines_minor = sum(
-            len(seg) > 0 for coll in contour_minor.allsegs for seg in coll
-        )
-        n_contour_lines_major = sum(
-            len(seg) > 0 for coll in contour_major.allsegs for seg in coll
-        )
+        n_contour_lines_minor = sum(len(seg) > 0 for coll in contour_minor.allsegs for seg in coll)
+        n_contour_lines_major = sum(len(seg) > 0 for coll in contour_major.allsegs for seg in coll)
         n_contour_lines = n_contour_lines_minor + n_contour_lines_major
         print(
             f"Generated {len(contour_minor.allsegs) + len(contour_major.allsegs)} contour collections "
             f"with {n_contour_lines} total contour lines"
         )
         if n_contour_lines == 0:
-            print(
-                "WARNING: No contour lines were generated! Check coordinate grid and DEM data."
-            )
+            print("WARNING: No contour lines were generated! Check coordinate grid and DEM data.")
     except Exception as e:
         print(f"ERROR generating contours: {e}")
         print(f"DEM shape: {dem.shape}, X shape: {xs.shape}, Y shape: {ys.shape}")
@@ -320,9 +302,7 @@ def plot_svf_with_isolines(
     ax.set_ylim(plot_bounds[1], plot_bounds[3])
     ax.set_aspect("equal")
 
-    ax.set_title(
-        "Street-Level SVF with Terrain Isolines", fontsize=14, fontweight="bold"
-    )
+    ax.set_title("Street-Level SVF with Terrain Isolines", fontsize=14, fontweight="bold")
     ax.set_axis_off()
     plt.tight_layout()
 
@@ -333,12 +313,8 @@ def plot_svf_with_isolines(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Plot street SVF with terrain isolines."
-    )
-    parser.add_argument(
-        "--segments", required=True, help="Path to street_svf_segments.gpkg"
-    )
+    parser = argparse.ArgumentParser(description="Plot street SVF with terrain isolines.")
+    parser.add_argument("--segments", required=True, help="Path to street_svf_segments.gpkg")
     parser.add_argument("--dtm", required=True, help="Path to DTM raster")
     parser.add_argument("--output", required=True, help="Output PNG path")
     parser.add_argument(
@@ -351,9 +327,7 @@ def main() -> None:
         default=None,
         help="Optional roads shapefile in original CRS for robust alignment",
     )
-    parser.add_argument(
-        "--levels", type=int, default=18, help="Number of contour levels"
-    )
+    parser.add_argument("--levels", type=int, default=18, help="Number of contour levels")
     parser.add_argument(
         "--scale-mode",
         choices=["full", "minmax"],

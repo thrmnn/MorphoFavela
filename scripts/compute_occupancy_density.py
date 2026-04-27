@@ -21,17 +21,17 @@ Usage:
         --units data/raw/analysis_units.shp
 """
 
-import numpy as np
-import pyvista as pv
+import argparse
+import logging
+import sys
+from pathlib import Path
+
 import geopandas as gpd
 import matplotlib.pyplot as plt
-from pathlib import Path
-import argparse
-import sys
-import logging
-from shapely.geometry import Polygon, Point, box
+import numpy as np
+import pyvista as pv
+from shapely.geometry import Point, box
 from tqdm import tqdm
-import pandas as pd
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -39,8 +39,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import shared utilities
 from src.svf_v2.utils import (
-    load_mesh,
     load_building_footprints,
+    load_mesh,
 )
 
 # Setup logging
@@ -85,9 +85,7 @@ def compute_building_volumes(
     # Get all mesh points once
     mesh_points = full_mesh.points
 
-    for idx, row in tqdm(
-        footprints.iterrows(), total=len(footprints), desc="  Computing volumes"
-    ):
+    for idx, row in tqdm(footprints.iterrows(), total=len(footprints), desc="  Computing volumes"):
         geom = row.geometry
         bounds = geom.bounds  # (minx, miny, maxx, maxy)
 
@@ -128,7 +126,7 @@ def compute_building_volumes(
                     * (bounds_3d[3] - bounds_3d[2])
                     * (bounds_3d[5] - bounds_3d[4])
                 )
-        except:
+        except Exception:
             # Fallback: bounding box volume
             bounds_3d = building_mesh.bounds
             volume = (
@@ -203,9 +201,7 @@ def aggregate_by_unit(
 
     # Ensure CRS match
     if footprints.crs != analysis_units.crs:
-        logger.info(
-            f"  Reprojecting footprints from {footprints.crs} to {analysis_units.crs}"
-        )
+        logger.info(f"  Reprojecting footprints from {footprints.crs} to {analysis_units.crs}")
         footprints = footprints.to_crs(analysis_units.crs)
 
     # Spatial join: assign each building to an analysis unit
@@ -258,9 +254,7 @@ def compute_open_space(
     result["built_area"] = 0.0
 
     # For each analysis unit, compute built footprint area
-    for idx, unit_row in tqdm(
-        result.iterrows(), total=len(result), desc="  Computing open space"
-    ):
+    for idx, unit_row in tqdm(result.iterrows(), total=len(result), desc="  Computing open space"):
         unit_geom = unit_row.geometry
 
         # Find buildings within this unit
@@ -298,9 +292,7 @@ def compute_open_space(
 
     logger.info(f"  Computed open space for {len(result)} analysis units")
     logger.info(f"  Mean open space: {result['open_space_area'].mean():.2f} m²")
-    logger.info(
-        f"  Units with zero open space: {(result['open_space_area'] == 0).sum()}"
-    )
+    logger.info(f"  Units with zero open space: {(result['open_space_area'] == 0).sum()}")
 
     return result
 
@@ -436,7 +428,7 @@ def print_summary_statistics(analysis_units: gpd.GeoDataFrame) -> None:
     print(f"Units with insufficient open space: {(~finite_mask).sum()}")
 
     if len(finite_values) > 0:
-        print(f"\nDensity proxy (m³/m²):")
+        print("\nDensity proxy (m³/m²):")
         print(f"  Mean: {finite_values.mean():.2f}")
         print(f"  Median: {finite_values.median():.2f}")
         print(f"  Std: {finite_values.std():.2f}")
@@ -445,15 +437,13 @@ def print_summary_statistics(analysis_units: gpd.GeoDataFrame) -> None:
         print(f"  80th percentile: {np.percentile(finite_values, 80):.2f}")
         print(f"  90th percentile: {np.percentile(finite_values, 90):.2f}")
 
-    print(f"\nVolume statistics:")
+    print("\nVolume statistics:")
     print(f"  Total built volume: {analysis_units['built_volume'].sum():.2f} m³")
     print(f"  Mean volume per unit: {analysis_units['built_volume'].mean():.2f} m³")
 
-    print(f"\nOpen space statistics:")
+    print("\nOpen space statistics:")
     print(f"  Total open space: {analysis_units['open_space_area'].sum():.2f} m²")
-    print(
-        f"  Mean open space per unit: {analysis_units['open_space_area'].mean():.2f} m²"
-    )
+    print(f"  Mean open space per unit: {analysis_units['open_space_area'].mean():.2f} m²")
 
     print("=" * 60 + "\n")
 
@@ -546,9 +536,7 @@ It does NOT represent population. It is used only for relative ranking.
     if use_custom_units:
         print(f"Analysis units: {units_path}")
     else:
-        print(
-            f"Analysis units: Auto-generated grid ({args.grid_size}m × {args.grid_size}m)"
-        )
+        print(f"Analysis units: Auto-generated grid ({args.grid_size}m × {args.grid_size}m)")
     print(f"Output directory: {output_dir}")
     print("=" * 60)
 
@@ -580,14 +568,10 @@ It does NOT represent population. It is used only for relative ranking.
     units_with_volume = aggregate_by_unit(footprints_with_volume, analysis_units)
 
     # Compute open space area
-    units_with_open_space = compute_open_space(
-        units_with_volume, footprints_with_volume
-    )
+    units_with_open_space = compute_open_space(units_with_volume, footprints_with_volume)
 
     # Compute density proxy
-    result = compute_density_proxy(
-        units_with_open_space, min_open_space=args.min_open_space
-    )
+    result = compute_density_proxy(units_with_open_space, min_open_space=args.min_open_space)
 
     # Print summary statistics
     print_summary_statistics(result)

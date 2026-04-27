@@ -21,10 +21,6 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import get_area_output_dir  # noqa: E402
-from src.svf_v2.paths import resolve_paths  # noqa: E402
-from src.svf_v2.scene import build_scene  # noqa: E402
-from src.svf_v2.sampling import sample_facade_points  # noqa: E402
-from src.svf_v2.facades import compute_facade_svf  # noqa: E402
 from src.solar.facade import (  # noqa: E402
     aggregate_by_building,
     aggregate_by_building_floor,
@@ -32,6 +28,10 @@ from src.solar.facade import (  # noqa: E402
     summarize_housing_units,
 )
 from src.solar.sun import REFERENCE_DATES  # noqa: E402
+from src.svf_v2.facades import compute_facade_svf  # noqa: E402
+from src.svf_v2.paths import resolve_paths  # noqa: E402
+from src.svf_v2.sampling import sample_facade_points  # noqa: E402
+from src.svf_v2.scene import build_scene  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -74,9 +74,7 @@ def run_single_date(
     if result.crs is not None:
         crs_obj = CRS(result.crs)
         if crs_obj.is_compound:
-            horiz = [
-                s for s in crs_obj.sub_crs_list if s.is_projected or s.is_geographic
-            ][0]
+            horiz = [s for s in crs_obj.sub_crs_list if s.is_projected or s.is_geographic][0]
             result = result.set_crs(horiz, allow_override=True)
             logger.info("Normalized compound CRS to %s for GPKG export", horiz.name)
 
@@ -168,12 +166,8 @@ def main():
         action="store_true",
         help="Skip facade SVF computation (use svf=1.0 for diffuse)",
     )
-    parser.add_argument(
-        "--height-field", default="altura", help="Building height column"
-    )
-    parser.add_argument(
-        "--base-field", default="base", help="Building base elevation column"
-    )
+    parser.add_argument("--height-field", default="altura", help="Building height column")
+    parser.add_argument("--base-field", default="base", help="Building base elevation column")
     parser.add_argument(
         "--sky-patches",
         type=int,

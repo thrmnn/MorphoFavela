@@ -1,8 +1,8 @@
 """Tests for src/svf_v2/facades.py."""
 
+import geopandas as gpd
 import numpy as np
 import pyvista as pv
-import geopandas as gpd
 from shapely.geometry import Point
 
 from src.svf_v2.facades import compute_facade_svf

@@ -51,9 +51,7 @@ def main() -> None:
         description="Compute zone-level urban morphology metrics and spatial analysis."
     )
     parser.add_argument("--area", required=True, help="Area name (e.g. vidigal_tls)")
-    parser.add_argument(
-        "--cell-size", type=float, default=50.0, help="Grid cell size in metres"
-    )
+    parser.add_argument("--cell-size", type=float, default=50.0, help="Grid cell size in metres")
     parser.add_argument(
         "--floor-height",
         type=float,
@@ -100,9 +98,7 @@ def main() -> None:
     if buildings_path is None:
         buildings_path = _find_shapefile(data_dir, "*Buildings*.shp")
     if buildings_path is None:
-        logger.error(
-            "No buildings shapefile found in %s matching '*buildings*.shp'.", data_dir
-        )
+        logger.error("No buildings shapefile found in %s matching '*buildings*.shp'.", data_dir)
         sys.exit(1)
 
     logger.info("Loading buildings from %s", buildings_path)
@@ -211,9 +207,7 @@ def main() -> None:
         lisa_combined = lisa_frames[0]
         for frame in lisa_frames[1:]:
             lisa_cols = [c for c in frame.columns if c.startswith("lisa_")]
-            lisa_combined = lisa_combined.join(
-                frame[lisa_cols], rsuffix="_dup", how="left"
-            )
+            lisa_combined = lisa_combined.join(frame[lisa_cols], rsuffix="_dup", how="left")
         lisa_path = output_dir / "lisa_clusters.gpkg"
         lisa_combined.to_file(lisa_path, driver="GPKG")
         logger.info("Saved LISA clusters to %s", lisa_path)

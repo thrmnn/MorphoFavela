@@ -23,9 +23,7 @@ def assert_svf_valid(svf_values, tolerance=1e-6):
     )
 
 
-def compare_cpu_gpu_results(
-    cpu_svf, gpu_svf, tolerance=0.01, correlation_threshold=0.95
-):
+def compare_cpu_gpu_results(cpu_svf, gpu_svf, tolerance=0.01, correlation_threshold=0.95):
     """
     Compare CPU and GPU SVF results and return statistics.
 
@@ -114,9 +112,7 @@ def create_synthetic_mesh(mesh_type="empty", **kwargs):
         for i in range(n - 1):
             for j in range(n - 1):
                 idx = i * n + j
-                faces.extend(
-                    [[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]]
-                )
+                faces.extend([[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]])
 
         return pv.PolyData(points, faces)
 

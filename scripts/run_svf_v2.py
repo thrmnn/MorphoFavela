@@ -12,32 +12,33 @@ import argparse
 import logging
 import sys
 import time
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import get_area_output_dir
-from src.svf_v2.paths import resolve_boundary, resolve_paths
-from src.svf_v2.scene import build_scene
-from src.svf_v2.sampling import (
-    sample_grid_points,
-    sample_street_points,
-    sample_facade_points,
-)
 from src.svf_v2.compute import compute_svf
-from src.svf_v2.facades import compute_facade_svf, compute_facade_solar_potential
+from src.svf_v2.facades import compute_facade_solar_potential, compute_facade_svf
 from src.svf_v2.io import (
-    save_grid_results,
-    save_street_results,
+    plot_alignment_check,
+    plot_offset_diagnostic,
+    plot_road_z_check,
     save_facade_results,
+    save_grid_results,
     save_scene_stl,
     save_scene_vtk,
-    plot_alignment_check,
-    plot_road_z_check,
-    plot_offset_diagnostic,
+    save_street_results,
 )
+from src.svf_v2.paths import resolve_boundary, resolve_paths
+from src.svf_v2.sampling import (
+    sample_facade_points,
+    sample_grid_points,
+    sample_street_points,
+)
+from src.svf_v2.scene import build_scene
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,9 +71,7 @@ def run_grid(
     )
     logger.info(f"Grid sampling: {len(observers)} points ({time.time() - t0:.1f}s)")
 
-    checkpoint_path = (
-        output_dir / ".svf_checkpoint_grid.npz" if args.checkpoint else None
-    )
+    checkpoint_path = output_dir / ".svf_checkpoint_grid.npz" if args.checkpoint else None
     t0 = time.time()
     svf = compute_svf(
         observers,
@@ -84,9 +83,7 @@ def run_grid(
         checkpoint_path=checkpoint_path,
     )
     logger.info(f"Grid SVF computed in {time.time() - t0:.1f}s")
-    logger.info(
-        f"  SVF stats: mean={svf.mean():.3f}, min={svf.min():.3f}, max={svf.max():.3f}"
-    )
+    logger.info(f"  SVF stats: mean={svf.mean():.3f}, min={svf.min():.3f}, max={svf.max():.3f}")
 
     import rasterio
 
@@ -140,9 +137,7 @@ def run_streets(
         ]
     )
 
-    checkpoint_path = (
-        output_dir / ".svf_checkpoint_streets.npz" if args.checkpoint else None
-    )
+    checkpoint_path = output_dir / ".svf_checkpoint_streets.npz" if args.checkpoint else None
     t0 = time.time()
     svf = compute_svf(
         observers,
@@ -155,9 +150,7 @@ def run_streets(
     )
     street_gdf["svf"] = svf
     logger.info(f"Street SVF computed in {time.time() - t0:.1f}s")
-    logger.info(
-        f"  SVF stats: mean={svf.mean():.3f}, min={svf.min():.3f}, max={svf.max():.3f}"
-    )
+    logger.info(f"  SVF stats: mean={svf.mean():.3f}, min={svf.min():.3f}, max={svf.max():.3f}")
 
     # Load roads for segment aggregation
     import geopandas
@@ -183,12 +176,8 @@ def run_streets(
         with rio.open(dtm_path) as src:
             dtm_data = src.read(1)
             valid = dtm_data[np.isfinite(dtm_data) & (dtm_data < 10000)]
-            dtm_z_range = (
-                (float(valid.min()), float(valid.max())) if len(valid) > 0 else None
-            )
-        plot_road_z_check(
-            street_gdf, output_dir / "road_z_check.png", dtm_z_range=dtm_z_range
-        )
+            dtm_z_range = (float(valid.min()), float(valid.max())) if len(valid) > 0 else None
+        plot_road_z_check(street_gdf, output_dir / "road_z_check.png", dtm_z_range=dtm_z_range)
 
 
 def run_facades(
@@ -239,9 +228,7 @@ def run_facades(
 def main():
     parser = argparse.ArgumentParser(description="SVF v2 computation")
     parser.add_argument("--area", required=True, help="Area name (e.g. vidigal_tls)")
-    parser.add_argument(
-        "--mode", default="streets", choices=["grid", "streets", "facades", "all"]
-    )
+    parser.add_argument("--mode", default="streets", choices=["grid", "streets", "facades", "all"])
     parser.add_argument("--grid-spacing", type=float, default=2.0)
     parser.add_argument("--street-spacing", type=float, default=1.5)
     parser.add_argument("--facade-spacing", type=float, default=1.0)
@@ -277,12 +264,8 @@ def main():
         help="Safety margin (m) when offsetting street points outside buildings",
     )
     parser.add_argument("--dtm-subsample", type=int, default=1)
-    parser.add_argument(
-        "--base-field", default="base", help="Building base elevation field"
-    )
-    parser.add_argument(
-        "--height-field", default="altura", help="Building extrusion height field"
-    )
+    parser.add_argument("--base-field", default="base", help="Building base elevation field")
+    parser.add_argument("--height-field", default="altura", help="Building extrusion height field")
     parser.add_argument(
         "--skip-visual",
         action="store_true",

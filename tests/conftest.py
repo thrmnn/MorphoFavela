@@ -3,8 +3,8 @@ Pytest configuration and shared fixtures for SVF tests.
 """
 
 import numpy as np
-import pyvista as pv
 import pytest
+import pyvista as pv
 
 # Optional GPU imports
 try:
@@ -53,9 +53,7 @@ def empty_mesh():
         for j in range(n - 1):
             # Two triangles per quad
             idx = i * n + j
-            faces.extend(
-                [[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]]
-            )
+            faces.extend([[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]])
 
     mesh = pv.PolyData(points, faces)
     return mesh
@@ -89,9 +87,7 @@ def single_building_mesh():
     for i in range(n - 1):
         for j in range(n - 1):
             idx = i * n + j
-            terrain_faces.extend(
-                [[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]]
-            )
+            terrain_faces.extend([[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]])
 
     # Create building mesh (box with 6 faces)
     building_verts = base_corners + top_corners
@@ -156,9 +152,7 @@ def two_buildings_mesh():
     for i in range(n - 1):
         for j in range(n - 1):
             idx = i * n + j
-            terrain_faces.extend(
-                [[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]]
-            )
+            terrain_faces.extend([[3, idx, idx + 1, idx + n], [3, idx + 1, idx + n + 1, idx + n]])
 
     # Create building meshes
     n_terrain = len(terrain_points)

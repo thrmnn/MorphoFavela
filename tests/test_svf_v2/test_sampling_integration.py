@@ -26,8 +26,9 @@ class TestGridSampling:
         assert np.all(np.isfinite(pts[:, 2])), "Grid points have NaN Z values"
 
     def test_grid_z_within_dtm_range(self, area_paths, area_scene):
-        from src.svf_v2.sampling import sample_grid_points
         import rasterio
+
+        from src.svf_v2.sampling import sample_grid_points
 
         dtm_path = area_paths[0]
         _, _, gdf = area_scene
@@ -44,9 +45,10 @@ class TestGridSampling:
 
     def test_grid_excludes_buildings(self, area_paths, area_scene):
         """Verify a random sample of grid points are outside building footprints."""
-        from src.svf_v2.sampling import sample_grid_points
         import geopandas as gpd
         from shapely.geometry import Point
+
+        from src.svf_v2.sampling import sample_grid_points
 
         dtm_path = area_paths[0]
         _, _, gdf = area_scene

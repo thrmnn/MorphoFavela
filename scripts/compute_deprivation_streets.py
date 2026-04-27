@@ -11,14 +11,15 @@ Usage:
     python scripts/compute_deprivation_streets.py --area copacabana
 """
 
-import numpy as np
-import geopandas as gpd
-import pandas as pd
-import matplotlib.pyplot as plt
-from pathlib import Path
 import argparse
-import sys
 import logging
+import sys
+from pathlib import Path
+
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -32,9 +33,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def compute_deprivation_index(
-    svf_values: np.ndarray, solar_values: np.ndarray
-) -> tuple:
+def compute_deprivation_index(svf_values: np.ndarray, solar_values: np.ndarray) -> tuple:
     """
     Compute deprivation index from SVF and solar access values.
 
@@ -156,9 +155,7 @@ def create_deprivation_distribution_plots(
     ax.hist(dep_values, bins=50, edgecolor="black", alpha=0.7, color="darkred")
     ax.set_xlabel("Deprivation Index", fontsize=12)
     ax.set_ylabel("Frequency", fontsize=12)
-    ax.set_title(
-        "Distribution of Street-Level Deprivation Index", fontsize=14, fontweight="bold"
-    )
+    ax.set_title("Distribution of Street-Level Deprivation Index", fontsize=14, fontweight="bold")
     ax.set_xlim(0, 1)
     ax.grid(True, alpha=0.3)
 
@@ -209,12 +206,8 @@ def create_deprivation_distribution_plots(
 
 def main():
     """Compute and save street-level deprivation index."""
-    parser = argparse.ArgumentParser(
-        description="Compute street-level deprivation index"
-    )
-    parser.add_argument(
-        "--area", type=str, required=True, help="Area name (vidigal, copacabana)"
-    )
+    parser = argparse.ArgumentParser(description="Compute street-level deprivation index")
+    parser.add_argument("--area", type=str, required=True, help="Area name (vidigal, copacabana)")
     args = parser.parse_args()
 
     logger.info("=" * 60)
@@ -290,9 +283,7 @@ def main():
     svf_vals = merged["svf"].values
     solar_vals = merged["solar_hours"].values
 
-    deprivation_index, svf_deficit, solar_deficit = compute_deprivation_index(
-        svf_vals, solar_vals
-    )
+    deprivation_index, svf_deficit, solar_deficit = compute_deprivation_index(svf_vals, solar_vals)
 
     # Create output GeoDataFrame
     deprivation_points = merged[["geometry"]].copy()
@@ -426,20 +417,16 @@ def main():
             # Ensure same CRS
             if building_footprints.crs != segments.crs:
                 building_footprints = building_footprints.to_crs(segments.crs)
-            logger.info(f"  Loaded building footprints for visualization")
+            logger.info("  Loaded building footprints for visualization")
         except Exception as e:
             logger.warning(f"  Could not load building footprints: {e}")
 
     # Create street deprivation map
     if segments is not None and isinstance(segments, gpd.GeoDataFrame):
         map_path = output_dir / "street_deprivation_map.png"
-        create_street_deprivation_map(
-            segments, deprivation_points, building_footprints, map_path
-        )
+        create_street_deprivation_map(segments, deprivation_points, building_footprints, map_path)
     else:
-        logger.warning(
-            "  Cannot create map visualization (segments not available as GeoDataFrame)"
-        )
+        logger.warning("  Cannot create map visualization (segments not available as GeoDataFrame)")
 
     # Create distribution plots
     if segments is not None and isinstance(segments, gpd.GeoDataFrame):
@@ -456,18 +443,16 @@ def main():
     logger.info(f"Total points: {stats['n_points']}")
     if segments is not None:
         logger.info(f"Total segments: {stats['n_segments']}")
-    logger.info(f"\nDeprivation Index Statistics:")
+    logger.info("\nDeprivation Index Statistics:")
     logger.info(f"  Mean: {stats['deprivation_mean']:.3f}")
     logger.info(f"  Median: {stats['deprivation_median']:.3f}")
     logger.info(f"  Min: {stats['deprivation_min']:.3f}")
     logger.info(f"  Max: {stats['deprivation_max']:.3f}")
     logger.info(f"  Std: {stats['deprivation_std']:.3f}")
-    logger.info(f"\nDeprivation Thresholds:")
+    logger.info("\nDeprivation Thresholds:")
     logger.info(f"  High deprivation (>0.5): {stats['high_deprivation_pct']:.1f}%")
-    logger.info(
-        f"  Extreme deprivation (>0.75): {stats['extreme_deprivation_pct']:.1f}%"
-    )
-    logger.info(f"\nComponent Deficits:")
+    logger.info(f"  Extreme deprivation (>0.75): {stats['extreme_deprivation_pct']:.1f}%")
+    logger.info("\nComponent Deficits:")
     logger.info(f"  Mean SVF deficit: {stats['svf_deficit_mean']:.3f}")
     logger.info(f"  Mean solar deficit: {stats['solar_deficit_mean']:.3f}")
     logger.info("=" * 60)

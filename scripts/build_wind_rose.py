@@ -35,11 +35,10 @@ import argparse
 import json
 import logging
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -253,10 +252,7 @@ def from_inmet_csv(
     def _norm(s: str) -> str:
         nf = unicodedata.normalize("NFKD", s)
         return (
-            "".join(c for c in nf if not unicodedata.combining(c))
-            .lower()
-            .strip()
-            .replace(" ", "_")
+            "".join(c for c in nf if not unicodedata.combining(c)).lower().strip().replace(" ", "_")
         )
 
     df.columns = [_norm(c) for c in df.columns]
@@ -370,8 +366,7 @@ def from_iowa_asos_csv(
     required = {"valid", "drct", "sknt"}
     if not required.issubset(df.columns):
         raise ValueError(
-            f"Iowa ASOS CSV missing expected columns {required}. "
-            f"Got: {sorted(df.columns)}"
+            f"Iowa ASOS CSV missing expected columns {required}. Got: {sorted(df.columns)}"
         )
 
     # Station coords carried per-row in the ASOS schema
@@ -460,9 +455,7 @@ def from_template(site: str) -> dict:
         "station_id": profile.recommended_station_id,
         "station_name": profile.recommended_station_name,
         "station_coords": (
-            list(profile.recommended_station_coords)
-            if profile.recommended_station_coords
-            else None
+            list(profile.recommended_station_coords) if profile.recommended_station_coords else None
         ),
         "time_window_start": None,
         "time_window_end": None,
@@ -594,9 +587,7 @@ def main():
     args = parser.parse_args()
 
     if not any([args.inmet_csv, args.asos_csv, args.from_template]):
-        parser.error(
-            "Must provide --inmet-csv <path>, --asos-csv <path>, or --from-template"
-        )
+        parser.error("Must provide --inmet-csv <path>, --asos-csv <path>, or --from-template")
 
     sites = list(SITE_PROFILES) if args.site == "all" else [args.site]
 

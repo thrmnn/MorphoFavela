@@ -1,8 +1,9 @@
 """Basic morphometric metrics calculation."""
 
-import numpy as np
-import geopandas as gpd
 import logging
+
+import geopandas as gpd
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -122,9 +123,7 @@ def calculate_inter_building_distance(gdf: gpd.GeoDataFrame) -> np.ndarray:
     distances = np.full(n_buildings, np.nan)
 
     if n_buildings < 2:
-        logger.warning(
-            "Less than 2 buildings, cannot calculate inter-building distances"
-        )
+        logger.warning("Less than 2 buildings, cannot calculate inter-building distances")
         return distances
 
     # Build spatial index for efficient nearest neighbor queries

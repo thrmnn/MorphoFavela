@@ -42,9 +42,7 @@ DEFAULT_FEATURES = ["bcr", "far", "sigma_h", "lambda_f"]
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Classify settlement typology via clustering."
-    )
+    parser = argparse.ArgumentParser(description="Classify settlement typology via clustering.")
     parser.add_argument(
         "--areas",
         nargs="+",
@@ -80,9 +78,7 @@ def main() -> None:
     # ------------------------------------------------ load zone metrics
     frames: list[gpd.GeoDataFrame] = []
     for area in args.areas:
-        metrics_path = (
-            get_area_output_dir(area) / "urban_morphology" / "zone_metrics.gpkg"
-        )
+        metrics_path = get_area_output_dir(area) / "urban_morphology" / "zone_metrics.gpkg"
         if not metrics_path.exists():
             logger.error(
                 "Zone metrics not found for area '%s' at %s. "
@@ -175,9 +171,7 @@ def main() -> None:
         plot_typology_map(classified, maps_dir / "typology_clusters.png")
 
         logger.info("Generating cluster profiles chart...")
-        plot_cluster_profiles(
-            profiles, maps_dir / "cluster_profiles.png", features=args.features
-        )
+        plot_cluster_profiles(profiles, maps_dir / "cluster_profiles.png", features=args.features)
 
         if optimal_k_result is not None:
             logger.info("Generating elbow/silhouette plot...")

@@ -27,7 +27,7 @@ import geopandas as gpd
 import numpy as np
 from esda import Moran, Moran_Local
 from esda.getisord import G_Local
-from libpysal.weights import DistanceBand, KNN, Queen
+from libpysal.weights import KNN, DistanceBand, Queen
 
 logger = logging.getLogger(__name__)
 
@@ -82,16 +82,13 @@ def build_spatial_weights(
         weights = DistanceBand.from_dataframe(gdf, threshold=threshold)
     else:
         raise ValueError(
-            f"Unsupported weights method '{method}'. "
-            "Choose from 'queen', 'knn', or 'distance'."
+            f"Unsupported weights method '{method}'. Choose from 'queen', 'knn', or 'distance'."
         )
 
     # Handle islands (isolated geometries with no neighbours).
     n_islands = len(weights.islands)
     if n_islands > 0:
-        logger.warning(
-            "Weight matrix contains %d island(s) with no neighbours.", n_islands
-        )
+        logger.warning("Weight matrix contains %d island(s) with no neighbours.", n_islands)
 
     weights.transform = "r"
     logger.info("Spatial weights built: %d observations.", weights.n)

@@ -22,8 +22,8 @@ from pathlib import Path
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.patches import Patch, Rectangle
 from matplotlib.colors import LightSource
+from matplotlib.patches import Patch, Rectangle
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -85,14 +85,14 @@ def main():
         boundary_gdf = boundary_gdf.to_crs(dtm_crs)
 
     # --- Print diagnostics ---
-    print(f"\n--- CRS ---")
+    print("\n--- CRS ---")
     print(f"  DTM CRS:         {dtm_crs}")
     print(f"  Footprints CRS:  {fp_gdf.crs}")
     print(f"  Roads CRS:       {roads_gdf.crs}")
     if boundary_gdf is not None:
         print(f"  Boundary CRS:    {boundary_gdf.crs}")
 
-    print(f"\n--- DTM ---")
+    print("\n--- DTM ---")
     print(f"  Shape:       {dtm.shape}")
     print(f"  Resolution:  {dtm_res[0]:.2f} x {dtm_res[1]:.2f} m")
     print(
@@ -112,7 +112,7 @@ def main():
             f"(mean {valid_vals.mean():.1f})"
         )
 
-    print(f"\n--- Footprints ---")
+    print("\n--- Footprints ---")
     print(f"  Count:    {len(fp_gdf):,}")
     print(f"  Columns:  {list(fp_gdf.columns)}")
     fb = fp_gdf.total_bounds
@@ -131,7 +131,7 @@ def main():
             else:
                 print(f"  {field:12s}: n={len(vals):,} (non-numeric or empty)")
 
-    print(f"\n--- Roads ---")
+    print("\n--- Roads ---")
     print(f"  Count:      {len(roads_gdf):,}")
     print(f"  Columns:    {list(roads_gdf.columns)}")
     rb = roads_gdf.total_bounds
@@ -140,7 +140,7 @@ def main():
     print(f"  Total len:  {total_length:,.0f} m ({total_length / 1000:.1f} km)")
 
     if boundary_gdf is not None:
-        print(f"\n--- Boundary ---")
+        print("\n--- Boundary ---")
         print(f"  Features:  {len(boundary_gdf)}")
         bb = boundary_gdf.total_bounds
         print(f"  Bounds:    ({bb[0]:.0f}, {bb[1]:.0f}) - ({bb[2]:.0f}, {bb[3]:.0f})")
@@ -148,7 +148,7 @@ def main():
         print(f"  Area:      {boundary_area:,.0f} m² ({boundary_area / 1e6:.2f} km²)")
 
     # --- Compute overlaps ---
-    print(f"\n--- Coverage Check ---")
+    print("\n--- Coverage Check ---")
     dtm_area = (dtm_bounds.right - dtm_bounds.left) * (
         dtm_bounds.top - dtm_bounds.bottom
     )
@@ -164,7 +164,7 @@ def main():
         pct_fp_covered = ix_area / fp_area_extent * 100
         print(f"  DTM covers {pct_fp_covered:.0f}% of footprint extent")
     else:
-        print(f"  WARNING: DTM and footprints DO NOT OVERLAP!")
+        print("  WARNING: DTM and footprints DO NOT OVERLAP!")
 
     # Buildings inside boundary
     if boundary_gdf is not None:
@@ -559,7 +559,7 @@ def main():
     # Summary verdict
     # ====================================================================
     print(f"\n{'=' * 60}")
-    print(f"  VERDICT")
+    print("  VERDICT")
     print(f"{'=' * 60}")
 
     issues = []

@@ -6,17 +6,16 @@ Builds a simple 2-building canyon on flat terrain and validates that:
 3. Without the fix (min_hit_distance=0), all points are falsely shadowed
 """
 
-import pytest
 import geopandas as gpd
+import pytest
 import pyvista as pv
 from shapely.geometry import Point
 
 from src.solar.facade import (
+    aggregate_by_building_floor,
     compute_facade_solar_access,
     summarize_housing_units,
-    aggregate_by_building_floor,
 )
-
 
 # ---------------------------------------------------------------------------
 # Canyon geometry helpers

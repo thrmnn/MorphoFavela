@@ -132,9 +132,7 @@ def _interior_angles(geom: Polygon | MultiPolygon) -> List[float]:
     return angles
 
 
-def _shared_wall_length(
-    geom_a: Polygon | MultiPolygon, geom_b: Polygon | MultiPolygon
-) -> float:
+def _shared_wall_length(geom_a: Polygon | MultiPolygon, geom_b: Polygon | MultiPolygon) -> float:
     if geom_a is None or geom_b is None:
         return 0.0
     if geom_a.is_empty or geom_b.is_empty:
@@ -305,9 +303,7 @@ def calculate_morphology_metrics(
 
     # --- Filter degenerate / invalid geometries --------------------------
     _n_before = len(gdf)
-    valid_mask = (
-        ~gdf.geometry.is_empty & gdf.geometry.is_valid & (gdf.geometry.area >= 1e-6)
-    )
+    valid_mask = ~gdf.geometry.is_empty & gdf.geometry.is_valid & (gdf.geometry.area >= 1e-6)
     n_filtered = int((~valid_mask).sum())
     if n_filtered > 0:
         logger.warning(
@@ -336,13 +332,10 @@ def calculate_morphology_metrics(
     gdf["longest_axis_length"] = gdf[["L_major", "L_minor"]].max(axis=1)
 
     # Shape/compactness metrics
-    gdf["shape_index"] = np.where(
-        gdf["area"] > 0, gdf["perimeter"] / np.sqrt(gdf["area"]), np.nan
-    )
+    gdf["shape_index"] = np.where(gdf["area"] > 0, gdf["perimeter"] / np.sqrt(gdf["area"]), np.nan)
     gdf["compactness_weighted_axis"] = np.where(
         (gdf["L_minor"] > 0) & (gdf["perimeter"] > 0),
-        (gdf["L_major"] / gdf["L_minor"])
-        * (4 * math.pi * gdf["area"] / (gdf["perimeter"] ** 2)),
+        (gdf["L_major"] / gdf["L_minor"]) * (4 * math.pi * gdf["area"] / (gdf["perimeter"] ** 2)),
         np.nan,
     )
     gdf["convexity"] = gdf.geometry.apply(
@@ -365,8 +358,7 @@ def calculate_morphology_metrics(
     # Equivalent rectangular index (min bounding rectangle area)
     gdf["equivalent_rectangular_index"] = gdf.geometry.apply(
         lambda geom: (
-            _safe_area(geom)
-            / _safe_area(_largest_polygon(geom).minimum_rotated_rectangle)
+            _safe_area(geom) / _safe_area(_largest_polygon(geom).minimum_rotated_rectangle)
             if _largest_polygon(geom) is not None
             else np.nan
         )
@@ -394,9 +386,7 @@ def calculate_morphology_metrics(
         gdf["area"] / (gdf["longest_axis_length"] ** 2),
         np.nan,
     )
-    gdf["elongation"] = np.where(
-        gdf["L_minor"] > 0, gdf["L_major"] / gdf["L_minor"], np.nan
-    )
+    gdf["elongation"] = np.where(gdf["L_minor"] > 0, gdf["L_major"] / gdf["L_minor"], np.nan)
 
     # Spatial distribution metrics
     centroids = np.array([[pt.x, pt.y] for pt in gdf.geometry.centroid])
@@ -428,9 +418,7 @@ def calculate_morphology_metrics(
             cell_angles.append(angle)
     cell_angles_arr = np.array([a for a in cell_angles if not np.isnan(a)])
     if len(cell_angles_arr) > 0:
-        mean_angle = math.atan2(
-            np.sin(cell_angles_arr).mean(), np.cos(cell_angles_arr).mean()
-        )
+        mean_angle = math.atan2(np.sin(cell_angles_arr).mean(), np.cos(cell_angles_arr).mean())
         ca = np.mean(np.cos(cell_angles_arr - mean_angle))
     else:
         ca = np.nan

@@ -84,9 +84,7 @@ def normalize_features(
         # Where range was 0, all values are identical → set to 0
         arr[:, ranges == 0] = 0.0
     else:
-        raise ValueError(
-            f"Unknown normalization method: {method!r}. Use 'zscore' or 'minmax'."
-        )
+        raise ValueError(f"Unknown normalization method: {method!r}. Use 'zscore' or 'minmax'.")
 
     gdf[features] = arr
     return gdf
@@ -171,17 +169,13 @@ def classify_typology(
     arr = _impute_median(arr)
 
     if method == "kmeans":
-        model = cluster_mod.KMeans(
-            n_clusters=n_clusters, random_state=42, n_init="auto"
-        )
+        model = cluster_mod.KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
         labels = model.fit_predict(arr)
     elif method == "hierarchical":
         model = cluster_mod.AgglomerativeClustering(n_clusters=n_clusters)
         labels = model.fit_predict(arr)
     else:
-        raise ValueError(
-            f"Unknown clustering method: {method!r}. Use 'kmeans' or 'hierarchical'."
-        )
+        raise ValueError(f"Unknown clustering method: {method!r}. Use 'kmeans' or 'hierarchical'.")
 
     gdf["cluster"] = labels.astype(int)
     logger.info(
@@ -237,9 +231,7 @@ def flag_zones(
         elif op == "gt":
             gdf[flag_col] = gdf[col] > value
         else:
-            raise ValueError(
-                f"Unknown operator {op!r} for column {col!r}. Use 'lt' or 'gt'."
-            )
+            raise ValueError(f"Unknown operator {op!r} for column {col!r}. Use 'lt' or 'gt'.")
         flag_cols.append(flag_col)
 
     gdf["flag_count"] = gdf[flag_cols].sum(axis=1).astype(int)

@@ -241,8 +241,7 @@ def load_and_validate(
     missing = [c for c in required if c not in grid.columns]
     if missing:
         raise ValueError(
-            f"Missing columns in grid: {missing}. "
-            f"Available: {sorted(grid.columns.tolist())}"
+            f"Missing columns in grid: {missing}. Available: {sorted(grid.columns.tolist())}"
         )
 
     # Ensure centroid columns
@@ -259,9 +258,7 @@ def load_and_validate(
     invalid = ~buildings.geometry.is_valid
     if invalid.any():
         logger.warning("Repairing %d invalid building geometries.", invalid.sum())
-        buildings.loc[invalid, "geometry"] = buildings.loc[invalid, "geometry"].buffer(
-            0
-        )
+        buildings.loc[invalid, "geometry"] = buildings.loc[invalid, "geometry"].buffer(0)
     logger.info("Loaded buildings: %d features.", len(buildings))
 
     # CRS alignment
@@ -513,17 +510,11 @@ def build_strata_summary(
     total_counts = grid_full.groupby("stratum_id").size()
     elig_counts = grid_eligible.groupby("stratum_id").size()
 
-    summary["n_cells_total"] = (
-        summary["stratum_id"].map(total_counts).fillna(0).astype(int)
-    )
-    summary["n_cells_eligible"] = (
-        summary["stratum_id"].map(elig_counts).fillna(0).astype(int)
-    )
+    summary["n_cells_total"] = summary["stratum_id"].map(total_counts).fillna(0).astype(int)
+    summary["n_cells_eligible"] = summary["stratum_id"].map(elig_counts).fillna(0).astype(int)
 
     total = summary["n_cells_total"].sum()
-    summary["pct_total"] = (
-        (100 * summary["n_cells_total"] / total).round(1) if total > 0 else 0.0
-    )
+    summary["pct_total"] = (100 * summary["n_cells_total"] / total).round(1) if total > 0 else 0.0
     summary["is_empty"] = summary["n_cells_eligible"] == 0
     return summary
 
@@ -857,9 +848,7 @@ _STRATUM_COLORS = [
 
 def _stratum_cmap(strata_ids: list[str]) -> dict[str, str]:
     unique = sorted(set(s for s in strata_ids if pd.notna(s)))
-    return {
-        sid: _STRATUM_COLORS[i % len(_STRATUM_COLORS)] for i, sid in enumerate(unique)
-    }
+    return {sid: _STRATUM_COLORS[i % len(_STRATUM_COLORS)] for i, sid in enumerate(unique)}
 
 
 # --- Figure A: spatial map ---
@@ -1071,11 +1060,7 @@ def generate_figure_featurespace(
     )
     fig.tight_layout()
 
-    out = (
-        _resolve(config["output_dir"])
-        / "figures"
-        / "fig_pilot_patches_featurespace.png"
-    )
+    out = _resolve(config["output_dir"]) / "figures" / "fig_pilot_patches_featurespace.png"
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=config["dpi"], bbox_inches="tight")
     plt.close(fig)
@@ -1315,9 +1300,7 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
         logger.error("No patches selected — check data and parameters.")
         return gpd.GeoDataFrame()
 
-    selected = gpd.GeoDataFrame(
-        pd.concat(all_selected, ignore_index=True), crs=grid.crs
-    )
+    selected = gpd.GeoDataFrame(pd.concat(all_selected, ignore_index=True), crs=grid.crs)
 
     # 7. Assign patch IDs
     selected = selected.sort_values(["stratum_id", "centroid_x"]).reset_index(drop=True)
@@ -1407,8 +1390,7 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
             "domain_data_coverage": selected["_domain_coverage"].values,
         },
         geometry=[
-            Point(row["centroid_x"], row["centroid_y"]).buffer(r)
-            for _, row in selected.iterrows()
+            Point(row["centroid_x"], row["centroid_y"]).buffer(r) for _, row in selected.iterrows()
         ],
         crs=grid.crs,
     )

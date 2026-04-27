@@ -106,9 +106,7 @@ def allocate_campaign(
     additional = target_total - existing_total
 
     if additional <= 0:
-        logger.info(
-            "Already at or above target (%d >= %d).", existing_total, target_total
-        )
+        logger.info("Already at or above target (%d >= %d).", existing_total, target_total)
         return existing_per_stratum.copy()
 
     # Weighted scores: eligible_cells * SVF_priority
@@ -188,9 +186,7 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
     logger.info("=" * 60)
 
     # 1. Load pilot patches
-    pilot_dir = _resolve(
-        config["output_dir"].replace("campaign_sampling", "pilot_sampling")
-    )
+    pilot_dir = _resolve(config["output_dir"].replace("campaign_sampling", "pilot_sampling"))
     pilot_csv = pilot_dir / "pilot_patches.csv"
     pilot_gpkg = pilot_dir / "pilot_patches.gpkg"
 
@@ -219,26 +215,20 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
     pilot_strata = []
     for _, prow in pilot_df.iterrows():
         cx, cy = prow["center_x"], prow["center_y"]
-        dists = np.sqrt(
-            (eligible["centroid_x"] - cx) ** 2 + (eligible["centroid_y"] - cy) ** 2
-        )
+        dists = np.sqrt((eligible["centroid_x"] - cx) ** 2 + (eligible["centroid_y"] - cy) ** 2)
         if dists.min() < 10:  # within one cell
             nearest_idx = dists.idxmin()
             sid = eligible.loc[nearest_idx, "stratum_id"]
         else:
             # Try full grid
-            dists_full = np.sqrt(
-                (grid["centroid_x"] - cx) ** 2 + (grid["centroid_y"] - cy) ** 2
-            )
+            dists_full = np.sqrt((grid["centroid_x"] - cx) ** 2 + (grid["centroid_y"] - cy) ** 2)
             nearest_idx = dists_full.idxmin()
             sid = grid.loc[nearest_idx, "stratum_id"]
         pilot_strata.append(sid)
         existing_per_stratum[sid] = existing_per_stratum.get(sid, 0) + 1
 
     allocation = allocate_campaign(summary, existing_per_stratum, target)
-    summary["n_existing"] = (
-        summary["stratum_id"].map(existing_per_stratum).fillna(0).astype(int)
-    )
+    summary["n_existing"] = summary["stratum_id"].map(existing_per_stratum).fillna(0).astype(int)
     summary["n_target"] = summary["stratum_id"].map(allocation).fillna(0).astype(int)
     summary["n_additional"] = summary["n_target"] - summary["n_existing"]
 
@@ -334,15 +324,9 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
 
     # Build new patches GeoDataFrame
     if new_selected:
-        new_gdf = gpd.GeoDataFrame(
-            pd.concat(new_selected, ignore_index=True), crs=grid.crs
-        )
-        new_gdf = new_gdf.sort_values(["stratum_id", "centroid_x"]).reset_index(
-            drop=True
-        )
-        new_gdf["patch_id"] = [
-            f"{prefix}-P{n_pilot + i + 1:02d}" for i in range(len(new_gdf))
-        ]
+        new_gdf = gpd.GeoDataFrame(pd.concat(new_selected, ignore_index=True), crs=grid.crs)
+        new_gdf = new_gdf.sort_values(["stratum_id", "centroid_x"]).reset_index(drop=True)
+        new_gdf["patch_id"] = [f"{prefix}-P{n_pilot + i + 1:02d}" for i in range(len(new_gdf))]
         new_gdf["is_pilot"] = False
 
         # Blocken validation for new patches
@@ -384,9 +368,7 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
 
     if len(new_gdf) > 0:
         all_patches = gpd.GeoDataFrame(
-            pd.concat(
-                [pilot_gdf[common_cols], new_gdf[common_cols]], ignore_index=True
-            ),
+            pd.concat([pilot_gdf[common_cols], new_gdf[common_cols]], ignore_index=True),
             crs=grid.crs,
         )
     else:
@@ -705,9 +687,7 @@ def _generate_campaign_figures(
         bbox_to_anchor=(0.5, -0.01),
     )
 
-    fig.suptitle(
-        f"Feature-Space Coverage \u2014 {site_name}", fontsize=14, fontweight="bold"
-    )
+    fig.suptitle(f"Feature-Space Coverage \u2014 {site_name}", fontsize=14, fontweight="bold")
     fig.tight_layout(rect=[0, 0.03, 1, 0.97])
     fig.savefig(
         out_dir / "figures" / "fig_campaign_patches_featurespace.png",
@@ -786,9 +766,7 @@ def _generate_campaign_figures(
         for j in range(i + 1, nrows * ncols):
             axes_flat[j].set_visible(False)
 
-        fig.suptitle(
-            f"New Patch Context \u2014 {site_name}", fontsize=14, fontweight="bold"
-        )
+        fig.suptitle(f"New Patch Context \u2014 {site_name}", fontsize=14, fontweight="bold")
         fig.tight_layout()
         fig.savefig(
             out_dir / "figures" / "fig_campaign_patches_context.png",
@@ -961,10 +939,7 @@ def generate_cross_site_summary(all_results: dict[str, gpd.GeoDataFrame]) -> Non
         site_order = [s for s in SITE_COLORS if s in pivot.columns]
 
         for site in site_order:
-            vals = [
-                pivot.loc[sid, site] if site in pivot.columns else 0
-                for sid in strata_ids
-            ]
+            vals = [pivot.loc[sid, site] if site in pivot.columns else 0 for sid in strata_ids]
             ax.bar(
                 x,
                 vals,

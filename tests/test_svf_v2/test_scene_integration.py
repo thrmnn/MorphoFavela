@@ -1,9 +1,8 @@
 """Integration tests for scene construction with real data."""
 
 import numpy as np
-import pyvista as pv
 import pytest
-
+import pyvista as pv
 
 # Expected building counts after filtering (approximate)
 EXPECTED_BUILDINGS = {

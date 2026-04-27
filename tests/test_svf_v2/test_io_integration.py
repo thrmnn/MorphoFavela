@@ -1,8 +1,8 @@
 """Tests for I/O functions: file creation and roundtrips."""
 
+import geopandas as gpd
 import numpy as np
 import pyvista as pv
-import geopandas as gpd
 from shapely.geometry import Point, box
 
 
@@ -91,8 +91,9 @@ class TestAlignmentPlot:
         assert png_path.stat().st_size > 0
 
     def test_with_roads_and_points(self, tmp_path):
-        from src.svf_v2.io import plot_alignment_check
         from shapely.geometry import LineString
+
+        from src.svf_v2.io import plot_alignment_check
 
         fp_gdf = gpd.GeoDataFrame(
             geometry=[box(0, 0, 5, 5)],

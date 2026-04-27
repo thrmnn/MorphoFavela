@@ -22,13 +22,14 @@ Usage:
     python scripts/compute_sectional_porosity.py --footprints data/raw/vidigal_buildings.shp --grid-spacing 2.0 --height 1.5
 """
 
-import numpy as np
+import argparse
+import logging
+import sys
+from pathlib import Path
+
 import geopandas as gpd
 import matplotlib.pyplot as plt
-from pathlib import Path
-import argparse
-import sys
-import logging
+import numpy as np
 from shapely.geometry import box
 from tqdm import tqdm
 
@@ -43,9 +44,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_footprints(
-    footprints_path: Path, buffer_distance: float = 0.25
-) -> gpd.GeoDataFrame:
+def load_footprints(footprints_path: Path, buffer_distance: float = 0.25) -> gpd.GeoDataFrame:
     """
     Load and prepare building footprints for porosity computation.
 
@@ -144,10 +143,12 @@ def compute_sectional_porosity(
     # Set CRS for grid cells to match footprints
     grid_cells = grid_cells.set_crs(footprints.crs, allow_override=True)
 
-    # Build spatial index for efficient intersection queries
+    # Build spatial index for efficient intersection queries.
+    # Accessing the .sindex property triggers the lazy-built rtree;
+    # the assignment to `_` is just to satisfy the linter.
     if not footprints.sindex:
         logger.info("  Building spatial index...")
-        footprints.sindex
+        _ = footprints.sindex
 
     # Cell area (all cells are square)
     cell_area = grid_spacing * grid_spacing
@@ -164,14 +165,10 @@ def compute_sectional_porosity(
 
         # Find buildings that intersect this cell using spatial index
         try:
-            possible_matches = list(
-                footprints.sindex.query(cell_geom, predicate="intersects")
-            )
-        except:
+            possible_matches = list(footprints.sindex.query(cell_geom, predicate="intersects"))
+        except Exception:
             # Fallback if sindex query fails
-            possible_matches = footprints[
-                footprints.geometry.intersects(cell_geom)
-            ].index.tolist()
+            possible_matches = footprints[footprints.geometry.intersects(cell_geom)].index.tolist()
 
         if len(possible_matches) == 0:
             # No buildings in this cell - fully open
@@ -250,13 +247,9 @@ def plot_porosity_map(
     # Define extent for imshow
     extent = [
         x_coords.min(),
-        x_coords.max() + (x_coords[1] - x_coords[0])
-        if len(x_coords) > 1
-        else x_coords.max(),
+        x_coords.max() + (x_coords[1] - x_coords[0]) if len(x_coords) > 1 else x_coords.max(),
         y_coords.min(),
-        y_coords.max() + (y_coords[1] - y_coords[0])
-        if len(y_coords) > 1
-        else y_coords.max(),
+        y_coords.max() + (y_coords[1] - y_coords[0]) if len(y_coords) > 1 else y_coords.max(),
     ]
 
     # Plot porosity heatmap
@@ -309,9 +302,7 @@ def print_summary_statistics(porosity_2d: np.ndarray) -> None:
     print(f"Min porosity: {np.min(porosity_flat):.3f}")
     print(f"Max porosity: {np.max(porosity_flat):.3f}")
     print(f"Median porosity: {np.median(porosity_flat):.3f}")
-    print(
-        f"10th percentile: {np.percentile(porosity_flat, 10):.3f} (critical low-porosity zones)"
-    )
+    print(f"10th percentile: {np.percentile(porosity_flat, 10):.3f} (critical low-porosity zones)")
     print(f"90th percentile: {np.percentile(porosity_flat, 90):.3f}")
 
     # Count cells by porosity category
@@ -319,16 +310,12 @@ def print_summary_statistics(porosity_2d: np.ndarray) -> None:
     medium_porosity = np.sum((porosity_flat >= 0.3) & (porosity_flat < 0.7))
     high_porosity = np.sum(porosity_flat >= 0.7)
 
-    print(f"\nPorosity categories:")
-    print(
-        f"  Low (<0.3): {low_porosity} cells ({low_porosity / len(porosity_flat) * 100:.1f}%)"
-    )
+    print("\nPorosity categories:")
+    print(f"  Low (<0.3): {low_porosity} cells ({low_porosity / len(porosity_flat) * 100:.1f}%)")
     print(
         f"  Medium (0.3-0.7): {medium_porosity} cells ({medium_porosity / len(porosity_flat) * 100:.1f}%)"
     )
-    print(
-        f"  High (≥0.7): {high_porosity} cells ({high_porosity / len(porosity_flat) * 100:.1f}%)"
-    )
+    print(f"  High (≥0.7): {high_porosity} cells ({high_porosity / len(porosity_flat) * 100:.1f}%)")
     print("=" * 60 + "\n")
 
 

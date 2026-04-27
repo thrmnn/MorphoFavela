@@ -4,16 +4,17 @@ Point generation for SVF computation: grid, street, and facade sampling.
 All coordinates are in world CRS (EPSG:31983).
 """
 
-import numpy as np
-import geopandas as gpd
-import rasterio
+import logging
 from pathlib import Path
 from typing import Optional
-from shapely.geometry import Point, LineString, Polygon, MultiPolygon
+
+import geopandas as gpd
+import numpy as np
+import rasterio
 from shapely import STRtree
+from shapely.geometry import LineString, MultiPolygon, Point, Polygon
 from shapely.ops import nearest_points
 from tqdm import tqdm
-import logging
 
 from src.svf_v2.scene import sample_dtm_at_points
 

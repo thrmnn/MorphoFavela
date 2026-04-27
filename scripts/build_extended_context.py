@@ -163,9 +163,7 @@ def build_extended_buildings(
         logger.warning("union_all failed for site buildings — using centroid hull.")
         from shapely.geometry import MultiPoint
 
-        site_hull_area = MultiPoint(
-            site_bld.geometry.centroid.tolist()
-        ).convex_hull.area
+        site_hull_area = MultiPoint(site_bld.geometry.centroid.tolist()).convex_hull.area
 
     try:
         ext_hull_area = extended.geometry.union_all().convex_hull.area
@@ -182,9 +180,7 @@ def build_extended_buildings(
         "site_coverage_m2": float(site_hull_area),
         "extended_coverage_m2": float(ext_hull_area),
         "coverage_gain_m2": float(ext_hull_area - site_hull_area),
-        "coverage_gain_pct": float(
-            (ext_hull_area - site_hull_area) / site_hull_area * 100
-        ),
+        "coverage_gain_pct": float((ext_hull_area - site_hull_area) / site_hull_area * 100),
         "buffer_m": buffer_m,
         "output_path": str(output_path),
     }
@@ -281,9 +277,7 @@ def build_extended_dtm(
     with rasterio.open(output_path, "w", **profile) as dst:
         dst.write(mosaic.astype(np.float32))
 
-    logger.info(
-        "Saved %s (%d x %d pixels).", output_path, profile["width"], profile["height"]
-    )
+    logger.info("Saved %s (%d x %d pixels).", output_path, profile["width"], profile["height"])
 
     stats = {
         "width": profile["width"],
@@ -460,9 +454,7 @@ def main():
     )
     args = parser.parse_args()
 
-    build_extended_context(
-        args.area, buffer_m=args.buffer, skip_figure=args.skip_figure
-    )
+    build_extended_context(args.area, buffer_m=args.buffer, skip_figure=args.skip_figure)
 
 
 if __name__ == "__main__":

@@ -1,14 +1,15 @@
 """Simple visualization functions."""
 
-import matplotlib.pyplot as plt
-import geopandas as gpd
-import numpy as np
-from pathlib import Path
 import logging
 import math
+from pathlib import Path
+
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import numpy as np
 
 from src.cartography import add_north_arrow, add_scale_bar
-from src.config import DPI, FIGURE_SIZE, COLORMAP_HEIGHT, COLORMAP_VOLUME
+from src.config import COLORMAP_HEIGHT, COLORMAP_VOLUME, DPI, FIGURE_SIZE
 
 logger = logging.getLogger(__name__)
 

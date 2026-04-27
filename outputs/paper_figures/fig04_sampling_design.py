@@ -10,13 +10,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fig_style import *
-
-import geopandas as gpd
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from fig_style import *
 
 
 def main():
@@ -40,9 +38,7 @@ def main():
         / "final_allocation"
         / "campaign_strata_summary.csv"
     )
-    strata_summary = (
-        pd.read_csv(strata_path, index_col=0) if strata_path.exists() else None
-    )
+    strata_summary = pd.read_csv(strata_path, index_col=0) if strata_path.exists() else None
 
     # ── Layout: 3 rows ──
     # Row 1: feature space (a, b)
@@ -213,9 +209,7 @@ def main():
 
         try:
             bld = load_buildings(site)
-            bld.plot(
-                ax=ax, facecolor="#e0e0e0", edgecolor="#999", linewidth=0.05, alpha=0.6
-            )
+            bld.plot(ax=ax, facecolor="#e0e0e0", edgecolor="#999", linewidth=0.05, alpha=0.6)
         except Exception:
             pass
 

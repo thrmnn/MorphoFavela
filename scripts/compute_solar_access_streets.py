@@ -16,29 +16,31 @@ Usage:
         --area vidigal_tls
 """
 
-import numpy as np
-import pyvista as pv
+import argparse
+import logging
+import sys
+from pathlib import Path
+
 import geopandas as gpd
 import matplotlib.pyplot as plt
-from pathlib import Path
+import numpy as np
 import pandas as pd
+import pyvista as pv
+from shapely.geometry import LineString, Point
 from tqdm import tqdm
-import argparse
-import sys
-from shapely.geometry import Point, LineString
-import logging
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import shared utilities
-from src.svf_v2.utils import load_mesh, extract_terrain_surface
 from scripts.compute_svf_streets import (
-    sample_points_along_line,
     extract_elevation_from_mesh,
+    sample_points_along_line,
 )
+
 from scripts.compute_solar_access import compute_sun_positions
+from src.svf_v2.utils import extract_terrain_surface, load_mesh
 
 # Setup logging
 logging.basicConfig(
@@ -75,9 +77,7 @@ def compute_solar_access_for_street_points(
 
     solar_access_steps = []
 
-    pbar = tqdm(
-        total=len(observer_points), desc="Computing solar access", unit="points"
-    )
+    pbar = tqdm(total=len(observer_points), desc="Computing solar access", unit="points")
 
     for observer in observer_points:
         unobstructed_count = 0
@@ -131,9 +131,7 @@ def sample_street_points(
     all_points = []
     metadata = []
 
-    for idx, row in tqdm(
-        roads_gdf.iterrows(), total=len(roads_gdf), desc="  Processing streets"
-    ):
+    for idx, row in tqdm(roads_gdf.iterrows(), total=len(roads_gdf), desc="  Processing streets"):
         line = row.geometry
 
         if not isinstance(line, LineString):
@@ -160,9 +158,7 @@ def sample_street_points(
                 {
                     "segment_idx": idx,
                     "distance_along": distance_along,
-                    "street_name": row.get(
-                        "nome", row.get("tipo_logra", f"Street_{idx}")
-                    ),
+                    "street_name": row.get("nome", row.get("tipo_logra", f"Street_{idx}")),
                     "street_type": row.get("tipo_logra", "Unknown"),
                     "hierarchy": row.get("hierarquia", None),
                 }
@@ -367,13 +363,9 @@ def create_solar_distribution_plot(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Compute solar access along street centerlines"
-    )
+    parser = argparse.ArgumentParser(description="Compute solar access along street centerlines")
     parser.add_argument("--stl", type=str, required=True, help="Path to STL mesh file")
-    parser.add_argument(
-        "--roads", type=str, required=True, help="Path to roads shapefile"
-    )
+    parser.add_argument("--roads", type=str, required=True, help="Path to roads shapefile")
     parser.add_argument(
         "--footprints",
         type=str,
@@ -392,9 +384,7 @@ def main():
         default=1.5,
         help="Evaluation height above ground (meters)",
     )
-    parser.add_argument(
-        "--area", type=str, default=None, help="Area name for output organization"
-    )
+    parser.add_argument("--area", type=str, default=None, help="Area name for output organization")
     parser.add_argument("--output-dir", type=str, default=None, help="Output directory")
     parser.add_argument(
         "--latitude",
@@ -452,15 +442,10 @@ def main():
     logger.info(f"  Road bounds: {road_bounds}")
 
     # Transform roads if needed
-    if (
-        abs(road_center_x - mesh_center_x) > 1000
-        or abs(road_center_y - mesh_center_y) > 1000
-    ):
+    if abs(road_center_x - mesh_center_x) > 1000 or abs(road_center_y - mesh_center_y) > 1000:
         dx = mesh_center_x - road_center_x
         dy = mesh_center_y - road_center_y
-        logger.info(
-            f"  Detected coordinate system mismatch - transforming to local coordinates"
-        )
+        logger.info("  Detected coordinate system mismatch - transforming to local coordinates")
         logger.info(f"  Applying translation: dx={dx:.1f}, dy={dy:.1f}")
         roads_gdf.geometry = roads_gdf.geometry.translate(xoff=dx, yoff=dy)
         logger.info(f"  Transformed road bounds: {roads_gdf.total_bounds}")
@@ -474,15 +459,10 @@ def main():
         fp_bounds = building_footprints.total_bounds
         fp_center_x = (fp_bounds[0] + fp_bounds[2]) / 2
         fp_center_y = (fp_bounds[1] + fp_bounds[3]) / 2
-        if (
-            abs(fp_center_x - mesh_center_x) > 1000
-            or abs(fp_center_y - mesh_center_y) > 1000
-        ):
+        if abs(fp_center_x - mesh_center_x) > 1000 or abs(fp_center_y - mesh_center_y) > 1000:
             dx = mesh_center_x - fp_center_x
             dy = mesh_center_y - fp_center_y
-            building_footprints.geometry = building_footprints.geometry.translate(
-                xoff=dx, yoff=dy
-            )
+            building_footprints.geometry = building_footprints.geometry.translate(xoff=dx, yoff=dy)
 
     # Generate sample points along streets
     points_gdf = sample_street_points(roads_gdf, args.spacing, terrain)
@@ -500,9 +480,7 @@ def main():
     )
 
     # Compute solar access
-    solar_steps = compute_solar_access_for_street_points(
-        observer_points, sun_directions, mesh
-    )
+    solar_steps = compute_solar_access_for_street_points(observer_points, sun_directions, mesh)
 
     # Convert to hours (assuming 1-hour timestep)
     solar_hours = solar_steps.astype(float)  # Each step is 1 hour
@@ -562,7 +540,7 @@ def main():
     print("=" * 60)
     print(f"Total street segments: {len(segments_gdf)}")
     print(f"Total sample points: {len(points_gdf)}")
-    print(f"\nPoint-level statistics:")
+    print("\nPoint-level statistics:")
     print(f"  Mean solar hours: {stats['solar_mean']:.2f}h")
     print(f"  Median solar hours: {stats['solar_median']:.2f}h")
     print(f"  Min solar hours: {stats['solar_min']:.2f}h")

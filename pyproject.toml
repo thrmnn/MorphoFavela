@@ -49,3 +49,35 @@ markers = [
     "integration: real-data integration tests (minutes per area)",
 ]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    "data",
+    "outputs/paper_figures/exports",
+    "docs/archive",
+]
+
+[tool.ruff.lint]
+# Default rule set: pyflakes (F), pycodestyle (E,W), bugbear (B), isort (I).
+select = ["E", "F", "I", "B", "W"]
+# Pragmatic ignores for a research codebase:
+#   E402 — imports not at top: deliberate when scripts insert sys.path first.
+#   E501 — line length is already enforced by `ruff format`.
+#   E712 — `x == True/False`: pandas/numpy idiomatic in masks; fixing en
+#          masse risks subtle behaviour changes.
+#   E741 — ambiguous var names (l, I, O): present in vendored math notation.
+#   B007 — unused loop control variable: cosmetic; test fixtures often.
+#   B008 — function call in argument default: argparse `type=Path()` etc.
+#   B905 — `zip(strict=...)`: Python 3.10+ recommendation; not yet adopted.
+#   F841 — unused local variable: 14 instances in paper_figures from
+#          earlier draft revisions; cosmetic, not behavioural.
+#   W291 — trailing whitespace: rare residue; ruff format catches new ones.
+ignore = ["E402", "E501", "E712", "E741", "B007", "B008", "B905", "F841", "W291"]
+
+[tool.ruff.lint.per-file-ignores]
+# Paper figures share style via `from fig_style import *` — intentional.
+"outputs/paper_figures/*.py" = ["F403", "F405"]
+# Tests redefine fixtures via conftest in idiomatic ways.
+"tests/**/*.py" = ["F811"]

@@ -7,12 +7,9 @@ produce CSVs that map to CFDSamplePoint, plus summary.json per patch.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Optional
 
-import numpy as np
 import pandas as pd
-
 
 # 8 cardinal directions as bearing from north (degrees, meteorological convention)
 WIND_DIRECTIONS_8 = {

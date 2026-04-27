@@ -5,7 +5,6 @@ import numpy as np
 from src.solar.seasonal import compute_seasonal_solar
 from src.solar.sun import REFERENCE_DATES
 
-
 # ===================================================================
 # Tests: compute_seasonal_solar
 # ===================================================================

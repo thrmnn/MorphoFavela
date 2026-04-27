@@ -19,16 +19,16 @@ Usage:
         --density outputs/density/density_proxy.gpkg
 """
 
-import numpy as np
+import argparse
+import logging
+import sys
+from pathlib import Path
+
 import geopandas as gpd
 import matplotlib.pyplot as plt
-from pathlib import Path
-import argparse
-import sys
-import logging
-from shapely.geometry import Point, box
+import numpy as np
+from shapely.geometry import Point
 from tqdm import tqdm
-import pandas as pd
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -108,9 +108,7 @@ def aggregate_metrics(
 
     # Aggregate raster data per unit
     logger.info("  Aggregating raster metrics...")
-    for idx, unit_row in tqdm(
-        result.iterrows(), total=len(result), desc="  Aggregating"
-    ):
+    for idx, unit_row in tqdm(result.iterrows(), total=len(result), desc="  Aggregating"):
         unit_geom = unit_row.geometry
 
         # Find raster cells within this unit
@@ -217,16 +215,12 @@ def compute_deficits(
     valid_density = result["density_proxy"][result["density_proxy"] > 0]
     if len(valid_density) > 0:
         # Compute percentile rank (0-1 scale) using pandas
-        result["occupancy_score"] = result["density_proxy"].rank(
-            method="average", pct=True
-        )
+        result["occupancy_score"] = result["density_proxy"].rank(method="average", pct=True)
     else:
         result["occupancy_score"] = 0.0
 
     logger.info(f"  Mean solar deficit: {result['solar_deficit'].mean():.3f}")
-    logger.info(
-        f"  Mean ventilation deficit: {result['ventilation_deficit'].mean():.3f}"
-    )
+    logger.info(f"  Mean ventilation deficit: {result['ventilation_deficit'].mean():.3f}")
     logger.info(f"  Mean occupancy score: {result['occupancy_score'].mean():.3f}")
 
     return result
@@ -254,9 +248,7 @@ def compute_hotspot_index(analysis_units: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
     # Compute composite index with equal weighting
     result["hotspot_index"] = (
-        result["solar_deficit"]
-        + result["ventilation_deficit"]
-        + result["occupancy_score"]
+        result["solar_deficit"] + result["ventilation_deficit"] + result["occupancy_score"]
     ) / 3.0
 
     # Clamp to [0, 1]
@@ -306,11 +298,9 @@ def classify_hotspots(analysis_units: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
     # Count units per class
     class_counts = result["hotspot_class"].value_counts()
-    logger.info(f"  Classification counts:")
+    logger.info("  Classification counts:")
     for class_name, count in class_counts.items():
-        logger.info(
-            f"    {class_name}: {count} units ({count / len(result) * 100:.1f}%)"
-        )
+        logger.info(f"    {class_name}: {count} units ({count / len(result) * 100:.1f}%)")
 
     return result
 
@@ -346,18 +336,10 @@ def compute_deficit_overlap(
         low_solar.astype(int) + low_ventilation.astype(int) + high_occupancy.astype(int)
     )
 
-    logger.info(
-        f"  Units with 0 deficits: {(result['deficit_overlap_count'] == 0).sum()}"
-    )
-    logger.info(
-        f"  Units with 1 deficit: {(result['deficit_overlap_count'] == 1).sum()}"
-    )
-    logger.info(
-        f"  Units with 2 deficits: {(result['deficit_overlap_count'] == 2).sum()}"
-    )
-    logger.info(
-        f"  Units with 3 deficits: {(result['deficit_overlap_count'] == 3).sum()}"
-    )
+    logger.info(f"  Units with 0 deficits: {(result['deficit_overlap_count'] == 0).sum()}")
+    logger.info(f"  Units with 1 deficit: {(result['deficit_overlap_count'] == 1).sum()}")
+    logger.info(f"  Units with 2 deficits: {(result['deficit_overlap_count'] == 2).sum()}")
+    logger.info(f"  Units with 3 deficits: {(result['deficit_overlap_count'] == 3).sum()}")
 
     return result
 
@@ -416,9 +398,7 @@ def plot_hotspot_map(analysis_units: gpd.GeoDataFrame, output_path: Path) -> Non
     )
     ax.set_aspect("equal")
     if handles:
-        ax.legend(
-            handles=handles, loc="upper right", frameon=True, fancybox=True, shadow=True
-        )
+        ax.legend(handles=handles, loc="upper right", frameon=True, fancybox=True, shadow=True)
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -429,9 +409,7 @@ def plot_hotspot_map(analysis_units: gpd.GeoDataFrame, output_path: Path) -> Non
     logger.info(f"  Saved hotspot map to {output_path}")
 
 
-def plot_deficit_overlap_map(
-    analysis_units: gpd.GeoDataFrame, output_path: Path
-) -> None:
+def plot_deficit_overlap_map(analysis_units: gpd.GeoDataFrame, output_path: Path) -> None:
     """
     Create map showing deficit overlap count (0-3).
 
@@ -492,9 +470,7 @@ def export_ranking_table(analysis_units: gpd.GeoDataFrame, output_path: Path) ->
     result = analysis_units.copy()
 
     # Percentile ranks (0-100 scale) using pandas
-    result["solar_percentile"] = (
-        result["solar_deficit"].rank(method="average", pct=True) * 100
-    )
+    result["solar_percentile"] = result["solar_deficit"].rank(method="average", pct=True) * 100
     result["ventilation_percentile"] = (
         result["ventilation_deficit"].rank(method="average", pct=True) * 100
     )
@@ -549,9 +525,7 @@ All metrics are relative and distribution-based. No causality is inferred.
     parser.add_argument(
         "--solar", type=str, required=True, help="Path to solar access raster (.npy)"
     )
-    parser.add_argument(
-        "--svf", type=str, required=True, help="Path to SVF raster (.npy)"
-    )
+    parser.add_argument("--svf", type=str, required=True, help="Path to SVF raster (.npy)")
     parser.add_argument(
         "--porosity", type=str, required=True, help="Path to porosity raster (.npy)"
     )
@@ -630,9 +604,7 @@ All metrics are relative and distribution-based. No causality is inferred.
     )
 
     # Compute deficits
-    units_with_deficits = compute_deficits(
-        units_with_metrics, solar_reference=args.solar_reference
-    )
+    units_with_deficits = compute_deficits(units_with_metrics, solar_reference=args.solar_reference)
 
     # Compute hotspot index
     units_with_index = compute_hotspot_index(units_with_deficits)

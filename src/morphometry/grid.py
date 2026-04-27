@@ -14,18 +14,17 @@ from typing import Optional
 import geopandas as gpd
 import numpy as np
 
-from src.urban_morphology import (
-    compute_bcr,
-    compute_far,
-    compute_height_variability,
-    create_analysis_zones,
-)
-
 from src.morphometry.indicators import (
     compute_lambda_f_directional,
     compute_porosity,
     compute_slope_aspect,
     compute_zone_mean_height,
+)
+from src.urban_morphology import (
+    compute_bcr,
+    compute_far,
+    compute_height_variability,
+    create_analysis_zones,
 )
 
 logger = logging.getLogger(__name__)

@@ -1,22 +1,21 @@
 """Tests for src/solar/facade.py — facade solar irradiance pipeline."""
 
+import geopandas as gpd
 import numpy as np
 import pytest
-import geopandas as gpd
 from shapely.geometry import Point
 
 from src.solar.facade import (
-    compute_facade_incident_angle,
-    direct_beam_on_facade,
-    diffuse_on_tilted_surface,
-    compute_facade_daily_irradiance_array,
-    compute_facade_sunlit_hours,
-    assess_who_threshold,
-    compute_floor_level,
     aggregate_by_building,
     aggregate_by_building_floor,
+    assess_who_threshold,
+    compute_facade_daily_irradiance_array,
+    compute_facade_incident_angle,
+    compute_facade_sunlit_hours,
+    compute_floor_level,
+    diffuse_on_tilted_surface,
+    direct_beam_on_facade,
 )
-
 
 # ---------------------------------------------------------------------------
 # Section A: Incident angle geometry

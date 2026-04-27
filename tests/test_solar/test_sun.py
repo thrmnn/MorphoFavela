@@ -5,13 +5,12 @@ import math
 import numpy as np
 
 from src.solar.sun import (
-    compute_sun_positions,
-    sun_position_to_direction,
-    compute_sun_positions_multi_day,
-    compute_extraterrestrial_irradiance,
     REFERENCE_DATES,
+    compute_extraterrestrial_irradiance,
+    compute_sun_positions,
+    compute_sun_positions_multi_day,
+    sun_position_to_direction,
 )
-
 
 # ===================================================================
 # Tests: compute_sun_positions

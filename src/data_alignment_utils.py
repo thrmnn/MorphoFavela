@@ -7,13 +7,14 @@ This module handles:
 - Road redirection to avoid building collisions
 """
 
-import numpy as np
-import geopandas as gpd
-import pyvista as pv
-from pathlib import Path
-from shapely.geometry import Point, LineString
-from shapely.ops import unary_union
 import logging
+from pathlib import Path
+
+import geopandas as gpd
+import numpy as np
+import pyvista as pv
+from shapely.geometry import LineString, Point
+from shapely.ops import unary_union
 
 try:
     import rasterio
@@ -151,11 +152,7 @@ def validate_alignment(
         except Exception:
             pass
 
-    if (
-        reference_bounds is None
-        and buildings_gdf is not None
-        and len(buildings_gdf) > 0
-    ):
+    if reference_bounds is None and buildings_gdf is not None and len(buildings_gdf) > 0:
         bld_bounds = buildings_gdf.total_bounds
         reference_bounds = (bld_bounds[0], bld_bounds[1], bld_bounds[2], bld_bounds[3])
 
@@ -169,9 +166,7 @@ def validate_alignment(
         )
 
     if reference_bounds is None or stl_bounds is None:
-        warnings_list.append(
-            "Cannot validate alignment: missing reference or STL bounds"
-        )
+        warnings_list.append("Cannot validate alignment: missing reference or STL bounds")
         return False, warnings_list
 
     # Check if transformed STL bounds overlap with reference
@@ -222,9 +217,7 @@ def validate_alignment(
     return True, warnings_list
 
 
-def check_crs_alignment(
-    datasets: dict, tolerance: float = ALIGNMENT_TOLERANCE
-) -> tuple:
+def check_crs_alignment(datasets: dict, tolerance: float = ALIGNMENT_TOLERANCE) -> tuple:
     """
     Check if all datasets have compatible CRS and are aligned.
 
@@ -340,9 +333,7 @@ def check_crs_alignment(
     return is_aligned, warnings_list, corrections
 
 
-def auto_correct_alignment(
-    datasets: dict, corrections: dict, inplace: bool = False
-) -> dict:
+def auto_correct_alignment(datasets: dict, corrections: dict, inplace: bool = False) -> dict:
     """
     Automatically correct dataset alignment based on corrections dict.
 
@@ -380,9 +371,9 @@ def auto_correct_alignment(
             logger.info(f"  Translating {name} by dx={dx:.2f}m, dy={dy:.2f}m")
 
             if name == "buildings" and "buildings" in corrected:
-                corrected["buildings"].geometry = corrected[
-                    "buildings"
-                ].geometry.translate(xoff=dx, yoff=dy)
+                corrected["buildings"].geometry = corrected["buildings"].geometry.translate(
+                    xoff=dx, yoff=dy
+                )
             elif name == "roads" and "roads" in corrected:
                 corrected["roads"].geometry = corrected["roads"].geometry.translate(
                     xoff=dx, yoff=dy
@@ -412,9 +403,7 @@ def detect_road_building_intersections(
 
     # Ensure same CRS
     if roads_gdf.crs != buildings_gdf.crs:
-        logger.warning(
-            f"CRS mismatch: roads={roads_gdf.crs}, buildings={buildings_gdf.crs}"
-        )
+        logger.warning(f"CRS mismatch: roads={roads_gdf.crs}, buildings={buildings_gdf.crs}")
         buildings_gdf = buildings_gdf.to_crs(roads_gdf.crs)
 
     # Find intersections
@@ -447,9 +436,7 @@ def detect_road_building_intersections(
             )
 
     if intersecting_roads:
-        logger.warning(
-            f"Found {len(intersecting_roads)} road segments intersecting buildings"
-        )
+        logger.warning(f"Found {len(intersecting_roads)} road segments intersecting buildings")
         # Create GeoDataFrame with geometry column
         result_df = gpd.GeoDataFrame(intersecting_roads, crs=roads_gdf.crs)
         # Add road_geometry as regular column (not geometry)
@@ -535,15 +522,11 @@ def redirect_road_parallel_offset(
                     # Also check if it's significantly different from original
                     min_distance = offset_road.distance(road)
                     if min_distance > offset_dist * 0.3:  # More lenient threshold
-                        logger.debug(
-                            f"  Successfully offset road by {offset_dist:.1f}m ({side})"
-                        )
+                        logger.debug(f"  Successfully offset road by {offset_dist:.1f}m ({side})")
                         return offset_road
 
             except Exception as e:
-                logger.debug(
-                    f"  Offset failed (distance={offset_dist:.1f}m, side={side}): {e}"
-                )
+                logger.debug(f"  Offset failed (distance={offset_dist:.1f}m, side={side}): {e}")
                 continue
 
     # Try segment-based redirection: split road at intersections and redirect only intersecting segments
@@ -616,9 +599,7 @@ def redirect_road_simple_reroute(
             # Create buffer around intersecting buildings only
             building_buffers = intersecting_buildings.geometry.buffer(buf_dist)
             combined_buffer = (
-                unary_union(building_buffers.values)
-                if len(building_buffers) > 0
-                else None
+                unary_union(building_buffers.values) if len(building_buffers) > 0 else None
             )
 
             if combined_buffer is None or combined_buffer.is_empty:
@@ -671,13 +652,9 @@ def redirect_road_simple_reroute(
                                 # Try going around the buffer
                                 # Simple approach: offset the connection line
                                 try:
-                                    offset_conn = connection.parallel_offset(
-                                        buf_dist, "left"
-                                    )
+                                    offset_conn = connection.parallel_offset(buf_dist, "left")
                                     if hasattr(offset_conn, "geoms"):
-                                        offset_conn = max(
-                                            offset_conn.geoms, key=lambda g: g.length
-                                        )
+                                        offset_conn = max(offset_conn.geoms, key=lambda g: g.length)
                                     if not combined_buffer.intersects(offset_conn):
                                         connected_segments.append(offset_conn)
                                     else:
@@ -695,9 +672,7 @@ def redirect_road_simple_reroute(
 
                     # Verify it doesn't intersect buildings
                     if not buildings.geometry.intersects(merged).any():
-                        logger.debug(
-                            f"  Successfully rerouted road with buffer {buf_dist:.1f}m"
-                        )
+                        logger.debug(f"  Successfully rerouted road with buffer {buf_dist:.1f}m")
                         return merged
 
                 except Exception as e:
@@ -710,9 +685,7 @@ def redirect_road_simple_reroute(
                 # Single segment - check if it's valid
                 seg = segments[0]
                 if not buildings.geometry.intersects(seg).any():
-                    logger.debug(
-                        f"  Successfully rerouted road with buffer {buf_dist:.1f}m"
-                    )
+                    logger.debug(f"  Successfully rerouted road with buffer {buf_dist:.1f}m")
                     return seg
 
         except Exception as e:
@@ -784,19 +757,13 @@ def redirect_roads(
                 break  # Already successfully redirected
 
             if method_name == "parallel_offset":
-                redirected_road = redirect_road_parallel_offset(
-                    original_road, buildings_gdf, dist
-                )
+                redirected_road = redirect_road_parallel_offset(original_road, buildings_gdf, dist)
             elif method_name == "simple_reroute":
-                redirected_road = redirect_road_simple_reroute(
-                    original_road, buildings_gdf, dist
-                )
+                redirected_road = redirect_road_simple_reroute(original_road, buildings_gdf, dist)
 
             # Check if successful
             if redirected_road != original_road:
-                still_intersects = buildings_gdf.geometry.intersects(
-                    redirected_road
-                ).any()
+                still_intersects = buildings_gdf.geometry.intersects(redirected_road).any()
                 if still_intersects:
                     # Still intersects, continue trying
                     redirected_road = original_road

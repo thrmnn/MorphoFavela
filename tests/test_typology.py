@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pytest
-import geopandas as gpd
 from shapely.geometry import Point
 
 from src.typology import (
-    normalize_features,
-    find_optimal_k,
     classify_typology,
-    flag_zones,
     compute_cluster_profiles,
+    find_optimal_k,
+    flag_zones,
+    normalize_features,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -59,18 +58,14 @@ def synthetic_gdf() -> gpd.GeoDataFrame:
 @pytest.mark.fast
 class TestNormalizeFeatures:
     def test_zscore(self, synthetic_gdf: gpd.GeoDataFrame) -> None:
-        result = normalize_features(
-            synthetic_gdf, ["feat_a", "feat_b"], method="zscore"
-        )
+        result = normalize_features(synthetic_gdf, ["feat_a", "feat_b"], method="zscore")
         for col in ["feat_a", "feat_b"]:
             vals = result[col].to_numpy()
             assert abs(np.mean(vals)) < 1e-10, f"zscore mean of {col} should be ~0"
             assert abs(np.std(vals) - 1.0) < 1e-10, f"zscore std of {col} should be ~1"
 
     def test_minmax(self, synthetic_gdf: gpd.GeoDataFrame) -> None:
-        result = normalize_features(
-            synthetic_gdf, ["feat_a", "feat_b"], method="minmax"
-        )
+        result = normalize_features(synthetic_gdf, ["feat_a", "feat_b"], method="minmax")
         for col in ["feat_a", "feat_b"]:
             vals = result[col].to_numpy()
             assert vals.min() == pytest.approx(0.0, abs=1e-10)
@@ -85,9 +80,7 @@ class TestNormalizeFeatures:
         gdf = synthetic_gdf.copy()
         gdf.loc[0, "feat_a"] = np.nan
         result = normalize_features(gdf, ["feat_a", "feat_b"], method="zscore")
-        assert not result["feat_a"].isna().any(), (
-            "NaN should be imputed before normalizing"
-        )
+        assert not result["feat_a"].isna().any(), "NaN should be imputed before normalizing"
 
 
 # ---------------------------------------------------------------------------
@@ -105,9 +98,7 @@ class TestClassifyTypology:
 
         # With well-separated data, each cluster should have exactly 10 members
         counts = pd.Series(labels).value_counts()
-        assert all(c == 10 for c in counts), (
-            f"Expected 10 per cluster, got {counts.to_dict()}"
-        )
+        assert all(c == 10 for c in counts), f"Expected 10 per cluster, got {counts.to_dict()}"
 
     def test_hierarchical(self, synthetic_gdf: gpd.GeoDataFrame) -> None:
         result = classify_typology(
@@ -152,9 +143,7 @@ class TestFindOptimalK:
 
 @pytest.mark.fast
 class TestFlagZones:
-    def test_default_thresholds_missing_columns(
-        self, synthetic_gdf: gpd.GeoDataFrame
-    ) -> None:
+    def test_default_thresholds_missing_columns(self, synthetic_gdf: gpd.GeoDataFrame) -> None:
         """Default columns (svf_mean, bcr, sigma_h) are absent — flags should be False."""
         result = flag_zones(synthetic_gdf)
         assert "flag_svf_mean" in result.columns

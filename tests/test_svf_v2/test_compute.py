@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 
 from src.svf_v2.compute import (
-    generate_sky_directions,
     compute_svf,
     compute_svf_raycasting,
+    generate_sky_directions,
 )
 
 
@@ -222,7 +222,7 @@ class TestOBBTreeOptimization:
 
     def test_obb_matches_sequential(self, single_building_scene, sky_directions_small):
         """OBB tree path should produce identical results to the original ray_trace loop."""
-        from src.svf_v2.compute import _svf_for_point_obb, _build_obb_tree
+        from src.svf_v2.compute import _build_obb_tree, _svf_for_point_obb
 
         obs = np.array(
             [
@@ -255,7 +255,7 @@ class TestOBBTreeOptimization:
 
     def test_obb_with_normals(self, single_building_scene, sky_directions_small):
         """OBB tree path should handle normals correctly."""
-        from src.svf_v2.compute import _svf_for_point_obb, _build_obb_tree
+        from src.svf_v2.compute import _build_obb_tree, _svf_for_point_obb
 
         obs = np.array([3.9, 5.0, 2.5])
         normal = np.array([-1.0, 0.0, 0.0])

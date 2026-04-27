@@ -1,6 +1,7 @@
 """Tests for src/svf_v2/paths.py -- data path resolution."""
 
 import pytest
+
 from src.svf_v2.paths import resolve_paths
 
 

@@ -14,35 +14,37 @@ Usage:
         --ruleset rio
 """
 
-import numpy as np
-import pyvista as pv
+import argparse
+import logging
+import sys
+from pathlib import Path
+
 import geopandas as gpd
 import matplotlib.pyplot as plt
-from pathlib import Path
+import numpy as np
 import pandas as pd
-from tqdm import tqdm
-import argparse
-import sys
-from shapely.geometry import Point, LineString, Polygon
+import pyvista as pv
+from shapely.geometry import LineString, Point, Polygon
 from shapely.strtree import STRtree
-import logging
+from tqdm import tqdm
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from scripts.analyze_sky_exposure import extract_building_meshes
+from scripts.compute_svf_streets import (
+    extract_elevation_from_mesh,
+    sample_points_along_line,
+)
+
+from src.config import MAX_FILTER_AREA, MIN_BUILDING_AREA, is_formal_area
+from src.metrics import normalize_height_columns
 from src.svf_v2.utils import (
-    load_mesh,
     extract_terrain_surface,
     load_building_footprints,
+    load_mesh,
 )
-from src.metrics import normalize_height_columns
-from src.config import MIN_BUILDING_AREA, MAX_FILTER_AREA, is_formal_area
-from scripts.compute_svf_streets import (
-    sample_points_along_line,
-    extract_elevation_from_mesh,
-)
-from scripts.analyze_sky_exposure import extract_building_meshes
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -258,7 +260,6 @@ def extract_building_height_at_point(
         )
     else:
         # MultiPolygon - find closest polygon first
-        from shapely.ops import nearest_points
 
         closest_poly = min(
             building_footprint.geoms
@@ -287,8 +288,7 @@ def extract_building_height_at_point(
         from shapely.geometry import Point as ShapelyPoint
 
         within_footprint = [
-            building_footprint.contains(ShapelyPoint(p[0], p[1]))
-            for p in building_points
+            building_footprint.contains(ShapelyPoint(p[0], p[1])) for p in building_points
         ]
         facade_mask = np.array(within_footprint)
 
@@ -373,9 +373,7 @@ def compute_street_exceedance(
 
     # Calculate building heights
     buildings_gdf = buildings_gdf.copy()
-    buildings_gdf["building_height"] = (
-        buildings_gdf["top_height"] - buildings_gdf["base_height"]
-    )
+    buildings_gdf["building_height"] = buildings_gdf["top_height"] - buildings_gdf["base_height"]
 
     # Build spatial index for efficient queries
     logger.info("Building spatial index for building queries...")
@@ -391,9 +389,7 @@ def compute_street_exceedance(
         street_point = Point(x, y)
 
         # Find nearby buildings
-        nearby_indices = find_nearby_buildings(
-            street_point, buildings_gdf, search_radius
-        )
+        nearby_indices = find_nearby_buildings(street_point, buildings_gdf, search_radius)
 
         if len(nearby_indices) == 0:
             # No buildings nearby, no exceedance
@@ -529,9 +525,7 @@ def sample_street_points(
     all_points = []
     metadata = []
 
-    for idx, row in tqdm(
-        roads_gdf.iterrows(), total=len(roads_gdf), desc="  Processing streets"
-    ):
+    for idx, row in tqdm(roads_gdf.iterrows(), total=len(roads_gdf), desc="  Processing streets"):
         line = row.geometry
 
         if not isinstance(line, LineString):
@@ -558,9 +552,7 @@ def sample_street_points(
                 {
                     "segment_idx": idx,
                     "distance_along": distance_along,
-                    "street_name": row.get(
-                        "nome", row.get("tipo_logra", f"Street_{idx}")
-                    ),
+                    "street_name": row.get("nome", row.get("tipo_logra", f"Street_{idx}")),
                     "street_type": row.get("tipo_logra", "Unknown"),
                     "hierarchy": row.get("hierarquia", None),
                 }
@@ -620,9 +612,7 @@ def aggregate_segment_statistics(
             "min_exceedance": float(np.min(exceedance_array)),
             "std_exceedance": float(np.std(exceedance_array)),
             "points_exceeding": points_with_exceedance,
-            "exceedance_ratio": float(
-                points_with_exceedance / len(segment_points) * 100.0
-            ),
+            "exceedance_ratio": float(points_with_exceedance / len(segment_points) * 100.0),
         }
         segment_stats.append(stats)
 
@@ -725,9 +715,7 @@ def create_street_exceedance_map(
                     label=labels_map[label],
                 )
 
-    ruleset_name = {"rio": "Rio de Janeiro", "saopaulo": "São Paulo"}.get(
-        ruleset.lower(), ruleset
-    )
+    ruleset_name = {"rio": "Rio de Janeiro", "saopaulo": "São Paulo"}.get(ruleset.lower(), ruleset)
     ax.set_xlabel("X (meters)", fontsize=12)
     ax.set_ylabel("Y (meters)", fontsize=12)
     ax.set_title(
@@ -767,7 +755,7 @@ def compute_building_volume(mesh: pv.PolyData) -> float:
         hull = mesh.convex_hull()
         if hull.n_cells > 0:
             return hull.volume
-    except:
+    except Exception:
         pass
 
     # Fallback: bounding box volume
@@ -908,9 +896,7 @@ def create_building_exceedance_map(
 
     ax.set_xlabel("X (meters)", fontsize=12)
     ax.set_ylabel("Y (meters)", fontsize=12)
-    ruleset_name = {"rio": "Rio de Janeiro", "saopaulo": "São Paulo"}.get(
-        ruleset.lower(), ruleset
-    )
+    ruleset_name = {"rio": "Rio de Janeiro", "saopaulo": "São Paulo"}.get(ruleset.lower(), ruleset)
     ax.set_title(
         f"Sky Exposure Plane Exceedance Map ({ruleset_name} Ruleset)\nPercentage of Volume Exceeding Envelope",
         fontsize=14,
@@ -950,9 +936,7 @@ def create_statistics_plots(
     exceedance_data = exceedance_data[exceedance_data > 0]  # Only show violations
 
     if len(exceedance_data) > 0:
-        ax.hist(
-            exceedance_data, bins=50, edgecolor="black", alpha=0.7, color="steelblue"
-        )
+        ax.hist(exceedance_data, bins=50, edgecolor="black", alpha=0.7, color="steelblue")
         ax.set_xlabel("Exceedance (meters)", fontsize=12)
         ax.set_ylabel("Frequency", fontsize=12)
 
@@ -1111,9 +1095,7 @@ def create_street_section_views(
             terrain_z.append(z_terrain)
 
             # Find buildings near this section point
-            nearby_buildings = find_nearby_buildings(
-                point_2d, buildings_gdf, search_radius=50.0
-            )
+            nearby_buildings = find_nearby_buildings(point_2d, buildings_gdf, search_radius=50.0)
 
             # Extract actual building height at this (x,y) location
             # Use building footprints and height attributes directly (more reliable than mesh extraction)
@@ -1132,10 +1114,10 @@ def create_street_section_views(
 
             # Calculate envelope height at this point
             # Apply occlusion: only consider front-most building that intersects the plane
-            envelope_height_at_point = (
-                z_terrain  # Default: no restriction beyond terrain
+            envelope_height_at_point = z_terrain  # Default: no restriction beyond terrain
+            front_building_height = (
+                z_terrain  # Height of front-most building that intersects (for exceedance)
             )
-            front_building_height = z_terrain  # Height of front-most building that intersects (for exceedance)
 
             # Check if there's actually a building at this point
             if max_building_height > z_terrain + 1.0:
@@ -1195,9 +1177,7 @@ def create_street_section_views(
             if np.isnan(envelope_height_at_point):
                 envelope_height_at_point = z_terrain
 
-            building_heights.append(
-                max_building_height
-            )  # Tallest building (for visualization)
+            building_heights.append(max_building_height)  # Tallest building (for visualization)
             front_building_heights.append(
                 front_building_height
             )  # Front-most building that intersects (for exceedance)
@@ -1211,9 +1191,7 @@ def create_street_section_views(
 
         # Convert to numpy arrays for easier manipulation
         terrain_z_array = np.array(terrain_z)
-        building_heights_array = np.array(
-            building_heights
-        )  # Tallest building (for visualization)
+        building_heights_array = np.array(building_heights)  # Tallest building (for visualization)
         front_building_heights_array = np.array(
             front_building_heights
         )  # Front-most building that intersects (for exceedance)
@@ -1242,9 +1220,7 @@ def create_street_section_views(
             alpha=0.5,
             label="Terrain",
         )
-        ax.plot(
-            distances_array, terrain_z_array, "g-", linewidth=2, label="Ground level"
-        )
+        ax.plot(distances_array, terrain_z_array, "g-", linewidth=2, label="Ground level")
 
         # Plot building profiles (filled area from terrain to building top)
         if np.any(valid_mask):
@@ -1260,9 +1236,7 @@ def create_street_section_views(
             )
 
             # Plot building outlines
-            ax.plot(
-                distances_array, building_heights_array, "k-", linewidth=1.5, alpha=0.8
-            )
+            ax.plot(distances_array, building_heights_array, "k-", linewidth=1.5, alpha=0.8)
 
         # Plot envelope heights
         ax.plot(
@@ -1303,9 +1277,7 @@ def create_street_section_views(
             # Calculate exceedance metrics
             # Use the POINT EXCEEDANCE value (exceedance_value) for max height
             # This is the correct value from street-level analysis at this exact point
-            max_exceedance_height = (
-                exceedance_value  # Use the point exceedance, not section max
-            )
+            max_exceedance_height = exceedance_value  # Use the point exceedance, not section max
 
             # Calculate exceedance area (2D area in section view)
             # This represents the cross-sectional area of exceedance
@@ -1315,31 +1287,21 @@ def create_street_section_views(
                 building_heights_array[exceedance_mask],
             )
             exceedance_heights = bounded_top - envelope_heights_array[exceedance_mask]
-            exceedance_heights = np.maximum(
-                exceedance_heights, 0
-            )  # Ensure non-negative
+            exceedance_heights = np.maximum(exceedance_heights, 0)  # Ensure non-negative
             sample_spacing = (
-                np.abs(distances_array[1] - distances_array[0])
-                if len(distances_array) > 1
-                else 1.0
+                np.abs(distances_array[1] - distances_array[0]) if len(distances_array) > 1 else 1.0
             )
-            exceedance_area = (
-                np.sum(exceedance_heights) * sample_spacing
-            )  # m² (area in 2D section)
+            exceedance_area = np.sum(exceedance_heights) * sample_spacing  # m² (area in 2D section)
 
             # Calculate exceedance volume (approximate as area × unit width)
             # In a 2D section, this represents volume per unit width perpendicular to section
             # For a more accurate volume, we'd need the actual building width, but this gives a good approximation
-            exceedance_volume = (
-                exceedance_area * 1.0
-            )  # m³ per meter width (approximate)
+            exceedance_volume = exceedance_area * 1.0  # m³ per meter width (approximate)
 
             # Add text annotation with exceedance values (sparse annotations)
             for i in np.where(exceedance_mask)[0]:
                 if i % 20 == 0:  # Annotate every 20th point to avoid clutter
-                    bounded_height = min(
-                        front_building_heights_array[i], building_heights_array[i]
-                    )
+                    bounded_height = min(front_building_heights_array[i], building_heights_array[i])
                     exceedance_val = bounded_height - envelope_heights_array[i]
                     if exceedance_val > 1.0:  # Only show significant exceedances
                         ax.text(
@@ -1348,9 +1310,7 @@ def create_street_section_views(
                             f"{exceedance_val:.1f}m",
                             fontsize=8,
                             ha="center",
-                            bbox=dict(
-                                boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7
-                            ),
+                            bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7),
                         )
         else:
             # No exceedance
@@ -1397,9 +1357,7 @@ def create_street_section_views(
                     "",
                     xy=(arrow_x, building_at_street),
                     xytext=(arrow_x, envelope_at_street),
-                    arrowprops=dict(
-                        arrowstyle="<->", color="darkred", lw=3, shrinkA=0, shrinkB=0
-                    ),
+                    arrowprops=dict(arrowstyle="<->", color="darkred", lw=3, shrinkA=0, shrinkB=0),
                     zorder=25,
                 )
 
@@ -1473,9 +1431,7 @@ def create_street_section_views(
         )
 
         # Formatting
-        ax.set_xlabel(
-            "Distance from Street Point (meters)", fontsize=12, fontweight="bold"
-        )
+        ax.set_xlabel("Distance from Street Point (meters)", fontsize=12, fontweight="bold")
         ax.set_ylabel("Elevation (meters, absolute Z)", fontsize=12, fontweight="bold")
 
         ruleset_name = {"rio": "Rio de Janeiro", "saopaulo": "São Paulo"}.get(
@@ -1492,16 +1448,12 @@ def create_street_section_views(
 
         # Set reasonable axis limits
         if len(building_heights_array) > 0:
-            max_height = max(
-                np.max(building_heights_array), np.max(envelope_heights_array)
-            )
+            max_height = max(np.max(building_heights_array), np.max(envelope_heights_array))
             min_height = min(terrain_base, np.min(terrain_z_array) - 2)
             ax.set_ylim(min_height, max_height + 10)
 
         # Add horizontal reference line at street level
-        ax.axhline(
-            street_terrain_z, color="blue", linestyle="--", linewidth=1, alpha=0.5
-        )
+        ax.axhline(street_terrain_z, color="blue", linestyle="--", linewidth=1, alpha=0.5)
 
         plt.tight_layout()
         section_path = output_dir / f"street_section_{label}_{ruleset}.png"
@@ -1558,9 +1510,7 @@ def main():
         default=None,
         help="Path to road network shapefile (optional, enables street-level analysis)",
     )
-    parser.add_argument(
-        "--footprints", type=str, required=True, help="Path to building footprints"
-    )
+    parser.add_argument("--footprints", type=str, required=True, help="Path to building footprints")
     parser.add_argument(
         "--ruleset",
         type=str,
@@ -1622,9 +1572,7 @@ def main():
     print("STREET-LEVEL SKY EXPOSURE PLANE EXCEEDANCE ANALYSIS")
     print("=" * 60)
     print(f"STL file: {stl_path}")
-    print(
-        f"Road network: {roads_path if roads_path else 'Not provided (building-level only)'}"
-    )
+    print(f"Road network: {roads_path if roads_path else 'Not provided (building-level only)'}")
     print(f"Building footprints: {footprints_path}")
     print(f"Ruleset: {args.ruleset.upper()} (default: Rio de Janeiro)")
     if roads_path:
@@ -1658,16 +1606,12 @@ def main():
         dy = stl_center_y - roads_center_y
 
         if abs(dx) > 100 or abs(dy) > 100:
-            logger.info(
-                f"  Detected coordinate system mismatch - transforming to local coordinates"
-            )
+            logger.info("  Detected coordinate system mismatch - transforming to local coordinates")
             logger.info(f"  Applying translation: dx={dx:.1f}, dy={dy:.1f}")
             roads_gdf.geometry = roads_gdf.geometry.translate(xoff=dx, yoff=dy)
             logger.info(f"  Transformed road bounds: {roads_gdf.total_bounds}")
     else:
-        logger.info(
-            "No road network provided - will compute building-level exceedance only"
-        )
+        logger.info("No road network provided - will compute building-level exceedance only")
 
     # Load building footprints
     logger.info(f"Loading building footprints from {footprints_path}...")
@@ -1681,10 +1625,7 @@ def main():
     buildings_gdf = normalize_height_columns(buildings_gdf)
 
     # Validate required columns
-    if (
-        "base_height" not in buildings_gdf.columns
-        or "top_height" not in buildings_gdf.columns
-    ):
+    if "base_height" not in buildings_gdf.columns or "top_height" not in buildings_gdf.columns:
         raise ValueError(
             f"Building footprints must have 'base_height' and 'top_height' columns. "
             f"Found columns: {list(buildings_gdf.columns)}"
@@ -1698,9 +1639,7 @@ def main():
 
     # Calculate building footprint area and height
     buildings_gdf["footprint_area"] = buildings_gdf.geometry.area
-    buildings_gdf["building_height"] = (
-        buildings_gdf["top_height"] - buildings_gdf["base_height"]
-    )
+    buildings_gdf["building_height"] = buildings_gdf["top_height"] - buildings_gdf["base_height"]
 
     # Apply filters
     # 1. Remove buildings with footprint area too small (noise/errors)
@@ -1716,39 +1655,29 @@ def main():
         logger.info(f"Filtering buildings (informal area: {args.area}):")
     else:
         combined_mask = area_mask & height_mask
-        logger.info(f"Filtering buildings:")
+        logger.info("Filtering buildings:")
 
     buildings_gdf = buildings_gdf[combined_mask].copy()
     filtered_count = len(buildings_gdf)
 
     logger.info(f"  Original: {original_count} buildings")
     logger.info(f"  Removed: {original_count - filtered_count} outliers")
-    logger.info(
-        f"    - Min area: {MIN_BUILDING_AREA} m² (removed {(~area_mask).sum()})"
-    )
-    logger.info(
-        f"    - Min height: {MIN_BUILDING_HEIGHT} m (removed {(~height_mask).sum()})"
-    )
+    logger.info(f"    - Min area: {MIN_BUILDING_AREA} m² (removed {(~area_mask).sum()})")
+    logger.info(f"    - Min height: {MIN_BUILDING_HEIGHT} m (removed {(~height_mask).sum()})")
     if args.area and not is_formal_area(args.area):
-        logger.info(
-            f"    - Max area: {MAX_FILTER_AREA} m² (removed {(~max_area_mask).sum()})"
-        )
+        logger.info(f"    - Max area: {MAX_FILTER_AREA} m² (removed {(~max_area_mask).sum()})")
     logger.info(f"  Remaining: {filtered_count} buildings")
 
     # Extract building meshes
     logger.info("Extracting building meshes from STL...")
-    building_meshes = extract_building_meshes(
-        mesh, buildings_gdf, terrain.bounds, z_threshold=None
-    )
+    building_meshes = extract_building_meshes(mesh, buildings_gdf, terrain.bounds, z_threshold=None)
     logger.info(f"  Extracted {len(building_meshes)} building meshes")
 
     # Compute building-level exceedance
     logger.info("Computing building-level exceedance...")
     building_exceedance_results = {}
 
-    for building_idx in tqdm(
-        building_meshes.keys(), desc="Computing building exceedances"
-    ):
+    for building_idx in tqdm(building_meshes.keys(), desc="Computing building exceedances"):
         if building_idx not in buildings_gdf.index:
             continue
 
@@ -1779,14 +1708,9 @@ def main():
 
     # Save building exceedance results
     building_exceedance_df = pd.DataFrame(
-        [
-            {"building_idx": idx, **metrics}
-            for idx, metrics in building_exceedance_results.items()
-        ]
+        [{"building_idx": idx, **metrics} for idx, metrics in building_exceedance_results.items()]
     )
-    building_csv_path = (
-        output_dir / f"building_exceedance_statistics_{args.ruleset}.csv"
-    )
+    building_csv_path = output_dir / f"building_exceedance_statistics_{args.ruleset}.csv"
     building_exceedance_df.to_csv(building_csv_path, index=False)
     logger.info(f"  Saved building exceedance statistics to {building_csv_path}")
 
@@ -1802,15 +1726,11 @@ def main():
         # Remove points with invalid elevation
         valid_mask = ~points_gdf.geometry.apply(lambda p: np.isnan(p.z))
         if not valid_mask.all():
-            logger.warning(
-                f"  Removed {np.sum(~valid_mask)} points with invalid elevation"
-            )
+            logger.warning(f"  Removed {np.sum(~valid_mask)} points with invalid elevation")
             points_gdf = points_gdf[valid_mask].copy()
 
         # Convert points to numpy array
-        street_points_3d = np.array(
-            [[geom.x, geom.y, geom.z] for geom in points_gdf.geometry]
-        )
+        street_points_3d = np.array([[geom.x, geom.y, geom.z] for geom in points_gdf.geometry])
 
         # Compute exceedance
         exceedance_values, metadata_list = compute_street_exceedance(
@@ -1830,9 +1750,7 @@ def main():
             points_gdf[key] = [m[key] for m in metadata_list]
 
         # Aggregate to segment level
-        segments_gdf = aggregate_segment_statistics(
-            points_gdf, exceedance_values, roads_gdf
-        )
+        segments_gdf = aggregate_segment_statistics(points_gdf, exceedance_values, roads_gdf)
 
         # Save street-level results
         logger.info("Saving street-level results...")
@@ -1887,7 +1805,7 @@ def main():
     if roads_gdf is not None:
         print(f"Total street segments: {len(segments_gdf)}")
         print(f"Total sample points: {len(points_gdf)}")
-        print(f"\nPoint-level exceedance:")
+        print("\nPoint-level exceedance:")
         exceedance_array = points_gdf["exceedance"].values
         points_with_exceedance = (exceedance_array > 0).sum()
         print(
@@ -1895,23 +1813,17 @@ def main():
         )
         if points_with_exceedance > 0:
             exceedance_violations = exceedance_array[exceedance_array > 0]
-            print(
-                f"  Mean exceedance (violations only): {np.mean(exceedance_violations):.2f}m"
-            )
+            print(f"  Mean exceedance (violations only): {np.mean(exceedance_violations):.2f}m")
             print(f"  Max exceedance: {np.max(exceedance_array):.2f}m")
             print(f"  Median exceedance: {np.median(exceedance_violations):.2f}m")
         else:
-            print(f"  No exceedances found (all buildings comply)")
-        print(f"\nSegment-level exceedance (mean values):")
+            print("  No exceedances found (all buildings comply)")
+        print("\nSegment-level exceedance (mean values):")
         print(f"  Mean: {segments_gdf['mean_exceedance'].mean():.2f}m")
         print(f"  Max: {segments_gdf['max_exceedance'].max():.2f}m")
-        print(
-            f"  Segments with violations: {(segments_gdf['mean_exceedance'] > 0).sum()}"
-        )
-    print(f"\nBuilding-level exceedance:")
-    exceedance_ratios = [
-        m["exceedance_ratio"] for m in building_exceedance_results.values()
-    ]
+        print(f"  Segments with violations: {(segments_gdf['mean_exceedance'] > 0).sum()}")
+    print("\nBuilding-level exceedance:")
+    exceedance_ratios = [m["exceedance_ratio"] for m in building_exceedance_results.values()]
     buildings_with_exceedance = sum(1 for r in exceedance_ratios if r > 0)
     total_buildings = len(exceedance_ratios)
     print(
@@ -1919,9 +1831,7 @@ def main():
     )
     if buildings_with_exceedance > 0:
         exceedance_violations = [r for r in exceedance_ratios if r > 0]
-        print(
-            f"  Mean exceedance ratio (violations only): {np.mean(exceedance_violations):.2f}%"
-        )
+        print(f"  Mean exceedance ratio (violations only): {np.mean(exceedance_violations):.2f}%")
         print(f"  Max exceedance ratio: {np.max(exceedance_ratios):.2f}%")
         print(f"  Median exceedance ratio: {np.median(exceedance_violations):.2f}%")
     print("=" * 60)

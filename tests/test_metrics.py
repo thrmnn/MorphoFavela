@@ -14,7 +14,6 @@ from src.metrics import (
     validate_footprints,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -55,9 +54,7 @@ class TestNormalizeHeightColumns:
 
     def test_normalize_height_columns_alternative(self):
         """GDF with 'base' and 'altura' gets 'base_height' and 'top_height'."""
-        gdf = gpd.GeoDataFrame(
-            {"base": [2.0], "altura": [8.0], "geometry": [_square(0, 0, 5)]}
-        )
+        gdf = gpd.GeoDataFrame({"base": [2.0], "altura": [8.0], "geometry": [_square(0, 0, 5)]})
         result = normalize_height_columns(gdf)
         assert "base_height" in result.columns
         assert "top_height" in result.columns
