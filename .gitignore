@@ -24,8 +24,12 @@ coverage.xml
 .cache/
 
 # Data and outputs (not tracked — large files, generated)
-data/
+data/*
 outputs/*
+
+# Exception: track the data layout README so the input contract
+# travels with the repo.
+!data/README.md
 
 # Exception: track paper figure scripts (not their rendered exports)
 !outputs/paper_figures/
