@@ -117,26 +117,21 @@ reference height, and a `quality_flag` ∈ {`measured`, `gap-filled`,
 `placeholder-prior`}).
 
 **Current status (April 2026).** All five `wind_rose.json` files now
-carry measured hourly observations and are tagged `quality_flag:
-"measured"`. The four hillside / inland sites use INMET BDMEP records
-from 2016–2024 (a 7-year window with three years dropped due to INMET
-server-side transfer failures during the bulk download — 2015, 2019,
-and 2021); Maré uses the Iowa State ASOS METAR archive of SBGL Galeão
-across 2015–2024. Sample sizes range from n = 46,664 (A636 Jacarepaguá,
-which only began reporting in August 2017) to n = 89,439 (SBGL).
-Per-site directional frequencies, mean speeds, and calm fractions are
-shown in **Figure S5** (`docs/technical_report/figures/figS5_wind_roses.png`):
+carry measured hourly observations across the full 2015–2024 window
+and are tagged `quality_flag: "measured"`. The four hillside / inland
+sites use INMET BDMEP records; Maré uses the Iowa State ASOS METAR
+archive of SBGL Galeão. Sample sizes range from n = 64,088 (A636
+Jacarepaguá, which only began reporting in August 2017) to n = 89,439
+(SBGL). Per-site directional frequencies, mean speeds, and calm
+fractions are shown in **Figure S5**
+(`docs/technical_report/figures/figS5_wind_roses.png`):
 
 | Site (station) | n | Window | Calm | Prevailing dir | Notes |
 |---|---|---|---|---|---|
-| Vidigal / Rocinha (A652 Forte de Copacabana) | 58,943 | 2016–2024 | 1.4 % | E (30 %), W (23 %) | Coastal cliff: bimodal sea-breeze and reverse-channel along the Dois Irmãos saddle. |
-| Rio das Pedras (A636 Jacarepaguá) | 46,664 | 2017–2024 | 46.6 % | SW (26 %), W (20 %) | Sheltered basin, weak winds (Ū ≈ 1.3 m/s); high calm fraction reflects the Jacarepaguá lowland regime, not measurement gaps. |
-| Complexo do Alemão (A621 Vila Militar) | 59,759 | 2016–2024 | 33.4 % | N (26 %), SW (19 %) | North-zone interior; bay sea-breeze + post-frontal SW pattern. |
+| Vidigal / Rocinha (A652 Forte de Copacabana) | 85,103 | 2015–2024 | 1.4 % | E (30 %), W (23 %) | Coastal cliff: bimodal sea-breeze and reverse-channel along the Dois Irmãos saddle. |
+| Rio das Pedras (A636 Jacarepaguá) | 64,088 | 2017–2024 | 46.3 % | SW (26 %), W (20 %) | Sheltered basin, weak winds (Ū ≈ 1.3 m/s); high calm fraction reflects the Jacarepaguá lowland regime, not measurement gaps. |
+| Complexo do Alemão (A621 Vila Militar) | 86,019 | 2015–2024 | 33.1 % | N (26 %), SW (19 %) | North-zone interior; bay sea-breeze + post-frontal SW pattern. |
 | Maré (SBGL Galeão METAR) | 89,439 | 2015–2024 | 3.7 % | SE (26 %), E (19 %) | Bay regime; continuous METAR coverage gives the largest sample. |
-
-A second iteration with the three missing years filled in is expected
-once the INMET portal stabilises; the directional structure is unlikely
-to shift materially given the multi-year sample already in hand.
 
 **Recommended stations** (verified April 2026 against the INMET
 catalogue, daily-graph URLs, and the published TMY paper for A652):
