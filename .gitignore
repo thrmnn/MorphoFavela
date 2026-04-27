@@ -8,8 +8,20 @@ venv/
 env/
 ENV/
 *.egg-info/
+build/
+dist/
+.eggs/
+
+# Tooling caches
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.cache/
 
 # Data and outputs (not tracked — large files, generated)
 data/
