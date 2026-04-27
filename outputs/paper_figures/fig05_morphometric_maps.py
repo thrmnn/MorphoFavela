@@ -41,7 +41,9 @@ def main():
     ]
 
     fig, axes = plt.subplots(
-        2, 3, figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 0.55),
+        2,
+        3,
+        figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 0.55),
     )
 
     for row, (site, site_label) in enumerate(exemplars):
@@ -67,7 +69,12 @@ def main():
                     bounds = src.bounds
                     shade_data = hillshade(dtm, src.res[0])
                     shade_data = np.where(np.isnan(dtm), 1.0, shade_data)
-                    shade_extent = [bounds.left, bounds.right, bounds.bottom, bounds.top]
+                    shade_extent = [
+                        bounds.left,
+                        bounds.right,
+                        bounds.bottom,
+                        bounds.top,
+                    ]
             except Exception:
                 pass
 
@@ -77,23 +84,38 @@ def main():
             # Hillshade background
             if shade_data is not None:
                 ax.imshow(
-                    shade_data, cmap="gray", vmin=0, vmax=1,
-                    extent=shade_extent, alpha=0.3, zorder=0,
+                    shade_data,
+                    cmap="gray",
+                    vmin=0,
+                    vmax=1,
+                    extent=shade_extent,
+                    alpha=0.3,
+                    zorder=0,
                 )
 
             # Building outlines
             if bld is not None:
                 bld.plot(
-                    ax=ax, facecolor="none", edgecolor="#cccccc",
-                    linewidth=0.1, alpha=0.4, zorder=1,
+                    ax=ax,
+                    facecolor="none",
+                    edgecolor="#cccccc",
+                    linewidth=0.1,
+                    alpha=0.4,
+                    zorder=1,
                 )
 
             # Grid cells
             grid.plot(
-                ax=ax, column=col, cmap=cmap,
-                vmin=vlim[0], vmax=vlim[1],
-                alpha=0.75, edgecolor="none", zorder=2,
-                legend=False, missing_kwds={"color": "none"},
+                ax=ax,
+                column=col,
+                cmap=cmap,
+                vmin=vlim[0],
+                vmax=vlim[1],
+                alpha=0.75,
+                edgecolor="none",
+                zorder=2,
+                legend=False,
+                missing_kwds={"color": "none"},
             )
 
             # Colorbar

@@ -45,11 +45,15 @@ class TestWindRose:
 class TestCFDPatchResult:
     def test_requires_mandatory_cols(self):
         meta = PatchSimulationMetadata(
-            patch_id="P01", site="x", wind_direction="N", wind_speed_ref=5.0,
+            patch_id="P01",
+            site="x",
+            wind_direction="N",
+            wind_speed_ref=5.0,
         )
         # Missing U_mag
-        bad = pd.DataFrame({"x": [0], "y": [0], "z": [1.5],
-                            "U": [1], "V": [0], "W": [0]})
+        bad = pd.DataFrame(
+            {"x": [0], "y": [0], "z": [1.5], "U": [1], "V": [0], "W": [0]}
+        )
         with pytest.raises(ValueError, match="missing columns"):
             CFDPatchResult(metadata=meta, samples=bad)
 
@@ -72,11 +76,17 @@ class TestLoadPatchCSV:
 
     def test_autocomputes_umag(self, tmp_path, synthetic_metadata):
         """If U_mag is missing but U/V/W present, it's auto-computed."""
-        samples = pd.DataFrame({
-            "x": [0, 1], "y": [0, 1], "z": [1.5, 1.5],
-            "U": [3.0, 0.0], "V": [4.0, 0.0], "W": [0.0, 0.0],
-            "TKE": [0.1, 0.1],
-        })
+        samples = pd.DataFrame(
+            {
+                "x": [0, 1],
+                "y": [0, 1],
+                "z": [1.5, 1.5],
+                "U": [3.0, 0.0],
+                "V": [4.0, 0.0],
+                "W": [0.0, 0.0],
+                "TKE": [0.1, 0.1],
+            }
+        )
         csv = tmp_path / "sample_points.csv"
         samples.to_csv(csv, index=False)
         with open(tmp_path / "summary.json", "w") as f:

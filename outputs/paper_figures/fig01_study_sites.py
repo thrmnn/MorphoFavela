@@ -37,8 +37,8 @@ def main():
         "vidigal": "VIDIGAL",
         "rocinha": "ROCINHA",
         "complexo_do_alemao": None,  # multiple polygons — use boundary file
-        "riodaspedras": None,        # use boundary file
-        "maré": None,                # use boundary file
+        "riodaspedras": None,  # use boundary file
+        "maré": None,  # use boundary file
     }
 
     # Load per-site boundaries and buildings
@@ -50,7 +50,11 @@ def main():
         except FileNotFoundError:
             # Try matching from all_favelas
             for name_candidate in [site.upper(), site.replace("_", " ").upper()]:
-                match = all_favelas[all_favelas["nome"].str.upper().str.contains(name_candidate, na=False)]
+                match = all_favelas[
+                    all_favelas["nome"]
+                    .str.upper()
+                    .str.contains(name_candidate, na=False)
+                ]
                 if not match.empty:
                     boundaries[site] = match
                     break
@@ -73,7 +77,9 @@ def main():
             with rasterio.open(rj_dtm_path) as src:
                 # Read a decimated version for the overview
                 factor = 4
-                dtm = src.read(1, out_shape=(src.height // factor, src.width // factor)).astype(float)
+                dtm = src.read(
+                    1, out_shape=(src.height // factor, src.width // factor)
+                ).astype(float)
                 nodata = src.nodata
                 if nodata is not None:
                     dtm[dtm == nodata] = np.nan
@@ -82,31 +88,48 @@ def main():
                 shade = hillshade(dtm, src.res[0] * factor)
                 shade = np.where(np.isnan(dtm), 0.95, shade)
                 ax_main.imshow(
-                    shade, cmap="gray", vmin=0, vmax=1,
+                    shade,
+                    cmap="gray",
+                    vmin=0,
+                    vmax=1,
                     extent=[bounds.left, bounds.right, bounds.bottom, bounds.top],
-                    alpha=0.5, zorder=0,
+                    alpha=0.5,
+                    zorder=0,
                 )
         except Exception as e:
             print(f"  Hillshade failed: {e}")
 
     # All favela boundaries as light gray
-    all_favelas.plot(ax=ax_main, facecolor="none", edgecolor="#cccccc", linewidth=0.15, zorder=1)
+    all_favelas.plot(
+        ax=ax_main, facecolor="none", edgecolor="#cccccc", linewidth=0.15, zorder=1
+    )
 
     # Highlight campaign sites
     for site in SITE_ORDER:
         if site in boundaries:
             boundaries[site].plot(
-                ax=ax_main, facecolor=SITE_COLORS[site], edgecolor=SITE_COLORS[site],
-                alpha=0.5, linewidth=0.8, zorder=3,
+                ax=ax_main,
+                facecolor=SITE_COLORS[site],
+                edgecolor=SITE_COLORS[site],
+                alpha=0.5,
+                linewidth=0.8,
+                zorder=3,
             )
             # Label
             centroid = boundaries[site].geometry.union_all().centroid
             ax_main.annotate(
                 SITE_LABELS[site],
                 xy=(centroid.x, centroid.y),
-                fontsize=5, fontweight="bold",
-                ha="center", va="center",
-                bbox=dict(boxstyle="round,pad=0.15", facecolor="white", alpha=0.8, edgecolor="none"),
+                fontsize=5,
+                fontweight="bold",
+                ha="center",
+                va="center",
+                bbox=dict(
+                    boxstyle="round,pad=0.15",
+                    facecolor="white",
+                    alpha=0.8,
+                    edgecolor="none",
+                ),
                 zorder=5,
             )
 
@@ -135,13 +158,19 @@ def main():
 
         if site in buildings:
             buildings[site].plot(
-                ax=ax, facecolor=SITE_COLORS[site], edgecolor="k",
-                linewidth=0.05, alpha=0.6,
+                ax=ax,
+                facecolor=SITE_COLORS[site],
+                edgecolor="k",
+                linewidth=0.05,
+                alpha=0.6,
             )
 
         if site in boundaries:
             boundaries[site].boundary.plot(
-                ax=ax, color="k", linewidth=0.5, linestyle="--",
+                ax=ax,
+                color="k",
+                linewidth=0.5,
+                linestyle="--",
             )
 
         clean_map_axes(ax)

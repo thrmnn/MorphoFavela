@@ -96,8 +96,9 @@ def concat_station_across_years(
                 # Skip 9 lines (8 metadata + 1 column header)
                 lines = data.splitlines(keepends=True)
                 out.write(b"".join(lines[9:]))
-    logger.info("concatenated %s from %d years -> %s",
-                station, len(per_year_files), out_path)
+    logger.info(
+        "concatenated %s from %d years -> %s", station, len(per_year_files), out_path
+    )
     return out_path
 
 
@@ -108,7 +109,9 @@ def main():
     parser.add_argument("--zips-dir", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument(
-        "--stations", nargs="+", required=True,
+        "--stations",
+        nargs="+",
+        required=True,
         help="INMET station codes (e.g., A652 A636 A621 A602)",
     )
     args = parser.parse_args()
@@ -118,8 +121,7 @@ def main():
     if not zip_paths:
         raise FileNotFoundError(f"No ZIPs in {args.zips_dir}")
 
-    logger.info("Processing %d yearly ZIPs × %d stations",
-                len(zip_paths), len(wanted))
+    logger.info("Processing %d yearly ZIPs × %d stations", len(zip_paths), len(wanted))
 
     per_station: dict[str, list[Path]] = {s: [] for s in wanted}
     for zp in zip_paths:

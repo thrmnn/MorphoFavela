@@ -22,19 +22,19 @@ from scipy.stats import gaussian_kde
 
 # ── Typology colors (colorblind-safe, print-friendly) ──
 TYPO_COLORS = {
-    "Hillside":  "#C75B3B",  # terracotta
-    "Flatland":  "#4878A8",  # steel blue
-    "Mixed":     "#8B8C3E",  # olive-gold
+    "Hillside": "#C75B3B",  # terracotta
+    "Flatland": "#4878A8",  # steel blue
+    "Mixed": "#8B8C3E",  # olive-gold
 }
 TYPO_COLORS_DARK = {
-    "Hillside":  "#9A3F25",
-    "Flatland":  "#30587A",
-    "Mixed":     "#6A6C2A",
+    "Hillside": "#9A3F25",
+    "Flatland": "#30587A",
+    "Mixed": "#6A6C2A",
 }
 TYPO_SITES = {
-    "Hillside":  ["vidigal", "rocinha"],
-    "Flatland":  ["riodaspedras", "maré"],
-    "Mixed":     ["complexo_do_alemao"],
+    "Hillside": ["vidigal", "rocinha"],
+    "Flatland": ["riodaspedras", "maré"],
+    "Mixed": ["complexo_do_alemao"],
 }
 TYPO_ORDER = ["Hillside", "Mixed", "Flatland"]
 
@@ -56,9 +56,13 @@ def main():
     # Marginal ratios: ~13% of main panel
     fig = plt.figure(figsize=(WIDTH_1_5, WIDTH_1_5 * 0.95))
     gs = gridspec.GridSpec(
-        2, 2, figure=fig,
-        width_ratios=[5, 0.8], height_ratios=[0.8, 5],
-        hspace=0.02, wspace=0.02,
+        2,
+        2,
+        figure=fig,
+        width_ratios=[5, 0.8],
+        height_ratios=[0.8, 5],
+        hspace=0.02,
+        wspace=0.02,
     )
 
     ax_main = fig.add_subplot(gs[1, 0])
@@ -67,22 +71,40 @@ def main():
     fig.add_subplot(gs[0, 1]).set_visible(False)  # corner
 
     # ── Structurally empty region ──
-    ax_main.add_patch(mpatches.FancyBboxPatch(
-        (0.0, 0.0), 0.15, 0.50,
-        boxstyle="round,pad=0.008",
-        facecolor="#F4D4C4", alpha=0.30,
-        edgecolor="#B85A4A", linewidth=1.0,
-        zorder=2,
-    ))
-    ax_main.text(
-        0.075, 0.33, "Structurally\nempty",
-        ha="center", va="center", fontsize=8, color="#8B3A2A",
-        fontweight="bold", zorder=10,
+    ax_main.add_patch(
+        mpatches.FancyBboxPatch(
+            (0.0, 0.0),
+            0.15,
+            0.50,
+            boxstyle="round,pad=0.008",
+            facecolor="#F4D4C4",
+            alpha=0.30,
+            edgecolor="#B85A4A",
+            linewidth=1.0,
+            zorder=2,
+        )
     )
     ax_main.text(
-        0.075, 0.19, "Low SVF requires\nhigh $\\lambda_p$",
-        ha="center", va="center", fontsize=6.5, color="#A05040",
-        fontstyle="italic", zorder=10,
+        0.075,
+        0.33,
+        "Structurally\nempty",
+        ha="center",
+        va="center",
+        fontsize=8,
+        color="#8B3A2A",
+        fontweight="bold",
+        zorder=10,
+    )
+    ax_main.text(
+        0.075,
+        0.19,
+        "Low SVF requires\nhigh $\\lambda_p$",
+        ha="center",
+        va="center",
+        fontsize=6.5,
+        color="#A05040",
+        fontstyle="italic",
+        zorder=10,
     )
 
     # ── KDE contours (3 typologies) ──
@@ -125,20 +147,37 @@ def main():
 
             # 90% contour — dashed outline only
             ax_main.contour(
-                Xi, Yi, Z, levels=[level_90],
-                colors=[color], linewidths=[1.0], linestyles=["--"],
-                alpha=0.55, zorder=3,
+                Xi,
+                Yi,
+                Z,
+                levels=[level_90],
+                colors=[color],
+                linewidths=[1.0],
+                linestyles=["--"],
+                alpha=0.55,
+                zorder=3,
             )
 
             # 50% contour — filled + solid outline
             ax_main.contourf(
-                Xi, Yi, Z, levels=[level_50, Z.max()],
-                colors=[color], alpha=0.20, zorder=2,
+                Xi,
+                Yi,
+                Z,
+                levels=[level_50, Z.max()],
+                colors=[color],
+                alpha=0.20,
+                zorder=2,
             )
             ax_main.contour(
-                Xi, Yi, Z, levels=[level_50],
-                colors=[color], linewidths=[2.0], linestyles=["-"],
-                alpha=0.90, zorder=4,
+                Xi,
+                Yi,
+                Z,
+                levels=[level_50],
+                colors=[color],
+                linewidths=[2.0],
+                linestyles=["-"],
+                alpha=0.90,
+                zorder=4,
             )
 
             # Find centroid of 50% region for label placement
@@ -154,17 +193,20 @@ def main():
         site_names = ", ".join(SITE_LABELS[s] for s in TYPO_SITES[typo])
         legend_handles.append(
             mpatches.Patch(
-                facecolor=color, alpha=0.30, edgecolor=color,
-                linewidth=1.5, label=f"{typo} ({site_names})",
+                facecolor=color,
+                alpha=0.30,
+                edgecolor=color,
+                linewidth=1.5,
+                label=f"{typo} ({site_names})",
             )
         )
 
     # ── Typology labels (outside/adjacent to 50% contour) ──
     # Manual positioning for clarity
     offsets = {
-        "Hillside":  (-0.08, -0.08),
-        "Flatland":  (0.06, -0.06),
-        "Mixed":     (0.10, 0.06),
+        "Hillside": (-0.08, -0.08),
+        "Flatland": (0.06, -0.06),
+        "Mixed": (0.10, 0.06),
     }
     for typo in TYPO_ORDER:
         if typo not in label_positions:
@@ -172,14 +214,21 @@ def main():
         cx, cy = label_positions[typo]
         dx, dy = offsets.get(typo, (0, 0))
         ax_main.text(
-            cx + dx, cy + dy, typo.lower(),
-            ha="center", va="center",
-            fontsize=9, color=TYPO_COLORS_DARK[typo],
-            fontstyle="italic", fontweight="demibold",
+            cx + dx,
+            cy + dy,
+            typo.lower(),
+            ha="center",
+            va="center",
+            fontsize=9,
+            color=TYPO_COLORS_DARK[typo],
+            fontstyle="italic",
+            fontweight="demibold",
             zorder=8,
             bbox=dict(
                 boxstyle="round,pad=0.15",
-                facecolor="white", alpha=0.80, edgecolor="none",
+                facecolor="white",
+                alpha=0.80,
+                edgecolor="none",
             ),
         )
 
@@ -195,20 +244,32 @@ def main():
     r_val, _ = stats.pearsonr(svf_all[valid], lp_all[valid])
     n_total = valid.sum()
     ax_main.text(
-        0.97, 0.97,
+        0.97,
+        0.97,
         f"$r$ = {r_val:.2f}, $n$ = {n_total:,d}",
         transform=ax_main.transAxes,
-        ha="right", va="top", fontsize=7, color="#555555",
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.85, edgecolor="none"),
+        ha="right",
+        va="top",
+        fontsize=7,
+        color="#555555",
+        bbox=dict(
+            boxstyle="round,pad=0.3", facecolor="white", alpha=0.85, edgecolor="none"
+        ),
     )
 
     # ── Legend (compact, upper area near annotation) ──
     ax_main.legend(
-        handles=legend_handles, loc="upper right",
+        handles=legend_handles,
+        loc="upper right",
         bbox_to_anchor=(0.99, 0.90),
-        frameon=True, framealpha=0.90, edgecolor="#dddddd",
-        fontsize=6, handletextpad=0.4, handlelength=1.2,
-        borderpad=0.4, labelspacing=0.3,
+        frameon=True,
+        framealpha=0.90,
+        edgecolor="#dddddd",
+        fontsize=6,
+        handletextpad=0.4,
+        handlelength=1.2,
+        borderpad=0.4,
+        labelspacing=0.3,
     )
 
     # ── Marginal distributions (per-site, 5 individual curves) ──

@@ -113,7 +113,7 @@ def main():
     facade_gdf = build_facade_points(inset=0.1)
 
     print(f"\nCanyon: {CANYON_WIDTH}m wide, buildings {BUILDING_HEIGHT}m tall")
-    print(f"Facade points: {len(facade_gdf)} ({len(facade_gdf)//2} per wall)")
+    print(f"Facade points: {len(facade_gdf)} ({len(facade_gdf) // 2} per wall)")
     print(f"Floor height: {FLOOR_HEIGHT}m")
 
     # --- Run with fix ---
@@ -157,12 +157,12 @@ def main():
         floor_agg = aggregate_by_building_floor(r)
         hu = summarize_housing_units(floor_agg)
         print(f"\n{label}:")
-        print(f"  Sunlit points: {n_sunlit}/{len(r)} ({100*n_sunlit/len(r):.1f}%)")
+        print(f"  Sunlit points: {n_sunlit}/{len(r)} ({100 * n_sunlit / len(r):.1f}%)")
         print(
             f"  Sunlit hours: mean={r['facade_sunlit_hours'].mean():.2f}, "
             f"max={r['facade_sunlit_hours'].max():.2f}"
         )
-        print(f"  WHO compliant: {n_who}/{len(r)} ({100*n_who/len(r):.1f}%)")
+        print(f"  WHO compliant: {n_who}/{len(r)} ({100 * n_who / len(r):.1f}%)")
         print(
             f"  Housing units: {hu['total_units']} total, "
             f"{hu['units_below_who']} below WHO ({hu['pct_below']:.1f}%)"
@@ -247,7 +247,9 @@ def main():
         edgecolor="white",
         alpha=0.7,
     )
-    ax.axhline(2.0, color="black", linestyle="--", linewidth=1, label="WHO 2h threshold")
+    ax.axhline(
+        2.0, color="black", linestyle="--", linewidth=1, label="WHO 2h threshold"
+    )
     ax.set_xlabel("Floor Level")
     ax.set_ylabel("Mean Sunlit Hours")
     ax.set_title("(b) Sunlit Hours by Floor", fontsize=12, fontweight="bold")

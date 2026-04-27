@@ -122,11 +122,15 @@ def run_audit(
 
     # ── 1. Load data ────────────────────────────────────────────────
     logger.info("=" * 60)
-    logger.info("MORPHOMETRIC AUDIT: %s%s", area, f" ({output_suffix})" if output_suffix else "")
+    logger.info(
+        "MORPHOMETRIC AUDIT: %s%s", area, f" ({output_suffix})" if output_suffix else ""
+    )
     logger.info("=" * 60)
 
     buildings, streets, boundary, dtm_path, svf_points, scene_stl, streets_svf = (
-        load_data(area, buildings_override=buildings_override, dtm_override=dtm_override)
+        load_data(
+            area, buildings_override=buildings_override, dtm_override=dtm_override
+        )
     )
     n_buildings = len(buildings)
     logger.info("Buildings: %d, Streets: %d segments", n_buildings, len(streets))

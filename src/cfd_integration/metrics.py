@@ -14,9 +14,7 @@ def velocity_magnitude(u: np.ndarray, v: np.ndarray, w: np.ndarray) -> np.ndarra
     return np.sqrt(u**2 + v**2 + w**2)
 
 
-def stagnation_fraction(
-    u_mag: np.ndarray, threshold: float = 0.5
-) -> float:
+def stagnation_fraction(u_mag: np.ndarray, threshold: float = 0.5) -> float:
     """Fraction of sample points with |U| below threshold.
 
     Parameters
@@ -114,9 +112,7 @@ def low_wind_percentile(u_mag: np.ndarray, pct: float = 10) -> float:
     return float(np.percentile(u_mag, pct))
 
 
-def canyon_ventilation_efficiency(
-    u_mag_in_canyon: np.ndarray, u_ref: float
-) -> float:
+def canyon_ventilation_efficiency(u_mag_in_canyon: np.ndarray, u_ref: float) -> float:
     """Canyon ventilation efficiency: mean(|U|) / U_ref.
 
     Ratio of in-canyon wind speed to the reference (free-stream) velocity.
@@ -132,8 +128,8 @@ def canyon_ventilation_efficiency(
 
 # Default thresholds for reporting (configurable in campaign analysis)
 HEALTH_THRESHOLDS = {
-    "u_mag_stagnation": 0.5,       # m/s, below = calm/stagnant
-    "ach_poor": 3.0,                # h⁻¹, below = inadequate ventilation
+    "u_mag_stagnation": 0.5,  # m/s, below = calm/stagnant
+    "ach_poor": 3.0,  # h⁻¹, below = inadequate ventilation
     "ventilation_efficiency_poor": 0.2,  # canyon U / U_ref
-    "TI_high": 0.5,                 # high turbulence (dispersion-dominated)
+    "TI_high": 0.5,  # high turbulence (dispersion-dominated)
 }

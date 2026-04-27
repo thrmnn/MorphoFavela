@@ -49,7 +49,10 @@ def main():
         corr = grid[available].corr()
 
         im = ax.imshow(
-            corr.values, cmap="RdBu_r", vmin=vmin, vmax=vmax,
+            corr.values,
+            cmap="RdBu_r",
+            vmin=vmin,
+            vmax=vmax,
             aspect="equal",
         )
 
@@ -59,8 +62,15 @@ def main():
             for j in range(n):
                 val = corr.values[i, j]
                 color = "white" if abs(val) > 0.6 else "black"
-                ax.text(j, i, f"{val:.2f}", ha="center", va="center",
-                        fontsize=3.5, color=color)
+                ax.text(
+                    j,
+                    i,
+                    f"{val:.2f}",
+                    ha="center",
+                    va="center",
+                    fontsize=3.5,
+                    color=color,
+                )
 
         ax.set_xticks(range(n))
         ax.set_yticks(range(n))
@@ -72,10 +82,16 @@ def main():
         for i in range(n):
             for j in range(n):
                 if i != j and abs(corr.values[i, j]) > 0.7:
-                    ax.add_patch(plt.Rectangle(
-                        (j - 0.5, i - 0.5), 1, 1,
-                        fill=False, edgecolor="k", linewidth=0.5,
-                    ))
+                    ax.add_patch(
+                        plt.Rectangle(
+                            (j - 0.5, i - 0.5),
+                            1,
+                            1,
+                            fill=False,
+                            edgecolor="k",
+                            linewidth=0.5,
+                        )
+                    )
 
     fig.tight_layout(w_pad=0.3)
     save_fig(fig, "figS1_correlation_matrices")

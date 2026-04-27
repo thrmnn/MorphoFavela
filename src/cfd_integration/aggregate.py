@@ -98,7 +98,9 @@ def aggregate_to_patch(
         "U_p90": low_wind_percentile(u_mag, 90),
         "stagnation_frac": stagnation_fraction(u_mag, stagnation_threshold),
         "TKE_mean": float(np.mean(tke)),
-        "TI_mean": float(np.mean(turbulent_intensity(tke, u_ref))) if u_ref > 0 else np.nan,
+        "TI_mean": float(np.mean(turbulent_intensity(tke, u_ref)))
+        if u_ref > 0
+        else np.nan,
         "vent_efficiency": float(np.mean(u_mag) / u_ref) if u_ref > 0 else np.nan,
     }
 
@@ -164,23 +166,35 @@ def aggregate_to_grid(
     half_c = cell_size / 2
 
     metrics = {
-        "cfd_U_mean": [], "cfd_U_p10": [], "cfd_stagnation_frac": [],
-        "cfd_TKE_mean": [], "cfd_TI_mean": [], "cfd_ach": [],
+        "cfd_U_mean": [],
+        "cfd_U_p10": [],
+        "cfd_stagnation_frac": [],
+        "cfd_TKE_mean": [],
+        "cfd_TI_mean": [],
+        "cfd_ach": [],
         "cfd_n_samples": [],
     }
 
     for _, row in cells.iterrows():
         ccx, ccy = row["centroid_x"], row["centroid_y"]
         in_cell = samples[
-            (samples["x"] >= ccx - half_c) & (samples["x"] <= ccx + half_c)
-            & (samples["y"] >= ccy - half_c) & (samples["y"] <= ccy + half_c)
+            (samples["x"] >= ccx - half_c)
+            & (samples["x"] <= ccx + half_c)
+            & (samples["y"] >= ccy - half_c)
+            & (samples["y"] <= ccy + half_c)
         ]
         n = len(in_cell)
         metrics["cfd_n_samples"].append(n)
 
         if n == 0:
-            for k in ["cfd_U_mean", "cfd_U_p10", "cfd_stagnation_frac",
-                      "cfd_TKE_mean", "cfd_TI_mean", "cfd_ach"]:
+            for k in [
+                "cfd_U_mean",
+                "cfd_U_p10",
+                "cfd_stagnation_frac",
+                "cfd_TKE_mean",
+                "cfd_TI_mean",
+                "cfd_ach",
+            ]:
                 metrics[k].append(np.nan)
             continue
 
@@ -188,7 +202,9 @@ def aggregate_to_grid(
         tke = in_cell["TKE"].values
         metrics["cfd_U_mean"].append(float(np.mean(u_mag)))
         metrics["cfd_U_p10"].append(low_wind_percentile(u_mag, 10))
-        metrics["cfd_stagnation_frac"].append(stagnation_fraction(u_mag, stagnation_threshold))
+        metrics["cfd_stagnation_frac"].append(
+            stagnation_fraction(u_mag, stagnation_threshold)
+        )
         metrics["cfd_TKE_mean"].append(float(np.mean(tke)))
         ti = turbulent_intensity(tke, u_ref) if u_ref > 0 else np.array([np.nan])
         metrics["cfd_TI_mean"].append(float(np.mean(ti)))
@@ -223,7 +239,7 @@ def aggregate_to_domain(
     """
     cx, cy = patch_center_xy
     samples = patch_result.samples
-    dist = np.sqrt((samples["x"] - cx)**2 + (samples["y"] - cy)**2)
+    dist = np.sqrt((samples["x"] - cx) ** 2 + (samples["y"] - cy) ** 2)
     in_domain = samples[dist <= domain_radius]
 
     if in_domain.empty:

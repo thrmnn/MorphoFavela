@@ -83,12 +83,25 @@ def apply_proximity_filter(flat_x, flat_y, footprints_gdf, buffer_dist):
 def main():
     parser = argparse.ArgumentParser(description="Debug grid point selection")
     parser.add_argument("--area", required=True, help="Area name")
-    parser.add_argument("--grid-spacing", type=float, default=5.0,
-                        help="Grid spacing in metres (default: 5.0 for faster debug)")
-    parser.add_argument("--buffers", type=float, nargs="+", default=[10, 20, 30, 50],
-                        help="Buffer distances to compare (default: 10 20 30 50)")
-    parser.add_argument("--max-plot-points", type=int, default=50000,
-                        help="Max discarded points to plot (subsampled for speed)")
+    parser.add_argument(
+        "--grid-spacing",
+        type=float,
+        default=5.0,
+        help="Grid spacing in metres (default: 5.0 for faster debug)",
+    )
+    parser.add_argument(
+        "--buffers",
+        type=float,
+        nargs="+",
+        default=[10, 20, 30, 50],
+        help="Buffer distances to compare (default: 10 20 30 50)",
+    )
+    parser.add_argument(
+        "--max-plot-points",
+        type=int,
+        default=50000,
+        help="Max discarded points to plot (subsampled for speed)",
+    )
     args = parser.parse_args()
 
     dtm_path, footprints_path, roads_path = resolve_paths(args.area)
@@ -105,6 +118,7 @@ def main():
 
     # Reproject to DTM CRS
     import rasterio
+
     with rasterio.open(dtm_path) as src:
         dtm_crs = src.crs
     if footprints_gdf.crs != dtm_crs:
@@ -118,14 +132,14 @@ def main():
     t0 = time.time()
     flat_x, flat_y = generate_grid(dtm_path, args.grid_spacing)
     n_total = len(flat_x)
-    print(f"Total grid points: {n_total:,} ({time.time()-t0:.1f}s)")
+    print(f"Total grid points: {n_total:,} ({time.time() - t0:.1f}s)")
 
     # Boundary clip
     if boundary_gdf is not None:
         t0 = time.time()
         flat_x, flat_y, _ = apply_boundary_clip(flat_x, flat_y, boundary_gdf)
         n_after_boundary = len(flat_x)
-        print(f"After boundary clip: {n_after_boundary:,} ({time.time()-t0:.1f}s)")
+        print(f"After boundary clip: {n_after_boundary:,} ({time.time() - t0:.1f}s)")
     else:
         n_after_boundary = len(flat_x)
 
@@ -133,7 +147,7 @@ def main():
     t0 = time.time()
     flat_x, flat_y = apply_building_mask(flat_x, flat_y, footprints_gdf)
     n_ground = len(flat_x)
-    print(f"After building mask: {n_ground:,} ({time.time()-t0:.1f}s)")
+    print(f"After building mask: {n_ground:,} ({time.time() - t0:.1f}s)")
 
     # Compute distances to nearest building (once, reuse for all buffers)
     import shapely
@@ -144,13 +158,17 @@ def main():
     nearest_idx = tree.nearest(pts)
     geom_arr = np.asarray(footprints_gdf.geometry.values)
     distances = shapely.distance(pts, geom_arr[nearest_idx])
-    print(f"Distance computation: {time.time()-t0:.1f}s")
-    print(f"Distance stats: min={distances.min():.1f}m, "
-          f"median={np.median(distances):.1f}m, max={distances.max():.1f}m")
+    print(f"Distance computation: {time.time() - t0:.1f}s")
+    print(
+        f"Distance stats: min={distances.min():.1f}m, "
+        f"median={np.median(distances):.1f}m, max={distances.max():.1f}m"
+    )
 
     # Create multi-panel figure
     n_buffers = len(args.buffers)
-    fig, axes = plt.subplots(2, (n_buffers + 1) // 2, figsize=(8 * ((n_buffers + 1) // 2), 16))
+    fig, axes = plt.subplots(
+        2, (n_buffers + 1) // 2, figsize=(8 * ((n_buffers + 1) // 2), 16)
+    )
     axes = axes.ravel()
 
     summary_counts = []
@@ -172,7 +190,9 @@ def main():
 
         # Plot boundary
         if boundary_gdf is not None:
-            boundary_gdf.boundary.plot(ax=ax, color="black", linewidth=1.0, linestyle="--")
+            boundary_gdf.boundary.plot(
+                ax=ax, color="black", linewidth=1.0, linestyle="--"
+            )
 
         # Plot discarded points (subsampled)
         disc_x, disc_y = flat_x[~mask], flat_y[~mask]
@@ -201,15 +221,25 @@ def main():
     if ax_summary is not None:
         dists = [s[0] for s in summary_counts]
         counts = [s[1] for s in summary_counts]
-        bars = ax_summary.bar(range(len(dists)), counts, color="#2ecc71", edgecolor="#27ae60")
+        bars = ax_summary.bar(
+            range(len(dists)), counts, color="#2ecc71", edgecolor="#27ae60"
+        )
         ax_summary.set_xticks(range(len(dists)))
         ax_summary.set_xticklabels([f"{d}m" for d in dists])
         ax_summary.set_ylabel("Grid points kept")
         ax_summary.set_title("Buffer distance vs point count")
-        ax_summary.axhline(n_ground, color="#e74c3c", linestyle="--", label=f"No filter: {n_ground:,}")
+        ax_summary.axhline(
+            n_ground, color="#e74c3c", linestyle="--", label=f"No filter: {n_ground:,}"
+        )
         for bar, count in zip(bars, counts):
-            ax_summary.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + n_ground * 0.01,
-                            f"{count:,}", ha="center", va="bottom", fontsize=9)
+            ax_summary.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + n_ground * 0.01,
+                f"{count:,}",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
         ax_summary.legend()
 
     # Hide unused axes
@@ -220,7 +250,8 @@ def main():
         f"{args.area} — Grid Selection Debug\n"
         f"Spacing={args.grid_spacing}m | Total={n_total:,} | "
         f"Boundary={n_after_boundary:,} | Ground={n_ground:,}",
-        fontsize=14, fontweight="bold",
+        fontsize=14,
+        fontweight="bold",
     )
     plt.tight_layout()
 
@@ -235,7 +266,9 @@ def main():
     print(f"\n{'Buffer':>8s}  {'Kept':>10s}  {'% of ground':>12s}  {'Reduction':>10s}")
     print("-" * 48)
     for buf_dist, n_kept in summary_counts:
-        print(f"{buf_dist:>7.0f}m  {n_kept:>10,}  {n_kept/n_ground*100:>11.1f}%  {(1-n_kept/n_ground)*100:>9.1f}%")
+        print(
+            f"{buf_dist:>7.0f}m  {n_kept:>10,}  {n_kept / n_ground * 100:>11.1f}%  {(1 - n_kept / n_ground) * 100:>9.1f}%"
+        )
     print(f"{'None':>8s}  {n_ground:>10,}  {'100.0':>11s}%  {'0.0':>9s}%")
 
 

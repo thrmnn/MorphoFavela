@@ -27,12 +27,15 @@ def _make_grid(center_x=0.0, center_y=0.0, extent=100.0):
     zone_id = 0
     for cy in np.arange(center_y - half + 5, center_y + half + 5, 10):
         for cx in np.arange(center_x - half + 5, center_x + half + 5, 10):
-            rows.append({
-                "zone_id": zone_id,
-                "centroid_x": cx, "centroid_y": cy,
-                "geometry": box(cx - 5, cy - 5, cx + 5, cy + 5),
-                "H_mean": 6.5,  # typical favela
-            })
+            rows.append(
+                {
+                    "zone_id": zone_id,
+                    "centroid_x": cx,
+                    "centroid_y": cy,
+                    "geometry": box(cx - 5, cy - 5, cx + 5, cy + 5),
+                    "H_mean": 6.5,  # typical favela
+                }
+            )
             zone_id += 1
     return gpd.GeoDataFrame(rows, crs="EPSG:31983")
 
@@ -51,14 +54,19 @@ class TestAggregateToPatch:
 
     def test_required_keys(self, patch_result):
         result = aggregate_to_patch(patch_result, (0, 0))
-        required = {"U_mean", "U_median", "U_p10", "U_p90",
-                    "stagnation_frac", "TKE_mean", "vent_efficiency"}
+        required = {
+            "U_mean",
+            "U_median",
+            "U_p10",
+            "U_p90",
+            "stagnation_frac",
+            "TKE_mean",
+            "vent_efficiency",
+        }
         assert required.issubset(result.keys())
 
     def test_ach_when_canopy_height_given(self, patch_result):
-        result = aggregate_to_patch(
-            patch_result, (0, 0), canopy_height=6.5
-        )
+        result = aggregate_to_patch(patch_result, (0, 0), canopy_height=6.5)
         assert "ach_patch" in result
         assert result["ach_patch"] > 0
 
@@ -97,8 +105,9 @@ class TestAggregateToGrid:
         # Build a grid larger than the analysis patch
         grid = _make_grid(extent=200)  # 20×20 cells at 10m
         assert len(grid) == 400
-        cells = aggregate_to_grid(patch_result, grid, (0, 0),
-                                  analysis_patch_diameter=100)
+        cells = aggregate_to_grid(
+            patch_result, grid, (0, 0), analysis_patch_diameter=100
+        )
         # Only centroids inside the 100m-diameter circle survive — 80 cells.
         assert len(cells) == 80
 

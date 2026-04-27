@@ -35,7 +35,8 @@ def main():
         bld_sindex = bld.sindex
 
         fig, axes = plt.subplots(
-            nrows, ncols,
+            nrows,
+            ncols,
             figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * nrows / ncols * 0.95),
         )
         if n == 1:
@@ -55,27 +56,42 @@ def main():
                 nearby = bld.iloc[cands]
                 nearby = nearby[nearby.intersects(vbox)]
                 nearby.plot(
-                    ax=ax, facecolor="#d0d0d0", edgecolor="#888",
-                    linewidth=0.1, zorder=1,
+                    ax=ax,
+                    facecolor="#d0d0d0",
+                    edgecolor="#888",
+                    linewidth=0.1,
+                    zorder=1,
                 )
 
             # Analysis patch (100m-diameter circle)
-            ax.add_patch(plt.Circle(
-                (cx, cy), 50,
-                linewidth=0.6, edgecolor=SITE_COLORS[site],
-                facecolor="none", linestyle="--", zorder=5,
-            ))
+            ax.add_patch(
+                plt.Circle(
+                    (cx, cy),
+                    50,
+                    linewidth=0.6,
+                    edgecolor=SITE_COLORS[site],
+                    facecolor="none",
+                    linestyle="--",
+                    zorder=5,
+                )
+            )
             # Domain circle (250m)
-            ax.add_patch(plt.Circle(
-                (cx, cy), 250,
-                linewidth=0.4, edgecolor="#999",
-                facecolor="none", linestyle=":", zorder=4,
-            ))
+            ax.add_patch(
+                plt.Circle(
+                    (cx, cy),
+                    250,
+                    linewidth=0.4,
+                    edgecolor="#999",
+                    facecolor="none",
+                    linestyle=":",
+                    zorder=4,
+                )
+            )
 
             svf = row.get("svf", np.nan)
             lp = row.get("lambda_p", np.nan)
             slope = row.get("slope_deg", np.nan)
-            pid = row.get("patch_id", f"P{i+1}")
+            pid = row.get("patch_id", f"P{i + 1}")
 
             parts = [pid]
             if pd.notna(svf):

@@ -20,11 +20,23 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import (
-    RAW_DATA, OUTPUTS_DIR, MAX_FILTER_HEIGHT, MAX_FILTER_AREA,
-    MAX_FILTER_VOLUME, MAX_FILTER_HW_RATIO, MAX_HEIGHT_AREA_RATIO, HEIGHT_AREA_PERCENTILE,
-    get_area_data_dir, get_area_analysis_dir, is_formal_area
+    RAW_DATA,
+    OUTPUTS_DIR,
+    MAX_FILTER_HEIGHT,
+    MAX_FILTER_AREA,
+    MAX_FILTER_VOLUME,
+    MAX_FILTER_HW_RATIO,
+    MAX_HEIGHT_AREA_RATIO,
+    HEIGHT_AREA_PERCENTILE,
+    get_area_data_dir,
+    get_area_analysis_dir,
+    is_formal_area,
 )
-from src.metrics import calculate_basic_metrics, validate_footprints, normalize_height_columns
+from src.metrics import (
+    calculate_basic_metrics,
+    validate_footprints,
+    normalize_height_columns,
+)
 from src.morphology_metrics import calculate_morphology_metrics
 from src.visualization import (
     create_metric_map,
@@ -37,8 +49,7 @@ from src.visualization import (
 
 # Setup logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -50,15 +61,42 @@ def generate_summary_stats(gdf: gpd.GeoDataFrame, metrics: list[str]) -> pd.Data
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Calculate extended morphology metrics")
-    parser.add_argument("--area", type=str, default=None, help="Area name (vidigal_tls, riodaspedras)")
-    parser.add_argument("--input", type=str, default=None, help="Input footprints file path")
+    parser = argparse.ArgumentParser(
+        description="Calculate extended morphology metrics"
+    )
+    parser.add_argument(
+        "--area", type=str, default=None, help="Area name (vidigal_tls, riodaspedras)"
+    )
+    parser.add_argument(
+        "--input", type=str, default=None, help="Input footprints file path"
+    )
     parser.add_argument("--output", type=str, default=None, help="Output directory")
-    parser.add_argument("--streets", type=str, default=None, help="Optional streets file path for facade ratio")
-    parser.add_argument("--street-buffer", type=float, default=1.0, help="Street buffer distance (m)")
-    parser.add_argument("--voronoi-buffer", type=float, default=50.0, help="Voronoi envelope buffer distance (m)")
-    parser.add_argument("--weight-mode", type=str, default="adjacent", help="Weighting mode for d_w (adjacent)")
-    parser.add_argument("--basic-only", action="store_true", help="Compute only basic metrics (skip extended morphology)")
+    parser.add_argument(
+        "--streets",
+        type=str,
+        default=None,
+        help="Optional streets file path for facade ratio",
+    )
+    parser.add_argument(
+        "--street-buffer", type=float, default=1.0, help="Street buffer distance (m)"
+    )
+    parser.add_argument(
+        "--voronoi-buffer",
+        type=float,
+        default=50.0,
+        help="Voronoi envelope buffer distance (m)",
+    )
+    parser.add_argument(
+        "--weight-mode",
+        type=str,
+        default="adjacent",
+        help="Weighting mode for d_w (adjacent)",
+    )
+    parser.add_argument(
+        "--basic-only",
+        action="store_true",
+        help="Compute only basic metrics (skip extended morphology)",
+    )
     args = parser.parse_args()
 
     logger.info("Starting extended morphology analysis")
@@ -97,10 +135,18 @@ def main() -> None:
         logger.warning("Validation issues found:")
         for issue in issues:
             logger.warning(f"  - {issue}")
-        critical_issues = [i for i in issues if any(keyword in i.lower()
-                          for keyword in ['missing', 'crs', 'geometry', 'null values'])]
+        critical_issues = [
+            i
+            for i in issues
+            if any(
+                keyword in i.lower()
+                for keyword in ["missing", "crs", "geometry", "null values"]
+            )
+        ]
         if critical_issues:
-            logger.error("Critical validation errors found. Please fix data issues before proceeding.")
+            logger.error(
+                "Critical validation errors found. Please fix data issues before proceeding."
+            )
             return
 
     logger.info("✓ Data validation passed")
@@ -113,66 +159,102 @@ def main() -> None:
     if args.area:
         if is_formal_area(args.area):
             apply_filtering = False
-            logger.info(f"Formal area detected ({args.area}): Skipping building filters")
+            logger.info(
+                f"Formal area detected ({args.area}): Skipping building filters"
+            )
         else:
-            logger.info(f"Informal area detected ({args.area}): Applying building filters")
+            logger.info(
+                f"Informal area detected ({args.area}): Applying building filters"
+            )
 
     # 3.1 Height filter (informal only)
     if apply_filtering and MAX_FILTER_HEIGHT is not None:
         initial_count = len(buildings)
-        buildings['_temp_height'] = buildings['top_height'] - buildings['base_height']
-        buildings = buildings[buildings['_temp_height'] <= MAX_FILTER_HEIGHT].copy()
-        buildings = buildings.drop(columns=['_temp_height'])
+        buildings["_temp_height"] = buildings["top_height"] - buildings["base_height"]
+        buildings = buildings[buildings["_temp_height"] <= MAX_FILTER_HEIGHT].copy()
+        buildings = buildings.drop(columns=["_temp_height"])
         removed = initial_count - len(buildings)
         if removed > 0:
-            logger.info(f"Filtered out {removed} buildings with height > {MAX_FILTER_HEIGHT}m")
+            logger.info(
+                f"Filtered out {removed} buildings with height > {MAX_FILTER_HEIGHT}m"
+            )
 
     # 4. Basic metrics (needed for some morphology metrics)
     logger.info("Calculating basic metrics...")
     buildings = calculate_basic_metrics(buildings)
 
     # 4.1 Area filter
-    if apply_filtering and MAX_FILTER_AREA is not None and 'area' in buildings.columns:
+    if apply_filtering and MAX_FILTER_AREA is not None and "area" in buildings.columns:
         initial_count = len(buildings)
-        buildings = buildings[buildings['area'] <= MAX_FILTER_AREA].copy()
+        buildings = buildings[buildings["area"] <= MAX_FILTER_AREA].copy()
         removed = initial_count - len(buildings)
         if removed > 0:
-            logger.info(f"Filtered out {removed} buildings with area > {MAX_FILTER_AREA}m²")
+            logger.info(
+                f"Filtered out {removed} buildings with area > {MAX_FILTER_AREA}m²"
+            )
 
     # 4.2 Volume filter
-    if apply_filtering and MAX_FILTER_VOLUME is not None and 'volume' in buildings.columns:
+    if (
+        apply_filtering
+        and MAX_FILTER_VOLUME is not None
+        and "volume" in buildings.columns
+    ):
         initial_count = len(buildings)
-        buildings = buildings[buildings['volume'] <= MAX_FILTER_VOLUME].copy()
+        buildings = buildings[buildings["volume"] <= MAX_FILTER_VOLUME].copy()
         removed = initial_count - len(buildings)
         if removed > 0:
-            logger.info(f"Filtered out {removed} buildings with volume > {MAX_FILTER_VOLUME}m³")
+            logger.info(
+                f"Filtered out {removed} buildings with volume > {MAX_FILTER_VOLUME}m³"
+            )
 
     # 4.3 H/W ratio filter
-    if apply_filtering and MAX_FILTER_HW_RATIO is not None and 'hw_ratio' in buildings.columns:
+    if (
+        apply_filtering
+        and MAX_FILTER_HW_RATIO is not None
+        and "hw_ratio" in buildings.columns
+    ):
         initial_count = len(buildings)
-        hw_valid = buildings['hw_ratio'].notna()
-        buildings = buildings[(~hw_valid) | (buildings['hw_ratio'] <= MAX_FILTER_HW_RATIO)].copy()
+        hw_valid = buildings["hw_ratio"].notna()
+        buildings = buildings[
+            (~hw_valid) | (buildings["hw_ratio"] <= MAX_FILTER_HW_RATIO)
+        ].copy()
         removed = initial_count - len(buildings)
         if removed > 0:
-            logger.info(f"Filtered out {removed} buildings with h/w ratio > {MAX_FILTER_HW_RATIO}")
+            logger.info(
+                f"Filtered out {removed} buildings with h/w ratio > {MAX_FILTER_HW_RATIO}"
+            )
 
     # 4.4 Height/area outlier filter
-    if apply_filtering and 'height' in buildings.columns and 'area' in buildings.columns:
+    if (
+        apply_filtering
+        and "height" in buildings.columns
+        and "area" in buildings.columns
+    ):
         initial_count = len(buildings)
-        buildings['height_area_ratio'] = buildings['height'] / buildings['area']
-        valid_mask = buildings['height_area_ratio'].notna() & (buildings['area'] > 0)
+        buildings["height_area_ratio"] = buildings["height"] / buildings["area"]
+        valid_mask = buildings["height_area_ratio"].notna() & (buildings["area"] > 0)
         if HEIGHT_AREA_PERCENTILE is not None and valid_mask.any():
-            threshold = buildings[valid_mask]['height_area_ratio'].quantile(HEIGHT_AREA_PERCENTILE / 100.0)
-            buildings = buildings[buildings['height_area_ratio'] <= threshold].copy()
-            logger.info(f"Filtered height/area outliers using {HEIGHT_AREA_PERCENTILE}th percentile (threshold: {threshold:.4f})")
+            threshold = buildings[valid_mask]["height_area_ratio"].quantile(
+                HEIGHT_AREA_PERCENTILE / 100.0
+            )
+            buildings = buildings[buildings["height_area_ratio"] <= threshold].copy()
+            logger.info(
+                f"Filtered height/area outliers using {HEIGHT_AREA_PERCENTILE}th percentile (threshold: {threshold:.4f})"
+            )
         elif MAX_HEIGHT_AREA_RATIO is not None:
-            buildings = buildings[buildings['height_area_ratio'] <= MAX_HEIGHT_AREA_RATIO].copy()
-            logger.info(f"Filtered height/area outliers (max ratio: {MAX_HEIGHT_AREA_RATIO})")
-        if 'height_area_ratio' in buildings.columns:
-            buildings = buildings.drop(columns=['height_area_ratio'])
+            buildings = buildings[
+                buildings["height_area_ratio"] <= MAX_HEIGHT_AREA_RATIO
+            ].copy()
+            logger.info(
+                f"Filtered height/area outliers (max ratio: {MAX_HEIGHT_AREA_RATIO})"
+            )
+        if "height_area_ratio" in buildings.columns:
+            buildings = buildings.drop(columns=["height_area_ratio"])
         removed = initial_count - len(buildings)
         if removed > 0:
-            logger.info(f"Filtered out {removed} buildings with extreme height/area ratios")
+            logger.info(
+                f"Filtered out {removed} buildings with extreme height/area ratios"
+            )
 
     # 5. Extended morphology metrics (unless --basic-only)
     if not args.basic_only:
@@ -181,7 +263,9 @@ def main() -> None:
             streets_path = Path(args.streets)
             if streets_path.exists():
                 streets = gpd.read_file(streets_path)
-                logger.info(f"Loaded streets from {streets_path} ({len(streets)} features)")
+                logger.info(
+                    f"Loaded streets from {streets_path} ({len(streets)} features)"
+                )
             else:
                 logger.warning(f"Streets file not found: {streets_path}")
 
@@ -202,7 +286,9 @@ def main() -> None:
         analysis_type = "metrics" if args.basic_only else "morphology_metrics"
         output_base = get_area_analysis_dir(args.area, analysis_type)
     else:
-        output_base = OUTPUTS_DIR / ("metrics" if args.basic_only else "morphology_metrics")
+        output_base = OUTPUTS_DIR / (
+            "metrics" if args.basic_only else "morphology_metrics"
+        )
     output_base.mkdir(parents=True, exist_ok=True)
 
     # 7. Save GeoPackage
@@ -216,26 +302,51 @@ def main() -> None:
 
     if args.basic_only:
         # Basic metrics: summary panel visualizations
-        metric_cols = ["height", "area", "volume", "perimeter", "hw_ratio", "inter_building_distance"]
+        metric_cols = [
+            "height",
+            "area",
+            "volume",
+            "perimeter",
+            "hw_ratio",
+            "inter_building_distance",
+        ]
         stats = generate_summary_stats(buildings, metric_cols)
         stats.to_csv(output_base / "summary_stats.csv")
 
         create_thematic_maps(buildings, maps_dir / "height_volume_maps.png")
         create_multi_panel_summary(buildings, maps_dir / "multi_panel_summary.png")
-        create_statistical_distributions(buildings, maps_dir / "statistical_distributions.png")
+        create_statistical_distributions(
+            buildings, maps_dir / "statistical_distributions.png"
+        )
         create_scatter_plots(buildings, maps_dir / "scatter_plots.png")
     else:
         # Extended morphology: per-metric maps
         metric_cols = [
-            "area", "perimeter", "longest_axis_length",
-            "shape_index", "compactness_weighted_axis", "convexity",
-            "shared_walls", "perimeter_wall", "num_corners",
-            "equivalent_rectangular_index", "rectangularity", "squareness",
-            "square_compactness", "elongation", "cwt",
-            "mean_distance_between_buildings", "inter_building_distance",
-            "building_adjacency", "covered_area_ratio",
-            "tessellation_area", "cell_alignment", "tessellation_neighbors",
-            "fractal_dimension", "average_weighted_distance", "facade_ratio",
+            "area",
+            "perimeter",
+            "longest_axis_length",
+            "shape_index",
+            "compactness_weighted_axis",
+            "convexity",
+            "shared_walls",
+            "perimeter_wall",
+            "num_corners",
+            "equivalent_rectangular_index",
+            "rectangularity",
+            "squareness",
+            "square_compactness",
+            "elongation",
+            "cwt",
+            "mean_distance_between_buildings",
+            "inter_building_distance",
+            "building_adjacency",
+            "covered_area_ratio",
+            "tessellation_area",
+            "cell_alignment",
+            "tessellation_neighbors",
+            "fractal_dimension",
+            "average_weighted_distance",
+            "facade_ratio",
         ]
         stats = generate_summary_stats(buildings, metric_cols)
         stats.to_csv(output_base / "morphology_summary_stats.csv")

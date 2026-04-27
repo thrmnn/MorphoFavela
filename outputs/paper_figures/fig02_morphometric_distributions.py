@@ -19,11 +19,11 @@ def main():
     apply_style()
 
     indicators = [
-        ("svf",           r"$SVF$"),
-        ("lambda_p",      r"$\lambda_p$"),
+        ("svf", r"$SVF$"),
+        ("lambda_p", r"$\lambda_p$"),
         ("lambda_f_mean", r"$\lambda_f$"),
-        ("sigma_h",       r"$\sigma_H$ (m)"),
-        ("slope_deg",     "Slope (\u00b0)"),
+        ("sigma_h", r"$\sigma_H$ (m)"),
+        ("slope_deg", "Slope (\u00b0)"),
     ]
 
     thresholds = {
@@ -66,11 +66,14 @@ def main():
             continue
 
         # Typology background shading
-        ax.axvspan(-0.5, 1.5, color="#CC6677", alpha=0.04, zorder=0)   # hillside
-        ax.axvspan(3.5, 4.5, color="#44AA99", alpha=0.04, zorder=0)    # flatland
+        ax.axvspan(-0.5, 1.5, color="#CC6677", alpha=0.04, zorder=0)  # hillside
+        ax.axvspan(3.5, 4.5, color="#44AA99", alpha=0.04, zorder=0)  # flatland
 
         parts = ax.violinplot(
-            data, positions=positions, showextrema=False, showmedians=False,
+            data,
+            positions=positions,
+            showextrema=False,
+            showmedians=False,
             widths=0.75,
         )
         for i, pc in enumerate(parts["bodies"]):
@@ -83,8 +86,9 @@ def main():
         for i, (vals, pos) in enumerate(zip(data, positions)):
             q1, med, q3 = np.percentile(vals, [25, 50, 75])
             ax.vlines(pos, q1, q3, color="k", linewidth=1.0, zorder=5)
-            ax.scatter(pos, med, color="white", s=10, zorder=6,
-                       edgecolors="k", linewidths=0.4)
+            ax.scatter(
+                pos, med, color="white", s=10, zorder=6, edgecolors="k", linewidths=0.4
+            )
 
         # Threshold lines
         if col in thresholds:
@@ -94,14 +98,23 @@ def main():
         ax.set_xticks(range(len(SITE_ORDER)))
         ax.set_xticklabels(
             [SITE_LABELS.get(s, s) for s in SITE_ORDER],
-            rotation=35, ha="right", fontsize=6,
+            rotation=35,
+            ha="right",
+            fontsize=6,
         )
         ax.set_ylabel(label, fontsize=7)
 
         # n annotations
         for i, (vals, pos) in enumerate(zip(data, positions)):
-            ax.text(pos, ax.get_ylim()[1] * 0.97, f"n={len(vals):,d}",
-                    ha="center", va="top", fontsize=4, color="#999999")
+            ax.text(
+                pos,
+                ax.get_ylim()[1] * 0.97,
+                f"n={len(vals):,d}",
+                ha="center",
+                va="top",
+                fontsize=4,
+                color="#999999",
+            )
 
     # Typology bracket annotations on the first panel
     ax0 = axes[0]

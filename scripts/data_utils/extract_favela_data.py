@@ -56,7 +56,9 @@ def find_complex(favelas_gdf: gpd.GeoDataFrame, complex_name: str) -> gpd.GeoDat
     return partial
 
 
-def _fix_mixed_crs(gdf: gpd.GeoDataFrame, target_crs: str = "EPSG:31983") -> gpd.GeoDataFrame:
+def _fix_mixed_crs(
+    gdf: gpd.GeoDataFrame, target_crs: str = "EPSG:31983"
+) -> gpd.GeoDataFrame:
     """Detect and fix datasets with mixed CRS (some rows in lat/lon, rest projected).
 
     The RJ buildings shapefile contains ~467k rows stored in WGS84 (EPSG:4326)
@@ -73,8 +75,10 @@ def _fix_mixed_crs(gdf: gpd.GeoDataFrame, target_crs: str = "EPSG:31983") -> gpd
         # All rows already in projected CRS — nothing to fix.
         return gdf
 
-    print(f"  Mixed-CRS detected: {n_latlon} rows in lat/lon, "
-          f"{len(gdf) - n_latlon} in projected. Reprojecting lat/lon rows...")
+    print(
+        f"  Mixed-CRS detected: {n_latlon} rows in lat/lon, "
+        f"{len(gdf) - n_latlon} in projected. Reprojecting lat/lon rows..."
+    )
 
     projected_part = gdf[~latlon_mask].copy()
     latlon_part = gdf[latlon_mask].copy()
@@ -192,7 +196,9 @@ def extract_favela_data(
     print("Extracting roads...")
     roads_idx = list(roads_gdf.sindex.intersection(favela_buffer_geom.bounds))
     roads_subset = roads_gdf.iloc[roads_idx].copy()
-    roads_out = roads_subset[roads_subset.geometry.intersects(favela_buffer_geom)].copy()
+    roads_out = roads_subset[
+        roads_subset.geometry.intersects(favela_buffer_geom)
+    ].copy()
 
     buildings_shp = out_dir / f"{slug}_buildings.shp"
     roads_shp = out_dir / f"roads_{slug}.shp"
@@ -207,7 +213,9 @@ def extract_favela_data(
     with rasterio.open(dtm_path) as src:
         favela_for_dtm = favela_row.to_crs(src.crs)
         terrain_geom = favela_for_dtm.geometry.iloc[0].buffer(terrain_buffer_m)
-        out_image, out_transform = mask(src, [terrain_geom.__geo_interface__], crop=True)
+        out_image, out_transform = mask(
+            src, [terrain_geom.__geo_interface__], crop=True
+        )
         out_meta = src.meta.copy()
         out_meta.update(
             {
@@ -249,9 +257,13 @@ def extract_favela_data(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Extract data for one Rio favela or complex")
+    parser = argparse.ArgumentParser(
+        description="Extract data for one Rio favela or complex"
+    )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--favela", help="Favela name to look up in the `nome` column (e.g., Rocinha)")
+    group.add_argument(
+        "--favela", help="Favela name to look up in the `nome` column (e.g., Rocinha)"
+    )
     group.add_argument(
         "--complexo",
         help="Complex name to look up in the `complexo` column (e.g., Complexo do Alemão)",
@@ -336,7 +348,9 @@ def main() -> None:
             print(f"Dissolved {len(matches)} sub-favelas into single boundary")
         else:
             boundary_gdf = matches.copy()
-            print(f"Using {len(matches)} individual sub-favela boundaries (no dissolve)")
+            print(
+                f"Using {len(matches)} individual sub-favela boundaries (no dissolve)"
+            )
 
         favela_name = args.complexo
     else:

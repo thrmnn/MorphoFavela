@@ -63,16 +63,13 @@ CONFIG = {
     # --- Site identity ---
     "site_id": "vidigal",
     "site_prefix": "VDG",
-
     # --- Input paths (relative to PROJECT_ROOT) ---
     "grid_metrics": "outputs/vidigal/morphometrics/grid/grid_metrics.gpkg",
     "buildings": "data/vidigal/raw/Vidigal_buildings.shp",
     "boundary": "data/vidigal/raw/Vidigal_Limit.shp",
     "dtm": "data/vidigal/raw/DTM_Vidigal.tif",
-
     # --- Output root (script creates subdirectories) ---
     "output_dir": "outputs/vidigal/sampling_cfd/pilot_sampling",
-
     # --- Stratification bins ---
     "svf_bins": [0.0, 0.15, 0.30, 1.0],
     "svf_labels": ["SVF<0.15", "0.15≤SVF<0.30", "SVF≥0.30"],
@@ -80,22 +77,18 @@ CONFIG = {
     "slope_labels": ["slope<15°", "slope≥15°"],
     "lambda_p_bins": [0.0, 0.5, 1.0],
     "lambda_p_labels": ["λp<0.5", "λp≥0.5"],
-
     # --- Domain geometry ---
-    "analysis_patch_size": 100,       # metres, diameter of circular analysis zone
-    "cfd_domain_radius": 250,         # metres, circular simulation domain
-    "blocken_fetch_multiple": 5,      # min fetch = this * H_max per patch
-
+    "analysis_patch_size": 100,  # metres, diameter of circular analysis zone
+    "cfd_domain_radius": 250,  # metres, circular simulation domain
+    "blocken_fetch_multiple": 5,  # min fetch = this * H_max per patch
     # --- Selection constraints ---
-    "min_patch_spacing": 80,          # metres between patch centres
-    "min_building_coverage": 0.50,    # fraction of analysis patch
-    "min_domain_data_coverage": 0.70, # fraction of circular domain
-
+    "min_patch_spacing": 80,  # metres between patch centres
+    "min_building_coverage": 0.50,  # fraction of analysis patch
+    "min_domain_data_coverage": 0.70,  # fraction of circular domain
     # --- Allocation ---
-    "target_patches": [12, 15],       # [min, max] total patches
-    "min_per_stratum": 1,             # minimum per occupied stratum
-    "bonus_strata_count": 3,          # top N most populated get +1
-
+    "target_patches": [12, 15],  # [min, max] total patches
+    "min_per_stratum": 1,  # minimum per occupied stratum
+    "bonus_strata_count": 3,  # top N most populated get +1
     # --- Column name mapping (adapt per site if schemas differ) ---
     "col_svf": "svf",
     "col_lambda_p": "lambda_p",
@@ -106,13 +99,10 @@ CONFIG = {
     "col_entropy": "street_orientation_entropy",
     "col_far": "far",
     "col_building_count": "building_count",
-
     # --- CRS ---
     "crs": "EPSG:31983",
-
     # --- Reproducibility ---
     "random_seed": 42,
-
     # --- Figures ---
     "dpi": 300,
 }
@@ -203,9 +193,9 @@ def _hillshade(
     slope = np.arctan(np.sqrt(dx**2 + dy**2))
     aspect = np.arctan2(-dx, dy)
     az_rad, alt_rad = np.radians(azimuth), np.radians(altitude)
-    shade = np.sin(alt_rad) * np.cos(slope) + np.cos(alt_rad) * np.sin(
-        slope
-    ) * np.cos(az_rad - aspect)
+    shade = np.sin(alt_rad) * np.cos(slope) + np.cos(alt_rad) * np.sin(slope) * np.cos(
+        az_rad - aspect
+    )
     return np.clip(shade, 0, 1)
 
 
@@ -269,9 +259,9 @@ def load_and_validate(
     invalid = ~buildings.geometry.is_valid
     if invalid.any():
         logger.warning("Repairing %d invalid building geometries.", invalid.sum())
-        buildings.loc[invalid, "geometry"] = buildings.loc[
-            invalid, "geometry"
-        ].buffer(0)
+        buildings.loc[invalid, "geometry"] = buildings.loc[invalid, "geometry"].buffer(
+            0
+        )
     logger.info("Loaded buildings: %d features.", len(buildings))
 
     # CRS alignment
@@ -475,8 +465,7 @@ def exclude_edges(
     n_excl_nan = int(eligible["stratum_id"].isna().sum())
 
     eligible = eligible[
-        (eligible["_building_coverage"] >= min_bld_cov)
-        & eligible["stratum_id"].notna()
+        (eligible["_building_coverage"] >= min_bld_cov) & eligible["stratum_id"].notna()
     ].copy()
 
     stats = {
@@ -869,8 +858,7 @@ _STRATUM_COLORS = [
 def _stratum_cmap(strata_ids: list[str]) -> dict[str, str]:
     unique = sorted(set(s for s in strata_ids if pd.notna(s)))
     return {
-        sid: _STRATUM_COLORS[i % len(_STRATUM_COLORS)]
-        for i, sid in enumerate(unique)
+        sid: _STRATUM_COLORS[i % len(_STRATUM_COLORS)] for i, sid in enumerate(unique)
     }
 
 
@@ -975,9 +963,7 @@ def generate_figure_map(
     # Legend
     from matplotlib.patches import Patch
 
-    handles = [
-        Patch(facecolor=cmap[sid], label=sid, alpha=0.7) for sid in sorted(cmap)
-    ]
+    handles = [Patch(facecolor=cmap[sid], label=sid, alpha=0.7) for sid in sorted(cmap)]
     handles.extend(
         [
             plt.Line2D(
@@ -1062,9 +1048,7 @@ def generate_figure_featurespace(
             if pd.isna(xv) or pd.isna(yv):
                 continue
             c = cmap.get(row["stratum_id"], "#333333")
-            ax.scatter(
-                xv, yv, s=80, c=c, edgecolors="k", linewidths=0.5, zorder=5
-            )
+            ax.scatter(xv, yv, s=80, c=c, edgecolors="k", linewidths=0.5, zorder=5)
             label = row["patch_id"].split("-")[-1]
             ax.annotate(
                 label,
@@ -1114,9 +1098,7 @@ def generate_figure_context(
     ncols = min(5, n)
     nrows = int(np.ceil(n / ncols))
 
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(3.5 * ncols, 3.5 * nrows)
-    )
+    fig, axes = plt.subplots(nrows, ncols, figsize=(3.5 * ncols, 3.5 * nrows))
     if n == 1:
         axes = np.array([axes])
     axes = np.atleast_2d(axes).flat
@@ -1196,9 +1178,7 @@ def generate_figure_context(
     )
     fig.tight_layout()
 
-    out = (
-        _resolve(config["output_dir"]) / "figures" / "fig_pilot_patches_context.png"
-    )
+    out = _resolve(config["output_dir"]) / "figures" / "fig_pilot_patches_context.png"
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=config["dpi"], bbox_inches="tight")
     plt.close(fig)
@@ -1261,9 +1241,7 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
     # 4. Summary + allocation
     summary = build_strata_summary(grid, eligible, config)
     allocation = allocate_patches(summary, config)
-    summary["n_allocated"] = (
-        summary["stratum_id"].map(allocation).fillna(0).astype(int)
-    )
+    summary["n_allocated"] = summary["stratum_id"].map(allocation).fillna(0).astype(int)
 
     # Print stratum table
     logger.info("")
@@ -1297,9 +1275,7 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
     #    Process strata from most-allocated to least so that the richest
     #    strata get first pick of locations.
     min_spacing = config["min_patch_spacing"]
-    strata_order = sorted(
-        allocation, key=lambda s: allocation.get(s, 0), reverse=True
-    )
+    strata_order = sorted(allocation, key=lambda s: allocation.get(s, 0), reverse=True)
     all_selected: list[gpd.GeoDataFrame] = []
     selected_coords = np.empty((0, 2))
 
@@ -1321,20 +1297,18 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
             logger.warning("  %s: no candidates remain after spacing filter.", sid)
             continue
 
-        picks = select_within_stratum(
-            candidates, min(n, len(candidates)), config
-        )
+        picks = select_within_stratum(candidates, min(n, len(candidates)), config)
         all_selected.append(picks)
 
         new_xy = picks[["centroid_x", "centroid_y"]].values
         selected_coords = (
-            np.vstack([selected_coords, new_xy])
-            if len(selected_coords) > 0
-            else new_xy
+            np.vstack([selected_coords, new_xy]) if len(selected_coords) > 0 else new_xy
         )
         logger.info(
             "  %s: selected %d / %d eligible (after spacing).",
-            sid, len(picks), len(eligible[eligible["stratum_id"] == sid]),
+            sid,
+            len(picks),
+            len(eligible[eligible["stratum_id"] == sid]),
         )
 
     if not all_selected:
@@ -1346,12 +1320,8 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
     )
 
     # 7. Assign patch IDs
-    selected = selected.sort_values(
-        ["stratum_id", "centroid_x"]
-    ).reset_index(drop=True)
-    selected["patch_id"] = [
-        f"{prefix}-P{i + 1:02d}" for i in range(len(selected))
-    ]
+    selected = selected.sort_values(["stratum_id", "centroid_x"]).reset_index(drop=True)
+    selected["patch_id"] = [f"{prefix}-P{i + 1:02d}" for i in range(len(selected))]
 
     # 8. Blocken validation
     selected = validate_blocken(selected, buildings, config)

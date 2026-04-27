@@ -17,11 +17,11 @@ from src.cfd_integration.weighting import (
 def per_direction_metrics():
     """Mock per-direction results for one patch."""
     return {
-        "N":  {"U_mean": 1.0, "stagnation_frac": 0.6},
+        "N": {"U_mean": 1.0, "stagnation_frac": 0.6},
         "NE": {"U_mean": 1.5, "stagnation_frac": 0.4},
-        "E":  {"U_mean": 3.0, "stagnation_frac": 0.1},
+        "E": {"U_mean": 3.0, "stagnation_frac": 0.1},
         "SE": {"U_mean": 4.0, "stagnation_frac": 0.05},
-        "S":  {"U_mean": 2.0, "stagnation_frac": 0.3},
+        "S": {"U_mean": 2.0, "stagnation_frac": 0.3},
     }
 
 
@@ -37,13 +37,18 @@ class TestWeightedByWindRose:
         wr = WindRose(
             site="x",
             frequencies={
-                "N": 0.05, "NE": 0.05, "E": 0.10, "SE": 0.60, "S": 0.20,
+                "N": 0.05,
+                "NE": 0.05,
+                "E": 0.10,
+                "SE": 0.60,
+                "S": 0.20,
             },
         )
         result = weighted_by_wind_rose(per_direction_metrics, wr, weight_by="frequency")
         # SE dominates (60%) with U_mean=4, so weighted mean should be high
-        manual = (0.05 * 1.0 + 0.05 * 1.5 + 0.10 * 3.0
-                  + 0.60 * 4.0 + 0.20 * 2.0) / (0.05 + 0.05 + 0.10 + 0.60 + 0.20)
+        manual = (0.05 * 1.0 + 0.05 * 1.5 + 0.10 * 3.0 + 0.60 * 4.0 + 0.20 * 2.0) / (
+            0.05 + 0.05 + 0.10 + 0.60 + 0.20
+        )
         assert result["annual_U_mean"] == pytest.approx(manual)
 
     def test_freq_speed_weighting_differs(self, per_direction_metrics):

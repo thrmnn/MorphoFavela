@@ -20,6 +20,7 @@ Usage:
 Pair with `scripts/extract_inmet_stations.py` to pull per-station
 CSVs out of the yearly ZIPs.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -47,7 +48,7 @@ def download_partial(year: str, want: int, out_dir: Path) -> int:
         return have
     headers = dict(HEADERS)
     if have > 0:
-        headers["Range"] = f"bytes={have}-{want-1}"
+        headers["Range"] = f"bytes={have}-{want - 1}"
     req = urllib.request.Request(URL.format(year), headers=headers)
     with urllib.request.urlopen(req, timeout=60) as r:
         mode = "ab" if have > 0 else "wb"
@@ -66,18 +67,20 @@ def is_valid(year: str, out_dir: Path) -> bool:
         return False
     rc = subprocess.run(
         ["unzip", "-tq", str(out)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     return rc.returncode == 0
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--years", nargs="+", required=True,
-                    help="e.g. 2015 2016 ... 2024")
-    ap.add_argument("--out-dir", type=Path, required=True,
-                    help="Destination directory for the ZIPs")
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument("--years", nargs="+", required=True, help="e.g. 2015 2016 ... 2024")
+    ap.add_argument(
+        "--out-dir", type=Path, required=True, help="Destination directory for the ZIPs"
+    )
     ap.add_argument("--max-attempts", type=int, default=12)
     args = ap.parse_args()
 
@@ -111,7 +114,10 @@ def main() -> None:
 
     print("=== ALL DONE ===", flush=True)
     for year in args.years:
-        print(("OK" if is_valid(year, args.out_dir) else "BAD") + f" {year}.zip", flush=True)
+        print(
+            ("OK" if is_valid(year, args.out_dir) else "BAD") + f" {year}.zip",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":

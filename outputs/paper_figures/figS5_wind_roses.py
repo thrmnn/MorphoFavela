@@ -49,9 +49,15 @@ def _polar(ax, freq: dict, speeds: dict, vmax_speed: float):
     bar_colors = [cmap(norm(v)) for v in u]
 
     ax.bar(
-        angles, f, width=width * 0.92,
-        bottom=0.0, color=bar_colors, edgecolor="white", linewidth=0.4,
-        align="center", zorder=3,
+        angles,
+        f,
+        width=width * 0.92,
+        bottom=0.0,
+        color=bar_colors,
+        edgecolor="white",
+        linewidth=0.4,
+        align="center",
+        zorder=3,
     )
     ax.set_theta_zero_location("N")
     ax.set_theta_direction(-1)  # clockwise (compass)
@@ -80,16 +86,11 @@ def main() -> None:
         raise FileNotFoundError("No wind_rose.json files under data/{site}/")
 
     # Common speed scale across panels
-    vmax_speed = max(
-        max(r["mean_speeds"].values()) for r in roses.values()
-    )
+    vmax_speed = max(max(r["mean_speeds"].values()) for r in roses.values())
 
     fig = plt.figure(figsize=(SIZE_DOUBLE[0], SIZE_DOUBLE[0] * 0.45))
     n = len(roses)
-    axes = [
-        fig.add_subplot(1, n, i + 1, projection="polar")
-        for i in range(n)
-    ]
+    axes = [fig.add_subplot(1, n, i + 1, projection="polar") for i in range(n)]
 
     norm = cmap = None
     for ax, (site, rose) in zip(axes, roses.items()):
@@ -103,10 +104,14 @@ def main() -> None:
         tw_b = (rose.get("time_window_end") or "?")[:4]
         sid = rose.get("station_id", "?")
         ax.text(
-            0.5, -0.18,
+            0.5,
+            -0.18,
             f"{sid}  {tw_a}–{tw_b}\nn={n_obs:,}  calm={calm:.1%}",
-            transform=ax.transAxes, ha="center", va="top",
-            fontsize=5.2, color="#444",
+            transform=ax.transAxes,
+            ha="center",
+            va="top",
+            fontsize=5.2,
+            color="#444",
         )
 
     # Shared colorbar

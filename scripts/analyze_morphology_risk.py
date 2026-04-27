@@ -63,7 +63,9 @@ def _normalize_series(series: np.ndarray) -> np.ndarray:
     return out
 
 
-def _compute_risk_index(gdf: gpd.GeoDataFrame, weights: dict[str, float]) -> gpd.GeoDataFrame:
+def _compute_risk_index(
+    gdf: gpd.GeoDataFrame, weights: dict[str, float]
+) -> gpd.GeoDataFrame:
     """
     Compute a composite risk index from multiple morphology metrics.
 
@@ -100,7 +102,9 @@ def _compute_risk_index(gdf: gpd.GeoDataFrame, weights: dict[str, float]) -> gpd
     return gdf
 
 
-def _create_grid(bounds: tuple[float, float, float, float], cell_size: float) -> gpd.GeoDataFrame:
+def _create_grid(
+    bounds: tuple[float, float, float, float], cell_size: float
+) -> gpd.GeoDataFrame:
     """
     Create a regular grid of square cells covering the given bounds.
 
@@ -176,12 +180,22 @@ def _plot_map(
     data = gdf[column].replace([np.inf, -np.inf], np.nan)
     if diverging:
         from matplotlib.colors import TwoSlopeNorm
+
         vmax = np.nanpercentile(data, 98) if np.isfinite(data).any() else 1.0
         vmin = np.nanpercentile(data, 2) if np.isfinite(data).any() else -1.0
         norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
-        gdf.plot(column=column, ax=ax, cmap=cmap, legend=True, legend_kwds={"label": column}, norm=norm)
+        gdf.plot(
+            column=column,
+            ax=ax,
+            cmap=cmap,
+            legend=True,
+            legend_kwds={"label": column},
+            norm=norm,
+        )
     else:
-        gdf.plot(column=column, ax=ax, cmap=cmap, legend=True, legend_kwds={"label": column})
+        gdf.plot(
+            column=column, ax=ax, cmap=cmap, legend=True, legend_kwds={"label": column}
+        )
     ax.set_title(title)
     ax.set_axis_off()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -221,11 +235,7 @@ def _plot_hotspot_class(gdf: gpd.GeoDataFrame, output_path: Path, title: str) ->
 
 
 def _plot_bivariate(
-    gdf: gpd.GeoDataFrame,
-    x_col: str,
-    y_col: str,
-    output_path: Path,
-    title: str
+    gdf: gpd.GeoDataFrame, x_col: str, y_col: str, output_path: Path, title: str
 ) -> None:
     """
     Create a bivariate map showing interaction between two metrics.
@@ -384,8 +394,12 @@ def _compute_hotspots(grid: gpd.GeoDataFrame, value_col: str) -> gpd.GeoDataFram
 
     # Classification: 1 = hotspot, -1 = coldspot, 0 = not significant
     grid["hotspot_class"] = 0
-    grid.loc[valid & (grid["hotspot_p"] <= 0.05) & (grid["hotspot_gi"] > 0), "hotspot_class"] = 1
-    grid.loc[valid & (grid["hotspot_p"] <= 0.05) & (grid["hotspot_gi"] < 0), "hotspot_class"] = -1
+    grid.loc[
+        valid & (grid["hotspot_p"] <= 0.05) & (grid["hotspot_gi"] > 0), "hotspot_class"
+    ] = 1
+    grid.loc[
+        valid & (grid["hotspot_p"] <= 0.05) & (grid["hotspot_gi"] < 0), "hotspot_class"
+    ] = -1
     return grid
 
 
@@ -405,23 +419,42 @@ def main() -> None:
         - Hotspot maps (if --hotspots flag used)
     """
     parser = argparse.ArgumentParser(description="Morphology risk visualization")
-    parser.add_argument("--area", type=str, required=True, help="Area name (vidigal_tls, riodaspedras)")
-    parser.add_argument("--input", type=str, default=None, help="Input morphology GPKG path")
+    parser.add_argument(
+        "--area", type=str, required=True, help="Area name (vidigal_tls, riodaspedras)"
+    )
+    parser.add_argument(
+        "--input", type=str, default=None, help="Input morphology GPKG path"
+    )
     parser.add_argument("--output", type=str, default=None, help="Output directory")
-    parser.add_argument("--grid-size", type=float, default=50.0, help="Grid aggregation size (m)")
-    parser.add_argument("--hotspots", action="store_true", help="Compute hotspot clusters (Gi*)")
-    parser.add_argument("--streets", type=str, default=None, help="Optional streets file path")
-    parser.add_argument("--street-spacing", type=float, default=10.0, help="Street sampling spacing (m)")
+    parser.add_argument(
+        "--grid-size", type=float, default=50.0, help="Grid aggregation size (m)"
+    )
+    parser.add_argument(
+        "--hotspots", action="store_true", help="Compute hotspot clusters (Gi*)"
+    )
+    parser.add_argument(
+        "--streets", type=str, default=None, help="Optional streets file path"
+    )
+    parser.add_argument(
+        "--street-spacing", type=float, default=10.0, help="Street sampling spacing (m)"
+    )
     args = parser.parse_args()
 
     if args.input:
         input_path = Path(args.input)
     else:
-        input_path = get_area_analysis_dir(args.area, "morphology_metrics") / "buildings_with_morphology_metrics.gpkg"
+        input_path = (
+            get_area_analysis_dir(args.area, "morphology_metrics")
+            / "buildings_with_morphology_metrics.gpkg"
+        )
     if not input_path.exists():
         raise FileNotFoundError(f"Input not found: {input_path}")
 
-    output_base = Path(args.output) if args.output else get_area_analysis_dir(args.area, "morphology_risk")
+    output_base = (
+        Path(args.output)
+        if args.output
+        else get_area_analysis_dir(args.area, "morphology_risk")
+    )
     output_base.mkdir(parents=True, exist_ok=True)
     maps_dir = output_base / "maps"
     maps_dir.mkdir(exist_ok=True)
@@ -456,8 +489,12 @@ def main() -> None:
                 spacing=args.street_spacing,
             )
             if not street_points.empty:
-                street_points.to_file(output_base / "street_canyon_hw_points.gpkg", driver="GPKG")
-                street_grid = gpd.sjoin(street_points, grid, predicate="intersects", how="left")
+                street_points.to_file(
+                    output_base / "street_canyon_hw_points.gpkg", driver="GPKG"
+                )
+                street_grid = gpd.sjoin(
+                    street_points, grid, predicate="intersects", how="left"
+                )
                 street_grouped = street_grid.groupby("index_right")["street_hw"].mean()
                 grid["street_canyon_hw_mean"] = street_grouped
                 _plot_map(
@@ -470,13 +507,30 @@ def main() -> None:
             logger.warning(f"Streets file not found: {streets_path}")
 
     # Primary risk maps
-    _plot_map(gdf, "risk_index", maps_dir / "risk_index_map.png", "Morphology Risk Index (Building)")
-    _plot_map(grid, "risk_mean", maps_dir / "risk_grid_mean.png", "Morphology Risk Index (Grid Mean)")
-    _plot_map(grid, "risk_p90", maps_dir / "risk_grid_p90.png", "Morphology Risk Index (Grid 90th)")
+    _plot_map(
+        gdf,
+        "risk_index",
+        maps_dir / "risk_index_map.png",
+        "Morphology Risk Index (Building)",
+    )
+    _plot_map(
+        grid,
+        "risk_mean",
+        maps_dir / "risk_grid_mean.png",
+        "Morphology Risk Index (Grid Mean)",
+    )
+    _plot_map(
+        grid,
+        "risk_p90",
+        maps_dir / "risk_grid_p90.png",
+        "Morphology Risk Index (Grid 90th)",
+    )
     if "street_canyon_hw_mean" in grid.columns:
         # Combine grid risk with street canyon H/W to better reflect ventilation risk
         z_risk = _normalize_series(grid["risk_mean"].to_numpy(dtype=float))
-        z_street = _normalize_series(grid["street_canyon_hw_mean"].to_numpy(dtype=float))
+        z_street = _normalize_series(
+            grid["street_canyon_hw_mean"].to_numpy(dtype=float)
+        )
         grid["risk_grid_index"] = z_risk + z_street
         _plot_map(
             grid,
@@ -488,13 +542,23 @@ def main() -> None:
             grid,
             "street_canyon_hw_mean",
             maps_dir / "street_canyon_hw_grid.png",
-            "Street Canyon H/W (Grid Mean)"
+            "Street Canyon H/W (Grid Mean)",
         )
 
     # Key component maps
-    for metric in ["building_adjacency", "shared_walls", "tessellation_area", "shape_index"]:
+    for metric in [
+        "building_adjacency",
+        "shared_walls",
+        "tessellation_area",
+        "shape_index",
+    ]:
         if metric in gdf.columns:
-            _plot_map(gdf, metric, maps_dir / f"{metric}_risk_map.png", metric.replace("_", " ").title())
+            _plot_map(
+                gdf,
+                metric,
+                maps_dir / f"{metric}_risk_map.png",
+                metric.replace("_", " ").title(),
+            )
 
     # Bivariate risk visualization
     if "building_adjacency" in gdf.columns and "shared_walls" in gdf.columns:
@@ -529,7 +593,7 @@ def main() -> None:
             _plot_hotspot_class(
                 grid_hot,
                 maps_dir / "risk_hotspot_class.png",
-                "Risk Hotspots (1=hotspot, -1=coldspot)"
+                "Risk Hotspots (1=hotspot, -1=coldspot)",
             )
         except ImportError as exc:
             logger.warning(str(exc))

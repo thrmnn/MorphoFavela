@@ -106,7 +106,9 @@ def allocate_campaign(
     additional = target_total - existing_total
 
     if additional <= 0:
-        logger.info("Already at or above target (%d >= %d).", existing_total, target_total)
+        logger.info(
+            "Already at or above target (%d >= %d).", existing_total, target_total
+        )
         return existing_per_stratum.copy()
 
     # Weighted scores: eligible_cells * SVF_priority
@@ -186,7 +188,9 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
     logger.info("=" * 60)
 
     # 1. Load pilot patches
-    pilot_dir = _resolve(config["output_dir"].replace("campaign_sampling", "pilot_sampling"))
+    pilot_dir = _resolve(
+        config["output_dir"].replace("campaign_sampling", "pilot_sampling")
+    )
     pilot_csv = pilot_dir / "pilot_patches.csv"
     pilot_gpkg = pilot_dir / "pilot_patches.gpkg"
 
@@ -232,7 +236,9 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
         existing_per_stratum[sid] = existing_per_stratum.get(sid, 0) + 1
 
     allocation = allocate_campaign(summary, existing_per_stratum, target)
-    summary["n_existing"] = summary["stratum_id"].map(existing_per_stratum).fillna(0).astype(int)
+    summary["n_existing"] = (
+        summary["stratum_id"].map(existing_per_stratum).fillna(0).astype(int)
+    )
     summary["n_target"] = summary["stratum_id"].map(allocation).fillna(0).astype(int)
     summary["n_additional"] = summary["n_target"] - summary["n_existing"]
 
@@ -242,7 +248,12 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
     logger.info("CAMPAIGN ALLOCATION")
     logger.info(
         "%-20s  %6s  %6s  %6s  %6s  %6s",
-        "Stratum", "Elig.", "Pilot", "Target", "Add", "Bins",
+        "Stratum",
+        "Elig.",
+        "Pilot",
+        "Target",
+        "Add",
+        "Bins",
     )
     logger.info("-" * 90)
     for _, r in summary.iterrows():
@@ -272,7 +283,9 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
     selected_coords = pilot_coords.copy()
 
     strata_order = sorted(
-        allocation, key=lambda s: allocation.get(s, 0) - existing_per_stratum.get(s, 0), reverse=True
+        allocation,
+        key=lambda s: allocation.get(s, 0) - existing_per_stratum.get(s, 0),
+        reverse=True,
     )
 
     new_selected: list[gpd.GeoDataFrame] = []
@@ -291,9 +304,7 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
             candidates = candidates[~too_close]
 
         if candidates.empty:
-            logger.warning(
-                "  %s: 0 candidates after spacing (wanted +%d).", sid, n_add
-            )
+            logger.warning("  %s: 0 candidates after spacing (wanted +%d).", sid, n_add)
             continue
 
         actual = min(n_add, len(candidates))
@@ -304,21 +315,31 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
         selected_coords = np.vstack([selected_coords, new_xy])
         if actual < n_add:
             logger.warning(
-                "  %s: selected %d / %d wanted (candidate shortage).", sid, actual, n_add
+                "  %s: selected %d / %d wanted (candidate shortage).",
+                sid,
+                actual,
+                n_add,
             )
         else:
             logger.info("  %s: +%d new patches.", sid, actual)
 
     # 5. Merge pilot + new
     n_new = sum(len(df) for df in new_selected)
-    logger.info("Selected %d new patches (pilot: %d, total: %d).", n_new, n_pilot, n_pilot + n_new)
+    logger.info(
+        "Selected %d new patches (pilot: %d, total: %d).",
+        n_new,
+        n_pilot,
+        n_pilot + n_new,
+    )
 
     # Build new patches GeoDataFrame
     if new_selected:
         new_gdf = gpd.GeoDataFrame(
             pd.concat(new_selected, ignore_index=True), crs=grid.crs
         )
-        new_gdf = new_gdf.sort_values(["stratum_id", "centroid_x"]).reset_index(drop=True)
+        new_gdf = new_gdf.sort_values(["stratum_id", "centroid_x"]).reset_index(
+            drop=True
+        )
         new_gdf["patch_id"] = [
             f"{prefix}-P{n_pilot + i + 1:02d}" for i in range(len(new_gdf))
         ]
@@ -334,9 +355,7 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
     for i, (_, prow) in enumerate(pilot_df.iterrows()):
         cx, cy = prow["center_x"], prow["center_y"]
         # Find nearest grid cell
-        dists = np.sqrt(
-            (grid["centroid_x"] - cx) ** 2 + (grid["centroid_y"] - cy) ** 2
-        )
+        dists = np.sqrt((grid["centroid_x"] - cx) ** 2 + (grid["centroid_y"] - cy) ** 2)
         nearest_idx = dists.idxmin()
         row_data = grid.loc[nearest_idx].to_dict()
         row_data["patch_id"] = prow["patch_id"]
@@ -355,13 +374,19 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
     pilot_gdf = gpd.GeoDataFrame(pilot_rows, crs=grid.crs)
 
     # Merge
-    common_cols = sorted(set(pilot_gdf.columns) & set(new_gdf.columns)) if len(new_gdf) > 0 else list(pilot_gdf.columns)
+    common_cols = (
+        sorted(set(pilot_gdf.columns) & set(new_gdf.columns))
+        if len(new_gdf) > 0
+        else list(pilot_gdf.columns)
+    )
     if "geometry" not in common_cols:
         common_cols.append("geometry")
 
     if len(new_gdf) > 0:
         all_patches = gpd.GeoDataFrame(
-            pd.concat([pilot_gdf[common_cols], new_gdf[common_cols]], ignore_index=True),
+            pd.concat(
+                [pilot_gdf[common_cols], new_gdf[common_cols]], ignore_index=True
+            ),
             crs=grid.crs,
         )
     else:
@@ -391,10 +416,20 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
         for _, row in all_patches.iterrows()
     ]
     out_cols = [
-        "patch_id", "is_pilot", "centroid_x", "centroid_y", "stratum_id",
-        config["col_svf"], config["col_lambda_p"], config["col_slope"],
-        config["col_porosity"], config["col_sigma_h"], config["col_h_mean"],
-        "H_max_analysis", "blocken_radius_required", "geometry",
+        "patch_id",
+        "is_pilot",
+        "centroid_x",
+        "centroid_y",
+        "stratum_id",
+        config["col_svf"],
+        config["col_lambda_p"],
+        config["col_slope"],
+        config["col_porosity"],
+        config["col_sigma_h"],
+        config["col_h_mean"],
+        "H_max_analysis",
+        "blocken_radius_required",
+        "geometry",
     ]
     out_cols = [c for c in out_cols if c in patches_out.columns]
     patches_export = patches_out[out_cols].rename(
@@ -406,8 +441,14 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
 
     # Domains layer
     domains_out = gpd.GeoDataFrame(
-        {"patch_id": all_patches["patch_id"].values, "is_pilot": all_patches["is_pilot"].values},
-        geometry=[Point(row["centroid_x"], row["centroid_y"]).buffer(r) for _, row in all_patches.iterrows()],
+        {
+            "patch_id": all_patches["patch_id"].values,
+            "is_pilot": all_patches["is_pilot"].values,
+        },
+        geometry=[
+            Point(row["centroid_x"], row["centroid_y"]).buffer(r)
+            for _, row in all_patches.iterrows()
+        ],
         crs=grid.crs,
     )
     domains_out.to_file(gpkg_path, layer="cfd_domains", driver="GPKG")
@@ -431,7 +472,10 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
         "n_total": len(all_patches),
         "excluded_cells": exclusion_stats,
         "strata_allocation": {
-            sid: {"existing": existing_per_stratum.get(sid, 0), "target": allocation[sid]}
+            sid: {
+                "existing": existing_per_stratum.get(sid, 0),
+                "target": allocation[sid],
+            }
             for sid in allocation
         },
     }
@@ -451,7 +495,13 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
     elapsed = time.time() - t0
     logger.info("=" * 60)
     logger.info("CAMPAIGN SAMPLING COMPLETE: %s in %.1f s", site.upper(), elapsed)
-    logger.info("  Pilot: %d  New: %d  Total: %d / %d target", n_pilot, n_new, len(all_patches), target)
+    logger.info(
+        "  Pilot: %d  New: %d  Total: %d / %d target",
+        n_pilot,
+        n_new,
+        len(all_patches),
+        target,
+    )
     logger.info("  Output: %s", out_dir)
     logger.info("=" * 60)
 
@@ -490,9 +540,15 @@ def _generate_campaign_figures(
                 bounds = src.bounds
                 shade = _hillshade(dtm, src.res[0])
                 shade = np.where(np.isnan(dtm), 1.0, shade)
-                ax.imshow(shade, cmap="gray", vmin=0, vmax=1,
-                          extent=[bounds.left, bounds.right, bounds.bottom, bounds.top],
-                          alpha=0.4, zorder=0)
+                ax.imshow(
+                    shade,
+                    cmap="gray",
+                    vmin=0,
+                    vmax=1,
+                    extent=[bounds.left, bounds.right, bounds.bottom, bounds.top],
+                    alpha=0.4,
+                    zorder=0,
+                )
         except Exception:
             pass
 
@@ -511,39 +567,70 @@ def _generate_campaign_figures(
     # Pilot patches — solid circle, 100 m diameter
     for _, row in pilots.iterrows():
         cx, cy = row["centroid_x"], row["centroid_y"]
-        ax.add_patch(plt.Circle(
-            (cx, cy), PATCH_RADIUS_M,
-            linewidth=1.2, edgecolor="#1565c0", facecolor="#1565c0", alpha=0.15, zorder=4,
-        ))
+        ax.add_patch(
+            plt.Circle(
+                (cx, cy),
+                PATCH_RADIUS_M,
+                linewidth=1.2,
+                edgecolor="#1565c0",
+                facecolor="#1565c0",
+                alpha=0.15,
+                zorder=4,
+            )
+        )
         ax.plot(cx, cy, "o", color="#1565c0", markersize=4, zorder=6)
 
     # New patches — dashed circle, 100 m diameter
     for _, row in new_patches.iterrows():
         cx, cy = row["centroid_x"], row["centroid_y"]
-        ax.add_patch(plt.Circle(
-            (cx, cy), PATCH_RADIUS_M,
-            linewidth=1.5, edgecolor="#d62728", facecolor="#d62728", alpha=0.12,
-            linestyle="--", zorder=5,
-        ))
+        ax.add_patch(
+            plt.Circle(
+                (cx, cy),
+                PATCH_RADIUS_M,
+                linewidth=1.5,
+                edgecolor="#d62728",
+                facecolor="#d62728",
+                alpha=0.12,
+                linestyle="--",
+                zorder=5,
+            )
+        )
         ax.plot(cx, cy, "s", color="#d62728", markersize=4, zorder=7)
 
     from matplotlib.patches import Patch
+
     handles = [
-        Patch(facecolor="#1565c0", alpha=0.3, edgecolor="#1565c0", label=f"Pilot ({len(pilots)})"),
-        Patch(facecolor="#d62728", alpha=0.3, edgecolor="#d62728", linestyle="--", label=f"New ({len(new_patches)})"),
+        Patch(
+            facecolor="#1565c0",
+            alpha=0.3,
+            edgecolor="#1565c0",
+            label=f"Pilot ({len(pilots)})",
+        ),
+        Patch(
+            facecolor="#d62728",
+            alpha=0.3,
+            edgecolor="#d62728",
+            linestyle="--",
+            label=f"New ({len(new_patches)})",
+        ),
     ]
     ax.legend(handles=handles, loc="upper left", fontsize=10, framealpha=0.9)
 
     ax.set_title(
         f"Campaign Patches \u2014 {site_name} (n={len(all_patches)})",
-        fontsize=14, fontweight="bold",
+        fontsize=14,
+        fontweight="bold",
     )
     format_utm_axes(ax)
     add_scale_bar(ax)
     add_north_arrow(ax)
     ax.set_aspect("equal")
 
-    fig.savefig(out_dir / "figures" / "fig_campaign_patches_map.png", dpi=300, bbox_inches="tight")
+    fig.savefig(
+        out_dir / "figures" / "fig_campaign_patches_map.png",
+        dpi=300,
+        bbox_inches="tight",
+    )
     plt.close(fig)
     logger.info("  Saved fig_campaign_patches_map.png")
 
@@ -564,13 +651,24 @@ def _generate_campaign_figures(
         valid = grid[[xc, yc]].dropna()
         ax.scatter(valid[xc], valid[yc], s=2, c="#cccccc", alpha=0.15, rasterized=True)
 
-        for is_p, color, marker, label in [(True, "#1565c0", "o", "Pilot"), (False, "#d62728", "s", "New")]:
+        for is_p, color, marker, label in [
+            (True, "#1565c0", "o", "Pilot"),
+            (False, "#d62728", "s", "New"),
+        ]:
             subset = all_patches[all_patches["is_pilot"] == is_p]
             for _, row in subset.iterrows():
                 xv, yv = row.get(xc), row.get(yc)
                 if pd.notna(xv) and pd.notna(yv):
-                    ax.scatter(xv, yv, s=60, c=color, edgecolors="k", linewidths=0.4,
-                               marker=marker, zorder=5)
+                    ax.scatter(
+                        xv,
+                        yv,
+                        s=60,
+                        c=color,
+                        edgecolors="k",
+                        linewidths=0.4,
+                        marker=marker,
+                        zorder=5,
+                    )
 
         ax.set_xlabel(xl)
         ax.set_ylabel(yl)
@@ -578,15 +676,44 @@ def _generate_campaign_figures(
 
     # Manual legend
     from matplotlib.lines import Line2D
-    legend_handles = [
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="#1565c0", markersize=8, label="Pilot"),
-        Line2D([0], [0], marker="s", color="w", markerfacecolor="#d62728", markersize=8, label="New"),
-    ]
-    fig.legend(handles=legend_handles, loc="lower center", ncol=2, fontsize=10, bbox_to_anchor=(0.5, -0.01))
 
-    fig.suptitle(f"Feature-Space Coverage \u2014 {site_name}", fontsize=14, fontweight="bold")
+    legend_handles = [
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            markerfacecolor="#1565c0",
+            markersize=8,
+            label="Pilot",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="s",
+            color="w",
+            markerfacecolor="#d62728",
+            markersize=8,
+            label="New",
+        ),
+    ]
+    fig.legend(
+        handles=legend_handles,
+        loc="lower center",
+        ncol=2,
+        fontsize=10,
+        bbox_to_anchor=(0.5, -0.01),
+    )
+
+    fig.suptitle(
+        f"Feature-Space Coverage \u2014 {site_name}", fontsize=14, fontweight="bold"
+    )
     fig.tight_layout(rect=[0, 0.03, 1, 0.97])
-    fig.savefig(out_dir / "figures" / "fig_campaign_patches_featurespace.png", dpi=300, bbox_inches="tight")
+    fig.savefig(
+        out_dir / "figures" / "fig_campaign_patches_featurespace.png",
+        dpi=300,
+        bbox_inches="tight",
+    )
     plt.close(fig)
     logger.info("  Saved fig_campaign_patches_featurespace.png")
 
@@ -612,15 +739,36 @@ def _generate_campaign_figures(
             if cands:
                 nearby = buildings.iloc[cands]
                 nearby = nearby[nearby.intersects(vbox)]
-                nearby.plot(ax=ax, facecolor="#d0d0d0", edgecolor="#666666", linewidth=0.3, zorder=1)
+                nearby.plot(
+                    ax=ax,
+                    facecolor="#d0d0d0",
+                    edgecolor="#666666",
+                    linewidth=0.3,
+                    zorder=1,
+                )
 
-            ax.add_patch(plt.Circle(
-                (cx, cy), PATCH_RADIUS_M,
-                linewidth=1.5, edgecolor="#d62728", facecolor="none", linestyle="--", zorder=5,
-            ))
-            ax.add_patch(plt.Circle(
-                (cx, cy), radius, linewidth=1.0, edgecolor="#1f77b4", facecolor="none", linestyle=":", zorder=4,
-            ))
+            ax.add_patch(
+                plt.Circle(
+                    (cx, cy),
+                    PATCH_RADIUS_M,
+                    linewidth=1.5,
+                    edgecolor="#d62728",
+                    facecolor="none",
+                    linestyle="--",
+                    zorder=5,
+                )
+            )
+            ax.add_patch(
+                plt.Circle(
+                    (cx, cy),
+                    radius,
+                    linewidth=1.0,
+                    edgecolor="#1f77b4",
+                    facecolor="none",
+                    linestyle=":",
+                    zorder=4,
+                )
+            )
 
             svf = row.get(config["col_svf"])
             lp = row.get(config["col_lambda_p"])
@@ -638,9 +786,15 @@ def _generate_campaign_figures(
         for j in range(i + 1, nrows * ncols):
             axes_flat[j].set_visible(False)
 
-        fig.suptitle(f"New Patch Context \u2014 {site_name}", fontsize=14, fontweight="bold")
+        fig.suptitle(
+            f"New Patch Context \u2014 {site_name}", fontsize=14, fontweight="bold"
+        )
         fig.tight_layout()
-        fig.savefig(out_dir / "figures" / "fig_campaign_patches_context.png", dpi=300, bbox_inches="tight")
+        fig.savefig(
+            out_dir / "figures" / "fig_campaign_patches_context.png",
+            dpi=300,
+            bbox_inches="tight",
+        )
         plt.close(fig)
         logger.info("  Saved fig_campaign_patches_context.png")
 
@@ -663,20 +817,22 @@ def generate_cross_site_summary(all_results: dict[str, gpd.GeoDataFrame]) -> Non
         if patches is None:
             continue
         for _, row in patches.iterrows():
-            master_rows.append({
-                "patch_id": row["patch_id"],
-                "site": site,
-                "is_pilot": row.get("is_pilot", True),
-                "stratum_id": row.get("stratum_id", ""),
-                "center_x": row["centroid_x"],
-                "center_y": row["centroid_y"],
-                "svf": row.get("svf"),
-                "lambda_p": row.get("lambda_p"),
-                "slope_deg": row.get("slope_deg"),
-                "sigma_h": row.get("sigma_h"),
-                "H_mean": row.get("H_mean"),
-                "porosity": row.get("porosity"),
-            })
+            master_rows.append(
+                {
+                    "patch_id": row["patch_id"],
+                    "site": site,
+                    "is_pilot": row.get("is_pilot", True),
+                    "stratum_id": row.get("stratum_id", ""),
+                    "center_x": row["centroid_x"],
+                    "center_y": row["centroid_y"],
+                    "svf": row.get("svf"),
+                    "lambda_p": row.get("lambda_p"),
+                    "slope_deg": row.get("slope_deg"),
+                    "sigma_h": row.get("sigma_h"),
+                    "H_mean": row.get("H_mean"),
+                    "porosity": row.get("porosity"),
+                }
+            )
 
     master = pd.DataFrame(master_rows)
     master.to_csv(out_dir / "campaign_allocation_table.csv", index=False)
@@ -685,7 +841,14 @@ def generate_cross_site_summary(all_results: dict[str, gpd.GeoDataFrame]) -> Non
     # Strata summary across sites
     strata_rows = []
     for site in all_results:
-        csv_path = PROJECT_ROOT / "outputs" / site / "sampling_cfd" / "campaign_sampling" / "stratum_summary.csv"
+        csv_path = (
+            PROJECT_ROOT
+            / "outputs"
+            / site
+            / "sampling_cfd"
+            / "campaign_sampling"
+            / "stratum_summary.csv"
+        )
         if csv_path.exists():
             df = pd.read_csv(csv_path)
             df["site"] = site
@@ -702,12 +865,18 @@ def generate_cross_site_summary(all_results: dict[str, gpd.GeoDataFrame]) -> Non
 
     # Cross-site feature space plot
     SITE_COLORS = {
-        "vidigal": "#e6194b", "rocinha": "#3cb44b", "riodaspedras": "#4363d8",
-        "complexo_do_alemao": "#f58231", "maré": "#911eb4",
+        "vidigal": "#e6194b",
+        "rocinha": "#3cb44b",
+        "riodaspedras": "#4363d8",
+        "complexo_do_alemao": "#f58231",
+        "maré": "#911eb4",
     }
     SITE_MARKERS = {
-        "vidigal": "o", "rocinha": "s", "riodaspedras": "D",
-        "complexo_do_alemao": "^", "maré": "v",
+        "vidigal": "o",
+        "rocinha": "s",
+        "riodaspedras": "D",
+        "complexo_do_alemao": "^",
+        "maré": "v",
     }
 
     pairs = [
@@ -731,23 +900,55 @@ def generate_cross_site_summary(all_results: dict[str, gpd.GeoDataFrame]) -> Non
             for subset, alpha, size in [(pilots, 0.6, 60), (new, 0.9, 80)]:
                 vals = subset[[xc, yc]].dropna()
                 if not vals.empty:
-                    ax.scatter(vals[xc], vals[yc], s=size, c=color, marker=marker,
-                               edgecolors="k", linewidths=0.3, alpha=alpha, zorder=5)
+                    ax.scatter(
+                        vals[xc],
+                        vals[yc],
+                        s=size,
+                        c=color,
+                        marker=marker,
+                        edgecolors="k",
+                        linewidths=0.3,
+                        alpha=alpha,
+                        zorder=5,
+                    )
 
         ax.set_xlabel(xl)
         ax.set_ylabel(yl)
         ax.grid(alpha=0.15)
 
     from matplotlib.lines import Line2D
+
     handles = [
-        Line2D([0], [0], marker=SITE_MARKERS[s], color="w", markerfacecolor=SITE_COLORS[s],
-               markersize=8, label=s.replace("_", " ").title())
-        for s in all_results if all_results[s] is not None
+        Line2D(
+            [0],
+            [0],
+            marker=SITE_MARKERS[s],
+            color="w",
+            markerfacecolor=SITE_COLORS[s],
+            markersize=8,
+            label=s.replace("_", " ").title(),
+        )
+        for s in all_results
+        if all_results[s] is not None
     ]
-    fig.legend(handles=handles, loc="lower center", ncol=5, fontsize=10, bbox_to_anchor=(0.5, -0.01))
-    fig.suptitle(f"Campaign Feature-Space Coverage \u2014 {len(master)} Patches", fontsize=14, fontweight="bold")
+    fig.legend(
+        handles=handles,
+        loc="lower center",
+        ncol=5,
+        fontsize=10,
+        bbox_to_anchor=(0.5, -0.01),
+    )
+    fig.suptitle(
+        f"Campaign Feature-Space Coverage \u2014 {len(master)} Patches",
+        fontsize=14,
+        fontweight="bold",
+    )
     fig.tight_layout(rect=[0, 0.04, 1, 0.97])
-    fig.savefig(out_dir / "fig_campaign_cross_site_featurespace.png", dpi=300, bbox_inches="tight")
+    fig.savefig(
+        out_dir / "fig_campaign_cross_site_featurespace.png",
+        dpi=300,
+        bbox_inches="tight",
+    )
     plt.close(fig)
     logger.info("Saved fig_campaign_cross_site_featurespace.png")
 
@@ -760,15 +961,33 @@ def generate_cross_site_summary(all_results: dict[str, gpd.GeoDataFrame]) -> Non
         site_order = [s for s in SITE_COLORS if s in pivot.columns]
 
         for site in site_order:
-            vals = [pivot.loc[sid, site] if site in pivot.columns else 0 for sid in strata_ids]
-            ax.bar(x, vals, bottom=bottoms, label=site.replace("_", " ").title(),
-                   color=SITE_COLORS[site], edgecolor="white", linewidth=0.5)
+            vals = [
+                pivot.loc[sid, site] if site in pivot.columns else 0
+                for sid in strata_ids
+            ]
+            ax.bar(
+                x,
+                vals,
+                bottom=bottoms,
+                label=site.replace("_", " ").title(),
+                color=SITE_COLORS[site],
+                edgecolor="white",
+                linewidth=0.5,
+            )
             bottoms += np.array(vals)
 
         # Total labels on top
         for i, sid in enumerate(strata_ids):
             total = pivot.loc[sid, "TOTAL"]
-            ax.text(i, total + 0.3, str(total), ha="center", va="bottom", fontsize=8, fontweight="bold")
+            ax.text(
+                i,
+                total + 0.3,
+                str(total),
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                fontweight="bold",
+            )
 
         ax.set_xticks(x)
         ax.set_xticklabels(strata_ids, rotation=45, ha="right", fontsize=8)
@@ -778,7 +997,11 @@ def generate_cross_site_summary(all_results: dict[str, gpd.GeoDataFrame]) -> Non
         ax.grid(axis="y", alpha=0.2)
 
         fig.tight_layout()
-        fig.savefig(out_dir / "fig_campaign_allocation_summary.png", dpi=300, bbox_inches="tight")
+        fig.savefig(
+            out_dir / "fig_campaign_allocation_summary.png",
+            dpi=300,
+            bbox_inches="tight",
+        )
         plt.close(fig)
         logger.info("Saved fig_campaign_allocation_summary.png")
 
@@ -823,21 +1046,25 @@ def generate_cross_site_summary(all_results: dict[str, gpd.GeoDataFrame]) -> Non
         sf_str = f"-{shortfall}" if shortfall > 0 else "0"
         report_lines.append(f"| {site} | {n_p} | {n_n} | {n_t} | {target} | {sf_str} |")
 
-    report_lines.extend([
-        "",
-        "## Minimum Inter-Patch Distance",
-        "",
-    ] + spacing_info + [
-        "",
-        "## Files",
-        "",
-        "- `campaign_allocation_table.csv` — master table (all patches, all sites)",
-        "- `campaign_strata_summary.csv` — 12 strata x 5 sites allocation",
-        "- `fig_campaign_cross_site_featurespace.png` — feature-space coverage",
-        "- `fig_campaign_allocation_summary.png` — allocation bar chart by stratum",
-        "",
-        "Per-site outputs at `outputs/{site}/sampling_cfd/campaign_sampling/`.",
-    ])
+    report_lines.extend(
+        [
+            "",
+            "## Minimum Inter-Patch Distance",
+            "",
+        ]
+        + spacing_info
+        + [
+            "",
+            "## Files",
+            "",
+            "- `campaign_allocation_table.csv` — master table (all patches, all sites)",
+            "- `campaign_strata_summary.csv` — 12 strata x 5 sites allocation",
+            "- `fig_campaign_cross_site_featurespace.png` — feature-space coverage",
+            "- `fig_campaign_allocation_summary.png` — allocation bar chart by stratum",
+            "",
+            "Per-site outputs at `outputs/{site}/sampling_cfd/campaign_sampling/`.",
+        ]
+    )
 
     with open(out_dir / "campaign_report.md", "w") as f:
         f.write("\n".join(report_lines))

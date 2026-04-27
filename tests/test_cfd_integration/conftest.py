@@ -42,11 +42,18 @@ def synthetic_samples() -> pd.DataFrame:
     w = rng.normal(0, 0.02, len(pts))
     tke = 0.5 * (u_mag * 0.15) ** 2 + rng.uniform(0, 0.01, len(pts))
 
-    return pd.DataFrame({
-        "x": pts[:, 0], "y": pts[:, 1], "z": np.full(len(pts), 1.5),
-        "U": u, "V": v, "W": w,
-        "U_mag": u_mag, "TKE": tke,
-    })
+    return pd.DataFrame(
+        {
+            "x": pts[:, 0],
+            "y": pts[:, 1],
+            "z": np.full(len(pts), 1.5),
+            "U": u,
+            "V": v,
+            "W": w,
+            "U_mag": u_mag,
+            "TKE": tke,
+        }
+    )
 
 
 @pytest.fixture
@@ -83,11 +90,23 @@ def synthetic_wind_rose():
         "site": "test_site",
         "source": "synthetic",
         "frequencies": {
-            "N": 0.05, "NE": 0.10, "E": 0.15, "SE": 0.30,
-            "S": 0.15, "SW": 0.10, "W": 0.10, "NW": 0.05,
+            "N": 0.05,
+            "NE": 0.10,
+            "E": 0.15,
+            "SE": 0.30,
+            "S": 0.15,
+            "SW": 0.10,
+            "W": 0.10,
+            "NW": 0.05,
         },
         "mean_speeds": {
-            "N": 2.0, "NE": 3.0, "E": 3.5, "SE": 4.0,
-            "S": 3.0, "SW": 2.5, "W": 2.0, "NW": 1.8,
+            "N": 2.0,
+            "NE": 3.0,
+            "E": 3.5,
+            "SE": 4.0,
+            "S": 3.0,
+            "SW": 2.5,
+            "W": 2.0,
+            "NW": 1.8,
         },
     }

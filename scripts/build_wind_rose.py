@@ -65,12 +65,24 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 PRIOR_FREQUENCIES = {
-    "N":  0.06, "NE": 0.14, "E":  0.16, "SE": 0.22,
-    "S":  0.14, "SW": 0.10, "W":  0.08, "NW": 0.10,
+    "N": 0.06,
+    "NE": 0.14,
+    "E": 0.16,
+    "SE": 0.22,
+    "S": 0.14,
+    "SW": 0.10,
+    "W": 0.08,
+    "NW": 0.10,
 }
 PRIOR_MEAN_SPEEDS = {
-    "N":  2.0, "NE": 3.2, "E":  3.5, "SE": 3.8,
-    "S":  2.8, "SW": 2.4, "W":  2.2, "NW": 2.0,
+    "N": 2.0,
+    "NE": 3.2,
+    "E": 3.5,
+    "SE": 3.8,
+    "S": 2.8,
+    "SW": 2.4,
+    "W": 2.2,
+    "NW": 2.0,
 }
 PRIOR_SOURCE = (
     "PLACEHOLDER — Rio de Janeiro coastal-zone climatological prior. "
@@ -82,11 +94,12 @@ PRIOR_SOURCE = (
 @dataclass
 class SiteProfile:
     """Per-site metadata used by the template writer."""
-    exposure_class: str                # coastal / valley / plain / urban / bayside
-    recommended_station_id: str        # INMET code (e.g., "A652")
+
+    exposure_class: str  # coastal / valley / plain / urban / bayside
+    recommended_station_id: str  # INMET code (e.g., "A652")
     recommended_station_name: str
     recommended_station_coords: Optional[tuple[float, float]] = None  # (lat, lon)
-    expected_adjustment: str = ""      # how real data is likely to differ from prior
+    expected_adjustment: str = ""  # how real data is likely to differ from prior
 
 
 # Per-site profiles. Station recommendations were validated by the INMET
@@ -153,7 +166,7 @@ SITE_PROFILES: dict[str, SiteProfile] = {
     ),
     "maré": SiteProfile(
         exposure_class="bayside (Guanabara Bay)",
-        recommended_station_id="A652",   # INMET fallback
+        recommended_station_id="A652",  # INMET fallback
         recommended_station_name="Forte de Copacabana (INMET fallback; SBGL Galeão METAR preferred)",
         recommended_station_coords=(-22.988, -43.190),
         expected_adjustment=(
@@ -236,9 +249,16 @@ def from_inmet_csv(
     # replace spaces with underscores. INMET headers contain "direção",
     # "pressão", etc., which would otherwise miss our ASCII candidates.
     import unicodedata
+
     def _norm(s: str) -> str:
         nf = unicodedata.normalize("NFKD", s)
-        return "".join(c for c in nf if not unicodedata.combining(c)).lower().strip().replace(" ", "_")
+        return (
+            "".join(c for c in nf if not unicodedata.combining(c))
+            .lower()
+            .strip()
+            .replace(" ", "_")
+        )
+
     df.columns = [_norm(c) for c in df.columns]
 
     def _find_col(candidates):
@@ -312,7 +332,7 @@ def from_inmet_csv(
         "frequencies": frequencies,
         "mean_speeds": mean_speeds,
         "source": source,
-        "reference_height_m": 10.0,   # INMET anemometer standard
+        "reference_height_m": 10.0,  # INMET anemometer standard
         "station_id": station_id,
         "station_name": station_name,
         "station_coords": list(station_coords) if station_coords else None,
@@ -425,9 +445,7 @@ def from_template(site: str) -> dict:
     """
     profile = SITE_PROFILES.get(site)
     if profile is None:
-        raise ValueError(
-            f"Unknown site: {site}. Known sites: {list(SITE_PROFILES)}"
-        )
+        raise ValueError(f"Unknown site: {site}. Known sites: {list(SITE_PROFILES)}")
     source = (
         f"{PRIOR_SOURCE} Site profile: {profile.exposure_class}. "
         f"Recommended station: {profile.recommended_station_name} "
@@ -443,7 +461,8 @@ def from_template(site: str) -> dict:
         "station_name": profile.recommended_station_name,
         "station_coords": (
             list(profile.recommended_station_coords)
-            if profile.recommended_station_coords else None
+            if profile.recommended_station_coords
+            else None
         ),
         "time_window_start": None,
         "time_window_end": None,
@@ -465,14 +484,14 @@ def _validate_rose(payload: dict) -> None:
         f"frequencies must cover all 8 directions; got {sorted(f)}"
     )
     total = sum(f.values())
-    assert abs(total - 1.0) < 1e-6, (
-        f"frequencies must sum to 1.0; got {total:.6f}"
-    )
+    assert abs(total - 1.0) < 1e-6, f"frequencies must sum to 1.0; got {total:.6f}"
     assert payload["reference_height_m"] is not None, (
         "reference_height_m is required (nominally 10 m for INMET)"
     )
     assert payload["quality_flag"] in (
-        "measured", "gap-filled", "placeholder-prior",
+        "measured",
+        "gap-filled",
+        "placeholder-prior",
     ), f"invalid quality_flag: {payload['quality_flag']}"
 
 
@@ -509,7 +528,9 @@ def write_wind_rose(
 
     logger.info(
         "Wrote %s [%s, station=%s]",
-        path, payload["quality_flag"], payload["station_id"],
+        path,
+        payload["quality_flag"],
+        payload["station_id"],
     )
     return path
 
@@ -524,38 +545,50 @@ def main():
         description="Build wind rose JSON for CFD simulations",
     )
     parser.add_argument(
-        "--site", required=True,
+        "--site",
+        required=True,
         choices=list(SITE_PROFILES) + ["all"],
     )
     parser.add_argument(
-        "--inmet-csv", type=Path, default=None,
+        "--inmet-csv",
+        type=Path,
+        default=None,
         help="INMET observations CSV (preferred — real measured data)",
     )
     parser.add_argument(
-        "--asos-csv", type=Path, default=None,
+        "--asos-csv",
+        type=Path,
+        default=None,
         help="Iowa ASOS METAR CSV (for Maré / SBGL Galeão).",
     )
     parser.add_argument(
-        "--station-id", default=None,
+        "--station-id",
+        default=None,
         help="INMET station code (e.g., A652). Defaults to the site's "
-             "recommended station from SITE_PROFILES.",
+        "recommended station from SITE_PROFILES.",
     )
     parser.add_argument(
-        "--station-name", default=None,
+        "--station-name",
+        default=None,
         help="INMET station name. Defaults to the site's recommendation.",
     )
     parser.add_argument(
-        "--station-lat", type=float, default=None,
+        "--station-lat",
+        type=float,
+        default=None,
         help="Station latitude (decimal degrees).",
     )
     parser.add_argument(
-        "--station-lon", type=float, default=None,
+        "--station-lon",
+        type=float,
+        default=None,
         help="Station longitude (decimal degrees).",
     )
     parser.add_argument("--year-start", type=int, default=None)
     parser.add_argument("--year-end", type=int, default=None)
     parser.add_argument(
-        "--from-template", action="store_true",
+        "--from-template",
+        action="store_true",
         help="Use the Rio climatological prior (flagged placeholder-prior).",
     )
     args = parser.parse_args()

@@ -74,7 +74,9 @@ def run_single_date(
     if result.crs is not None:
         crs_obj = CRS(result.crs)
         if crs_obj.is_compound:
-            horiz = [s for s in crs_obj.sub_crs_list if s.is_projected or s.is_geographic][0]
+            horiz = [
+                s for s in crs_obj.sub_crs_list if s.is_projected or s.is_geographic
+            ][0]
             result = result.set_crs(horiz, allow_override=True)
             logger.info("Normalized compound CRS to %s for GPKG export", horiz.name)
 
@@ -118,45 +120,64 @@ def main():
     )
     parser.add_argument("--area", required=True, help="Area name (e.g. vidigal)")
     parser.add_argument(
-        "--date", default="2026-06-21",
+        "--date",
+        default="2026-06-21",
         help="Analysis date (default: winter solstice for Southern Hemisphere)",
     )
     parser.add_argument(
-        "--all-dates", action="store_true",
+        "--all-dates",
+        action="store_true",
         help="Run for all 4 reference dates (solstices + equinoxes)",
     )
     parser.add_argument("--interval", type=int, default=30, help="Timestep (minutes)")
     parser.add_argument("--hour-start", type=int, default=6, help="Start hour")
     parser.add_argument("--hour-end", type=int, default=18, help="End hour")
     parser.add_argument(
-        "--facade-spacing", type=float, default=1.0,
+        "--facade-spacing",
+        type=float,
+        default=1.0,
         help="Facade sample spacing (metres)",
     )
     parser.add_argument("--n-jobs", type=int, default=1, help="Parallel workers")
     parser.add_argument(
-        "--floor-height", type=float, default=2.5,
+        "--floor-height",
+        type=float,
+        default=2.5,
         help="Floor-to-floor height (metres, default 2.5 for informal settlements)",
     )
     parser.add_argument(
-        "--min-hit-distance", type=float, default=0.2,
+        "--min-hit-distance",
+        type=float,
+        default=0.2,
         help="Ignore ray hits closer than this (metres) to avoid self-intersection (default: 0.2)",
     )
     parser.add_argument(
-        "--who-threshold", type=float, default=2.0,
+        "--who-threshold",
+        type=float,
+        default=2.0,
         help="WHO minimum sunlight threshold (hours)",
     )
     parser.add_argument(
-        "--site-elevation", type=float, default=100.0,
+        "--site-elevation",
+        type=float,
+        default=100.0,
         help="Site elevation (metres)",
     )
     parser.add_argument(
-        "--skip-svf", action="store_true",
+        "--skip-svf",
+        action="store_true",
         help="Skip facade SVF computation (use svf=1.0 for diffuse)",
     )
-    parser.add_argument("--height-field", default="altura", help="Building height column")
-    parser.add_argument("--base-field", default="base", help="Building base elevation column")
     parser.add_argument(
-        "--sky-patches", type=int, default=145,
+        "--height-field", default="altura", help="Building height column"
+    )
+    parser.add_argument(
+        "--base-field", default="base", help="Building base elevation column"
+    )
+    parser.add_argument(
+        "--sky-patches",
+        type=int,
+        default=145,
         help="Sky patches for SVF (default: 145 Tregenza)",
     )
     args = parser.parse_args()
@@ -174,7 +195,8 @@ def main():
     # Build scene
     logger.info("Building 3D scene...")
     scene_mesh, _building_mesh, buildings_gdf = build_scene(
-        dtm_path, footprints_path,
+        dtm_path,
+        footprints_path,
         height_field=args.height_field,
         base_field=args.base_field,
         area=args.area,
@@ -198,7 +220,9 @@ def main():
     if not args.skip_svf:
         logger.info("Computing facade SVF (%d sky patches)...", args.sky_patches)
         facade_gdf = compute_facade_svf(
-            facade_gdf, scene_mesh, n_sky_patches=args.sky_patches,
+            facade_gdf,
+            scene_mesh,
+            n_sky_patches=args.sky_patches,
         )
     else:
         facade_gdf["svf"] = 1.0

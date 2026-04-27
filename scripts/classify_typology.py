@@ -175,7 +175,9 @@ def main() -> None:
         plot_typology_map(classified, maps_dir / "typology_clusters.png")
 
         logger.info("Generating cluster profiles chart...")
-        plot_cluster_profiles(profiles, maps_dir / "cluster_profiles.png", features=args.features)
+        plot_cluster_profiles(
+            profiles, maps_dir / "cluster_profiles.png", features=args.features
+        )
 
         if optimal_k_result is not None:
             logger.info("Generating elbow/silhouette plot...")

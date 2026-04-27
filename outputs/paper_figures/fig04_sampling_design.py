@@ -33,8 +33,16 @@ def main():
             print(f"  WARNING: {e}")
 
     # Load campaign strata summary
-    strata_path = PROJECT_ROOT / "outputs" / "comparative" / "final_allocation" / "campaign_strata_summary.csv"
-    strata_summary = pd.read_csv(strata_path, index_col=0) if strata_path.exists() else None
+    strata_path = (
+        PROJECT_ROOT
+        / "outputs"
+        / "comparative"
+        / "final_allocation"
+        / "campaign_strata_summary.csv"
+    )
+    strata_summary = (
+        pd.read_csv(strata_path, index_col=0) if strata_path.exists() else None
+    )
 
     # ── Layout: 3 rows ──
     # Row 1: feature space (a, b)
@@ -42,9 +50,12 @@ def main():
     # Row 3: mini-maps (d) — full width, taller
     fig = plt.figure(figsize=(WIDTH_DOUBLE, HEIGHT_MAX * 0.92))
     gs = gridspec.GridSpec(
-        3, 2, figure=fig,
+        3,
+        2,
+        figure=fig,
         height_ratios=[1, 0.85, 0.7],
-        hspace=0.35, wspace=0.30,
+        hspace=0.35,
+        wspace=0.30,
     )
 
     # ── Panel (a): SVF vs slope ──
@@ -55,8 +66,12 @@ def main():
         g = grids[site]
         valid = g[["svf", "slope_deg"]].dropna()
         ax_a.scatter(
-            valid["svf"], valid["slope_deg"],
-            s=1, c=SITE_COLORS[site], alpha=0.05, rasterized=True,
+            valid["svf"],
+            valid["slope_deg"],
+            s=1,
+            c=SITE_COLORS[site],
+            alpha=0.05,
+            rasterized=True,
         )
     for site in SITE_ORDER:
         if site not in patches:
@@ -64,20 +79,37 @@ def main():
         p = patches[site]
         v = p[["svf", "slope_deg"]].dropna()
         ax_a.scatter(
-            v["svf"], v["slope_deg"],
-            s=20, c=SITE_COLORS[site], marker=SITE_MARKERS[site],
-            edgecolors="k", linewidths=0.3, zorder=5,
+            v["svf"],
+            v["slope_deg"],
+            s=20,
+            c=SITE_COLORS[site],
+            marker=SITE_MARKERS[site],
+            edgecolors="k",
+            linewidths=0.3,
+            zorder=5,
             label=SITE_LABELS[site],
         )
 
     # Labeled threshold lines
     for t in SVF_THRESHOLDS:
         ax_a.axvline(t, color="#aaa", linewidth=0.3, linestyle=":")
-        ax_a.text(t + 0.01, ax_a.get_ylim()[1] * 0.95, f"SVF={t}",
-                  fontsize=4.5, color="#888", va="top")
+        ax_a.text(
+            t + 0.01,
+            ax_a.get_ylim()[1] * 0.95,
+            f"SVF={t}",
+            fontsize=4.5,
+            color="#888",
+            va="top",
+        )
     ax_a.axhline(SLOPE_THRESHOLD, color="#aaa", linewidth=0.3, linestyle=":")
-    ax_a.text(0.95, SLOPE_THRESHOLD + 1, f"{SLOPE_THRESHOLD:.0f}\u00b0",
-              fontsize=4.5, color="#888", ha="right")
+    ax_a.text(
+        0.95,
+        SLOPE_THRESHOLD + 1,
+        f"{SLOPE_THRESHOLD:.0f}\u00b0",
+        fontsize=4.5,
+        color="#888",
+        ha="right",
+    )
     ax_a.set_xlabel(r"$SVF$")
     ax_a.set_ylabel("Slope (\u00b0)")
     ax_a.legend(loc="upper right", frameon=False, markerscale=1.5, fontsize=5)
@@ -90,8 +122,12 @@ def main():
         g = grids[site]
         valid = g[["svf", "lambda_p"]].dropna()
         ax_b.scatter(
-            valid["svf"], valid["lambda_p"],
-            s=1, c=SITE_COLORS[site], alpha=0.05, rasterized=True,
+            valid["svf"],
+            valid["lambda_p"],
+            s=1,
+            c=SITE_COLORS[site],
+            alpha=0.05,
+            rasterized=True,
         )
     for site in SITE_ORDER:
         if site not in patches:
@@ -99,15 +135,26 @@ def main():
         p = patches[site]
         v = p[["svf", "lambda_p"]].dropna()
         ax_b.scatter(
-            v["svf"], v["lambda_p"],
-            s=20, c=SITE_COLORS[site], marker=SITE_MARKERS[site],
-            edgecolors="k", linewidths=0.3, zorder=5,
+            v["svf"],
+            v["lambda_p"],
+            s=20,
+            c=SITE_COLORS[site],
+            marker=SITE_MARKERS[site],
+            edgecolors="k",
+            linewidths=0.3,
+            zorder=5,
         )
     for t in SVF_THRESHOLDS:
         ax_b.axvline(t, color="#aaa", linewidth=0.3, linestyle=":")
     ax_b.axhline(LAMBDA_P_THRESHOLD, color="#aaa", linewidth=0.3, linestyle=":")
-    ax_b.text(0.95, LAMBDA_P_THRESHOLD + 0.02, f"$\\lambda_p$={LAMBDA_P_THRESHOLD}",
-              fontsize=4.5, color="#888", ha="right")
+    ax_b.text(
+        0.95,
+        LAMBDA_P_THRESHOLD + 0.02,
+        f"$\\lambda_p$={LAMBDA_P_THRESHOLD}",
+        fontsize=4.5,
+        color="#888",
+        ha="right",
+    )
     ax_b.set_xlabel(r"$SVF$")
     ax_b.set_ylabel(r"$\lambda_p$")
 
@@ -121,19 +168,34 @@ def main():
         for site in SITE_ORDER:
             if site not in strata_summary.columns:
                 continue
-            vals = [strata_summary.loc[sid, site] if sid in strata_summary.index else 0
-                    for sid in strata_ids]
-            ax_c.barh(y, vals, left=lefts, height=0.65,
-                      color=SITE_COLORS[site], edgecolor="white", linewidth=0.3,
-                      label=SITE_LABELS[site])
+            vals = [
+                strata_summary.loc[sid, site] if sid in strata_summary.index else 0
+                for sid in strata_ids
+            ]
+            ax_c.barh(
+                y,
+                vals,
+                left=lefts,
+                height=0.65,
+                color=SITE_COLORS[site],
+                edgecolor="white",
+                linewidth=0.3,
+                label=SITE_LABELS[site],
+            )
             lefts += np.array(vals)
 
         # Total annotations at end of each bar
         for i, sid in enumerate(strata_ids):
             total = int(lefts[i])
             if total > 0:
-                ax_c.text(total + 0.3, i, str(total), va="center", fontsize=5.5,
-                          fontweight="bold")
+                ax_c.text(
+                    total + 0.3,
+                    i,
+                    str(total),
+                    va="center",
+                    fontsize=5.5,
+                    fontweight="bold",
+                )
             else:
                 ax_c.text(0.3, i, "\u2014", va="center", fontsize=5, color="#999")
 
@@ -151,8 +213,9 @@ def main():
 
         try:
             bld = load_buildings(site)
-            bld.plot(ax=ax, facecolor="#e0e0e0", edgecolor="#999",
-                     linewidth=0.05, alpha=0.6)
+            bld.plot(
+                ax=ax, facecolor="#e0e0e0", edgecolor="#999", linewidth=0.05, alpha=0.6
+            )
         except Exception:
             pass
 
@@ -161,11 +224,17 @@ def main():
             for _, row in p.iterrows():
                 cx = row.get("center_x", row.get("centroid_x"))
                 cy = row.get("center_y", row.get("centroid_y"))
-                ax.add_patch(plt.Circle(
-                    (cx, cy), 50,
-                    linewidth=0.6, edgecolor="k",
-                    facecolor=SITE_COLORS[site], alpha=0.4, zorder=5,
-                ))
+                ax.add_patch(
+                    plt.Circle(
+                        (cx, cy),
+                        50,
+                        linewidth=0.6,
+                        edgecolor="k",
+                        facecolor=SITE_COLORS[site],
+                        alpha=0.4,
+                        zorder=5,
+                    )
+                )
 
         clean_map_axes(ax)
         ax.set_aspect("equal")

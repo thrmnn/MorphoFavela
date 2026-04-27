@@ -89,9 +89,7 @@ def build_extended_buildings(
     logger.info("Site buildings: %d features.", len(site_bld))
 
     # Load city-wide buildings — bbox filter for speed (avoids reading 2.4M rows)
-    logger.info(
-        "Loading city-wide buildings (bbox filter, buffer=%dm)...", buffer_m
-    )
+    logger.info("Loading city-wide buildings (bbox filter, buffer=%dm)...", buffer_m)
     if not RJ_BUILDINGS.exists():
         raise FileNotFoundError(f"City-wide buildings not found: {RJ_BUILDINGS}")
     minx, miny, maxx, maxy = buffer_geom.bounds
@@ -141,9 +139,7 @@ def build_extended_buildings(
         common_cols.append("geometry")
 
     extended = gpd.GeoDataFrame(
-        pd.concat(
-            [site_bld[common_cols], rj_context[common_cols]], ignore_index=True
-        ),
+        pd.concat([site_bld[common_cols], rj_context[common_cols]], ignore_index=True),
         crs=site_bld.crs,
     )
 
@@ -151,9 +147,7 @@ def build_extended_buildings(
     invalid = ~extended.geometry.is_valid
     if invalid.any():
         logger.warning("Repairing %d invalid geometries.", invalid.sum())
-        extended.loc[invalid, "geometry"] = extended.loc[
-            invalid, "geometry"
-        ].buffer(0)
+        extended.loc[invalid, "geometry"] = extended.loc[invalid, "geometry"].buffer(0)
 
     # Save
     data_dir = get_area_data_dir(area).parent  # data/{area}/
@@ -168,6 +162,7 @@ def build_extended_buildings(
     except Exception:
         logger.warning("union_all failed for site buildings — using centroid hull.")
         from shapely.geometry import MultiPoint
+
         site_hull_area = MultiPoint(
             site_bld.geometry.centroid.tolist()
         ).convex_hull.area
@@ -177,9 +172,8 @@ def build_extended_buildings(
     except Exception:
         logger.warning("union_all failed for extended buildings — using centroid hull.")
         from shapely.geometry import MultiPoint
-        ext_hull_area = MultiPoint(
-            extended.geometry.centroid.tolist()
-        ).convex_hull.area
+
+        ext_hull_area = MultiPoint(extended.geometry.centroid.tolist()).convex_hull.area
     stats = {
         "site_buildings": len(site_bld),
         "context_buildings": len(rj_context),
@@ -287,7 +281,9 @@ def build_extended_dtm(
     with rasterio.open(output_path, "w", **profile) as dst:
         dst.write(mosaic.astype(np.float32))
 
-    logger.info("Saved %s (%d x %d pixels).", output_path, profile["width"], profile["height"])
+    logger.info(
+        "Saved %s (%d x %d pixels).", output_path, profile["width"], profile["height"]
+    )
 
     stats = {
         "width": profile["width"],
@@ -328,7 +324,11 @@ def generate_diagnostic_figure(
 
     # Buffer zone
     gpd.GeoSeries([buffer_geom], crs=extended.crs).boundary.plot(
-        ax=ax, color="#1f77b4", linewidth=1.5, linestyle=":", label=f"{int(buffer_m)}m buffer"
+        ax=ax,
+        color="#1f77b4",
+        linewidth=1.5,
+        linestyle=":",
+        label=f"{int(buffer_m)}m buffer",
     )
 
     # Context buildings
@@ -460,7 +460,9 @@ def main():
     )
     args = parser.parse_args()
 
-    build_extended_context(args.area, buffer_m=args.buffer, skip_figure=args.skip_figure)
+    build_extended_context(
+        args.area, buffer_m=args.buffer, skip_figure=args.skip_figure
+    )
 
 
 if __name__ == "__main__":

@@ -33,17 +33,24 @@ from scipy.stats import gaussian_kde
 
 
 INDICATORS = [
-    ("svf",           r"$SVF$",           (0, 1)),
-    ("lambda_p",      r"$\lambda_p$",     (0, 1)),
-    ("lambda_f_mean", r"$\lambda_f$",     (0, 2)),
-    ("sigma_h",       r"$\sigma_H$ (m)",  (0, 8)),
-    ("slope_deg",     "Slope (°)",         (0, 50)),
+    ("svf", r"$SVF$", (0, 1)),
+    ("lambda_p", r"$\lambda_p$", (0, 1)),
+    ("lambda_f_mean", r"$\lambda_f$", (0, 2)),
+    ("sigma_h", r"$\sigma_H$ (m)", (0, 8)),
+    ("slope_deg", "Slope (°)", (0, 50)),
 ]
 
 
 def load_grid_res(site: str, suffix: str = "") -> gpd.GeoDataFrame | None:
     """Load a grid by resolution suffix. '' = 10m default, '_20m' = 20m."""
-    path = PROJECT_ROOT / "outputs" / site / f"morphometrics{suffix}" / "grid" / "grid_metrics.gpkg"
+    path = (
+        PROJECT_ROOT
+        / "outputs"
+        / site
+        / f"morphometrics{suffix}"
+        / "grid"
+        / "grid_metrics.gpkg"
+    )
     if not path.exists():
         return None
     return gpd.read_file(path)
@@ -58,7 +65,8 @@ def make_variant_a():
     apply_style()
 
     fig, axes = plt.subplots(
-        len(SITE_ORDER), len(INDICATORS),
+        len(SITE_ORDER),
+        len(INDICATORS),
         figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 0.72),
         sharex="col",
     )
@@ -82,9 +90,18 @@ def make_variant_a():
                 x = np.linspace(xlim[0], xlim[1], 200)
                 k10 = gaussian_kde(v10, bw_method=0.1)
                 k20 = gaussian_kde(v20, bw_method=0.1)
-                ax.fill_between(x, k10(x), color=SITE_COLORS[site], alpha=0.12, linewidth=0)
+                ax.fill_between(
+                    x, k10(x), color=SITE_COLORS[site], alpha=0.12, linewidth=0
+                )
                 ax.plot(x, k10(x), color=SITE_COLORS[site], linewidth=0.8, label="10 m")
-                ax.plot(x, k20(x), color="#333333", linewidth=0.8, linestyle="--", label="20 m")
+                ax.plot(
+                    x,
+                    k20(x),
+                    color="#333333",
+                    linewidth=0.8,
+                    linestyle="--",
+                    label="20 m",
+                )
             except Exception:
                 ax.set_visible(False)
                 continue
@@ -97,8 +114,14 @@ def make_variant_a():
             if row == 0:
                 ax.set_title(label, fontsize=7, pad=4)
             if col == 0:
-                ax.set_ylabel(SITE_LABELS[site], fontsize=6, rotation=0,
-                              labelpad=30, va="center", ha="right")
+                ax.set_ylabel(
+                    SITE_LABELS[site],
+                    fontsize=6,
+                    rotation=0,
+                    labelpad=30,
+                    va="center",
+                    ha="right",
+                )
             if row == len(SITE_ORDER) - 1:
                 ax.tick_params(labelsize=5)
             else:
@@ -116,10 +139,13 @@ def make_variant_a():
 # ══════════════════════════════════════════════════════════════════════
 
 
-def _upscale_10m_to_20m(g10: gpd.GeoDataFrame, g20: gpd.GeoDataFrame, col: str) -> pd.Series:
+def _upscale_10m_to_20m(
+    g10: gpd.GeoDataFrame, g20: gpd.GeoDataFrame, col: str
+) -> pd.Series:
     """Spatial average of 10m cell values within each 20m cell footprint."""
     # Each 20m cell contains up to 4 10m cells. Match by centroid containment.
     from scipy.spatial import cKDTree
+
     tree = cKDTree(g10[["centroid_x", "centroid_y"]].values)
     # For each 20m centroid, query points within a 10m radius (captures ~4 cells)
     coords_20 = g20[["centroid_x", "centroid_y"]].values
@@ -138,8 +164,9 @@ def make_variant_b():
         print("  SKIP variant B — Vidigal grids missing.")
         return
 
-    fig, axes = plt.subplots(1, len(INDICATORS),
-                             figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 0.22))
+    fig, axes = plt.subplots(
+        1, len(INDICATORS), figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 0.22)
+    )
 
     for ax, (col, label, lim) in zip(axes, INDICATORS):
         upscaled = _upscale_10m_to_20m(g10, g20, col)
@@ -150,8 +177,15 @@ def make_variant_b():
             ax.set_visible(False)
             continue
 
-        ax.scatter(u, n, s=3, c=SITE_COLORS["vidigal"], alpha=0.35, linewidths=0,
-                   rasterized=True)
+        ax.scatter(
+            u,
+            n,
+            s=3,
+            c=SITE_COLORS["vidigal"],
+            alpha=0.35,
+            linewidths=0,
+            rasterized=True,
+        )
         ax.plot(lim, lim, color="#888888", linewidth=0.5, linestyle="--")
 
         r, _ = stats.pearsonr(u, n)
@@ -184,20 +218,26 @@ def make_variant_c():
         return
 
     map_indicators = [
-        ("svf",       r"$SVF$",        CMAP_SVF,      (0, 0.8)),
-        ("lambda_p",  r"$\lambda_p$",  CMAP_LAMBDA_P, (0, 1.0)),
-        ("slope_deg", "Slope (°)",      CMAP_SLOPE,    (0, 45)),
+        ("svf", r"$SVF$", CMAP_SVF, (0, 0.8)),
+        ("lambda_p", r"$\lambda_p$", CMAP_LAMBDA_P, (0, 1.0)),
+        ("slope_deg", "Slope (°)", CMAP_SLOPE, (0, 45)),
     ]
 
     n_rows = len(map_indicators)
-    fig, axes = plt.subplots(n_rows, 3,
-                             figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 1.05))
+    fig, axes = plt.subplots(n_rows, 3, figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 1.05))
 
     for row, (col, label, cmap, vlim) in enumerate(map_indicators):
         # 10m native
         ax = axes[row, 0]
-        g10.plot(ax=ax, column=col, cmap=cmap, vmin=vlim[0], vmax=vlim[1],
-                 edgecolor="none", legend=False)
+        g10.plot(
+            ax=ax,
+            column=col,
+            cmap=cmap,
+            vmin=vlim[0],
+            vmax=vlim[1],
+            edgecolor="none",
+            legend=False,
+        )
         clean_map_axes(ax)
         ax.set_aspect("equal")
         if row == 0:
@@ -207,8 +247,15 @@ def make_variant_c():
 
         # 20m native
         ax = axes[row, 1]
-        g20.plot(ax=ax, column=col, cmap=cmap, vmin=vlim[0], vmax=vlim[1],
-                 edgecolor="none", legend=False)
+        g20.plot(
+            ax=ax,
+            column=col,
+            cmap=cmap,
+            vmin=vlim[0],
+            vmax=vlim[1],
+            edgecolor="none",
+            legend=False,
+        )
         clean_map_axes(ax)
         ax.set_aspect("equal")
         if row == 0:
@@ -221,8 +268,15 @@ def make_variant_c():
         g20_diff = g20.copy()
         g20_diff["_diff"] = np.abs(g20[col].values - upscaled.values)
         dmax = float(np.nanpercentile(g20_diff["_diff"].values, 95))
-        g20_diff.plot(ax=ax, column="_diff", cmap="Reds", vmin=0, vmax=dmax,
-                      edgecolor="none", legend=False)
+        g20_diff.plot(
+            ax=ax,
+            column="_diff",
+            cmap="Reds",
+            vmin=0,
+            vmax=dmax,
+            edgecolor="none",
+            legend=False,
+        )
         clean_map_axes(ax)
         ax.set_aspect("equal")
         if row == 0:
@@ -231,14 +285,19 @@ def make_variant_c():
 
         # Colorbar for native maps
         import matplotlib.colors as mcolors
-        sm = plt.cm.ScalarMappable(cmap=cmap,
-                                   norm=mcolors.Normalize(vmin=vlim[0], vmax=vlim[1]))
-        cbar = fig.colorbar(sm, ax=axes[row, :2].tolist(), shrink=0.7, pad=0.02, aspect=30)
+
+        sm = plt.cm.ScalarMappable(
+            cmap=cmap, norm=mcolors.Normalize(vmin=vlim[0], vmax=vlim[1])
+        )
+        cbar = fig.colorbar(
+            sm, ax=axes[row, :2].tolist(), shrink=0.7, pad=0.02, aspect=30
+        )
         cbar.ax.tick_params(labelsize=5, width=0.3, length=2)
         cbar.outline.set_linewidth(0.3)
 
-        sm_d = plt.cm.ScalarMappable(cmap="Reds",
-                                     norm=mcolors.Normalize(vmin=0, vmax=dmax))
+        sm_d = plt.cm.ScalarMappable(
+            cmap="Reds", norm=mcolors.Normalize(vmin=0, vmax=dmax)
+        )
         cbar_d = fig.colorbar(sm_d, ax=ax, shrink=0.7, pad=0.02, aspect=20)
         cbar_d.ax.tick_params(labelsize=5, width=0.3, length=2)
         cbar_d.outline.set_linewidth(0.3)
@@ -249,6 +308,7 @@ def make_variant_c():
 def make_canonical():
     """Canonical S3 (distribution overlay) saved as figS3_resolution_sensitivity."""
     import shutil
+
     make_variant_a()
     # Promote S3a to the canonical S3 output
     src_svg = EXPORTS_DIR / "figS3a_distribution_overlay.svg"
@@ -264,9 +324,13 @@ def make_canonical():
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Generate Fig S3 (resolution sensitivity)")
+
+    parser = argparse.ArgumentParser(
+        description="Generate Fig S3 (resolution sensitivity)"
+    )
     parser.add_argument(
-        "--variants", action="store_true",
+        "--variants",
+        action="store_true",
         help="Also generate B (scatter) and C (difference maps) — archived in exports/_variants/",
     )
     args = parser.parse_args()
