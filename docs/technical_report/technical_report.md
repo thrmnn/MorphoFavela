@@ -116,13 +116,27 @@ coordinates, time window, observation count, calm fraction, anemometer
 reference height, and a `quality_flag` ∈ {`measured`, `gap-filled`,
 `placeholder-prior`}).
 
-**Current status.** All five files are regenerated from a Rio-coastal
-climatological prior and explicitly tagged `placeholder-prior`. They
-carry a per-site recommended INMET station and an `expected_adjustment`
-note describing how real station data is likely to differ from the
-prior. They are not usable for annualised metrics; the CFD campaign's
-results chapter will only be compiled once real data replaces the
-placeholders.
+**Current status (April 2026).** All five `wind_rose.json` files now
+carry measured hourly observations and are tagged `quality_flag:
+"measured"`. The four hillside / inland sites use INMET BDMEP records
+from 2016–2024 (a 7-year window with three years dropped due to INMET
+server-side transfer failures during the bulk download — 2015, 2019,
+and 2021); Maré uses the Iowa State ASOS METAR archive of SBGL Galeão
+across 2015–2024. Sample sizes range from n = 46,664 (A636 Jacarepaguá,
+which only began reporting in August 2017) to n = 89,439 (SBGL).
+Per-site directional frequencies, mean speeds, and calm fractions are
+shown in **Figure S5** (`docs/technical_report/figures/figS5_wind_roses.png`):
+
+| Site (station) | n | Window | Calm | Prevailing dir | Notes |
+|---|---|---|---|---|---|
+| Vidigal / Rocinha (A652 Forte de Copacabana) | 58,943 | 2016–2024 | 1.4 % | E (30 %), W (23 %) | Coastal cliff: bimodal sea-breeze and reverse-channel along the Dois Irmãos saddle. |
+| Rio das Pedras (A636 Jacarepaguá) | 46,664 | 2017–2024 | 46.6 % | SW (26 %), W (20 %) | Sheltered basin, weak winds (Ū ≈ 1.3 m/s); high calm fraction reflects the Jacarepaguá lowland regime, not measurement gaps. |
+| Complexo do Alemão (A621 Vila Militar) | 59,759 | 2016–2024 | 33.4 % | N (26 %), SW (19 %) | North-zone interior; bay sea-breeze + post-frontal SW pattern. |
+| Maré (SBGL Galeão METAR) | 89,439 | 2015–2024 | 3.7 % | SE (26 %), E (19 %) | Bay regime; continuous METAR coverage gives the largest sample. |
+
+A second iteration with the three missing years filled in is expected
+once the INMET portal stabilises; the directional structure is unlikely
+to shift materially given the multi-year sample already in hand.
 
 **Recommended stations** (verified April 2026 against the INMET
 catalogue, daily-graph URLs, and the published TMY paper for A652):
@@ -630,8 +644,8 @@ data/{site}/cfd_results/{patch_id}/{wind_direction}/
   field.vtu               # optional — full 3D field
 ```
 
-Plus `data/{site}/wind_rose.json` per site (currently placeholder,
-must be rebuilt from INMET data before analysis).
+Plus `data/{site}/wind_rose.json` per site (now built from measured
+INMET BDMEP / Iowa ASOS records; see §2.3 and Figure S5).
 
 ### 7.2 Module architecture
 

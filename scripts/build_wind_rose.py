@@ -232,8 +232,14 @@ def from_inmet_csv(
     frames = [_read_inmet_csv(p) for p in paths]
     df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
-    # Normalise column names
-    df.columns = [c.lower().strip().replace(" ", "_") for c in df.columns]
+    # Normalise column names: lowercase, strip whitespace, strip accents,
+    # replace spaces with underscores. INMET headers contain "direção",
+    # "pressão", etc., which would otherwise miss our ASCII candidates.
+    import unicodedata
+    def _norm(s: str) -> str:
+        nf = unicodedata.normalize("NFKD", s)
+        return "".join(c for c in nf if not unicodedata.combining(c)).lower().strip().replace(" ", "_")
+    df.columns = [_norm(c) for c in df.columns]
 
     def _find_col(candidates):
         for cand in candidates:
@@ -252,8 +258,15 @@ def from_inmet_csv(
             f"Columns found: {list(df.columns)}"
         )
 
+    # INMET changed the date format around 2019: pre-2019 uses
+    # ISO "YYYY-MM-DD"; 2019+ uses Portuguese "YYYY/MM/DD". Normalise
+    # before parsing so concat'd files spanning the change still work.
+    def _parse_dates(s):
+        s = s.astype(str).str.replace("/", "-", regex=False)
+        return pd.to_datetime(s, errors="coerce")
+
     if date_col and (year_start or year_end):
-        df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+        df[date_col] = _parse_dates(df[date_col])
         if year_start:
             df = df[df[date_col].dt.year >= year_start]
         if year_end:
@@ -261,7 +274,7 @@ def from_inmet_csv(
 
     tw_start = tw_end = None
     if date_col and len(df) > 0:
-        dates = pd.to_datetime(df[date_col], errors="coerce").dropna()
+        dates = _parse_dates(df[date_col]).dropna()
         if len(dates) > 0:
             tw_start = dates.min().date().isoformat()
             tw_end = dates.max().date().isoformat()
