@@ -8,7 +8,66 @@ a stable v1.0 is cut.
 
 ## [Unreleased]
 
-### Added
+### Added — production-grade pass
+
+- `CHANGELOG.md`, `CONTRIBUTING.md`, `CITATION.cff` (this file is
+  what activates GitHub's "Cite this repository" widget).
+- `.pre-commit-config.yaml` — ruff format + check + standard
+  pre-commit-hooks (trailing whitespace, EOF, YAML/TOML syntax,
+  merge-conflict markers, large-file guard at 2 MB).
+- `data/README.md` (now tracked) — input contract per `data/{site}/`
+  + INMET / Iowa ASOS recovery commands + manual-clip steps.
+- Per-package READMEs across `src/`: `svf_v2/`, `solar/`,
+  `morphometry/`, `visualization/` (matching the existing
+  `cfd_integration/README.md` standard).
+- `scripts/README.md` — index of all 27 entry-point scripts grouped
+  by pipeline stage, with a "CLI" column showing the `ivf-*`
+  console aliases.
+- 11 `ivf-*` console scripts via `[project.scripts]` in
+  `pyproject.toml` — `ivf-svf`, `ivf-morphometry`, `ivf-wind-rose`,
+  etc. Available after `pip install -e .`.
+- `[tool.ruff]` configuration in `pyproject.toml` with documented
+  pragmatic ignores for cosmetic checks; CI now lints `scripts/`
+  and `outputs/paper_figures/` in addition to `src/`+`tests/`.
+
+### Changed — production-grade pass
+
+- README rewritten: 611 → 279 lines, single canonical walkthrough
+  (clone → install → run on vidigal end-to-end → paper figures)
+  replacing four overlapping Quick Start / Usage Examples /
+  Configuration / Output Files blocks. Per-module details now
+  defer to `src/<module>/README.md`.
+- 8 stale planning docs moved to `docs/archive/`
+  (ALIGNMENT_EXPLANATION, DOCUMENTATION, GPU_SETUP,
+  FAVELA_DATA_EXTRACTION_PLAN, FAVELA_EXTRACTION_SUMMARY,
+  PYTORCH3D_GPU_IMPLEMENTATION, SVF_OPTIMIZATION_COMMIT_SUMMARY,
+  TEST_SUITE_DESIGN).
+- `.gitignore` tightened (build/, dist/, .mypy_cache/, .coverage,
+  htmlcov/) and adjusted to permit the tracked `data/README.md`.
+
+### Fixed — production-grade pass
+
+- 5 bare `except:` clauses → `except Exception:` in
+  `analyze_sky_exposure_streets.py`, `compare_areas.py`,
+  `compute_deprivation_index_raster.py`, `compute_occupancy_density.py`,
+  `compute_sectional_porosity.py`.
+- `src/cfd_integration/io.py:96` — `raise ImportError` inside an
+  `except ImportError` block now uses `from exc` so the original
+  traceback is preserved.
+
+### Known issues — flagged for follow-up
+
+- 3 scripts import deleted sibling modules and fail at launch
+  (`compute_solar_access_streets.py`, `analyze_sky_exposure_streets.py`,
+  `compute_deprivation_streets.py`). Library functions still
+  exist; documented in `scripts/README.md` for a future cleanup
+  pass.
+- `compute_deprivation_index.py` ↔ `compute_deprivation_index_raster.py`
+  functional overlap; should likely consolidate on a
+  `--resolution {unit,raster}` flag.
+
+### Added — wind-rose work (earlier this cycle)
+
 - `scripts/download_inmet_zips.py` — robust INMET BDMEP yearly ZIP
   downloader with HTTP Range resume + per-attempt validation. Replaces
   the curl 7.68 + `-C -` workflow which trips on the INMET portal's
