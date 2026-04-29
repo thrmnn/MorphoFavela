@@ -58,6 +58,9 @@ ivf-compare = "scripts.compare_areas:main"
 # CFD patch sampling
 ivf-pilot-sampling = "scripts.run_pilot_sampling:main"
 ivf-campaign-sampling = "scripts.run_campaign_sampling:main"
+# CFD result analysis
+ivf-synthetic-cfd = "scripts.generate_synthetic_cfd_results:main"
+ivf-analyze-cfd = "scripts.analyze_cfd_results:main"
 
 [tool.pytest.ini_options]
 markers = [

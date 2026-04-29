@@ -8,6 +8,42 @@ a stable v1.0 is cut.
 
 ## [Unreleased]
 
+### Added — result-side CFD analysis pipeline (`scripts/analyze_cfd_results.py`)
+
+- New `scripts/analyze_cfd_results.py` orchestrates the full chain
+  for one site: discover returned patches → aggregate per-direction
+  → wind-rose annualise (frequency × speed weighting by default) →
+  per-patch indicator table joined with morphometric covariates →
+  per-cell cell-level annualisation onto the 10 m grid → within-site
+  OLS predictor regression (ACH/U_mean ~ SVF + λp + slope + σ_h) →
+  Figure 5 wind-panel PNG. Auto-detects IVF-native CSV and
+  Airflow-native parquet layouts via the existing
+  `src.cfd_integration.io` adapter.
+- New `scripts/generate_synthetic_cfd_results.py` produces a complete
+  `data/{site}/cfd_results/` tree (per-patch × 8-direction sample
+  files + summary.json) keyed off `campaign_patches.csv`. Mean
+  in-canopy U_mag is modulated by patch SVF and λp so the predictor
+  regression has the expected sign structure (lower SVF + higher λp
+  → lower ventilation). Both layouts (`csv`, `parquet`) produced
+  identically; `--n-patches`, `--n-samples`, `--seed` for control.
+- Outputs written to `outputs/{site}/cfd_analysis/`:
+  `per_patch_indicators.csv`, `grid_with_cfd.gpkg`,
+  `predictor_regression.csv`, `figures/fig5_wind_panel.png`,
+  `coverage.json` (which patches/directions returned, what was
+  missing, weighting method).
+- Smoke-tested end-to-end on real Vidigal campaign patches (5/22
+  patches × 8 directions × 2,000 samples → full chain runs in 2.7 s,
+  produces 386 covered grid cells, U_mean range 0.63–2.38 m/s).
+- 6 new tests in `tests/test_cfd_integration/test_analyze.py` cover
+  the synthetic generator (CSV + parquet layouts), the full chain,
+  partial coverage (one direction missing), patch absence (entire
+  patch missing), and parquet auto-detection. Full CFD test suite
+  stays green at 63 tests.
+- Two new entry points: `ivf-synthetic-cfd` and `ivf-analyze-cfd`.
+- Docs/§7.4 update is deferred until real VDG-P07 results land —
+  the synthetic chain validates the plumbing but the manuscript
+  text wants real coefficients to cite.
+
 ### Changed — technical report §10/§11 reconciled with shipped reality
 
 - §10.1 rewritten: "Wind forcing is placeholder" → "Neutral stability
