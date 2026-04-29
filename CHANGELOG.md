@@ -8,6 +8,25 @@ a stable v1.0 is cut.
 
 ## [Unreleased]
 
+### Fixed — `src/exposure` package vs module collision (regression from `ede48ad`)
+
+- The deprivation cleanup in `ede48ad` created `src/exposure/` as a
+  package without removing the original `src/exposure.py` single-file
+  module. Python's import machinery picked up the package and shadowed
+  the original module's symbols (`compute_exposure_index`,
+  `compute_zone_solar_deficit`, `plot_exposure_panel`, …), breaking
+  `from src.exposure import compute_exposure_index, ...` everywhere.
+  Compounding this, `tests/test_exposure.py` (the file) and
+  `tests/test_exposure/` (the new directory holding `test_deprivation.py`)
+  collided in pytest collection, taking the full suite from green to
+  failing-on-collection.
+- `src/exposure.py` → `src/exposure/sky_exposure.py`; package
+  `__init__.py` re-exports the original symbols alongside the
+  deprivation formulas. `tests/test_exposure.py` →
+  `tests/test_exposure/test_sky_exposure.py` so both test modules
+  live under the same package and pytest can collect both.
+- Full suite now: **526 passed, 22 skipped** (was: collection error).
+
 ### Added — result-side CFD analysis pipeline (`scripts/analyze_cfd_results.py`)
 
 - New `scripts/analyze_cfd_results.py` orchestrates the full chain

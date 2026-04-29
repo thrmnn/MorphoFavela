@@ -1,17 +1,24 @@
-"""Composite morphological-environmental deprivation indices.
+"""Environmental exposure metrics, deprivation formulas, and visualisation.
 
-The two deprivation scripts in `scripts/` (unit-level and raster-level)
-share the same underlying formulas; those formulas live here so any
-change is a single point of edit.
+Two layers:
 
-Public API:
-    solar_deficit       — 1 - hours/reference, clipped [0, 1]
-    ventilation_deficit — 1 - (svf + porosity) / 2, clipped [0, 1]
-    hotspot_index       — equal-weighted mean of the three deficits
+* ``src.exposure.deprivation`` — pure arithmetic for the three deprivation
+  formulas (solar, ventilation, hotspot). Type-agnostic; works on numpy
+  arrays and pandas Series alike. Used by the two ``compute_deprivation_*``
+  scripts so they can't silently drift.
+* ``src.exposure.sky_exposure`` — zone-level metrics + composite exposure
+  index + the two plotting routines. Heavyweight (geopandas, matplotlib);
+  used by the legacy zone-analysis pipeline.
 
-Type-specific concerns (numpy NaN propagation, pandas percentile
-ranking, plotting, I/O) stay in the calling scripts; only the
-arithmetic is shared.
+Public API (re-exported here for stable callers):
+    Deprivation formulas:
+        solar_deficit, ventilation_deficit, hotspot_index,
+        DEFAULT_SOLAR_REFERENCE_HOURS
+    Zone-level metrics + composite:
+        compute_zone_solar_deficit, compute_zone_svf_deficit,
+        compute_zone_building_density, compute_exposure_index
+    Visualisation:
+        plot_exposure_panel, plot_exposure_bivariate
 """
 
 from src.exposure.deprivation import (
@@ -20,10 +27,24 @@ from src.exposure.deprivation import (
     solar_deficit,
     ventilation_deficit,
 )
+from src.exposure.sky_exposure import (
+    compute_exposure_index,
+    compute_zone_building_density,
+    compute_zone_solar_deficit,
+    compute_zone_svf_deficit,
+    plot_exposure_bivariate,
+    plot_exposure_panel,
+)
 
 __all__ = [
     "DEFAULT_SOLAR_REFERENCE_HOURS",
     "solar_deficit",
     "ventilation_deficit",
     "hotspot_index",
+    "compute_zone_solar_deficit",
+    "compute_zone_svf_deficit",
+    "compute_zone_building_density",
+    "compute_exposure_index",
+    "plot_exposure_panel",
+    "plot_exposure_bivariate",
 ]
