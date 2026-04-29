@@ -34,6 +34,8 @@ from tqdm import tqdm
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src import exposure  # noqa: E402  — sys.path adjusted above
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -201,15 +203,14 @@ def compute_deficits(
 
     logger.info(f"  Solar reference: {solar_reference:.2f} hours")
 
-    # Compute solar deficit
-    result["solar_deficit"] = 1.0 - (result["mean_solar_hours"] / solar_reference)
-    result["solar_deficit"] = result["solar_deficit"].clip(0.0, 1.0)
+    # Compute solar deficit (shared formula in src/exposure/deprivation.py)
+    result["solar_deficit"] = exposure.solar_deficit(result["mean_solar_hours"], solar_reference)
 
-    # 2. Ventilation deficit
-    # Combine SVF and porosity: ventilation_score = (svf + porosity) / 2
+    # 2. Ventilation deficit (shared formula in src/exposure/deprivation.py)
     result["ventilation_score"] = (result["mean_svf"] + result["mean_porosity"]) / 2.0
-    result["ventilation_deficit"] = 1.0 - result["ventilation_score"]
-    result["ventilation_deficit"] = result["ventilation_deficit"].clip(0.0, 1.0)
+    result["ventilation_deficit"] = exposure.ventilation_deficit(
+        result["mean_svf"], result["mean_porosity"]
+    )
 
     # 3. Occupancy pressure (percentile rank of density_proxy)
     valid_density = result["density_proxy"][result["density_proxy"] > 0]
@@ -246,13 +247,10 @@ def compute_hotspot_index(analysis_units: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
     result = analysis_units.copy()
 
-    # Compute composite index with equal weighting
-    result["hotspot_index"] = (
-        result["solar_deficit"] + result["ventilation_deficit"] + result["occupancy_score"]
-    ) / 3.0
-
-    # Clamp to [0, 1]
-    result["hotspot_index"] = result["hotspot_index"].clip(0.0, 1.0)
+    # Compute composite index with equal weighting (shared formula)
+    result["hotspot_index"] = exposure.hotspot_index(
+        result["solar_deficit"], result["ventilation_deficit"], result["occupancy_score"]
+    ).clip(0.0, 1.0)
 
     logger.info(f"  Mean hotspot index: {result['hotspot_index'].mean():.3f}")
     logger.info(f"  Min hotspot index: {result['hotspot_index'].min():.3f}")

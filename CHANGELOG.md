@@ -8,6 +8,43 @@ a stable v1.0 is cut.
 
 ## [Unreleased]
 
+### Removed — broken `_streets.py` scripts (cleanup)
+
+- `scripts/compute_solar_access_streets.py`,
+  `scripts/analyze_sky_exposure_streets.py`,
+  `scripts/compute_deprivation_streets.py` deleted. They had been
+  broken since the `src/svf_v2/` refactor — they imported
+  `scripts.compute_svf_streets` and `scripts.analyze_sky_exposure`
+  which no longer exist. Library functions for street-level analysis
+  remain available (`src.solar.compute.compute_solar_access_streets`,
+  `src.svf_v2.sampling.sample_street_points`); anyone needing the
+  CLI form can write a thin wrapper from those primitives. Old
+  implementations preserved at commit `82f7f44~1` for reference.
+- `scripts/README.md` "Known issues" section rewritten to reflect
+  the cleanup (no more dangling broken-script row).
+
+### Added — `src/exposure/` shared deprivation formulas
+
+- New `src/exposure/deprivation.py` module hosts the three formulas
+  shared between `compute_deprivation_index.py` (unit-level) and
+  `compute_deprivation_index_raster.py` (raster-level):
+  `solar_deficit`, `ventilation_deficit`, `hotspot_index`. The
+  formulas are deliberately type-agnostic — they work on numpy
+  ndarrays, pandas Series, and DataFrame columns alike via
+  duck-typed arithmetic + `.clip()`.
+- Both deprivation scripts patched to import from the shared module
+  instead of inlining the formulas. The scripts continue to handle
+  type-specific concerns (numpy NaN propagation, pandas percentile
+  ranking, plotting) themselves; only the math is centralised.
+- 16 new tests in `tests/test_exposure/test_deprivation.py`
+  verifying numpy/pandas equivalence and edge cases (zero hours,
+  exactly-at-reference, above-reference clipping). All pass.
+- Full unit↔raster consolidation onto a `--resolution {unit,raster}`
+  flag is still pending — but the residual duplication after this
+  pass is mostly the I/O and plotting wrappers, not the math, so
+  the two scripts can no longer silently disagree on what the index
+  *means*.
+
 ### Added — Airflow result adapter + report-sync hook
 
 - `src/cfd_integration/io.py::load_patch_parquet` — parquet reader

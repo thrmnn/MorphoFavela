@@ -107,34 +107,27 @@ the top-level `README.md` Repository Map.
 
 ---
 
-## Known issues / candidates for cleanup
+## Notes on cleanup history
 
-The following scripts are **broken** (import a module that no
-longer exists) and have not yet been removed pending a decision on
-whether the missing functionality should be restored.
+The street-level SVF + solar + sky-exposure scripts
+(`compute_solar_access_streets.py`, `analyze_sky_exposure_streets.py`,
+`compute_deprivation_streets.py`) were removed on 2026-04-29
+because they had been broken since the `src/svf_v2/` refactor
+— they imported sibling scripts that were deleted at that time.
+The library functions remain available:
+`src.solar.compute.compute_solar_access_streets` and
+`src.svf_v2.sampling.sample_street_points`. Anyone wanting
+street-level analysis can write a thin CLI wrapper using those
+helpers in <100 lines; the deleted scripts are preserved in git
+history if their implementations are useful as a reference.
 
-| Script | Symptom | Orphaned reference |
-|---|---|---|
-| `compute_solar_access_streets.py` | Import error on launch | `from scripts.compute_svf_streets import …` (file deleted) |
-| `analyze_sky_exposure_streets.py` | Import error on launch | `from scripts.analyze_sky_exposure import …` (file deleted) |
-| `compute_deprivation_streets.py` | Runtime fails: prerequisite outputs come from the two broken scripts above | Indirect |
-
-The street-level SVF + solar + sky-exposure functionality referenced
-by these scripts was previously provided by two scripts that were
-removed when `src/svf_v2/` was introduced. The library functions
-(`src.solar.compute.compute_solar_access_streets`,
-`src.svf_v2.sample_street_points`) still exist — these scripts need
-to be either rewritten as thin CLI wrappers around the library or
-deleted. **TODO** for a follow-up consolidation pass; flagging here
-so the broken state is at least documented.
-
-There are also two pairs of scripts whose functional overlap should
-be reviewed:
-
-- `compute_deprivation_index.py` (unit-level, 621 lines) vs
-  `compute_deprivation_index_raster.py` (raster, 759 lines) — both
-  compute the same combined index at different resolutions; consider
-  merging on a `--resolution {unit,raster}` flag.
-- `compute_solar_access.py` (ground grid, 451 lines) — fine
-  on its own; the broken `_streets.py` sibling should be deleted
-  or merged.
+The deprivation-index pair
+(`compute_deprivation_index.py` unit-level and
+`compute_deprivation_index_raster.py` raster-level) share their
+core deficit formulas via `src/exposure/deprivation.py`. The two
+scripts continue to exist because they have genuinely different
+semantics — unit-level aggregates rasters into spatial units for
+policy interpretation, raster-level produces a continuous 2D map
+for visualisation. A future consolidation could collapse them onto
+a `--resolution {unit,raster}` flag, but the residual duplication
+is now mostly the I/O and plotting wrappers, not the math.

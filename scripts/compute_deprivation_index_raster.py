@@ -36,6 +36,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import shared utilities
+from src import exposure
 from src.svf_v2.utils import (
     compute_ground_mask,
     load_building_footprints,
@@ -260,14 +261,12 @@ def compute_raster_deficits(
 
     logger.info(f"  Solar reference: {solar_reference:.2f} hours")
 
-    solar_deficit = 1.0 - (solar_map / solar_reference)
-    solar_deficit = np.clip(solar_deficit, 0.0, 1.0)
+    # 1. Solar deficit (shared formula in src/exposure/deprivation.py)
+    solar_deficit = exposure.solar_deficit(solar_map, solar_reference)
     solar_deficit[np.isnan(solar_map)] = np.nan
 
-    # 2. Ventilation deficit
-    ventilation_score = (svf_map + porosity_map) / 2.0
-    ventilation_deficit = 1.0 - ventilation_score
-    ventilation_deficit = np.clip(ventilation_deficit, 0.0, 1.0)
+    # 2. Ventilation deficit (shared formula in src/exposure/deprivation.py)
+    ventilation_deficit = exposure.ventilation_deficit(svf_map, porosity_map)
     ventilation_deficit[np.isnan(svf_map) | np.isnan(porosity_map)] = np.nan
 
     # 3. Occupancy pressure (percentile rank)
@@ -318,10 +317,11 @@ def compute_hotspot_index_raster(
     """
     logger.info("Computing composite hotspot index...")
 
-    hotspot_index = (solar_deficit + ventilation_deficit + occupancy_score) / 3.0
+    # Composite index (shared formula in src/exposure/deprivation.py)
+    hotspot_index = exposure.hotspot_index(solar_deficit, ventilation_deficit, occupancy_score)
     hotspot_index = np.clip(hotspot_index, 0.0, 1.0)
 
-    # Set NaN where any input is NaN
+    # Set NaN where any input is NaN (raster-specific NaN propagation)
     mask = np.isnan(solar_deficit) | np.isnan(ventilation_deficit) | np.isnan(occupancy_score)
     hotspot_index[mask] = np.nan
 
