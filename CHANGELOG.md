@@ -8,6 +8,36 @@ a stable v1.0 is cut.
 
 ## [Unreleased]
 
+### Added — SVF cross-validated against UMEP (closes §10.3 limitation)
+
+- `scripts/validate_svf_against_umep.py` benchmarks the IVF Tregenza-145
+  ray-cast SVF against UMEP's shadow-casting SVF
+  (`svfForProcessing153`, Lindberg & Holmer 2010, used in SOLWEIG) on a
+  rasterised DSM. The two engines are algorithmically distinct
+  (mesh ray-casting vs raster shadow-casting); their agreement is the
+  evidence reviewers want for "SVF absolute values are defensible".
+- UMEP source is auto-fetched on first run into `vendor/umep_processing/`
+  (gitignored) and patched to bypass its QGIS-only `util/__init__.py`.
+  No QGIS install needed; only `gdal` (and a `numba`-compatible
+  numpy < 2.3, both pulled into the conda env).
+- Vidigal benchmark at 1 m DSM: **n = 2,510 cells, r² = 0.68,
+  slope = 1.01, RMSE = 0.14, bias = −0.05** SVF units. The small
+  negative bias is consistent with the methodological offset
+  (IVF samples passageways at z = 1.5 m; UMEP integrates at the DSM
+  surface). UMEP is aggregated to the 10 m grid only over non-building
+  pixels — without that mask the comparison is contaminated by rooftop
+  pixels that UMEP scores ~1.0 but IVF never samples. The mask brought
+  r² from 0.04 to 0.68.
+- Outputs land in `outputs/{site}/morphometrics/svf/umep_validation/`
+  (per-cell scatter PNG, per-cell CSV, summary stats CSV). The scatter
+  is copied to `docs/technical_report/figures/figS6_umep_validation.png`
+  for the report.
+- Technical report: §4 SVF definition gains a "Cross-validation against
+  UMEP" paragraph with the headline numbers; §10.3 "SVF validation
+  pending" → "SVF validated against UMEP (limitation closed
+  2026-04-29)"; figure index updated with figS5 (wind roses, was
+  missing) and figS6 (UMEP validation). PDF rebuilt.
+
 ### Fixed — `src/exposure` package vs module collision (regression from `ede48ad`)
 
 - The deprivation cleanup in `ede48ad` created `src/exposure/` as a

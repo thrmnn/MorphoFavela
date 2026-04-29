@@ -65,3 +65,4 @@ Thumbs.db
 .ipynb_checkpoints/
 *.ipynb
 
+vendor/
