@@ -8,6 +8,52 @@ a stable v1.0 is cut.
 
 ## [Unreleased]
 
+### Added — Airflow result adapter + report-sync hook
+
+- `src/cfd_integration/io.py::load_patch_parquet` — parquet reader
+  parallel to `load_patch_csv`. Single-file or multi-file (concatenated
+  row-wise, used when OpenFOAM emits one parquet per processor
+  decomposition).
+- `src/cfd_integration/io.py::_normalize_wind_direction` — accepts
+  both the IVF-native cardinal form (`N`, `NE`, …) and the Airflow-
+  native `wind_NNN` form (`wind_000` → `N`, `wind_045` → `NE`, …,
+  `wind_315` → `NW`); off-axis degrees return `None` so callers can
+  warn-and-skip.
+- `load_campaign_results` updated to auto-detect both layouts per
+  direction (CSV vs. parquet) and dispatch transparently — including
+  the mixed case where one direction is CSV and another is parquet
+  within the same patch.
+- 12 new tests in `tests/test_cfd_integration/test_schema_io.py`
+  covering direction normalisation, single-file parquet round-trip,
+  multi-parquet concat, U_mag auto-compute, and three campaign-loader
+  layout scenarios (IVF native, Airflow native, mixed). All 57 CFD
+  tests pass; full fast-mark suite stays green at 81 tests.
+- `.claude/hooks/check_report_sync.py` + `.claude/settings.json` —
+  PreToolUse hook on Bash that fires on `git commit` and surfaces
+  a punch list of report-sync findings: hard FAIL on `.md` ↔ `.pdf`
+  mismatch and on paper-figure script changes without a matching PNG
+  copy; advisory-only on triggers that need LLM judgment (was that
+  `scripts/X.py` change pipeline-relevant?). Always exits 0
+  (advisory mode); flip to `exit 2` to make it blocking once the
+  false-positive rate is characterised. The full LLM-backed
+  `report-sync-auditor` agent remains available for explicit
+  invocation when the hook flags advisories.
+
+### Changed — Airflow result adapter
+
+- `src/cfd_integration/README.md` and `data/README.md` document both
+  on-disk layouts as accepted; the `summary.json` `wind_direction`
+  field still uses the cardinal form regardless of which directory
+  layout the producer used.
+- `.claude/agents/cfd-results-ingestor.md` no longer treats the
+  Airflow `wind_NNN/*.parquet` layout as "drift" — both layouts are
+  PASS; only unknown / off-axis directories and missing files remain
+  FAIL. The Bash recipes in the agent prompt updated to use
+  `load_campaign_results` (auto-detect) instead of inferring layout.
+- `.gitignore` exception expanded from `.claude/agents/` to also
+  cover `.claude/hooks/` and `.claude/settings.json`. Per-user
+  `settings.local.json` and `projects/` session data stay ignored.
+
 ### Added — agent team
 
 - Six project-scoped Claude Code subagents under `.claude/agents/`,

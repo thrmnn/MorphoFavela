@@ -136,18 +136,34 @@ extended building context with
 ## CFD results contract — `data/{site}/cfd_results/`
 
 CFD runs happen in the separate `~/Airflow` repo. When results return,
-they land at:
+two equivalent layouts are accepted (auto-detected by
+`src/cfd_integration/io.py::load_campaign_results`):
+
+**Layout A — IVF native (CSV + cardinal direction dirs):**
 
 ```
 data/{site}/cfd_results/{patch_id}/{wind_direction}/
-  sample_points.csv     # required — 15k rows, z=1.5m, 2m spacing
-  summary.json          # required — sim metadata (run id, mesh resolution, residuals)
+  sample_points.csv     # required — ~15k rows, z=1.5m, 2m spacing
+  summary.json          # required — sim metadata (run id, residuals, …)
   field.vtu             # optional — full 3D field for VTK inspection
 ```
 
+with `wind_direction` ∈ `{N, NE, E, SE, S, SW, W, NW}`.
+
+**Layout B — Airflow native (parquet + numeric-degree dirs):**
+
+```
+data/{site}/cfd_results/{patch_id}/wind_{NNN}/
+  *.parquet             # required — same column schema as Layout A's CSV; multiple parquets concat row-wise
+  summary.json          # required
+```
+
+with `wind_NNN` ∈ `{wind_000, wind_045, wind_090, wind_135, wind_180, wind_225, wind_270, wind_315}` mapped to cardinals (000→N, 045→NE, …). Off-axis directories are skipped with a warning.
+
 Schema and ingestion are in `src/cfd_integration/`; see its README
-for the full contract. Wind direction names are
-`{N, NE, E, SE, S, SW, W, NW}`.
+for the full contract. The `summary.json` `wind_direction` field
+must use the cardinal form (`"NE"`, not `"045"`) regardless of
+which directory layout the producer used.
 
 ## What's *not* in this directory
 

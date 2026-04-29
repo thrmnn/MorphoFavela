@@ -5,7 +5,12 @@ import json
 import pandas as pd
 import pytest
 
-from src.cfd_integration.io import load_patch_csv
+from src.cfd_integration.io import (
+    _normalize_wind_direction,
+    load_campaign_results,
+    load_patch_csv,
+    load_patch_parquet,
+)
 from src.cfd_integration.schema import (
     WIND_DIRECTIONS_8,
     CFDPatchResult,
@@ -103,3 +108,148 @@ class TestLoadPatchCSV:
         # No summary.json written
         with pytest.raises(FileNotFoundError, match="metadata"):
             load_patch_csv(csv)
+
+
+class TestNormalizeWindDirection:
+    """The Airflow producer uses wind_NNN/ directories instead of N/, NE/, etc.
+    The normalizer accepts both and returns the canonical cardinal name."""
+
+    def test_cardinal_passes_through(self):
+        for d in WIND_DIRECTIONS_8:
+            assert _normalize_wind_direction(d) == d
+
+    def test_airflow_degree_form(self):
+        assert _normalize_wind_direction("wind_000") == "N"
+        assert _normalize_wind_direction("wind_045") == "NE"
+        assert _normalize_wind_direction("wind_090") == "E"
+        assert _normalize_wind_direction("wind_135") == "SE"
+        assert _normalize_wind_direction("wind_180") == "S"
+        assert _normalize_wind_direction("wind_225") == "SW"
+        assert _normalize_wind_direction("wind_270") == "W"
+        assert _normalize_wind_direction("wind_315") == "NW"
+
+    def test_unknown_returns_none(self):
+        assert _normalize_wind_direction("wind_022") is None  # off-axis
+        assert _normalize_wind_direction("wind_NN") is None
+        assert _normalize_wind_direction("north") is None
+        assert _normalize_wind_direction("") is None
+        assert _normalize_wind_direction("wind_") is None
+
+
+class TestLoadPatchParquet:
+    def test_roundtrip_single_file(self, tmp_path, synthetic_samples, synthetic_metadata):
+        parquet = tmp_path / "samples.parquet"
+        synthetic_samples.to_parquet(parquet, index=False)
+        with open(tmp_path / "summary.json", "w") as f:
+            json.dump(synthetic_metadata, f)
+
+        result = load_patch_parquet(parquet)
+        assert result.metadata.patch_id == "TST-P01"
+        assert result.metadata.wind_direction == "E"
+        assert "U_mag" in result.samples.columns
+        assert len(result.samples) == len(synthetic_samples)
+
+    def test_concat_multiple_parquets(self, tmp_path, synthetic_samples, synthetic_metadata):
+        """Airflow may emit one parquet per processor decomposition; concat them."""
+        half = len(synthetic_samples) // 2
+        a = synthetic_samples.iloc[:half]
+        b = synthetic_samples.iloc[half:]
+        a.to_parquet(tmp_path / "samples_0.parquet", index=False)
+        b.to_parquet(tmp_path / "samples_1.parquet", index=False)
+        with open(tmp_path / "summary.json", "w") as f:
+            json.dump(synthetic_metadata, f)
+
+        result = load_patch_parquet(
+            [tmp_path / "samples_0.parquet", tmp_path / "samples_1.parquet"]
+        )
+        assert len(result.samples) == len(synthetic_samples)
+
+    def test_autocomputes_umag(self, tmp_path, synthetic_metadata):
+        samples = pd.DataFrame(
+            {
+                "x": [0, 1],
+                "y": [0, 1],
+                "z": [1.5, 1.5],
+                "U": [3.0, 0.0],
+                "V": [4.0, 0.0],
+                "W": [0.0, 0.0],
+                "TKE": [0.1, 0.1],
+            }
+        )
+        parquet = tmp_path / "samples.parquet"
+        samples.to_parquet(parquet, index=False)
+        with open(tmp_path / "summary.json", "w") as f:
+            json.dump(synthetic_metadata, f)
+
+        result = load_patch_parquet(parquet)
+        assert "U_mag" in result.samples.columns
+        assert result.samples.iloc[0]["U_mag"] == pytest.approx(5.0)
+
+    def test_missing_parquet(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            load_patch_parquet(tmp_path / "does_not_exist.parquet")
+
+    def test_empty_path_list(self):
+        with pytest.raises(ValueError, match="at least one parquet"):
+            load_patch_parquet([])
+
+
+class TestLoadCampaignAutodetect:
+    """`load_campaign_results` should transparently handle both layouts."""
+
+    def _write_summary(self, dir_path, patch_id, wind_direction):
+        with open(dir_path / "summary.json", "w") as f:
+            json.dump(
+                {
+                    "patch_id": patch_id,
+                    "site": "test_site",
+                    "wind_direction": wind_direction,
+                    "wind_speed_ref": 5.0,
+                    "converged": True,
+                },
+                f,
+            )
+
+    def test_ivf_native_layout(self, tmp_path, synthetic_samples):
+        """Cardinal direction dirs + sample_points.csv → loads cleanly."""
+        root = tmp_path / "cfd_results"
+        for direction in ["N", "E"]:
+            d = root / "TST-P01" / direction
+            d.mkdir(parents=True)
+            synthetic_samples.to_csv(d / "sample_points.csv", index=False)
+            self._write_summary(d, "TST-P01", direction)
+
+        result = load_campaign_results(site="test_site", results_root=root)
+        assert sorted(result.directions_for("TST-P01")) == ["E", "N"]
+
+    def test_airflow_native_layout(self, tmp_path, synthetic_samples):
+        """wind_NNN/ dirs + parquet → mapped to cardinal in the result."""
+        root = tmp_path / "cfd_results"
+        for deg, cardinal in [("000", "N"), ("090", "E")]:
+            d = root / "TST-P01" / f"wind_{deg}"
+            d.mkdir(parents=True)
+            synthetic_samples.to_parquet(d / "samples.parquet", index=False)
+            self._write_summary(d, "TST-P01", cardinal)
+
+        result = load_campaign_results(site="test_site", results_root=root)
+        # Cardinal keys, even though the on-disk dirs are wind_NNN
+        assert sorted(result.directions_for("TST-P01")) == ["E", "N"]
+
+    def test_mixed_layouts_per_direction(self, tmp_path, synthetic_samples):
+        """One direction CSV, another parquet — both load."""
+        root = tmp_path / "cfd_results"
+
+        # IVF native: N
+        d_n = root / "TST-P01" / "N"
+        d_n.mkdir(parents=True)
+        synthetic_samples.to_csv(d_n / "sample_points.csv", index=False)
+        self._write_summary(d_n, "TST-P01", "N")
+
+        # Airflow native: NE (wind_045)
+        d_ne = root / "TST-P01" / "wind_045"
+        d_ne.mkdir(parents=True)
+        synthetic_samples.to_parquet(d_ne / "samples.parquet", index=False)
+        self._write_summary(d_ne, "TST-P01", "NE")
+
+        result = load_campaign_results(site="test_site", results_root=root)
+        assert sorted(result.directions_for("TST-P01")) == ["N", "NE"]

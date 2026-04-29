@@ -1,6 +1,6 @@
 ---
 name: cfd-results-ingestor
-description: Validate CFD results that arrive at data/{site}/cfd_results/{patch_id}/{wind_direction}/ against the schema in src/cfd_integration/, flag schema drift from the Airflow producer, and (optionally) trigger aggregation via src.cfd_integration. Use when CFD outputs return from the ~/Airflow runtime, before consuming them in metrics/weighting/papers. Read-only by default; aggregation runs are gated behind an explicit "aggregate" flag in the request.
+description: Validate CFD results that arrive at data/{site}/cfd_results/{patch_id}/{wind_direction}/ against the schema in src/cfd_integration/. Auto-detects both supported on-disk layouts (cardinal + CSV, or wind_NNN + parquet) and flags only genuinely-unknown directory names or missing files. Optionally triggers aggregation via src.cfd_integration. Use when CFD outputs return from the ~/Airflow runtime, before consuming them in metrics/weighting/papers. Read-only by default; aggregation runs are gated behind an explicit "aggregate" flag in the request.
 tools: Read, Bash, Grep, Glob
 ---
 
@@ -47,17 +47,11 @@ Maps to `PatchSimulationMetadata` dataclass: keys `patch_id, site, wind_directio
 - `residual_final` should be < 1e-3 (configurable; flag values larger).
 - `patch_id` and `wind_direction` must match the path that contains the file.
 
-## Known producer drift (must flag)
+## Two on-disk layouts are supported (both PASS)
 
-The `~/Airflow` execution repo currently produces:
+`src/cfd_integration/io.py::load_campaign_results` auto-detects between two equivalent layouts:
 
-```
-patch_id_directory/wind_NNN/  (e.g. wind_000, wind_045, ..., wind_315)
-    *.parquet
-    summary.json
-```
-
-The IVF ingestion side expects:
+**Layout A — IVF native:**
 
 ```
 data/{site}/cfd_results/{patch_id}/{N|NE|E|SE|S|SW|W|NW}/
@@ -65,9 +59,24 @@ data/{site}/cfd_results/{patch_id}/{N|NE|E|SE|S|SW|W|NW}/
     summary.json
 ```
 
-**Mapping:** `wind_000` → `N`, `wind_045` → `NE`, `wind_090` → `E`, `wind_135` → `SE`, `wind_180` → `S`, `wind_225` → `SW`, `wind_270` → `W`, `wind_315` → `NW`. File format: `*.parquet` → `sample_points.csv`.
+**Layout B — Airflow native:**
 
-**Detection rule:** if you find directories matching `wind_\d{3}/` or files matching `*.parquet` under a patch's results, FAIL with a clear "Airflow→IVF adapter not run" finding and instruct the user. Do not auto-convert.
+```
+data/{site}/cfd_results/{patch_id}/wind_{NNN}/
+    *.parquet            (one or more, concatenated row-wise)
+    summary.json
+```
+
+Mapping: `wind_000` → `N`, `wind_045` → `NE`, `wind_090` → `E`, `wind_135` → `SE`, `wind_180` → `S`, `wind_225` → `SW`, `wind_270` → `W`, `wind_315` → `NW`. The parquet column schema is the same as the CSV schema.
+
+Within a single patch, mixing layouts per direction is allowed (e.g. `N/sample_points.csv` alongside `wind_045/samples.parquet`) — `load_campaign_results` handles it.
+
+**Things that are still a hard FAIL:**
+
+- A direction directory that is neither cardinal (`N`, `NE`, …) nor `wind_NNN` for one of the 8 axes (`wind_022`, `wind_NN`, etc.) → unknown-direction warning surfaced as FAIL.
+- A `wind_NNN` dir with off-axis degrees (e.g. `wind_022`, `wind_067`) → not on the 8-axis grid; FAIL because it implies a different sampling scheme than what the IVF analysis assumes.
+- A direction directory with neither `sample_points.csv` nor any `*.parquet` file → FAIL.
+- A direction directory missing `summary.json` → FAIL.
 
 ## Validation procedure
 
@@ -80,24 +89,24 @@ data/{site}/cfd_results/{patch_id}/{N|NE|E|SE|S|SW|W|NW}/
 
 For each `{patch_id}/`:
 
-1. **Direction directories present.** Expect 1–8 of `{N, NE, E, SE, S, SW, W, NW}`. Missing directions are not necessarily FAIL — campaigns may run subsets first — but list which directions are present and which aren't.
+1. **Direction directories present.** For each subdirectory, normalise its name with the rule above. Expect 1–8 distinct cardinal results. Missing directions are not necessarily FAIL — campaigns may run subsets first — but list which directions are present and which aren't.
 
-2. **Drift check.** Look for any subdirectory matching `wind_\d{3}/` or files matching `*.parquet`. If found → FAIL with the adapter message.
+2. **Layout consistency.** No drift check; both layouts are PASS. But surface unknown / off-axis directory names (anything that doesn't normalise to one of the 8 cardinals) as FAIL with the offending directory name and a one-line hint.
 
 ### Per-direction
 
-For each `{patch_id}/{direction}/`:
+For each `{patch_id}/{direction}/` (where `{direction}` is either cardinal or `wind_NNN`):
 
-1. **`sample_points.csv` present.** Missing → FAIL.
+1. **Sample data present.** At least one of: `sample_points.csv`, OR one or more `*.parquet` files. Missing → FAIL.
 2. **`summary.json` present.** Missing → FAIL.
-3. **CSV schema.** Required columns: `x, y, z, U, V, W, U_mag, TKE, p`. Missing column → FAIL with the missing names.
-4. **CSV row count.** ~15,000 expected; tolerate ±20% (12,000 – 18,000). Outside that range → WARN with the actual count.
-5. **CSV pedestrian level.** `z.median()` should be in `[1.4, 1.6]`. Outside → WARN.
-6. **CSV magnitude consistency.** Sample 100 random rows; `|U_mag - sqrt(U² + V² + W²)|` < 0.01. Violations → WARN.
+3. **Sample data schema.** Required columns (whether CSV or parquet): `x, y, z, U, V, W, U_mag, TKE`; `p` optional. Missing column → FAIL with the missing names. Use `pd.read_csv` or `pd.read_parquet` and inspect `.columns`.
+4. **Sample row count.** ~15,000 expected; tolerate ±20% (12,000 – 18,000). Outside that range → WARN with the actual count. For multi-parquet directories, use the concatenated row count.
+5. **Pedestrian level.** `z.median()` should be in `[1.4, 1.6]`. Outside → WARN.
+6. **Magnitude consistency.** Sample 100 random rows; `|U_mag - sqrt(U² + V² + W²)|` < 0.01. Violations → WARN.
 7. **summary.json schema.** All 10 keys from `PatchSimulationMetadata` present. Missing → FAIL with the missing names.
 8. **summary.json `converged`.** `true` → PASS. `false` → FAIL (but not blocking — the run completed, the user may still want to inspect).
 9. **summary.json `residual_final`.** `< 1e-3` → PASS, `< 1e-2` → WARN, otherwise FAIL.
-10. **summary.json self-consistency.** `patch_id` and `wind_direction` keys must match the path.
+10. **summary.json self-consistency.** `patch_id` must match the path; `wind_direction` must match the *cardinal form* of the directory (so `wind_045/summary.json` must have `wind_direction: "NE"`, not `"045"`). Mismatch → FAIL.
 
 ## How to check
 
@@ -111,18 +120,32 @@ for p in data/{site}/cfd_results/*/; do
     ls -1 "$p" 2>/dev/null
 done
 
-# Validate a single direction
+# Validate a single direction (auto-detects CSV vs parquet)
 python -c "
-import sys; sys.path.insert(0, 'src')
-from cfd_integration import io
-res = io.load_patch_result('data/{site}/cfd_results/{patch_id}/{direction}/')
+from src.cfd_integration import load_patch_csv, load_patch_parquet
+from pathlib import Path
+
+d = Path('data/{site}/cfd_results/{patch_id}/{direction}')
+csv = d / 'sample_points.csv'
+if csv.exists():
+    res = load_patch_csv(csv)
+else:
+    parquets = sorted(d.glob('*.parquet'))
+    res = load_patch_parquet(parquets if len(parquets) > 1 else parquets[0])
 print('metadata:', res.metadata)
 print('n_samples:', len(res.samples))
+print('cols:', list(res.samples.columns))
 "
 
-# Drift check
-find data/{site}/cfd_results -type d -regex '.*/wind_[0-9]+'
-find data/{site}/cfd_results -name '*.parquet' | head
+# Whole-site auto-detect (handles both layouts transparently)
+python -c "
+from src.cfd_integration import load_campaign_results
+camp = load_campaign_results(site='{site}')
+print('patches:', len(camp.patches))
+print('total sims:', camp.n_simulations())
+for pid in camp.patch_ids():
+    print(' ', pid, camp.directions_for(pid))
+"
 ```
 
 When `src.cfd_integration.io` raises, capture the exception type + message and report it as a FAIL — that's exactly the silent-failure mode this agent exists to surface.
@@ -161,10 +184,11 @@ Aggregation must not run if any patch has a FAIL above. Print the resulting tabl
 - {patch_id}: <N>/8 directions ({comma list of directions present})
 - ...
 
-## Producer drift
+## Layout summary
 
-- [PASS|FAIL] No `wind_\d{3}/` directories
-- [PASS|FAIL] No `*.parquet` files
+- [PASS|FAIL] All direction directories normalise to one of the 8 cardinals (cardinal or `wind_NNN`)
+- [INFO] Per-direction format: <list e.g. "N (csv), wind_045 (parquet, 8 files)">
+  
 
 ## Per-patch / per-direction findings
 
@@ -192,6 +216,6 @@ Aggregation must not run if any patch has a FAIL above. Print the resulting tabl
 
 - **Read-only by default.** Aggregation only when explicitly requested.
 - **Cite the contract.** Reference `src/cfd_integration/README.md` schema fields and `data/README.md` directory layout when flagging.
-- **Flag drift, do not adapt.** A `wind_NNN/*.parquet` layout is a FAIL with a clear message — the adapter belongs in `~/Airflow`'s post-process step, not in this validator.
-- **Stable ordering.** Alphabetise patches and directions in output.
+- **Both layouts are PASS.** As of commit adding `load_patch_parquet` + `_normalize_wind_direction`, the IVF side accepts cardinal+CSV (Layout A) and `wind_NNN`+parquet (Layout B) interchangeably, including mixed within a single patch. There is no "drift" finding — only unknown directory names (off-axis degrees, typos) and missing files are FAIL.
+- **Stable ordering.** Use cardinal-name order (`N, NE, E, SE, S, SW, W, NW`) for directions in the output, regardless of which on-disk layout the producer used.
 - **Don't speculate.** If a patch has only 4/8 directions, report it factually — the campaign may be running incrementally.

@@ -9,9 +9,9 @@ modification.
 
 ## Required outputs per simulation
 
-Each simulation = **one patch × one wind direction**. For each, produce:
+Each simulation = **one patch × one wind direction**. For each, produce one of two equivalent on-disk layouts; the IVF ingestion side auto-detects (`load_campaign_results`).
 
-### Directory layout
+### Layout A — IVF native (CSV + cardinal direction dirs)
 
 ```
 data/{site}/cfd_results/{patch_id}/{wind_direction}/
@@ -20,9 +20,25 @@ data/{site}/cfd_results/{patch_id}/{wind_direction}/
   field.vtu               # OPTIONAL — full 3D field for deep dives
 ```
 
+- `wind_direction` ∈ `{N, NE, E, SE, S, SW, W, NW}` (meteorological bearing from north)
+
+### Layout B — Airflow native (parquet + numeric-degree dirs)
+
+```
+data/{site}/cfd_results/{patch_id}/wind_{NNN}/
+  *.parquet               # REQUIRED — primary data (one or more files; concatenated row-wise)
+  summary.json            # REQUIRED — simulation metadata
+```
+
+- `wind_NNN` directory mapped to cardinal: `wind_000` → `N`, `wind_045` → `NE`, `wind_090` → `E`, `wind_135` → `SE`, `wind_180` → `S`, `wind_225` → `SW`, `wind_270` → `W`, `wind_315` → `NW`. Off-axis directories (anything other than the 8 listed) are skipped with a warning.
+- Multiple parquet files in the same `wind_NNN/` directory are concatenated row-wise (used when the OpenFOAM agent emits one parquet per processor decomposition).
+- `summary.json` `wind_direction` field must still use the cardinal form (`"NE"`, not `"045"`) — it describes the simulation, not the directory.
+
+Common across both layouts:
+
 - `site`: one of `vidigal`, `rocinha`, `riodaspedras`, `complexo_do_alemao`, `maré`
 - `patch_id`: from `outputs/{site}/sampling_cfd/campaign_sampling/campaign_patches.csv` (e.g., `VDG-P01`, `MAR-P07`)
-- `wind_direction`: one of `N`, `NE`, `E`, `SE`, `S`, `SW`, `W`, `NW` (meteorological bearing from north)
+- Sample-row schema and `summary.json` schema are identical between the two layouts (Layout B's parquet uses the same column names as Layout A's CSV).
 
 ### `sample_points.csv` (required)
 

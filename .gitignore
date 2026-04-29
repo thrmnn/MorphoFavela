@@ -44,9 +44,12 @@ slurm-*.out
 *.o[0-9]*
 *.e[0-9]*
 
-# Claude Code: ignore session data + local settings, but track project subagents.
+# Claude Code: ignore session data + per-user local settings.
+# Track project-shared assets: subagents, hooks, project settings.json.
 .claude/*
 !.claude/agents/
+!.claude/hooks/
+!.claude/settings.json
 
 # IDE
 .vscode/

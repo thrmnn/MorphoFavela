@@ -5,7 +5,8 @@ them to the 10m grid cells within each patch's 100m analysis zone.
 Supports wind-rose weighting across 8 cardinal directions.
 
 Public API:
-    load_patch_csv, load_campaign_results      — I/O
+    load_patch_csv, load_patch_parquet,
+    load_campaign_results                       — I/O (auto-detects layout)
     aggregate_to_grid, aggregate_to_patch       — spatial aggregation
     weighted_by_wind_rose                       — 8-direction ensemble
     ach, stagnation_fraction,
@@ -22,6 +23,7 @@ from src.cfd_integration.aggregate import (
 from src.cfd_integration.io import (
     load_campaign_results,
     load_patch_csv,
+    load_patch_parquet,
     load_patch_vtu,
 )
 from src.cfd_integration.metrics import (
@@ -49,6 +51,7 @@ __all__ = [
     "WindRose",
     "WIND_DIRECTIONS_8",
     "load_patch_csv",
+    "load_patch_parquet",
     "load_patch_vtu",
     "load_campaign_results",
     "aggregate_to_grid",
