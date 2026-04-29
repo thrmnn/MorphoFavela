@@ -27,7 +27,14 @@ Five **campaign sites** are required to meet the full contract — they feed the
 | `complexo_do_alemao` | CDA | A621 Vila Militar |
 | `maré` | MAR | SBGL ASOS (not INMET) |
 
-`cidade_de_deus` is an onboarding test, not a campaign site — apply the contract but treat `quality_flag != "measured"` as a WARNING rather than FAIL.
+`cidade_de_deus` is an onboarding-test site, **not** a campaign site. For onboarding-only sites, generated artefacts may be partially or fully absent because onboarding has not been completed (Step 2 manual DTM clip and Step 4 / 5 pipeline runs deliberately deferred). Apply the contract with these relaxations:
+
+- Missing `dtm_extended_300m.tif`, `buildings_extended_300m.gpkg`, or `wind_rose.json` → **SKIP** (note in output: "onboarding incomplete — file absent"), not FAIL.
+- `wind_rose.json` present but with `quality_flag != "measured"` → WARN.
+- `raw/` directory must still exist with at minimum the boundary shapefile — that is Step 1 and is the floor.
+- All other schema checks still apply when the relevant artefact exists.
+
+Onboarding-only sites should never raise the overall status above WARN. If you find a hard data corruption (e.g. raw/ shapefile loads but has no geometry, or a present file fails schema), still FAIL — the relaxation is only for *absent* artefacts.
 
 ## Per-site contract (from data/README.md)
 
@@ -137,11 +144,12 @@ Return a single markdown report with this structure (do not add any preamble):
 
 Severity rules:
 
-- **FAIL**: missing required file, schema violation, CRS not UTM 23S, empty geometry, sum-of-frequencies out of band, campaign site with `quality_flag != "measured"`.
-- **WARN**: CRS is EPSG:32723 instead of preferred EPSG:31983; `cidade_de_deus` with non-measured wind rose; optional file missing where it would be useful.
+- **FAIL**: missing required file *on a campaign site*, schema violation on a present file, CRS not UTM 23S, empty geometry, sum-of-frequencies out of band, campaign site with `quality_flag != "measured"`.
+- **WARN**: CRS is EPSG:32723 instead of preferred EPSG:31983; onboarding-only site with `quality_flag != "measured"`; optional file missing where it would be useful.
+- **SKIP**: onboarding-only site (`cidade_de_deus`) missing a generated artefact (`dtm_extended_300m.tif`, `buildings_extended_300m.gpkg`, `wind_rose.json`) because onboarding hasn't been completed — note this clearly in the output but do not promote to FAIL or WARN.
 - **PASS**: all required checks for the site succeed.
 
-The overall status is FAIL if any site has any FAIL, WARNING if any WARN and no FAIL, otherwise PASS.
+The overall status is FAIL if any site has any FAIL, WARNING if any WARN and no FAIL, otherwise PASS. SKIP entries do not affect the overall status.
 
 ## Operating principles
 

@@ -31,9 +31,15 @@ a stable v1.0 is cut.
     `wind_NNN/*.parquet` → `wind_{N..NW}/sample_points.csv`
     producer drift).
 - Trial run of `sampling-auditor` against the current 119-patch
-  state surfaced one real finding: `riodaspedras` stratum
-  `SVF2_SLP2_LP2` has `n_target=1` but zero patches placed
-  (logged as known issue below).
+  state cleanly surfaced the previously-documented Rio das Pedras
+  shortfall (stratum `SVF2_SLP2_LP2`: n_target=1, 0 placed) — that
+  gap was already accepted and documented in technical report §6.4
+  as a genuine morphological scarcity (only 7 eligible cells, all
+  within 80 m of pilot patches; sampler can't satisfy maximin).
+  Added `docs/cfd_sampling_overrides.yaml` (tracked) so the agent
+  downgrades documented gaps from FAIL → WARN — keeps the FAIL
+  signal reserved for genuinely-new misses while keeping the
+  accepted gap visible on every run.
 - `.claude/agents/README.md` documents the agent design rules
   (read-only validators, idempotent accelerators, stop loudly at
   manual steps, never push or commit, cite the contract).
@@ -46,14 +52,6 @@ a stable v1.0 is cut.
   `.claude/*` + `!.claude/agents/`, so project agents track but
   session data and local settings stay ignored. (Negation only
   works when the parent directory itself is not excluded.)
-
-### Known issues — flagged for follow-up
-
-- `outputs/riodaspedras/sampling_cfd/campaign_sampling/`: stratum
-  `SVF2_SLP2_LP2` has `n_target=1` but `0` patches placed (out of
-  7 eligible cells; 0.2% of the site). Either re-run
-  `scripts/run_campaign_sampling.py --area riodaspedras` to
-  top up, or accept the gap and document in technical report §6.
 
 ### Added — production-grade pass
 

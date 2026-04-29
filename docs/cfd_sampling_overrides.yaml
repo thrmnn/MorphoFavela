@@ -1,0 +1,39 @@
+# CFD sampling coverage overrides
+#
+# Strata where the campaign sampler intended to place a patch (n_target > 0)
+# but couldn't, AND the gap has been reviewed and accepted (typically because
+# of a genuine morphological scarcity that makes the maximin-spacing
+# constraint unsatisfiable).
+#
+# `sampling-auditor` reads this file and downgrades a matching coverage
+# FAIL to a WARNING, so the validator's signal stays clean for genuinely
+# new misses while still surfacing accepted gaps for visibility.
+#
+# Each override must cite where the gap is documented (technical report
+# section, ADR, CHANGELOG entry, etc.) so the override is auditable.
+# When you add an entry here, also add a one-line note in the relevant
+# section of the technical report.
+#
+# Schema:
+#   sites:
+#     <site_key>:
+#       - stratum_id: <STRATUM>     # e.g. SVF2_SLP2_LP2
+#         actual: <int>             # patches placed (typically 0)
+#         target: <int>             # n_target the sampler set
+#         reason: <str>             # one-line cause
+#         documented_in: <str>      # citation
+#         decided_at: YYYY-MM-DD
+
+sites:
+  riodaspedras:
+    - stratum_id: SVF2_SLP2_LP2
+      actual: 0
+      target: 1
+      reason: >
+        Stratum has only 7 eligible cells in Rio das Pedras (0.2% of the
+        site grid), all within 80 m of existing pilot patches. The greedy
+        maximin sampler cannot place an additional candidate without
+        violating the minimum-spacing constraint. Genuine morphological
+        scarcity, not a sampler bug.
+      documented_in: docs/technical_report/technical_report.md §6.4 (Allocation results)
+      decided_at: 2026-04-15

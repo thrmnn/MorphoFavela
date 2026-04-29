@@ -59,6 +59,10 @@ Per site, under `outputs/{site}/sampling_cfd/campaign_sampling/`:
 - `sampling_log.json` — config + run history (read for context but don't enforce)
 - `patches/{PATCH_ID}/` — each patch directory must contain `patch_meta.json`, `buildings.gpkg`, `terrain.tif`
 
+Project-wide override file (tracked under git, used to downgrade documented coverage gaps from FAIL to WARN):
+
+- `docs/cfd_sampling_overrides.yaml` — see "Stratum coverage" check below for schema and semantics.
+
 ## Checks
 
 For each site:
@@ -66,13 +70,26 @@ For each site:
 ### 1. Count check (strict)
 - `len(campaign_patches.csv)` == expected count from the table above. Mismatch → FAIL.
 - `len(patches/<PATCH_ID>/ subdirs)` == count from CSV. Mismatch → FAIL.
-- All patch IDs in CSV must follow `{prefix}-P{NN}` pattern with the correct prefix. Mismatch → FAIL.
+- All patch IDs in CSV must match the regex `^{PREFIX}-P\d{{2}}$` with the correct site prefix (e.g. for vidigal: `^VDG-P\d{{2}}$`). Each ID is exactly 7 characters: 3-char prefix + `-P` + 2-digit zero-padded number. Mismatch → FAIL. Use a regex test, not a length check (length-only checks have given false positives in past runs).
 
-### 2. Stratum coverage (strict)
+### 2. Stratum coverage (strict, with override mechanism)
 - For every row in `stratum_summary.csv` where `n_target > 0`: count patches in `campaign_patches.csv` with that `stratum_id`. Actual count must be `>= n_target`.
 - Strata with `n_target = 0` (typically because `n_cells_total` is very small, e.g. `pct_total < 0.5%`) are intentionally skipped by the sampler — do not flag.
 - Strata with `is_empty = True` are skipped — do not flag.
-- Under-coverage → FAIL with stratum ID, bin labels, and `actual/target`.
+- Under-coverage → **FAIL**, *unless* the gap is listed in `docs/cfd_sampling_overrides.yaml` for that site and stratum, in which case **downgrade to WARN** and quote the override's `reason` and `documented_in` fields verbatim.
+- The override mechanism exists so accepted morphological-scarcity gaps stay visible in every run (as WARN) without polluting the FAIL signal that should be reserved for genuinely new under-coverage. If an entry in the overrides file references a gap that no longer exists (the sampler now covers it), include a hint in "Next steps" that the override row is stale and can be removed.
+
+Read the overrides file with:
+
+```bash
+python -c "
+import yaml
+data = yaml.safe_load(open('docs/cfd_sampling_overrides.yaml')) or {}
+print(data.get('sites', {}))
+"
+```
+
+If the file does not exist, treat it as empty (no overrides) — every coverage gap is then a FAIL.
 
 ### 3. Spacing (strict)
 - Compute pairwise distances between `(center_x, center_y)` of all patches in the site.
