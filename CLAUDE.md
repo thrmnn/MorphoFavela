@@ -46,6 +46,28 @@ Project-specific facts about pipeline state, site data quirks, and
 outstanding work live in `.claude/projects/-home-theo-IVF/memory/`. Update
 those memories when you learn something durable — not in this CLAUDE.md.
 
+## Project subagents
+
+Six project-scoped subagents under `.claude/agents/` codify this
+project's contracts. Reach for them before re-implementing the
+checks they encode:
+
+- **Validators** (read-only): `data-contract-checker` (per-site
+  inputs against `data/README.md`), `sampling-auditor` (CFD patch
+  campaign integrity), `report-sync-auditor` (diff vs.
+  `technical_report.md`/`.pdf`/`figures/` per the triggers above).
+- **Workflow accelerators**: `site-onboarder` (new site through
+  the 7-step `data/README.md` checklist; halts at the manual DTM
+  clip), `wind-ingestion` (INMET/ASOS → `wind_rose.json`,
+  encoding the 3 known INMET quirks), `cfd-results-ingestor`
+  (validate `data/{site}/cfd_results/` returns from `~/Airflow`
+  against the `src/cfd_integration/` schema; flags producer
+  drift).
+
+Design rules and how to add a new agent live in
+`.claude/agents/README.md`. Agents are loaded at session startup
+— after pulling new ones, restart Claude Code to register them.
+
 ## Incremental commits
 
 This repo's main branch is protected in practice by the fact that work

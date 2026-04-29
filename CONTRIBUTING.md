@@ -119,12 +119,14 @@ This repo:
   `data/{site}/cfd_results/{patch_id}/{wind_direction}/` via
   `src/cfd_integration/`.
 
-## Project subagents (validators)
+## Project subagents
 
-The repo ships three read-only Claude Code subagents under
-[`.claude/agents/`](.claude/agents/) that check inputs and outputs
-against the project's contracts. Invoke them from a Claude Code
-session before commits or pipeline runs:
+The repo ships six Claude Code subagents under
+[`.claude/agents/`](.claude/agents/) — three **validators** (read-only
+contract checks) and three **workflow accelerators** (multi-step
+orchestration with explicit hand-offs at manual steps).
+
+### Validators (read-only; never modify files)
 
 | Agent | Use it when |
 |---|---|
@@ -132,9 +134,17 @@ session before commits or pipeline runs:
 | [`sampling-auditor`](.claude/agents/sampling-auditor.md) | Re-ran `run_campaign_sampling.py`, before submitting patches to CFD execution, or to confirm campaign integrity |
 | [`report-sync-auditor`](.claude/agents/report-sync-auditor.md) | Before committing pipeline / figure / sampling changes — flags drift between code and `docs/technical_report/` |
 
-These are validators, not auto-fixers: they report issues but never
-modify files. See [`.claude/agents/README.md`](.claude/agents/README.md)
-for the design rules and how to add a new one.
+### Workflow accelerators (modify code, run scripts, hand off at manual steps)
+
+| Agent | Use it when |
+|---|---|
+| [`site-onboarder`](.claude/agents/site-onboarder.md) | Adding a new favela site — walks the 7-step `data/README.md` checklist, stops loudly at the manual DTM-clip step |
+| [`wind-ingestion`](.claude/agents/wind-ingestion.md) | (Re)building `wind_rose.json` from INMET or ASOS — encodes the 3 known INMET quirks |
+| [`cfd-results-ingestor`](.claude/agents/cfd-results-ingestor.md) | CFD outputs returned from `~/Airflow` to `data/{site}/cfd_results/` — validates schema and flags producer drift |
+
+See [`.claude/agents/README.md`](.claude/agents/README.md) for design
+rules and how to add a new one. Agents are loaded at session
+startup — restart Claude Code after pulling new agents.
 
 ## Reporting issues
 

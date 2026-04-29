@@ -22,11 +22,26 @@ the same harness as the rest of the pipeline.
 
 ## Available agents
 
+The team is two classes:
+
+- **Validators** — read-only, report contract violations as a punch list, never modify files.
+- **Workflow accelerators** — orchestrate multi-step processes, may modify code or run scripts, but stop loudly at manual steps and never push or commit.
+
+### Validators
+
 | Name | When to invoke | Inputs |
 |---|---|---|
 | [`data-contract-checker`](data-contract-checker.md) | Before running pipeline scripts on a site, after pulling new data, or before changing `data/README.md` | Site name (e.g. `vidigal`) or `--all` |
 | [`sampling-auditor`](sampling-auditor.md) | After `run_campaign_sampling.py`, before submitting patches to CFD execution, or to confirm campaign integrity | Site name or `--all` |
 | [`report-sync-auditor`](report-sync-auditor.md) | Before committing pipeline / figure / sampling changes, or to audit a series of recent commits for documentation drift | Git ref range (`HEAD~3..HEAD`), `staged`, or `working` (default) |
+
+### Workflow accelerators
+
+| Name | When to invoke | Inputs |
+|---|---|---|
+| [`site-onboarder`](site-onboarder.md) | Adding a new favela site to the IVF dataset (walks the 7-step `data/README.md` checklist; stops at the manual DTM-clip step) | Site key, building footprint path, boundary path, station code or `asos`, optional buffer/label/colour |
+| [`wind-ingestion`](wind-ingestion.md) | Building or rebuilding `wind_rose.json` from INMET BDMEP or Iowa ASOS METAR (encodes the 3 known INMET quirks) | Site key + station code or `asos`; optional years range |
+| [`cfd-results-ingestor`](cfd-results-ingestor.md) | When CFD outputs return from `~/Airflow` to `data/{site}/cfd_results/` — validate schema and flag the known producer drift | Site key; optional patch ID list; optional `aggregate` flag |
 
 ## Invocation
 
@@ -71,23 +86,42 @@ The overall status is the worst per-check status across the report.
 
 ## Design rules (when adding a new agent)
 
-1. **Read-only.** Tools should be `Read, Grep, Glob, Bash` — no `Edit`
-   or `Write`. Validators report; humans (or other agents) fix.
-2. **Single responsibility.** One agent = one contract. Don't bundle
-   data-contract checks with sampling checks; users invoke the right
-   agent for the question they're asking.
-3. **Self-contained system prompt.** Subagents do not see the parent
+Validator-class rules:
+
+1. **Read-only.** Tools `Read, Grep, Glob, Bash` only — no `Edit` or
+   `Write`. Validators report; humans (or accelerator agents) fix.
+2. **Single responsibility.** One agent = one contract.
+3. **Don't auto-fix.** Even when the fix is obvious, describe it
+   under "Next steps" only.
+
+Workflow-accelerator-class rules:
+
+4. **Stop loudly at manual steps.** Some operations are deliberately
+   manual (e.g. DTM clipping per
+   `feedback_dtm_workflow.md`). Don't try to automate around them
+   — stop, hand off with clear instructions, exit.
+5. **Idempotent.** Re-running on a partially completed state must
+   pick up where it left off, not destructively rewrite valid
+   intermediates.
+6. **Never push or commit.** Produce a clean diff for the user to
+   review.
+7. **Delegate validation.** Finish by invoking (or instructing the
+   user to invoke) the appropriate validator agent.
+
+Rules common to both classes:
+
+8. **Self-contained system prompt.** Subagents do not see the parent
    conversation. The system prompt must encode the contract
-   explicitly (paths, schemas, thresholds) — not "go read the README".
-4. **Cite the contract.** When flagging a finding, reference the file
-   and line of the source rule (`data/README.md L37`, `CLAUDE.md
-   "Technical report" section`).
-5. **Fail loudly on missing inputs.** A scope referencing a site that
-   doesn't exist is FAIL with a clear message — not a silent skip.
-6. **Deterministic.** Stable ordering, no timestamps, no random
-   sampling.
-7. **Don't auto-fix.** Even when the fix is obvious, describe it under
-   "Next steps" only.
+   explicitly (paths, schemas, thresholds, exact commands) — not
+   "go read the README".
+9. **Cite the contract.** When flagging a finding or referencing a
+   policy, link the source line (`data/README.md L37`, `CLAUDE.md
+   "Technical report" section`, the relevant memory file).
+10. **Fail loudly on missing inputs.** A scope referencing a site
+    or path that doesn't exist is FAIL with a clear message — not
+    a silent skip.
+11. **Deterministic.** Stable ordering, no timestamps, no random
+    sampling. Process inputs in alphabetical order.
 
 ## Adding a new agent
 

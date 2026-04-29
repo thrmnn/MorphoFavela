@@ -8,6 +8,53 @@ a stable v1.0 is cut.
 
 ## [Unreleased]
 
+### Added — agent team
+
+- Six project-scoped Claude Code subagents under `.claude/agents/`,
+  split into two classes:
+  - **Validators** (read-only, report-only):
+    `data-contract-checker` (verifies `data/{site}/` against
+    `data/README.md` schema + measured-quality gate),
+    `sampling-auditor` (audits CFD patch sampling against
+    per-site counts, stratum `n_target` coverage, 80 m maximin
+    spacing, per-patch integrity), `report-sync-auditor` (maps a
+    git diff to the `CLAUDE.md` "Technical report" triggers and
+    flags `.md` ↔ `.pdf` ↔ `figures/` drift).
+  - **Workflow accelerators** (orchestrate multi-step work, stop
+    at manual steps): `site-onboarder` (the 7-step new-site
+    checklist; halts at the deliberately-manual DTM-clip step),
+    `wind-ingestion` (INMET/ASOS download → extract → build rose,
+    encoding the 3 known INMET quirks: server cuts, post-2019
+    date format, accent-bearing column names),
+    `cfd-results-ingestor` (validates returns from `~/Airflow`
+    against the `src/cfd_integration/` contract and flags the
+    `wind_NNN/*.parquet` → `wind_{N..NW}/sample_points.csv`
+    producer drift).
+- Trial run of `sampling-auditor` against the current 119-patch
+  state surfaced one real finding: `riodaspedras` stratum
+  `SVF2_SLP2_LP2` has `n_target=1` but zero patches placed
+  (logged as known issue below).
+- `.claude/agents/README.md` documents the agent design rules
+  (read-only validators, idempotent accelerators, stop loudly at
+  manual steps, never push or commit, cite the contract).
+- `CONTRIBUTING.md` "Project subagents" section points contributors
+  at the team and notes that agents are loaded at session startup.
+
+### Changed — agent team
+
+- `.gitignore` reworked from `.claude/` (full-directory ignore) to
+  `.claude/*` + `!.claude/agents/`, so project agents track but
+  session data and local settings stay ignored. (Negation only
+  works when the parent directory itself is not excluded.)
+
+### Known issues — flagged for follow-up
+
+- `outputs/riodaspedras/sampling_cfd/campaign_sampling/`: stratum
+  `SVF2_SLP2_LP2` has `n_target=1` but `0` patches placed (out of
+  7 eligible cells; 0.2% of the site). Either re-run
+  `scripts/run_campaign_sampling.py --area riodaspedras` to
+  top up, or accept the gap and document in technical report §6.
+
 ### Added — production-grade pass
 
 - `CHANGELOG.md`, `CONTRIBUTING.md`, `CITATION.cff` (this file is
