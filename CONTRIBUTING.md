@@ -119,6 +119,23 @@ This repo:
   `data/{site}/cfd_results/{patch_id}/{wind_direction}/` via
   `src/cfd_integration/`.
 
+## Project subagents (validators)
+
+The repo ships three read-only Claude Code subagents under
+[`.claude/agents/`](.claude/agents/) that check inputs and outputs
+against the project's contracts. Invoke them from a Claude Code
+session before commits or pipeline runs:
+
+| Agent | Use it when |
+|---|---|
+| [`data-contract-checker`](.claude/agents/data-contract-checker.md) | Pulled new data, added a site, edited `data/README.md`, or about to run a pipeline script on `data/{site}/` |
+| [`sampling-auditor`](.claude/agents/sampling-auditor.md) | Re-ran `run_campaign_sampling.py`, before submitting patches to CFD execution, or to confirm campaign integrity |
+| [`report-sync-auditor`](.claude/agents/report-sync-auditor.md) | Before committing pipeline / figure / sampling changes — flags drift between code and `docs/technical_report/` |
+
+These are validators, not auto-fixers: they report issues but never
+modify files. See [`.claude/agents/README.md`](.claude/agents/README.md)
+for the design rules and how to add a new one.
+
 ## Reporting issues
 
 Open a GitHub issue with:

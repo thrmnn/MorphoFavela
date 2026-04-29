@@ -44,8 +44,9 @@ slurm-*.out
 *.o[0-9]*
 *.e[0-9]*
 
-# Claude Code session data
-.claude/
+# Claude Code: ignore session data + local settings, but track project subagents.
+.claude/*
+!.claude/agents/
 
 # IDE
 .vscode/
