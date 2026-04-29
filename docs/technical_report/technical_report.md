@@ -142,7 +142,7 @@ catalogue, daily-graph URLs, and the published TMY paper for A652):
 | Rocinha | Forte de Copacabana | A652 | −22.988, −43.190 | coastal | Provides the unobstructed SE→NE driver. Valley channelling is resolved by the CFD itself. |
 | Rio das Pedras | Jacarepaguá | A636 | −22.99, −43.37 | plain | Colocated with the Jacarepaguá lowland. |
 | Complexo do Alemão | Vila Militar | A621 | −22.86, −43.41 | urban interior | Closest north-zone station (~8 km W). Corrects the earlier placeholder recommendation of A602 Marambaia, which is geographically mismatched (southwest coast, not north zone). |
-| Maré | SBGL Galeão METAR (preferred); A652 (INMET fallback) | — / A652 | −22.81, −43.25 / −22.988, −43.190 | bayside | Galeão airport METAR via the Iowa State ASOS archive is the best match for the bay regime; METAR ingestion is not yet implemented in `build_wind_rose.py`. A652 is the INMET fallback. |
+| Maré | SBGL Galeão METAR (preferred); A652 (INMET fallback) | — / A652 | −22.81, −43.25 / −22.988, −43.190 | bayside | Galeão airport METAR via the Iowa State ASOS archive is the best match for the bay regime; ingested via `build_wind_rose.from_iowa_asos_csv`. A652 is the INMET fallback. |
 
 **The earlier placeholder attributed A652 to "Alto da Boa Vista" — that
 name belongs to the municipal Alerta Rio network, not INMET. A652 is
@@ -805,27 +805,24 @@ Key scripts:
 
 ## 10. Known Limitations
 
-1. **Wind forcing is placeholder.** All five `wind_rose.json` files
-   carry `"quality_flag": "placeholder-prior"` and a per-site
-   `expected_adjustment` note; the schema includes provenance fields
-   (station id + coords, time window, observation count, calm
-   fraction, anemometer height) but they are null pending ingestion of
-   real data from the stations recommended in §2.3. The code path for
-   ingestion (`scripts/build_wind_rose.py --inmet-csv`) is implemented
-   and verified against the BDMEP CSV format; the outstanding step is
-   downloading the yearly ZIPs and running it. Neutral stability is
-   also assumed (see §2.3).
-
-   Additionally, the earlier placeholder recommendations misattributed
-   A652 ("Alto da Boa Vista") and A602 (Marambaia, for Complexo do
-   Alemão). Both are corrected in §2.3's station table.
+1. **Neutral stability is assumed.** All five `wind_rose.json` files
+   now carry measured hourly observations (`quality_flag: "measured"`,
+   2015–2024 window, n = 64,088–89,439; see §2.3). The methodological
+   simplification that remains is the assumption of neutral atmospheric
+   stability across all directions and seasons. Stability classes are
+   not separated; CFD inflow uses the neutral log-law profile. In
+   practice this is conservative for the dispersion-relevant low-wind
+   regimes that dominate Rio das Pedras and Complexo do Alemão (calm
+   fractions 46 % and 33 %), and a known limitation for the more
+   stably stratified nocturnal hours.
 
 2. **CFD results not yet integrated.** `src/cfd_integration/` is
    tested but has not yet processed real simulation data. Any
    assumptions about sample-point density, column naming quirks, or
    edge cases in OpenFOAM output will only surface at first ingestion.
-   Running the test suite against the first delivered patch
-   (MAR-P07 recommended) will catch most issues.
+   The first pilot patch (VDG-P07) is in flight; running the test
+   suite plus `cfd-results-ingestor` agent against the returned
+   results will catch most issues.
 
 3. **SVF validation against benchmark tools pending.** The Tregenza
    145-patch engine has been tested against synthetic canyons but not
@@ -838,9 +835,13 @@ Key scripts:
    warrant a spot-check for the CFD patches specifically. Not a
    priority for the current milestone.
 
-5. **Cidade de Deus excluded.** Data integrity issue leaves CDD
-   outside the campaign. Adding it would require reprocessing the
-   building footprints upstream of this repository.
+5. **Cidade de Deus excluded.** A data integrity issue in the CDD
+   building footprints (geometry inconsistencies; see project memory
+   `project_cdd_data_bug`) leaves CDD outside the 5-site campaign.
+   This is a final decision for the current campaign cycle: the
+   119-patch allocation, OpenFOAM submission, and downstream analysis
+   all assume 5 sites. Re-onboarding CDD is out of scope until the
+   building data is reprocessed upstream of this repository.
 
 ---
 
@@ -848,19 +849,22 @@ Key scripts:
 
 **In this repository:**
 
-- [ ] Replace placeholder wind roses with INMET station data (1–2 h
-      each once CSVs are in hand)
+- [x] Wind ingestion — measured roses for all 5 sites
+      (completed 2026-04-27, see §2.3)
+- [ ] Build the result-side analysis pipeline
+      (`scripts/analyze_cfd_results.py`) end-to-end on synthetic CFD
+      data so the chain is exercised before VDG-P07 returns
 - [ ] Optional: 20 m grids already exist; generate the variant Fig S3
       forms (`--variants` flag) if reviewers request the scatter or
       difference-map views
 - [ ] Draft the Nature Cities manuscript (separate from this technical
-      report)
+      report) once the result-side pipeline is operational
 
 **In the CFD repository:**
 
 - [ ] Implement OpenFOAM case from per-patch exports (template in
       `outputs/{site}/sampling_cfd/campaign_sampling/patches/{id}/`)
-- [ ] Validate pipeline on MAR-P07
+- [ ] Validate pipeline on VDG-P07 (in flight at MIT ORCD)
 - [ ] Mesh convergence study
 - [ ] Run full 952-simulation campaign
 - [ ] Post-process to `sample_points.csv` + `summary.json` per
@@ -868,9 +872,9 @@ Key scripts:
 
 **After CFD results land here:**
 
-- [ ] Verify first patch ingests correctly
-- [ ] Annualise via wind-rose weighting
-- [ ] Map CFD metrics onto the 10 m grid
+- [ ] Verify first patch ingests correctly via `cfd-results-ingestor`
+- [ ] Annualise via wind-rose weighting (`src.cfd_integration.weighting`)
+- [ ] Map CFD metrics onto the 10 m grid (nearest-patch v0)
 - [ ] Extend Figure 5 to include wind-velocity panel
 - [ ] Statistical analysis: SVF/λp/terrain as predictors of ACH and
       stagnation

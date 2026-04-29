@@ -8,6 +8,27 @@ a stable v1.0 is cut.
 
 ## [Unreleased]
 
+### Changed — technical report §10/§11 reconciled with shipped reality
+
+- §10.1 rewritten: "Wind forcing is placeholder" → "Neutral stability
+  is assumed". All five `wind_rose.json` files have carried
+  `quality_flag: "measured"` since 2026-04-27 with the full 2015–2024
+  window (n = 64,088–89,439 hourly records); the methodological
+  caveat that remains is the neutral-stability assumption, not the
+  data state. The historical placeholder framing was a 3-day-old
+  contradiction in the project's primary deliverable document.
+- §10.5 (Cidade de Deus) firmed up: campaign locked to 5 sites,
+  re-onboarding CDD is out of scope for the current cycle.
+- §11 "Next Steps" updated: wind ingestion checked off; pilot patch
+  reference changed from MAR-P07 to VDG-P07 (the actual one in flight
+  at MIT ORCD); added explicit step for the result-side analysis
+  pipeline; CFD-results checklist annotated with the agent
+  (`cfd-results-ingestor`) and weighting module that handle each item.
+- §2.3 station-table footnote corrected: METAR ingestion via
+  `build_wind_rose.from_iowa_asos_csv` is implemented, not "not yet
+  implemented".
+- PDF rebuilt (`docs/technical_report/technical_report.pdf`).
+
 ### Removed — broken `_streets.py` scripts (cleanup)
 
 - `scripts/compute_solar_access_streets.py`,
