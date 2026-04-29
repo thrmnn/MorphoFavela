@@ -352,9 +352,7 @@ def figure_svf_slope_scatter(
     fig = plt.figure(figsize=(12, 9))
 
     # Main axes + marginals
-    gs = fig.add_gridspec(
-        2, 2, width_ratios=[4, 1], height_ratios=[1, 4], hspace=0.05, wspace=0.05
-    )
+    gs = fig.add_gridspec(2, 2, width_ratios=[4, 1], height_ratios=[1, 4], hspace=0.05, wspace=0.05)
     ax_main = fig.add_subplot(gs[1, 0])
     ax_histx = fig.add_subplot(gs[0, 0], sharex=ax_main)
     ax_histy = fig.add_subplot(gs[1, 1], sharey=ax_main)
@@ -376,9 +374,7 @@ def figure_svf_slope_scatter(
 
     ax_main.set_xlabel("Terrain Slope (degrees)", fontsize=11)
     ax_main.set_ylabel("Sky View Factor", fontsize=11)
-    ax_main.axhline(
-        0.15, color=SWISS["accent"], linestyle="--", linewidth=0.8, alpha=0.7
-    )
+    ax_main.axhline(0.15, color=SWISS["accent"], linestyle="--", linewidth=0.8, alpha=0.7)
     ax_main.text(
         ax_main.get_xlim()[1] * 0.95,
         0.16,
@@ -389,9 +385,7 @@ def figure_svf_slope_scatter(
     )
 
     # Marginal histograms
-    ax_histx.hist(
-        valid["slope_deg"], bins=30, color=SWISS["accent"], alpha=0.5, edgecolor="white"
-    )
+    ax_histx.hist(valid["slope_deg"], bins=30, color=SWISS["accent"], alpha=0.5, edgecolor="white")
     ax_histx.set_ylabel("Count", fontsize=8)
     plt.setp(ax_histx.get_xticklabels(), visible=False)
 
@@ -592,9 +586,7 @@ def figure_distributions(
         data = grid[col].dropna().values
 
         if len(data) == 0:
-            ax.text(
-                0.5, 0.5, "No data", transform=ax.transAxes, ha="center", fontsize=9
-            )
+            ax.text(0.5, 0.5, "No data", transform=ax.transAxes, ha="center", fontsize=9)
             ax.set_title(meta["label"])
             continue
 
@@ -614,9 +606,7 @@ def figure_distributions(
                 0.95,
                 lcz[1],
                 meta.get("lcz_label", "LCZ 3"),
-                transform=mpl.transforms.blended_transform_factory(
-                    ax.transAxes, ax.transData
-                ),
+                transform=mpl.transforms.blended_transform_factory(ax.transAxes, ax.transData),
                 fontsize=6,
                 color="#16a34a",
                 ha="right",
@@ -842,9 +832,7 @@ def figure_building_heights(
     elif "height" in buildings.columns:
         height_col = "height"
     else:
-        logger.warning(
-            "No height column (altura/height) in buildings; falling back to flat fill."
-        )
+        logger.warning("No height column (altura/height) in buildings; falling back to flat fill.")
         buildings.plot(
             ax=ax,
             facecolor=SWISS["building_face"],
@@ -908,9 +896,7 @@ def figure_building_heights(
     ax.text(
         0.02,
         0.02,
-        f"{len(buildings):,} buildings | "
-        f"mean height = {mean_h:.1f} m | "
-        f"max = {max_h:.1f} m",
+        f"{len(buildings):,} buildings | mean height = {mean_h:.1f} m | max = {max_h:.1f} m",
         transform=ax.transAxes,
         fontsize=7,
         color=SWISS["secondary"],

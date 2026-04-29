@@ -21,9 +21,7 @@ class TestComputeSunPositions:
     """Tests for compute_sun_positions (expanded from test_solar_access.py)."""
 
     def test_returns_list_of_tuples(self):
-        positions = compute_sun_positions(
-            latitude=-22.97, longitude=-43.17, date="2026-06-21"
-        )
+        positions = compute_sun_positions(latitude=-22.97, longitude=-43.17, date="2026-06-21")
         assert isinstance(positions, list)
         assert len(positions) > 0
         for item in positions:
@@ -32,17 +30,13 @@ class TestComputeSunPositions:
 
     def test_all_altitudes_positive(self):
         """All returned positions must have altitude > 0 (sun above horizon)."""
-        positions = compute_sun_positions(
-            latitude=-22.97, longitude=-43.17, date="2026-06-21"
-        )
+        positions = compute_sun_positions(latitude=-22.97, longitude=-43.17, date="2026-06-21")
         for alt, az in positions:
             assert alt > 0, f"Altitude {alt} should be > 0"
 
     def test_azimuths_in_range(self):
         """Azimuths should be in [0, 360)."""
-        positions = compute_sun_positions(
-            latitude=-22.97, longitude=-43.17, date="2026-06-21"
-        )
+        positions = compute_sun_positions(latitude=-22.97, longitude=-43.17, date="2026-06-21")
         for alt, az in positions:
             assert 0 <= az < 360, f"Azimuth {az} out of range"
 
@@ -57,9 +51,7 @@ class TestComputeSunPositions:
             interval_minutes=60,
         )
         # Winter solstice at lat -23: sunrise ~06:30, sunset ~17:15 local
-        assert 7 <= len(positions) <= 13, (
-            f"Expected 7-13 positions, got {len(positions)}"
-        )
+        assert 7 <= len(positions) <= 13, f"Expected 7-13 positions, got {len(positions)}"
 
     def test_max_altitude_winter_solstice_rio(self):
         """At lat -23 winter solstice, max altitude ~ 43-44 degrees.
@@ -139,9 +131,7 @@ class TestSunPositionToDirection:
         az=180 -> south (0, -1, 0)
         az=270 -> west  (-1, 0, 0)
         """
-        np.testing.assert_allclose(
-            sun_position_to_direction(0.0, 0.0), [0.0, 1.0, 0.0], atol=1e-10
-        )
+        np.testing.assert_allclose(sun_position_to_direction(0.0, 0.0), [0.0, 1.0, 0.0], atol=1e-10)
         np.testing.assert_allclose(
             sun_position_to_direction(0.0, 90.0), [1.0, 0.0, 0.0], atol=1e-10
         )

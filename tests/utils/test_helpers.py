@@ -81,16 +81,12 @@ def create_two_buildings_scene(
     # Building 1
     w1, d1, h1 = building1_size
     cx1, cy1 = building1_center
-    building1 = pv.Box(
-        bounds=(cx1 - w1 / 2, cx1 + w1 / 2, cy1 - d1 / 2, cy1 + d1 / 2, 0, h1)
-    )
+    building1 = pv.Box(bounds=(cx1 - w1 / 2, cx1 + w1 / 2, cy1 - d1 / 2, cy1 + d1 / 2, 0, h1))
 
     # Building 2
     w2, d2, h2 = building2_size
     cx2, cy2 = building2_center
-    building2 = pv.Box(
-        bounds=(cx2 - w2 / 2, cx2 + w2 / 2, cy2 - d2 / 2, cy2 + d2 / 2, 0, h2)
-    )
+    building2 = pv.Box(bounds=(cx2 - w2 / 2, cx2 + w2 / 2, cy2 - d2 / 2, cy2 + d2 / 2, 0, h2))
 
     # Combine
     combined = ground.extract_surface() + building1 + building2

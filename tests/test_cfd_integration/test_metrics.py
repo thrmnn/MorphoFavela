@@ -58,9 +58,7 @@ class TestACH:
     def test_standard_formulation(self):
         """ACH = 3600 × U / L for square cell."""
         # U=1 m/s, L=10m cell → ACH = 360/h
-        assert ach(
-            np.array([1.0]), canopy_height=10.0, cell_area=100.0
-        ) == pytest.approx(360.0)
+        assert ach(np.array([1.0]), canopy_height=10.0, cell_area=100.0) == pytest.approx(360.0)
 
     def test_scales_with_velocity(self):
         # Doubling U doubles ACH

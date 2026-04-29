@@ -41,9 +41,7 @@ class TestBuildBuildingMeshes:
         dtm_path, fp_path, _ = area_paths
         mesh, gdf = build_building_meshes(fp_path, dtm_path, area=area_name)
         lo, hi = EXPECTED_BUILDINGS.get(area_name, (1, 100000))
-        assert lo <= len(gdf) <= hi, (
-            f"{area_name}: {len(gdf)} buildings (expected {lo}-{hi})"
-        )
+        assert lo <= len(gdf) <= hi, f"{area_name}: {len(gdf)} buildings (expected {lo}-{hi})"
         assert mesh is not None, "Building mesh should not be None"
         assert mesh.n_points > 0
 

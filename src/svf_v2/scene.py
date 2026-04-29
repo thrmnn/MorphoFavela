@@ -130,9 +130,7 @@ def build_terrain_mesh(
     grid = pv.StructuredGrid(x_coords, y_coords, z_coords)
     terrain_mesh = grid.extract_surface()
 
-    logger.info(
-        f"  Terrain mesh: {terrain_mesh.n_points} pts, {terrain_mesh.n_cells} cells"
-    )
+    logger.info(f"  Terrain mesh: {terrain_mesh.n_points} pts, {terrain_mesh.n_cells} cells")
     return terrain_mesh
 
 
@@ -217,9 +215,7 @@ def build_building_meshes(
 
     # Validate required fields
     if height_field not in gdf.columns:
-        raise ValueError(
-            f"Height field '{height_field}' not in columns: {list(gdf.columns)}"
-        )
+        raise ValueError(f"Height field '{height_field}' not in columns: {list(gdf.columns)}")
     if base_field not in gdf.columns and not use_dtm_for_base:
         logger.warning(f"Base field '{base_field}' missing -- will sample from DTM")
         use_dtm_for_base = True
@@ -335,12 +331,7 @@ def build_scene(
         _terrain_vtk = None
         _footprints_gpkg = None
 
-    if (
-        cache_vtk
-        and cache_vtk.exists()
-        and _terrain_vtk.exists()
-        and _footprints_gpkg.exists()
-    ):
+    if cache_vtk and cache_vtk.exists() and _terrain_vtk.exists() and _footprints_gpkg.exists():
         logger.info(f"Loading cached scene from {cache_vtk}")
         full_scene = pv.read(str(cache_vtk))
         terrain = pv.read(str(_terrain_vtk))

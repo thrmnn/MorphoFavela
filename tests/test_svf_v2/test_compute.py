@@ -41,9 +41,7 @@ class TestRaycastingSVF:
         svf = compute_svf_raycasting(obs, single_building_scene, sky_directions_small)
         assert svf[0] < 0.9  # should be partially blocked
 
-    def test_far_from_building_high_svf(
-        self, single_building_scene, sky_directions_small
-    ):
+    def test_far_from_building_high_svf(self, single_building_scene, sky_directions_small):
         """Point far from building should have high SVF."""
         obs = np.array([[0.5, 0.5, 1.5]])
         svf = compute_svf_raycasting(obs, single_building_scene, sky_directions_small)
@@ -102,12 +100,8 @@ class TestPyViewFactorSVF:
         # Point at the base of the building, surrounded by walls
         obs_inside = np.array([[5.0, 5.0, 0.1]])
         obs_outside = np.array([[0.5, 0.5, 1.5]])
-        svf_inside = compute_svf(
-            obs_inside, single_building_scene, backend="pyviewfactor"
-        )
-        svf_outside = compute_svf(
-            obs_outside, single_building_scene, backend="pyviewfactor"
-        )
+        svf_inside = compute_svf(obs_inside, single_building_scene, backend="pyviewfactor")
+        svf_outside = compute_svf(obs_outside, single_building_scene, backend="pyviewfactor")
         assert svf_inside[0] < svf_outside[0], (
             f"SVF inside building ({svf_inside[0]:.3f}) should be less than "
             f"SVF outside ({svf_outside[0]:.3f})"
@@ -151,9 +145,7 @@ class TestCheckpointResume:
         )
 
         # Checkpoint file should be cleaned up after successful completion
-        assert not checkpoint_path.exists(), (
-            "Checkpoint should be removed after completion"
-        )
+        assert not checkpoint_path.exists(), "Checkpoint should be removed after completion"
 
         # Resumed result should match the full reference run
         np.testing.assert_array_equal(
@@ -162,9 +154,7 @@ class TestCheckpointResume:
             err_msg="Resumed SVF should match uninterrupted SVF",
         )
 
-    def test_checkpoint_written_during_run(
-        self, empty_scene, sky_directions_small, tmp_path
-    ):
+    def test_checkpoint_written_during_run(self, empty_scene, sky_directions_small, tmp_path):
         """Verify checkpoint file is written at the expected interval."""
         n_points = 12
         obs = np.array([[float(i), 5.0, 1.5] for i in np.linspace(1, 9, n_points)])
@@ -233,17 +223,12 @@ class TestOBBTreeOptimization:
         )
 
         # Reference: sequential via compute_svf_raycasting (n_jobs=1)
-        svf_seq = compute_svf_raycasting(
-            obs, single_building_scene, sky_directions_small, n_jobs=1
-        )
+        svf_seq = compute_svf_raycasting(obs, single_building_scene, sky_directions_small, n_jobs=1)
 
         # Direct OBB tree calls
         obb = _build_obb_tree(single_building_scene)
         svf_obb = np.array(
-            [
-                _svf_for_point_obb(obs[i], sky_directions_small, obb, 500.0)
-                for i in range(len(obs))
-            ]
+            [_svf_for_point_obb(obs[i], sky_directions_small, obb, 500.0) for i in range(len(obs))]
         )
 
         np.testing.assert_allclose(
@@ -271,9 +256,7 @@ class TestOBBTreeOptimization:
 class TestParallelSVF:
     """Tests for parallel (n_jobs > 1) SVF computation."""
 
-    def test_n_jobs_1_matches_default(
-        self, single_building_scene, sky_directions_small
-    ):
+    def test_n_jobs_1_matches_default(self, single_building_scene, sky_directions_small):
         """n_jobs=1 should produce the same result as the default path."""
         obs = np.array(
             [
@@ -283,9 +266,7 @@ class TestParallelSVF:
             ]
         )
 
-        svf_default = compute_svf_raycasting(
-            obs, single_building_scene, sky_directions_small
-        )
+        svf_default = compute_svf_raycasting(obs, single_building_scene, sky_directions_small)
         svf_jobs1 = compute_svf_raycasting(
             obs, single_building_scene, sky_directions_small, n_jobs=1
         )
@@ -296,9 +277,7 @@ class TestParallelSVF:
             err_msg="n_jobs=1 should match default behavior",
         )
 
-    def test_parallel_matches_sequential(
-        self, single_building_scene, sky_directions_small
-    ):
+    def test_parallel_matches_sequential(self, single_building_scene, sky_directions_small):
         """Parallel (n_jobs=2) should produce same results as sequential."""
         obs = np.array(
             [
@@ -311,12 +290,8 @@ class TestParallelSVF:
             ]
         )
 
-        svf_seq = compute_svf_raycasting(
-            obs, single_building_scene, sky_directions_small, n_jobs=1
-        )
-        svf_par = compute_svf_raycasting(
-            obs, single_building_scene, sky_directions_small, n_jobs=2
-        )
+        svf_seq = compute_svf_raycasting(obs, single_building_scene, sky_directions_small, n_jobs=1)
+        svf_par = compute_svf_raycasting(obs, single_building_scene, sky_directions_small, n_jobs=2)
 
         np.testing.assert_allclose(
             svf_par,

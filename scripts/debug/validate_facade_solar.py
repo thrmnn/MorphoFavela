@@ -247,9 +247,7 @@ def main():
         edgecolor="white",
         alpha=0.7,
     )
-    ax.axhline(
-        2.0, color="black", linestyle="--", linewidth=1, label="WHO 2h threshold"
-    )
+    ax.axhline(2.0, color="black", linestyle="--", linewidth=1, label="WHO 2h threshold")
     ax.set_xlabel("Floor Level")
     ax.set_ylabel("Mean Sunlit Hours")
     ax.set_title("(b) Sunlit Hours by Floor", fontsize=12, fontweight="bold")

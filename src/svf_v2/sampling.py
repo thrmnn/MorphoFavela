@@ -55,8 +55,7 @@ def _check_dtm_coverage(
         )
     elif pct < 95:
         logger.warning(
-            f"DTM covers {pct:.0f}% of {label} extent — "
-            f"some data may be lost near edges."
+            f"DTM covers {pct:.0f}% of {label} extent — some data may be lost near edges."
         )
     else:
         logger.info(f"DTM covers {pct:.0f}% of {label} extent.")
@@ -121,9 +120,7 @@ def sample_grid_points(
         geometry=[Point(x, y) for x, y in zip(flat_x, flat_y)],
         crs=footprints_gdf.crs,
     )
-    joined = gpd.sjoin(
-        pts_gdf, footprints_gdf[["geometry"]], how="left", predicate="within"
-    )
+    joined = gpd.sjoin(pts_gdf, footprints_gdf[["geometry"]], how="left", predicate="within")
     # Deduplicate (point may touch multiple buildings)
     inside_mask = ~joined["index_right"].isna()
     if joined.index.duplicated().any():
@@ -197,9 +194,7 @@ def _nearest_edge_outward_normal(point: Point, polygon: Polygon) -> np.ndarray:
     coords = np.array(polygon.exterior.coords)
     n_verts = len(coords) - 1
     # Detect winding order
-    signed_area = 0.5 * np.sum(
-        coords[:-1, 0] * coords[1:, 1] - coords[1:, 0] * coords[:-1, 1]
-    )
+    signed_area = 0.5 * np.sum(coords[:-1, 0] * coords[1:, 1] - coords[1:, 0] * coords[:-1, 1])
     is_ccw = signed_area > 0
     best_dist = np.inf
     best_normal = np.array([1.0, 0.0])
@@ -274,9 +269,7 @@ def _offset_points_outside_buildings(
         px, py = pt.x, pt.y
 
         # Find containing building(s) via STRtree
-        containing = [
-            building_polys[i] for i in tree.query(pt) if building_polys[i].contains(pt)
-        ]
+        containing = [building_polys[i] for i in tree.query(pt) if building_polys[i].contains(pt)]
         if not containing:
             continue
         bldg = containing[0]
@@ -395,14 +388,10 @@ def sample_street_points(
         roads_gdf = roads_gdf.explode(index_parts=False).reset_index(drop=True)
         # Drop tiny fragments from clipping artifacts
         roads_gdf = roads_gdf[roads_gdf.geometry.length > spacing]
-        logger.info(
-            f"  Clipped roads to boundary: {n_before} -> {len(roads_gdf)} segments"
-        )
+        logger.info(f"  Clipped roads to boundary: {n_before} -> {len(roads_gdf)} segments")
 
     rows = []
-    for idx, row in tqdm(
-        roads_gdf.iterrows(), total=len(roads_gdf), desc="Sampling streets"
-    ):
+    for idx, row in tqdm(roads_gdf.iterrows(), total=len(roads_gdf), desc="Sampling streets"):
         geom = row.geometry
         if not isinstance(geom, LineString):
             continue
@@ -443,9 +432,7 @@ def sample_street_points(
     valid = np.isfinite(zs)
     n_dropped = int((~valid).sum())
     if n_dropped > 0:
-        logger.warning(
-            f"  Dropped {n_dropped}/{len(zs)} street points outside DTM bounds"
-        )
+        logger.warning(f"  Dropped {n_dropped}/{len(zs)} street points outside DTM bounds")
     gdf_pts = gdf_pts[valid].reset_index(drop=True)
 
     logger.info(f"  Street sample points: {len(gdf_pts)}")
@@ -457,9 +444,7 @@ def sample_street_points(
 # ---------------------------------------------------------------------------
 
 
-def _outward_normal_2d(
-    ax: float, ay: float, bx: float, by: float, ccw: bool = True
-) -> np.ndarray:
+def _outward_normal_2d(ax: float, ay: float, bx: float, by: float, ccw: bool = True) -> np.ndarray:
     """
     Outward normal for edge A->B of a polygon exterior ring.
 

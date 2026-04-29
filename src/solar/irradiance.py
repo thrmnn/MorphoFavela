@@ -268,9 +268,7 @@ def compute_instantaneous_ghi(
         I_direct = 0.0
 
     # Diffuse component (isotropic, weighted by SVF)
-    I_diffuse = diffuse_horizontal_irradiance(
-        altitude_deg, day_of_year, site_elevation_m
-    )
+    I_diffuse = diffuse_horizontal_irradiance(altitude_deg, day_of_year, site_elevation_m)
     I_diffuse_weighted = I_diffuse * svf
 
     return float(I_direct + I_diffuse_weighted)

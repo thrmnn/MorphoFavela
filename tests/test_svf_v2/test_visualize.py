@@ -52,9 +52,7 @@ def planned_gdf() -> gpd.GeoDataFrame:
 @pytest.fixture
 def street_gdf_with_segments() -> gpd.GeoDataFrame:
     """Street GeoDataFrame that includes a street_id column."""
-    return _make_street_gdf(
-        n=400, mean_svf=0.55, std_svf=0.18, with_street_id=True, seed=3
-    )
+    return _make_street_gdf(n=400, mean_svf=0.55, std_svf=0.18, with_street_id=True, seed=3)
 
 
 @pytest.fixture
@@ -73,9 +71,7 @@ class TestPlotSvfComparison:
 
     def test_creates_output_file(self, tmp_path, informal_gdf, planned_gdf):
         out = tmp_path / "comparison.png"
-        result = plot_svf_comparison(
-            {"Vidigal": informal_gdf, "Cidade de Deus": planned_gdf}, out
-        )
+        result = plot_svf_comparison({"Vidigal": informal_gdf, "Cidade de Deus": planned_gdf}, out)
         assert result == out
         assert out.exists()
         assert out.stat().st_size > 0
@@ -89,9 +85,7 @@ class TestPlotSvfComparison:
     def test_three_areas(self, tmp_path, informal_gdf, planned_gdf):
         third = _make_street_gdf(n=150, mean_svf=0.70, std_svf=0.10, seed=99)
         out = tmp_path / "three.png"
-        result = plot_svf_comparison(
-            {"A": informal_gdf, "B": planned_gdf, "C": third}, out
-        )
+        result = plot_svf_comparison({"A": informal_gdf, "B": planned_gdf, "C": third}, out)
         assert result == out
         assert out.exists()
 

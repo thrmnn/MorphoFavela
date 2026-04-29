@@ -431,8 +431,7 @@ def compute_solar_access_grid(
     )
 
     logger.info(
-        "Grid solar access complete: mean=%.2fh, min=%.2fh, max=%.2fh, "
-        "mean_irradiance=%.0f Wh/m2",
+        "Grid solar access complete: mean=%.2fh, min=%.2fh, max=%.2fh, mean_irradiance=%.0f Wh/m2",
         solar_hours.mean(),
         solar_hours.min(),
         solar_hours.max(),
@@ -523,9 +522,7 @@ def compute_solar_access_streets(
     elif "z" in street_gdf.columns:
         zs = street_gdf["z"].values.astype(np.float64) + evaluation_height
     else:
-        logger.warning(
-            "No z/z_observer column -- using evaluation_height=%.1f", evaluation_height
-        )
+        logger.warning("No z/z_observer column -- using evaluation_height=%.1f", evaluation_height)
         zs = np.full(n_pts, evaluation_height, dtype=np.float64)
 
     observers = np.column_stack([xs, ys, zs])

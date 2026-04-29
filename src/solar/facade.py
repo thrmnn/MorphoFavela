@@ -102,9 +102,7 @@ def direct_beam_on_facade(
     Returns ``DNI * max(0, cos(theta_i))``.  Zero when the sun is
     behind the facade.
     """
-    cos_theta = compute_facade_incident_angle(
-        sun_altitude_deg, sun_azimuth_deg, facade_azimuth_deg
-    )
+    cos_theta = compute_facade_incident_angle(sun_altitude_deg, sun_azimuth_deg, facade_azimuth_deg)
     return dni * max(0.0, cos_theta)
 
 
@@ -181,9 +179,7 @@ def compute_facade_daily_irradiance_array(
 
     for j, (alt, az) in enumerate(sun_positions):
         dni_arr[j] = direct_normal_irradiance(alt, day_of_year, site_elevation_m)
-        diffuse_h_arr[j] = diffuse_horizontal_irradiance(
-            alt, day_of_year, site_elevation_m
-        )
+        diffuse_h_arr[j] = diffuse_horizontal_irradiance(alt, day_of_year, site_elevation_m)
         alt_rad[j] = np.radians(alt)
         az_rad[j] = np.radians(az)
 
@@ -512,9 +508,7 @@ def compute_facade_solar_access(
     doy = dt.timetuple().tm_yday
 
     svf_array = (
-        facade_gdf["svf"].values
-        if "svf" in facade_gdf.columns
-        else np.ones(len(facade_gdf))
+        facade_gdf["svf"].values if "svf" in facade_gdf.columns else np.ones(len(facade_gdf))
     )
 
     facade_irradiance = compute_facade_daily_irradiance_array(

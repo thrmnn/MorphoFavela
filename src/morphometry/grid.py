@@ -47,9 +47,7 @@ def _aggregate_svf_to_grid(
         zones["svf_count"] = 0
         return zones
 
-    joined = gpd.sjoin(
-        svf_points[[svf_col, "geometry"]], zones, how="inner", predicate="within"
-    )
+    joined = gpd.sjoin(svf_points[[svf_col, "geometry"]], zones, how="inner", predicate="within")
 
     stats = joined.groupby("zone_id")[svf_col].agg(["mean", "count"])
     zones["svf"] = zones["zone_id"].map(stats["mean"])
@@ -119,9 +117,7 @@ def compute_grid_morphometrics(
         elif "altura" in bld.columns:
             bld["height"] = bld["altura"]
         else:
-            logger.warning(
-                "No height column found; height-dependent metrics will be NaN."
-            )
+            logger.warning("No height column found; height-dependent metrics will be NaN.")
 
     # Create grid
     zones = create_analysis_zones(bld, method="grid", cell_size=cell_size)

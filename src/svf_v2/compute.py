@@ -280,9 +280,7 @@ def _svf_for_point_multi_ray(
         # Weighted SVF
         total_weight = valid_weights.sum()
         blocked_weight = sum(valid_weights[r] for r in hit_set)
-        return (
-            (total_weight - blocked_weight) / total_weight if total_weight > 0 else 0.0
-        )
+        return (total_weight - blocked_weight) / total_weight if total_weight > 0 else 0.0
     else:
         # Unweighted SVF: count ratio (legacy behaviour)
         n_hit = len(hit_set)
@@ -483,8 +481,7 @@ def compute_svf_raycasting(
                 pass
 
         logger.info(
-            f"SVF complete: mean={svf.mean():.3f}, "
-            f"min={svf.min():.3f}, max={svf.max():.3f}"
+            f"SVF complete: mean={svf.mean():.3f}, min={svf.min():.3f}, max={svf.max():.3f}"
         )
         return svf
 
@@ -586,8 +583,7 @@ def compute_svf_gpu(
        code-path raises a clear error instead of an import failure.
     """
     raise NotImplementedError(
-        "GPU backend not yet ported to v2. "
-        "Use backend='raycast' (CPU, parallelised) instead."
+        "GPU backend not yet ported to v2. Use backend='raycast' (CPU, parallelised) instead."
     )
 
 
@@ -625,9 +621,7 @@ def compute_svf_pyviewfactor(
     # Keep only above-ground, non-degenerate faces
     keep = (areas > 1e-4) & (normals_z < 0.9)  # exclude near-horizontal ground
     obstruction_ids = np.where(keep)[0]
-    logger.info(
-        f"PyViewFactor: {len(obstruction_ids)} obstruction faces (of {mesh.n_cells})"
-    )
+    logger.info(f"PyViewFactor: {len(obstruction_ids)} obstruction faces (of {mesh.n_cells})")
 
     if len(obstruction_ids) == 0:
         return np.ones(n_obs)
@@ -713,9 +707,7 @@ def compute_svf(
         sky_dirs = generate_sky_directions(n_sky_patches)
         sky_weights = None
     else:
-        raise ValueError(
-            f"Unknown sky_model: {sky_model!r}. Use 'tregenza' or 'uniform'."
-        )
+        raise ValueError(f"Unknown sky_model: {sky_model!r}. Use 'tregenza' or 'uniform'.")
 
     if backend == "raycasting":
         return compute_svf_raycasting(

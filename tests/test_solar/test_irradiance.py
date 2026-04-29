@@ -68,16 +68,12 @@ class TestDirectHorizontalIrradiance:
 
     def test_zenith(self):
         """At 90 deg altitude, DHI == DNI (sin(90) = 1)."""
-        assert direct_horizontal_irradiance(800.0, 90.0) == pytest.approx(
-            800.0, rel=1e-6
-        )
+        assert direct_horizontal_irradiance(800.0, 90.0) == pytest.approx(800.0, rel=1e-6)
 
     def test_45_degrees(self):
         """At 45 deg, DHI = DNI * sin(45) = DNI * sqrt(2)/2."""
         expected = 800.0 * np.sin(np.radians(45))
-        assert direct_horizontal_irradiance(800.0, 45.0) == pytest.approx(
-            expected, rel=1e-6
-        )
+        assert direct_horizontal_irradiance(800.0, 45.0) == pytest.approx(expected, rel=1e-6)
 
     def test_negative_dni(self):
         """Negative DNI should return 0."""
@@ -133,9 +129,7 @@ class TestInstantaneousGHI:
 
     def test_zero_svf_shaded_zero(self):
         """SVF=0 and shaded -> no irradiance at all."""
-        assert compute_instantaneous_ghi(
-            45.0, 172, svf=0.0, is_sunlit=False
-        ) == pytest.approx(0.0)
+        assert compute_instantaneous_ghi(45.0, 172, svf=0.0, is_sunlit=False) == pytest.approx(0.0)
 
     def test_zero_altitude_zero_ghi(self):
         """Sun at/below horizon -> GHI = 0 regardless of other params."""
@@ -249,9 +243,7 @@ class TestDailyIrradianceArray:
         positions = [(45.0, 180.0), (60.0, 200.0)]
         sunlit_vec = np.array([[True, False]])
         svf_vec = np.array([0.7])
-        result_vec = compute_daily_irradiance_array(
-            positions, sunlit_vec, svf_vec, 60, 172
-        )
+        result_vec = compute_daily_irradiance_array(positions, sunlit_vec, svf_vec, 60, 172)
 
         sunlit_scalar = np.array([True, False])
         result_scalar = integrate_daily_irradiance(

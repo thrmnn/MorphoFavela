@@ -50,9 +50,7 @@ class TestCFDPatchResult:
             wind_speed_ref=5.0,
         )
         # Missing U_mag
-        bad = pd.DataFrame(
-            {"x": [0], "y": [0], "z": [1.5], "U": [1], "V": [0], "W": [0]}
-        )
+        bad = pd.DataFrame({"x": [0], "y": [0], "z": [1.5], "U": [1], "V": [0], "W": [0]})
         with pytest.raises(ValueError, match="missing columns"):
             CFDPatchResult(metadata=meta, samples=bad)
 

@@ -121,9 +121,7 @@ def _find_file(directory: Path, pattern: str, suffix: str, label: str) -> Path:
         # Prefer shorter name (more likely the main file)
         matches.sort(key=lambda p: len(p.name))
         return matches[0]
-    raise FileNotFoundError(
-        f"No {label} file matching '{pattern}{suffix}' in {directory}"
-    )
+    raise FileNotFoundError(f"No {label} file matching '{pattern}{suffix}' in {directory}")
 
 
 def _imatches(name: str, pattern: str) -> bool:

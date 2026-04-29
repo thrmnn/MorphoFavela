@@ -257,8 +257,7 @@ def plot_solar_access(
     std_v = float(np.std(vals)) if len(vals) > 0 else 0
     pct_shaded = 100.0 * np.sum(vals == 0) / n_pts if n_pts > 0 else 0
     stats_text = (
-        f"n={n_pts:,} | mean={mean_v:.2f}h | "
-        f"\u03c3={std_v:.2f}h | {pct_shaded:.1f}% fully shaded"
+        f"n={n_pts:,} | mean={mean_v:.2f}h | \u03c3={std_v:.2f}h | {pct_shaded:.1f}% fully shaded"
     )
     ax.text(
         0.02,
@@ -268,9 +267,7 @@ def plot_solar_access(
         fontsize=8,
         va="bottom",
         ha="left",
-        bbox=dict(
-            boxstyle="round,pad=0.4", facecolor="white", edgecolor="#cccccc", alpha=0.85
-        ),
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor="#cccccc", alpha=0.85),
         zorder=15,
     )
 
@@ -317,9 +314,7 @@ def plot_solar_seasonal_panel(
     """
     # Auto-detect date columns
     if date_columns is None:
-        date_columns = sorted(
-            [c for c in gdf.columns if c.startswith("solar_hours_20")]
-        )
+        date_columns = sorted([c for c in gdf.columns if c.startswith("solar_hours_20")])
     if not date_columns:
         logger.warning("No date columns found for seasonal panel -- skipping.")
         return Path(output_path)
@@ -479,9 +474,7 @@ def plot_solar_irradiance_map(
 
     vmin = 0.0
     vmax = (
-        float(np.percentile(plot_vals[np.isfinite(plot_vals)], 98))
-        if len(plot_vals) > 0
-        else 1.0
+        float(np.percentile(plot_vals[np.isfinite(plot_vals)], 98)) if len(plot_vals) > 0 else 1.0
     )
     if vmax == 0:
         vmax = 1.0
@@ -866,9 +859,7 @@ def plot_solar_dashboard(
     ax_hist.axvline(mean_val, color="#c62828", linestyle="--", linewidth=1.2)
     ax_hist.axvline(median_val, color="#e65100", linestyle="-.", linewidth=1.2)
 
-    stats_txt = (
-        f"n = {len(solar):,}\n\u03bc = {mean_val:.2f} h\n\u03c3 = {std_val:.2f} h"
-    )
+    stats_txt = f"n = {len(solar):,}\n\u03bc = {mean_val:.2f} h\n\u03c3 = {std_val:.2f} h"
     ax_hist.text(
         0.96,
         0.94,
@@ -877,9 +868,7 @@ def plot_solar_dashboard(
         fontsize=7,
         va="top",
         ha="right",
-        bbox=dict(
-            boxstyle="round,pad=0.3", facecolor="white", edgecolor="#cccccc", alpha=0.9
-        ),
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="#cccccc", alpha=0.9),
     )
     ax_hist.set_xlabel("Solar Hours", fontsize=_NC_LABEL_SIZE)
     ax_hist.set_ylabel("Count", fontsize=_NC_LABEL_SIZE)
@@ -1037,9 +1026,7 @@ def plot_solar_dashboard(
         cdf_y = np.arange(1, len(sorted_solar) + 1) / len(sorted_solar)
         ax_scatter.plot(sorted_solar, cdf_y, color="#c62828", linewidth=1.5)
         ax_scatter.axhline(0.5, color="gray", linestyle=":", linewidth=0.8)
-        ax_scatter.axvline(
-            median_val, color="#e65100", linestyle="-.", linewidth=1, alpha=0.7
-        )
+        ax_scatter.axvline(median_val, color="#e65100", linestyle="-.", linewidth=1, alpha=0.7)
         ax_scatter.set_xlabel("Solar Hours", fontsize=_NC_LABEL_SIZE)
         ax_scatter.set_ylabel("Cumulative Probability", fontsize=_NC_LABEL_SIZE)
         ax_scatter.set_title(
@@ -1367,9 +1354,7 @@ def plot_solar_comparison(
     # ---- Left panel: KDE curves ----
     for idx, (name, gdf) in enumerate(areas_data.items()):
         if column not in gdf.columns:
-            logger.warning(
-                "Column '%s' missing in area '%s' -- skipping.", column, name
-            )
+            logger.warning("Column '%s' missing in area '%s' -- skipping.", column, name)
             arrays.append(np.array([]))
             continue
         vals = gdf[column].dropna().values
@@ -1383,9 +1368,7 @@ def plot_solar_comparison(
         xs = np.linspace(vals.min(), vals.max(), 300)
         ax_kde.plot(xs, kde(xs), color=colors[idx], linewidth=2, label=name)
         ax_kde.fill_between(xs, kde(xs), alpha=0.12, color=colors[idx])
-        ax_kde.axvline(
-            mean_val, color=colors[idx], linestyle="--", linewidth=1, alpha=0.7
-        )
+        ax_kde.axvline(mean_val, color=colors[idx], linestyle="--", linewidth=1, alpha=0.7)
 
     ax_kde.set_xlabel("Solar Hours (Mean)", fontsize=_NC_LABEL_SIZE)
     ax_kde.set_ylabel("Density", fontsize=_NC_LABEL_SIZE)
@@ -1398,15 +1381,8 @@ def plot_solar_comparison(
         vals = arrays[idx]
         if len(vals) == 0:
             continue
-        label = (
-            f"{name}  "
-            f"(\u03bc={np.mean(vals):.2f}, "
-            f"med={np.median(vals):.2f}, "
-            f"n={len(vals):,})"
-        )
-        legend_handles.append(
-            Line2D([0], [0], color=colors[idx], linewidth=2, label=label)
-        )
+        label = f"{name}  (\u03bc={np.mean(vals):.2f}, med={np.median(vals):.2f}, n={len(vals):,})"
+        legend_handles.append(Line2D([0], [0], color=colors[idx], linewidth=2, label=label))
     ax_kde.legend(
         handles=legend_handles,
         fontsize=_NC_LEGEND_SIZE,
@@ -1727,15 +1703,11 @@ def plot_solar_seasonal_comparison_hero(
     # Custom colormaps
     # Winter: dark blue -> cool white
     winter_colors = ["#0d0d2b", "#1a237e", "#1565c0", "#42a5f5", "#b3e5fc", "#e1f5fe"]
-    winter_cmap = mcolors.LinearSegmentedColormap.from_list(
-        "winter_cold", winter_colors, N=256
-    )
+    winter_cmap = mcolors.LinearSegmentedColormap.from_list("winter_cold", winter_colors, N=256)
 
     # Summer: dark red -> bright yellow
     summer_colors = ["#1a0000", "#b71c1c", "#e65100", "#ff9800", "#ffeb3b", "#fffde7"]
-    summer_cmap = mcolors.LinearSegmentedColormap.from_list(
-        "summer_warm", summer_colors, N=256
-    )
+    summer_cmap = mcolors.LinearSegmentedColormap.from_list("summer_warm", summer_colors, N=256)
 
     panels = [
         (ax_w, winter_col, winter_cmap, "Winter Solstice (Jun 21)"),
@@ -1914,8 +1886,7 @@ def plot_facade_solar_dashboard(
     ax_floor = fig.add_subplot(gs[0, 1])
     floors = sorted(facade_gdf["floor_level"].unique())
     floor_data = [
-        facade_gdf.loc[facade_gdf["floor_level"] == f, "facade_sunlit_hours"].values
-        for f in floors
+        facade_gdf.loc[facade_gdf["floor_level"] == f, "facade_sunlit_hours"].values for f in floors
     ]
     bp = ax_floor.boxplot(
         floor_data,
@@ -2005,9 +1976,7 @@ def plot_facade_solar_dashboard(
     )
     ax_polar.set_theta_zero_location("N")
     ax_polar.set_theta_direction(-1)
-    ax_polar.set_title(
-        "(d) Sunlit Hours by Orientation", fontsize=_NC_TITLE_SIZE, pad=15
-    )
+    ax_polar.set_title("(d) Sunlit Hours by Orientation", fontsize=_NC_TITLE_SIZE, pad=15)
     ax_polar.tick_params(labelsize=_NC_TICK_SIZE)
 
     # Suptitle
@@ -2021,9 +1990,7 @@ def plot_facade_solar_dashboard(
 
     output_path = Path(output_path)
     _ensure_dir(output_path)
-    fig.savefig(
-        output_path, dpi=DPI, bbox_inches="tight", facecolor="white", edgecolor="none"
-    )
+    fig.savefig(output_path, dpi=DPI, bbox_inches="tight", facecolor="white", edgecolor="none")
     plt.close(fig)
     logger.info("Saved facade solar dashboard to %s", output_path)
     return output_path

@@ -77,9 +77,7 @@ def save_grid_results(
     _rasterise_svf(points, svf, crs, out / "svf_grid.tif", grid_spacing)
 
     # Heatmap plot
-    plot_svf_heatmap(
-        points, svf, out / "svf_heatmap.png", footprints_gdf=footprints_gdf
-    )
+    plot_svf_heatmap(points, svf, out / "svf_heatmap.png", footprints_gdf=footprints_gdf)
 
 
 def _rasterise_svf(
@@ -321,8 +319,7 @@ def save_scene_stl(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     scene_mesh.save(str(output_path), binary=binary)
     logger.info(
-        f"  Saved scene STL: {output_path} "
-        f"({scene_mesh.n_points} pts, {scene_mesh.n_cells} cells)"
+        f"  Saved scene STL: {output_path} ({scene_mesh.n_points} pts, {scene_mesh.n_cells} cells)"
     )
     return output_path
 
@@ -335,8 +332,7 @@ def save_scene_vtk(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     scene_mesh.save(str(output_path))
     logger.info(
-        f"  Saved scene VTK: {output_path} "
-        f"({scene_mesh.n_points} pts, {scene_mesh.n_cells} cells)"
+        f"  Saved scene VTK: {output_path} ({scene_mesh.n_points} pts, {scene_mesh.n_cells} cells)"
     )
     return output_path
 
@@ -380,9 +376,7 @@ def plot_alignment_check(
         # Sample points (cap at 5000 for render speed)
         if sample_points is not None and len(sample_points) > 0:
             pts = sample_points[:5000]
-            ax.scatter(
-                pts[:, 0], pts[:, 1], c="red", s=1, alpha=0.5, label="Sample pts"
-            )
+            ax.scatter(pts[:, 0], pts[:, 1], c="red", s=1, alpha=0.5, label="Sample pts")
 
         ax.set_aspect("equal")
         ax.set_xlabel("X (m)")

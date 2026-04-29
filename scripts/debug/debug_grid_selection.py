@@ -56,9 +56,7 @@ def apply_building_mask(flat_x, flat_y, footprints_gdf):
         geometry=[Point(x, y) for x, y in zip(flat_x, flat_y)],
         crs=footprints_gdf.crs,
     )
-    joined = gpd.sjoin(
-        pts_gdf, footprints_gdf[["geometry"]], how="left", predicate="within"
-    )
+    joined = gpd.sjoin(pts_gdf, footprints_gdf[["geometry"]], how="left", predicate="within")
     inside_mask = ~joined["index_right"].isna()
     if joined.index.duplicated().any():
         inside_mask = inside_mask.groupby(inside_mask.index).any()
@@ -165,9 +163,7 @@ def main():
 
     # Create multi-panel figure
     n_buffers = len(args.buffers)
-    fig, axes = plt.subplots(
-        2, (n_buffers + 1) // 2, figsize=(8 * ((n_buffers + 1) // 2), 16)
-    )
+    fig, axes = plt.subplots(2, (n_buffers + 1) // 2, figsize=(8 * ((n_buffers + 1) // 2), 16))
     axes = axes.ravel()
 
     summary_counts = []
@@ -189,9 +185,7 @@ def main():
 
         # Plot boundary
         if boundary_gdf is not None:
-            boundary_gdf.boundary.plot(
-                ax=ax, color="black", linewidth=1.0, linestyle="--"
-            )
+            boundary_gdf.boundary.plot(ax=ax, color="black", linewidth=1.0, linestyle="--")
 
         # Plot discarded points (subsampled)
         disc_x, disc_y = flat_x[~mask], flat_y[~mask]
@@ -208,8 +202,7 @@ def main():
         ax.scatter(kept_x, kept_y, s=0.3, c="#2ecc71", alpha=0.5, rasterized=True)
 
         ax.set_title(
-            f"Buffer = {buf_dist}m\n"
-            f"{n_kept:,} kept ({pct:.0f}%) / {n_disc:,} discarded",
+            f"Buffer = {buf_dist}m\n{n_kept:,} kept ({pct:.0f}%) / {n_disc:,} discarded",
             fontsize=11,
         )
         ax.set_aspect("equal")
@@ -220,9 +213,7 @@ def main():
     if ax_summary is not None:
         dists = [s[0] for s in summary_counts]
         counts = [s[1] for s in summary_counts]
-        bars = ax_summary.bar(
-            range(len(dists)), counts, color="#2ecc71", edgecolor="#27ae60"
-        )
+        bars = ax_summary.bar(range(len(dists)), counts, color="#2ecc71", edgecolor="#27ae60")
         ax_summary.set_xticks(range(len(dists)))
         ax_summary.set_xticklabels([f"{d}m" for d in dists])
         ax_summary.set_ylabel("Grid points kept")

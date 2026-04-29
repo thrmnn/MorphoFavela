@@ -98,9 +98,7 @@ def aggregate_to_patch(
         "U_p90": low_wind_percentile(u_mag, 90),
         "stagnation_frac": stagnation_fraction(u_mag, stagnation_threshold),
         "TKE_mean": float(np.mean(tke)),
-        "TI_mean": float(np.mean(turbulent_intensity(tke, u_ref)))
-        if u_ref > 0
-        else np.nan,
+        "TI_mean": float(np.mean(turbulent_intensity(tke, u_ref))) if u_ref > 0 else np.nan,
         "vent_efficiency": float(np.mean(u_mag) / u_ref) if u_ref > 0 else np.nan,
     }
 
@@ -202,9 +200,7 @@ def aggregate_to_grid(
         tke = in_cell["TKE"].values
         metrics["cfd_U_mean"].append(float(np.mean(u_mag)))
         metrics["cfd_U_p10"].append(low_wind_percentile(u_mag, 10))
-        metrics["cfd_stagnation_frac"].append(
-            stagnation_fraction(u_mag, stagnation_threshold)
-        )
+        metrics["cfd_stagnation_frac"].append(stagnation_fraction(u_mag, stagnation_threshold))
         metrics["cfd_TKE_mean"].append(float(np.mean(tke)))
         ti = turbulent_intensity(tke, u_ref) if u_ref > 0 else np.array([np.nan])
         metrics["cfd_TI_mean"].append(float(np.mean(ti)))

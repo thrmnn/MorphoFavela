@@ -146,11 +146,7 @@ def worst_case_direction(
     For metrics where lower = worse (U_mean, ACH):
         use negate=True via external logic or wrap in a helper.
     """
-    valid = {
-        d: m
-        for d, m in per_direction.items()
-        if metric in m and not np.isnan(m[metric])
-    }
+    valid = {d: m for d, m in per_direction.items() if metric in m and not np.isnan(m[metric])}
     if not valid:
         return ("", np.nan)
     worst = max(valid.items(), key=lambda kv: kv[1][metric])

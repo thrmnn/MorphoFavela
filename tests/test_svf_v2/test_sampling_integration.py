@@ -11,9 +11,7 @@ class TestGridSampling:
 
         dtm_path = area_paths[0]
         _, _, gdf = area_scene
-        pts = sample_grid_points(
-            dtm_path, gdf, grid_spacing=20.0, pedestrian_height=1.5
-        )
+        pts = sample_grid_points(dtm_path, gdf, grid_spacing=20.0, pedestrian_height=1.5)
         assert len(pts) > 50, f"Too few grid points: {len(pts)}"
         assert pts.shape[1] == 3
 

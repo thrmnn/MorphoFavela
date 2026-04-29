@@ -126,9 +126,7 @@ def compute_facade_solar_potential(
     elevation_factor = np.sin(np.radians(mean_el))
 
     facade_gdf = facade_gdf.copy()
-    facade_gdf["solar_potential"] = (
-        facade_gdf["svf"] * orientation_factor * elevation_factor
-    )
+    facade_gdf["solar_potential"] = facade_gdf["svf"] * orientation_factor * elevation_factor
 
     # Normalise to [0, 1]
     max_val = facade_gdf["solar_potential"].max()

@@ -31,9 +31,7 @@ logger = logging.getLogger(__name__)
 CFD_RESULTS_ROOT = "data/{site}/cfd_results"
 
 
-def load_patch_csv(
-    csv_path: Path, metadata_path: Optional[Path] = None
-) -> CFDPatchResult:
+def load_patch_csv(csv_path: Path, metadata_path: Optional[Path] = None) -> CFDPatchResult:
     """Load one patch × one wind-direction result from CSV + JSON.
 
     CSV schema (required columns): x, y, z, U, V, W, U_mag, TKE
@@ -53,9 +51,7 @@ def load_patch_csv(
     if "U_mag" not in samples.columns and {"U", "V", "W"}.issubset(samples.columns):
         import numpy as np
 
-        samples["U_mag"] = np.sqrt(
-            samples["U"] ** 2 + samples["V"] ** 2 + samples["W"] ** 2
-        )
+        samples["U_mag"] = np.sqrt(samples["U"] ** 2 + samples["V"] ** 2 + samples["W"] ** 2)
 
     # Load metadata
     if metadata_path is None:

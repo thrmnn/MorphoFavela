@@ -92,9 +92,7 @@ def plot_zone_metrics_panel(
             plot_gdf = gdf
 
     # Filter to available columns
-    available = [
-        (col, cmap, title) for col, cmap, title in metrics if col in plot_gdf.columns
-    ]
+    available = [(col, cmap, title) for col, cmap, title in metrics if col in plot_gdf.columns]
     if not available:
         logger.warning("No metric columns found for zone panel — skipping.")
         return output_path
@@ -628,10 +626,7 @@ def plot_moran_scatter(
     )
 
     # Legend
-    patches = [
-        Patch(facecolor=v, edgecolor="gray", label=k)
-        for k, v in quadrant_colors.items()
-    ]
+    patches = [Patch(facecolor=v, edgecolor="gray", label=k) for k, v in quadrant_colors.items()]
     ax.legend(handles=patches, loc="upper left", fontsize=9)
 
     plt.tight_layout()

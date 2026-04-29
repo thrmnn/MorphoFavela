@@ -37,7 +37,6 @@ from scripts.compute_svf_streets import (
     extract_elevation_from_mesh,
     sample_points_along_line,
 )
-
 from src.config import MAX_FILTER_AREA, MIN_BUILDING_AREA, is_formal_area
 from src.metrics import normalize_height_columns
 from src.svf_v2.utils import (

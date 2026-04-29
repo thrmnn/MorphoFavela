@@ -34,12 +34,11 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import shared utilities
+from scripts.compute_solar_access import compute_sun_positions
 from scripts.compute_svf_streets import (
     extract_elevation_from_mesh,
     sample_points_along_line,
 )
-
-from scripts.compute_solar_access import compute_sun_positions
 from src.svf_v2.utils import extract_terrain_surface, load_mesh
 
 # Setup logging

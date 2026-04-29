@@ -140,9 +140,7 @@ class TestTregenzaPatchGeneration:
 
     def test_all_upper_hemisphere(self, tregenza_dirs):
         """All direction z-components must be positive (upper hemisphere)."""
-        assert np.all(tregenza_dirs[:, 2] > 0), (
-            "All Tregenza directions must point upward (z > 0)"
-        )
+        assert np.all(tregenza_dirs[:, 2] > 0), "All Tregenza directions must point upward (z > 0)"
 
     def test_zenith_patch_is_last(self, tregenza_dirs):
         """The last patch should be the zenith (0, 0, 1)."""
@@ -221,9 +219,7 @@ class TestSolidAngles:
 class TestTregenzaSVF:
     """Verify SVF computation using Tregenza patches."""
 
-    def test_unobstructed_svf_approx_1(
-        self, empty_scene, tregenza_dirs, tregenza_weights
-    ):
+    def test_unobstructed_svf_approx_1(self, empty_scene, tregenza_dirs, tregenza_weights):
         """An unobstructed point should have SVF ~ 1.0.
 
         The flat terrain may block a few near-horizon rays, so we allow
@@ -240,9 +236,7 @@ class TestTregenzaSVF:
             f"Unobstructed SVF should be ~1.0, got {svf[0]:.4f}"
         )
 
-    def test_half_obstructed_svf_approx_05(
-        self, half_sky_scene, tregenza_dirs, tregenza_weights
-    ):
+    def test_half_obstructed_svf_approx_05(self, half_sky_scene, tregenza_dirs, tregenza_weights):
         """A point next to an infinite wall should have SVF ~ 0.5.
 
         The wall blocks roughly half the azimuthal range.  Because
@@ -261,9 +255,7 @@ class TestTregenzaSVF:
             f"Half-obstructed SVF should be ~0.5, got {svf[0]:.4f}"
         )
 
-    def test_building_reduces_svf(
-        self, single_building_scene, tregenza_dirs, tregenza_weights
-    ):
+    def test_building_reduces_svf(self, single_building_scene, tregenza_dirs, tregenza_weights):
         """SVF near a building should be lower than SVF far away."""
         obs_near = np.array([[4.1, 5.0, 0.1]])
         obs_far = np.array([[0.5, 0.5, 1.5]])
@@ -280,13 +272,10 @@ class TestTregenzaSVF:
             sky_weights=tregenza_weights,
         )
         assert svf_near[0] < svf_far[0], (
-            f"SVF near building ({svf_near[0]:.3f}) should be less than "
-            f"far ({svf_far[0]:.3f})"
+            f"SVF near building ({svf_near[0]:.3f}) should be less than far ({svf_far[0]:.3f})"
         )
 
-    def test_svf_bounded_01(
-        self, single_building_scene, tregenza_dirs, tregenza_weights
-    ):
+    def test_svf_bounded_01(self, single_building_scene, tregenza_dirs, tregenza_weights):
         """SVF values should always be in [0, 1]."""
         obs = np.array(
             [
@@ -321,9 +310,7 @@ class TestTregenzaVsUniform:
 
         # Tregenza (weighted)
         dirs_t, weights_t = generate_tregenza_patches()
-        svf_tregenza = compute_svf_raycasting(
-            obs, empty_scene, dirs_t, sky_weights=weights_t
-        )
+        svf_tregenza = compute_svf_raycasting(obs, empty_scene, dirs_t, sky_weights=weights_t)
 
         # Uniform (unweighted, same number of patches)
         dirs_u = generate_sky_directions(n_patches=145)
@@ -351,14 +338,10 @@ class TestTregenzaVsUniform:
         obs = np.array([[3.9, 5.0, 0.5]])
 
         dirs_t, weights_t = generate_tregenza_patches()
-        svf_t = compute_svf_raycasting(
-            obs, single_building_scene, dirs_t, sky_weights=weights_t
-        )
+        svf_t = compute_svf_raycasting(obs, single_building_scene, dirs_t, sky_weights=weights_t)
 
         dirs_u = generate_sky_directions(n_patches=145)
-        svf_u = compute_svf_raycasting(
-            obs, single_building_scene, dirs_u, sky_weights=None
-        )
+        svf_u = compute_svf_raycasting(obs, single_building_scene, dirs_u, sky_weights=None)
 
         # Both should be valid
         assert 0.0 <= svf_t[0] <= 1.0

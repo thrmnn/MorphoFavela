@@ -96,9 +96,7 @@ def _base_page(pdf: PdfPages, area_label: str = "") -> plt.Figure:
     fig.patch.set_facecolor("white")
 
     # Top accent line
-    ax_top = fig.add_axes(
-        [MARGIN["left"], 0.955, MARGIN["right"] - MARGIN["left"], 0.002]
-    )
+    ax_top = fig.add_axes([MARGIN["left"], 0.955, MARGIN["right"] - MARGIN["left"], 0.002])
     ax_top.add_patch(Rectangle((0, 0), 1, 1, facecolor=SWISS["accent"]))
     ax_top.axis("off")
 
@@ -653,11 +651,7 @@ def _build_study_site_lines(
 
     if streets_svf is not None and not streets_svf.empty:
         n_seg = len(streets_svf)
-        n_pts = (
-            int(streets_svf["svf_count"].sum())
-            if "svf_count" in streets_svf.columns
-            else 0
-        )
+        n_pts = int(streets_svf["svf_count"].sum()) if "svf_count" in streets_svf.columns else 0
         pts_label = f"{n_pts:,} sample points along " if n_pts > 0 else ""
         lines.append(f"**Street-level SVF:** {pts_label}{n_seg:,} street segments.")
     lines.append("")
@@ -710,9 +704,7 @@ def _build_methodology_lines(
     lines.append(
         "  \u2022 Volumetric porosity: fraction of the canopy volume not occupied by buildings."
     )
-    lines.append(
-        "  \u2022 Slope and aspect: derived from the DTM using a 3x3 gradient kernel."
-    )
+    lines.append("  \u2022 Slope and aspect: derived from the DTM using a 3x3 gradient kernel.")
     lines.append("")
 
     lines.append("### Sky View Factor")
@@ -851,9 +843,7 @@ def _build_morphometric_narrative(
             if lp_mean > 0.4
             else "is below typical LCZ 3 values (0.40\u20130.70)"
         )
-        lines.append(
-            f"Plan area density lambda_p = {lp_mean:.3f} ({q}), which {lcz_lp}. "
-        )
+        lines.append(f"Plan area density lambda_p = {lp_mean:.3f} ({q}), which {lcz_lp}. ")
         if lf_mean is not None:
             lines.append(
                 f"Mean frontal area density lambda_f = {lf_mean:.3f}, "
@@ -918,8 +908,7 @@ def _build_morphometric_narrative(
                 "Low porosity indicates limited void space within the urban "
                 "canopy for air circulation."
                 if porosity_mean < 0.4
-                else "Moderate porosity allows some ventilation pathways "
-                "within the canopy layer."
+                else "Moderate porosity allows some ventilation pathways within the canopy layer."
                 if porosity_mean < 0.7
                 else "High porosity with significant void space."
             )
@@ -939,11 +928,7 @@ def _build_spatial_patterns(grid_data: Dict[str, Any]) -> List[str]:
     lines.append("### Density\u2013Enclosure Coupling")
     if svf_lp_r is not None:
         strength = (
-            "Strong"
-            if abs(svf_lp_r) > 0.5
-            else "Moderate"
-            if abs(svf_lp_r) > 0.3
-            else "Weak"
+            "Strong" if abs(svf_lp_r) > 0.5 else "Moderate" if abs(svf_lp_r) > 0.3 else "Weak"
         )
         lines.append(
             f"SVF and lambda_p exhibit a Pearson correlation of r = {svf_lp_r:.3f}. "
@@ -1395,9 +1380,7 @@ def generate_pdf_report(
                 pdf,
                 "Site Overview",
                 _fig,
-                caption=(
-                    "Building footprints on hillshade DTM with elevation contours."
-                ),
+                caption=("Building footprints on hillshade DTM with elevation contours."),
                 area_label=area_label,
             )
 

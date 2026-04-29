@@ -196,9 +196,7 @@ def compute_slope_aspect(
                 # Circular mean for aspect
                 sin_sum = np.sum(np.sin(np.radians(zone_aspect)))
                 cos_sum = np.sum(np.cos(np.radians(zone_aspect)))
-                aspect_values[zone_id] = float(
-                    np.degrees(np.arctan2(sin_sum, cos_sum)) % 360
-                )
+                aspect_values[zone_id] = float(np.degrees(np.arctan2(sin_sum, cos_sum)) % 360)
             else:
                 slope_values[zone_id] = np.nan
                 aspect_values[zone_id] = np.nan

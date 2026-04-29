@@ -104,9 +104,7 @@ class TestAggregateToGrid:
         # Build a grid larger than the analysis patch
         grid = _make_grid(extent=200)  # 20×20 cells at 10m
         assert len(grid) == 400
-        cells = aggregate_to_grid(
-            patch_result, grid, (0, 0), analysis_patch_diameter=100
-        )
+        cells = aggregate_to_grid(patch_result, grid, (0, 0), analysis_patch_diameter=100)
         # Only centroids inside the 100m-diameter circle survive — 80 cells.
         assert len(cells) == 80
 

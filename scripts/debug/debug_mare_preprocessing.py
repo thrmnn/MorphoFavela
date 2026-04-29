@@ -94,9 +94,7 @@ def main():
 
     # ---- Extrusion validity ----
     skipped_height = (
-        kept_final[
-            kept_final[args.height_field].isna() | (kept_final[args.height_field] <= 0)
-        ]
+        kept_final[kept_final[args.height_field].isna() | (kept_final[args.height_field] <= 0)]
         if args.height_field in kept_final.columns
         else gpd.GeoDataFrame()
     )
@@ -121,13 +119,9 @@ def main():
 
     # Panel 1: All buildings, colored by filter outcome
     ax = axes[0, 0]
-    kept_final.plot(
-        ax=ax, color="#2ecc71", edgecolor="#27ae60", linewidth=0.1, alpha=0.7
-    )
+    kept_final.plot(ax=ax, color="#2ecc71", edgecolor="#27ae60", linewidth=0.1, alpha=0.7)
     if len(removed_by_area) > 0:
-        removed_by_area.plot(
-            ax=ax, color="#e74c3c", edgecolor="#c0392b", linewidth=0.2, alpha=0.8
-        )
+        removed_by_area.plot(ax=ax, color="#e74c3c", edgecolor="#c0392b", linewidth=0.2, alpha=0.8)
     if len(removed_by_cluster) > 0:
         removed_by_cluster.plot(
             ax=ax, color="#f39c12", edgecolor="#d68910", linewidth=0.2, alpha=0.8
@@ -138,9 +132,7 @@ def main():
     legend_items = [
         Patch(facecolor="#2ecc71", label=f"Kept ({len(kept_final):,})"),
         Patch(facecolor="#e74c3c", label=f"Area filter ({len(removed_by_area):,})"),
-        Patch(
-            facecolor="#f39c12", label=f"Cluster filter ({len(removed_by_cluster):,})"
-        ),
+        Patch(facecolor="#f39c12", label=f"Cluster filter ({len(removed_by_cluster):,})"),
     ]
     ax.legend(handles=legend_items, loc="upper right", fontsize=10)
     ax.set_title(
@@ -153,9 +145,7 @@ def main():
 
     # Panel 2: Zoom on area-filtered buildings
     ax = axes[0, 1]
-    kept_final.plot(
-        ax=ax, color="#d5f5e3", edgecolor="#abebc6", linewidth=0.05, alpha=0.5
-    )
+    kept_final.plot(ax=ax, color="#d5f5e3", edgecolor="#abebc6", linewidth=0.05, alpha=0.5)
     if len(removed_by_area) > 0:
         removed_by_area.plot(
             ax=ax,
@@ -199,9 +189,7 @@ def main():
 
     # Panel 3: Cluster-filtered buildings
     ax = axes[1, 0]
-    kept_final.plot(
-        ax=ax, color="#d5f5e3", edgecolor="#abebc6", linewidth=0.05, alpha=0.5
-    )
+    kept_final.plot(ax=ax, color="#d5f5e3", edgecolor="#abebc6", linewidth=0.05, alpha=0.5)
     if len(removed_by_cluster) > 0:
         removed_by_cluster.plot(
             ax=ax, color="#f39c12", edgecolor="#d68910", linewidth=0.5, alpha=0.9
@@ -284,9 +272,7 @@ def main():
             bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
         )
 
-    fig.suptitle(
-        f"{area} — Building Preprocessing Debug", fontsize=16, fontweight="bold", y=0.98
-    )
+    fig.suptitle(f"{area} — Building Preprocessing Debug", fontsize=16, fontweight="bold", y=0.98)
     plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     output_dir = get_area_output_dir(area) / "svf_v2"
@@ -306,9 +292,7 @@ def main():
         a_all = gdf["_footprint_area"].values
         valid = np.isfinite(h_all) & np.isfinite(a_all) & (h_all > 0) & (a_all > 0)
 
-        ax2.scatter(
-            a_all[valid], h_all[valid], s=1, alpha=0.15, c="#3498db", rasterized=True
-        )
+        ax2.scatter(a_all[valid], h_all[valid], s=1, alpha=0.15, c="#3498db", rasterized=True)
         ax2.axvline(
             MAX_FILTER_AREA,
             color="red",
@@ -333,8 +317,7 @@ def main():
         ax2.set_xlabel("Footprint area (m²)", fontsize=12)
         ax2.set_ylabel(f"Height [{args.height_field}] (m)", fontsize=12)
         ax2.set_title(
-            f"{area} — Footprint Area vs Height\n"
-            f"Red line = MAX_FILTER_AREA = {MAX_FILTER_AREA} m²",
+            f"{area} — Footprint Area vs Height\nRed line = MAX_FILTER_AREA = {MAX_FILTER_AREA} m²",
             fontsize=13,
         )
         ax2.legend(fontsize=10)

@@ -116,17 +116,11 @@ def filter_buildings(
         area_mask = footprints["area"] <= MAX_FILTER_AREA
         filtered_by_area = (~area_mask).sum()
         area_filtered = footprints[~area_mask].copy()  # Buildings filtered by area
-        footprints = footprints[
-            area_mask
-        ].copy()  # Keep only buildings that passed area filter
+        footprints = footprints[area_mask].copy()  # Keep only buildings that passed area filter
         if filtered_by_area > 0:
-            print(
-                f"    Filtered out {filtered_by_area} buildings with area > {MAX_FILTER_AREA}m²"
-            )
+            print(f"    Filtered out {filtered_by_area} buildings with area > {MAX_FILTER_AREA}m²")
     elif skip_area_filter:
-        print(
-            "    Skipping footprint-area filter (SVF mode: large buildings obstruct sky)"
-        )
+        print("    Skipping footprint-area filter (SVF mode: large buildings obstruct sky)")
 
     # Apply cluster filtering to identify significant clusters
     if len(footprints) == 0:
@@ -212,9 +206,7 @@ def filter_isolated_buildings(
             in_any_significant |= mask
 
     component_stats.sort(key=lambda x: x[1], reverse=True)
-    n_kept_clusters = sum(
-        1 for _, n, _ in component_stats if n >= min_cluster_buildings
-    )
+    n_kept_clusters = sum(1 for _, n, _ in component_stats if n >= min_cluster_buildings)
 
     print(
         f"    Found {len(components)} component(s), "
@@ -274,12 +266,8 @@ def load_building_footprints(
     stl_center_y = (terrain_bounds[2] + terrain_bounds[3]) / 2
 
     # Use ORIGINAL footprints center (before filtering) for transformation
-    original_footprints_center_x = (
-        footprints.total_bounds[0] + footprints.total_bounds[2]
-    ) / 2
-    original_footprints_center_y = (
-        footprints.total_bounds[1] + footprints.total_bounds[3]
-    ) / 2
+    original_footprints_center_x = (footprints.total_bounds[0] + footprints.total_bounds[2]) / 2
+    original_footprints_center_y = (footprints.total_bounds[1] + footprints.total_bounds[3]) / 2
 
     dx = stl_center_x - original_footprints_center_x
     dy = stl_center_y - original_footprints_center_y
@@ -296,9 +284,7 @@ def load_building_footprints(
     # Apply translation to filtered, isolated, and area-filtered footprints
     footprints.geometry = footprints.geometry.translate(xoff=dx, yoff=dy)
     if len(isolated_footprints) > 0:
-        isolated_footprints.geometry = isolated_footprints.geometry.translate(
-            xoff=dx, yoff=dy
-        )
+        isolated_footprints.geometry = isolated_footprints.geometry.translate(xoff=dx, yoff=dy)
         # Ensure CRS matches for plotting
         isolated_footprints.crs = footprints.crs
     if len(area_filtered_footprints) > 0:
@@ -314,15 +300,11 @@ def load_building_footprints(
     if buffer_distance > 0:
         print(f"  Applying {buffer_distance}m buffer...")
         # Ensure geometry column is active
-        footprints = footprints.set_geometry(
-            footprints.geometry.buffer(buffer_distance)
-        )
+        footprints = footprints.set_geometry(footprints.geometry.buffer(buffer_distance))
 
     print(f"  Prepared {len(footprints)} buffered footprints (main cluster)")
     if len(isolated_footprints) > 0:
-        print(
-            f"  Isolated buildings: {len(isolated_footprints)} (for visualization only)"
-        )
+        print(f"  Isolated buildings: {len(isolated_footprints)} (for visualization only)")
     if len(area_filtered_footprints) > 0:
         print(
             f"  Area-filtered buildings: {len(area_filtered_footprints)} (for visualization only)"
@@ -355,9 +337,7 @@ def compute_ground_mask(
 
     # Perform spatial join to find points within buildings
     # Points within buildings will have a match, others won't
-    joined = gpd.sjoin(
-        grid_points_gdf, building_footprints, how="left", predicate="within"
-    )
+    joined = gpd.sjoin(grid_points_gdf, building_footprints, how="left", predicate="within")
 
     # Handle potential duplicates from sjoin (if a point is in multiple buildings)
     # Group by original index and check if any match exists
@@ -448,9 +428,7 @@ def plot_ground_mask_debug(
 
     # Plot building buffer zone if provided (semi-transparent overlay, very light)
     if building_buffer_geom is not None:
-        buffer_gdf = gpd.GeoDataFrame(
-            geometry=[building_buffer_geom], crs=building_footprints.crs
-        )
+        buffer_gdf = gpd.GeoDataFrame(geometry=[building_buffer_geom], crs=building_footprints.crs)
         buffer_gdf.plot(
             ax=ax,
             facecolor="none",
@@ -476,9 +454,7 @@ def plot_ground_mask_debug(
     )
 
     # Plot all filtered grid points (light grey - these are the ones we're considering)
-    ax.scatter(
-        grid_x, grid_y, c="lightgrey", s=1, alpha=0.4, label="All filtered grid points"
-    )
+    ax.scatter(grid_x, grid_y, c="lightgrey", s=1, alpha=0.4, label="All filtered grid points")
 
     # Plot ground points (green) - only show points that are ground (will be used for SVF)
     if len(ground_mask) == len(grid_x):
@@ -508,9 +484,7 @@ def plot_ground_mask_debug(
     if isolated_buildings is not None and len(isolated_buildings) > 0:
         stats_text.append(f"Isolated: {len(isolated_buildings):,} buildings")
     if "area" in building_footprints.columns and len(building_footprints) > 0:
-        stats_text.append(
-            f"Max building area: {building_footprints['area'].max():.1f} m²"
-        )
+        stats_text.append(f"Max building area: {building_footprints['area'].max():.1f} m²")
 
     if stats_text:
         stats_str = "\n".join(stats_text)
@@ -609,9 +583,7 @@ def generate_ground_points(
             )
             print("  Recomputing mask on current grid...")
             if building_footprints is not None:
-                ground_mask = compute_ground_mask(
-                    grid_x_flat, grid_y_flat, building_footprints
-                )
+                ground_mask = compute_ground_mask(grid_x_flat, grid_y_flat, building_footprints)
             else:
                 # If no footprints, all points are ground
                 ground_mask = np.ones(len(grid_points_2d), dtype=bool)
@@ -624,9 +596,7 @@ def generate_ground_points(
             grid_x_flat = grid_x_flat[ground_mask]
             grid_y_flat = grid_y_flat[ground_mask]
         else:
-            print(
-                "  Error: Mask size still doesn't match after recomputation. Using all points."
-            )
+            print("  Error: Mask size still doesn't match after recomputation. Using all points.")
             ground_mask = np.ones(len(grid_points_2d), dtype=bool)
     else:
         ground_mask = np.ones(len(grid_points_2d), dtype=bool)
@@ -636,11 +606,7 @@ def generate_ground_points(
     building_buffer_geom = None
 
     # Apply building proximity filter if requested
-    if (
-        building_buffer is not None
-        and building_footprints is not None
-        and len(grid_points_2d) > 0
-    ):
+    if building_buffer is not None and building_footprints is not None and len(grid_points_2d) > 0:
         print(f"  Filtering to points within {building_buffer}m of buildings...")
         # Create buffer around buildings
         building_buffers = building_footprints.buffer(building_buffer)
@@ -705,9 +671,7 @@ def generate_ground_points(
 
     projected_points = np.array(projected_points)
 
-    print(
-        f"  Generated {len(projected_points)} ground points (after masking and filtering)"
-    )
+    print(f"  Generated {len(projected_points)} ground points (after masking and filtering)")
 
     # Create debug plot after all filtering is done
     if output_dir is not None and building_footprints is not None:

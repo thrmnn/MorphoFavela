@@ -80,9 +80,7 @@ def compute_sun_positions(
             latitude, longitude, date, hour_start, hour_end, interval_minutes
         )
     except Exception as exc:
-        logger.warning(
-            "pvlib unavailable or failed (%s), using analytical fallback", exc
-        )
+        logger.warning("pvlib unavailable or failed (%s), using analytical fallback", exc)
         return _sun_positions_analytical(
             latitude, longitude, date, hour_start, hour_end, interval_minutes
         )
@@ -161,9 +159,9 @@ def _sun_positions_analytical(
         hour_angle = math.radians(15.0 * (solar_hour - 12.0))
 
         # Solar altitude (elevation)
-        sin_alt = math.sin(lat_rad) * math.sin(declination) + math.cos(
-            lat_rad
-        ) * math.cos(declination) * math.cos(hour_angle)
+        sin_alt = math.sin(lat_rad) * math.sin(declination) + math.cos(lat_rad) * math.cos(
+            declination
+        ) * math.cos(hour_angle)
         sin_alt = max(-1.0, min(1.0, sin_alt))
         altitude_rad = math.asin(sin_alt)
         altitude_deg = math.degrees(altitude_rad)

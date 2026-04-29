@@ -106,9 +106,7 @@ class WindRose:
     time_window_end: Optional[str] = None  # ISO date
     n_observations: Optional[int] = None  # total observations in the window
     calm_fraction: Optional[float] = None  # fraction of obs with |U| < 0.5 m/s
-    quality_flag: Optional[str] = (
-        None  # "measured" | "gap-filled" | "placeholder-prior"
-    )
+    quality_flag: Optional[str] = None  # "measured" | "gap-filled" | "placeholder-prior"
 
     def __post_init__(self):
         # Normalise frequencies

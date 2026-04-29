@@ -163,8 +163,7 @@ class TestStreetCanyonValidation:
         )
         max_hours = result["facade_sunlit_hours"].max()
         assert max_hours > 0, (
-            f"No facade points sunlit (max={max_hours}). "
-            "Self-intersection fix may not be working."
+            f"No facade points sunlit (max={max_hours}). Self-intersection fix may not be working."
         )
 
     def test_upper_floors_more_sun(self, canyon):
@@ -236,8 +235,7 @@ class TestStreetCanyonValidation:
         )
         n_compliant = result["who_compliant"].sum()
         assert n_compliant > 0, (
-            "No WHO-compliant points in a 6m canyon — "
-            "upper floors should receive >2h sunlight."
+            "No WHO-compliant points in a 6m canyon — upper floors should receive >2h sunlight."
         )
 
     def test_housing_unit_summary(self, canyon):

@@ -129,9 +129,7 @@ def compute_seasonal_solar(
             )
 
             # 4. Solar hours
-            solar_hours = (
-                sunlit_matrix.sum(axis=1).astype(np.float64) * interval_minutes / 60.0
-            )
+            solar_hours = sunlit_matrix.sum(axis=1).astype(np.float64) * interval_minutes / 60.0
 
         # Track shadow frequency across all dates
         if n_sun > 0:

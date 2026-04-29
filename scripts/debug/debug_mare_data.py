@@ -149,9 +149,7 @@ def main():
 
     # --- Compute overlaps ---
     print("\n--- Coverage Check ---")
-    dtm_area = (dtm_bounds.right - dtm_bounds.left) * (
-        dtm_bounds.top - dtm_bounds.bottom
-    )
+    dtm_area = (dtm_bounds.right - dtm_bounds.left) * (dtm_bounds.top - dtm_bounds.bottom)
     fp_area_extent = (fb[2] - fb[0]) * (fb[3] - fb[1])
 
     # Intersection of DTM and footprints extents
@@ -227,9 +225,7 @@ def main():
     if boundary_gdf is not None:
         boundary_gdf.boundary.plot(ax=ax, color="black", linewidth=1.5, linestyle="--")
     legend_items = [
-        Patch(
-            facecolor="#d9d9d9", edgecolor="#777", label=f"Buildings ({len(fp_gdf):,})"
-        ),
+        Patch(facecolor="#d9d9d9", edgecolor="#777", label=f"Buildings ({len(fp_gdf):,})"),
         Patch(facecolor="#e74c3c", label=f"Roads ({len(roads_gdf):,})"),
         Patch(facecolor="lightblue", edgecolor="blue", label="DTM extent"),
     ]
@@ -279,9 +275,7 @@ def main():
             Patch(facecolor=[0.2, 0.7, 0.3], label=f"Valid ({pct_valid:.0f}%)"),
             Patch(facecolor=[0.9, 0.2, 0.2], label=f"NoData ({100 - pct_valid:.0f}%)"),
             Patch(facecolor="none", edgecolor="orange", label="Footprint extent"),
-            Patch(
-                facecolor="none", edgecolor="purple", linestyle=":", label="Road extent"
-            ),
+            Patch(facecolor="none", edgecolor="purple", linestyle=":", label="Road extent"),
         ],
         loc="upper right",
         fontsize=8,
@@ -375,9 +369,7 @@ def main():
             legend_kwds={"shrink": 0.6, "label": f"{height_field} (m)"},
         )
         if boundary_gdf is not None:
-            boundary_gdf.boundary.plot(
-                ax=ax, color="black", linewidth=1.5, linestyle="--"
-            )
+            boundary_gdf.boundary.plot(ax=ax, color="black", linewidth=1.5, linestyle="--")
         ax.set_title(f"Building Heights Map ({height_field})", fontsize=11)
     else:
         # Color by area
@@ -393,9 +385,7 @@ def main():
             legend_kwds={"shrink": 0.6, "label": "Area (m²)"},
         )
         if boundary_gdf is not None:
-            boundary_gdf.boundary.plot(
-                ax=ax, color="black", linewidth=1.5, linestyle="--"
-            )
+            boundary_gdf.boundary.plot(ax=ax, color="black", linewidth=1.5, linestyle="--")
         ax.set_title("Building Footprint Areas", fontsize=11)
     ax.set_aspect("equal")
     ax.tick_params(labelsize=7)
@@ -417,16 +407,13 @@ def main():
     if boundary_gdf is not None:
         boundary_gdf.boundary.plot(ax=ax, color="black", linewidth=1.5, linestyle="--")
     ax.set_title(
-        f"Road Network\n{len(roads_gdf):,} segments, "
-        f"{total_length / 1000:.1f} km total",
+        f"Road Network\n{len(roads_gdf):,} segments, {total_length / 1000:.1f} km total",
         fontsize=11,
     )
     ax.set_aspect("equal")
     ax.tick_params(labelsize=7)
 
-    fig.suptitle(
-        f"{area} — Data Readiness Check", fontsize=16, fontweight="bold", y=0.98
-    )
+    fig.suptitle(f"{area} — Data Readiness Check", fontsize=16, fontweight="bold", y=0.98)
     plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     output_dir = get_area_output_dir(area) / "svf_v2"
@@ -466,9 +453,7 @@ def main():
         base_vals = fp_gdf["base"].values
         valid_both = valid_z & np.isfinite(base_vals)
         if valid_both.sum() > 0:
-            ax.scatter(
-                dtm_z[valid_both], base_vals[valid_both], s=1, alpha=0.3, c="#3498db"
-            )
+            ax.scatter(dtm_z[valid_both], base_vals[valid_both], s=1, alpha=0.3, c="#3498db")
             lims = [
                 min(dtm_z[valid_both].min(), base_vals[valid_both].min()),
                 max(dtm_z[valid_both].max(), base_vals[valid_both].max()),
@@ -477,8 +462,7 @@ def main():
             ax.set_xlabel("DTM elevation at centroid (m)")
             ax.set_ylabel("Building 'base' field (m)")
             ax.set_title(
-                f"Base Elevation Check\n"
-                f"{valid_both.sum():,} buildings, {n_outside:,} outside DTM",
+                f"Base Elevation Check\n{valid_both.sum():,} buildings, {n_outside:,} outside DTM",
                 fontsize=11,
             )
             ax.legend()
@@ -495,9 +479,7 @@ def main():
             ax.set_title("Base Elevation Check", fontsize=11)
     else:
         if valid_z.sum() > 0:
-            ax.hist(
-                dtm_z[valid_z], bins=50, color="#3498db", edgecolor="#2980b9", alpha=0.8
-            )
+            ax.hist(dtm_z[valid_z], bins=50, color="#3498db", edgecolor="#2980b9", alpha=0.8)
             ax.axvline(
                 np.nanmean(dtm_z[valid_z]),
                 color="red",
@@ -566,13 +548,9 @@ def main():
     if pct_valid < 80:
         issues.append(f"DTM has only {pct_valid:.0f}% valid cells")
     if n_outside > len(fp_gdf) * 0.1:
-        issues.append(
-            f"{n_outside} buildings ({n_outside / len(fp_gdf) * 100:.0f}%) outside DTM"
-        )
+        issues.append(f"{n_outside} buildings ({n_outside / len(fp_gdf) * 100:.0f}%) outside DTM")
     if height_field is None:
-        issues.append(
-            "No height field found (altura/height/h) — buildings will be flat"
-        )
+        issues.append("No height field found (altura/height/h) — buildings will be flat")
     elif height_field:
         h = fp_gdf[height_field].dropna()
         if len(h) < len(fp_gdf) * 0.5:

@@ -36,9 +36,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _adaptive_linewidth(
-    gdf: gpd.GeoDataFrame, lw_min: float = 0.5, lw_max: float = 3.0
-) -> float:
+def _adaptive_linewidth(gdf: gpd.GeoDataFrame, lw_min: float = 0.5, lw_max: float = 3.0) -> float:
     """Compute a linewidth that scales inversely with the study area extent.
 
     Small areas (diagonal ~0.5 km) get thick lines (~3.0), large areas
@@ -59,25 +57,19 @@ def _adaptive_linewidth(
         Adaptive linewidth value.
     """
     bounds = gdf.total_bounds  # [minx, miny, maxx, maxy]
-    diag_km = (
-        np.sqrt((bounds[2] - bounds[0]) ** 2 + (bounds[3] - bounds[1]) ** 2) / 1000.0
-    )
+    diag_km = np.sqrt((bounds[2] - bounds[0]) ** 2 + (bounds[3] - bounds[1]) ** 2) / 1000.0
     lw = 3.0 / (diag_km + 0.5)
     return float(np.clip(lw, lw_min, lw_max))
 
 
-def _adaptive_markersize(
-    gdf: gpd.GeoDataFrame, ms_min: float = 0.5, ms_max: float = 5.0
-) -> float:
+def _adaptive_markersize(gdf: gpd.GeoDataFrame, ms_min: float = 0.5, ms_max: float = 5.0) -> float:
     """Compute a marker size that scales inversely with the study area extent.
 
     Same logic as :func:`_adaptive_linewidth` but with a different default
     range appropriate for scatter marker sizes.
     """
     bounds = gdf.total_bounds
-    diag_km = (
-        np.sqrt((bounds[2] - bounds[0]) ** 2 + (bounds[3] - bounds[1]) ** 2) / 1000.0
-    )
+    diag_km = np.sqrt((bounds[2] - bounds[0]) ** 2 + (bounds[3] - bounds[1]) ** 2) / 1000.0
     ms = 4.0 / (diag_km + 0.3)
     return float(np.clip(ms, ms_min, ms_max))
 
@@ -88,9 +80,7 @@ def _adaptive_folium_weight(gdf: gpd.GeoDataFrame) -> float:
     Returns a value in [1.5, 5.0].
     """
     bounds = gdf.total_bounds
-    diag_km = (
-        np.sqrt((bounds[2] - bounds[0]) ** 2 + (bounds[3] - bounds[1]) ** 2) / 1000.0
-    )
+    diag_km = np.sqrt((bounds[2] - bounds[0]) ** 2 + (bounds[3] - bounds[1]) ** 2) / 1000.0
     w = 4.0 / (diag_km + 0.5)
     return float(np.clip(w, 1.5, 5.0))
 
@@ -273,9 +263,7 @@ def plot_facade_by_height(gdf: gpd.GeoDataFrame, output_path: Path):
     sc = ax.scatter(
         gdf["height_above_ground"].values,
         gdf["svf"].values,
-        c=gdf["facade_azimuth"].values
-        if "facade_azimuth" in gdf.columns
-        else "steelblue",
+        c=gdf["facade_azimuth"].values if "facade_azimuth" in gdf.columns else "steelblue",
         cmap="hsv",
         s=1,
         alpha=0.3,
@@ -561,11 +549,7 @@ def plot_svf_interactive(
         buildings_layer.add_to(m)
 
     # Segment lines coloured by svf_mean — adaptive weight
-    if (
-        segments_gdf is not None
-        and len(segments_gdf) > 0
-        and "svf_mean" in segments_gdf.columns
-    ):
+    if segments_gdf is not None and len(segments_gdf) > 0 and "svf_mean" in segments_gdf.columns:
         seg_4326 = segments_gdf.to_crs(epsg=4326)
         folium_weight = _adaptive_folium_weight(segments_gdf)
         logger.debug("  Adaptive Folium weight=%.2f", folium_weight)
@@ -582,9 +566,7 @@ def plot_svf_interactive(
             )
             geom = row.geometry
             if geom.geom_type == "MultiLineString":
-                line_coords = [
-                    [(c[1], c[0]) for c in part.coords] for part in geom.geoms
-                ]
+                line_coords = [[(c[1], c[0]) for c in part.coords] for part in geom.geoms]
             else:
                 line_coords = [[(c[1], c[0]) for c in geom.coords]]
             for coords in line_coords:
@@ -697,12 +679,8 @@ def plot_svf_comparison(
     legend_handles = []
     for idx, name in enumerate(area_names):
         svf = svf_arrays[idx]
-        label = (
-            f"{name}  (mean={np.mean(svf):.2f}, med={np.median(svf):.2f}, n={len(svf)})"
-        )
-        legend_handles.append(
-            Line2D([0], [0], color=colors[idx], linewidth=2, label=label)
-        )
+        label = f"{name}  (mean={np.mean(svf):.2f}, med={np.median(svf):.2f}, n={len(svf)})"
+        legend_handles.append(Line2D([0], [0], color=colors[idx], linewidth=2, label=label))
     ax_kde.legend(handles=legend_handles, fontsize=8, loc="upper left")
 
     # ---- Right panel: violin + box ----
@@ -835,9 +813,7 @@ def plot_svf_dashboard(
     # ---- Top-right: histogram ----
     ax_hist.hist(svf, bins=40, color="#4363d8", edgecolor="white", alpha=0.8)
     ax_hist.axvline(mean_val, color="red", linestyle="--", linewidth=1.5, label="Mean")
-    ax_hist.axvline(
-        median_val, color="orange", linestyle="-.", linewidth=1.5, label="Median"
-    )
+    ax_hist.axvline(median_val, color="orange", linestyle="-.", linewidth=1.5, label="Median")
     stats_text = (
         f"n = {len(svf)}\n"
         f"mean = {mean_val:.3f}\n"

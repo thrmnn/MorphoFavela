@@ -75,9 +75,7 @@ class TestSeasonalSolar:
         """When SVF is provided, irradiance should be included."""
         obs = np.array([[5.0, 5.0, 1.5]])
         svf = np.array([0.8])
-        result = compute_seasonal_solar(
-            obs, flat_ground_mesh, svf_array=svf, dates=["2026-06-21"]
-        )
+        result = compute_seasonal_solar(obs, flat_ground_mesh, svf_array=svf, dates=["2026-06-21"])
         entry = result["dates"]["2026-06-21"]
         assert "irradiance_wh" in entry
         assert entry["irradiance_wh"][0] > 0

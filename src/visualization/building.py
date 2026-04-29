@@ -182,9 +182,7 @@ def create_multi_panel_summary(gdf: gpd.GeoDataFrame, output_path: Path) -> None
             legend=True,
             legend_kwds={"label": "H/W Ratio"},
         )
-        ax4.set_title(
-            "Street Canyon Ratio (Height/Width)", fontsize=12, fontweight="bold"
-        )
+        ax4.set_title("Street Canyon Ratio (Height/Width)", fontsize=12, fontweight="bold")
     ax4.set_axis_off()
 
     # Inter-building distance map (if available)
@@ -226,9 +224,7 @@ def create_multi_panel_summary(gdf: gpd.GeoDataFrame, output_path: Path) -> None
             add_scale_bar(ax)
             add_north_arrow(ax)
 
-    plt.suptitle(
-        "Morphometric Analysis Summary", fontsize=16, fontweight="bold", y=0.98
-    )
+    plt.suptitle("Morphometric Analysis Summary", fontsize=16, fontweight="bold", y=0.98)
     plt.tight_layout(rect=[0, 0, 1, 0.97])
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path, dpi=DPI, bbox_inches="tight")
@@ -332,9 +328,7 @@ def create_metric_map(
     if column not in gdf.columns:
         raise ValueError(f"GeoDataFrame must have '{column}' column")
     fig, ax = plt.subplots(1, 1, figsize=FIGURE_SIZE)
-    gdf.plot(
-        column=column, ax=ax, cmap=cmap, legend=True, legend_kwds={"label": column}
-    )
+    gdf.plot(column=column, ax=ax, cmap=cmap, legend=True, legend_kwds={"label": column})
     ax.set_title(title or column)
     ax.set_axis_off()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -396,9 +390,7 @@ def create_scatter_plots(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
 
     # Height vs Area
     ax1 = axes[0, 0]
-    ax1.scatter(
-        gdf["area"], gdf["height"], alpha=0.5, s=10, edgecolors="black", linewidth=0.1
-    )
+    ax1.scatter(gdf["area"], gdf["height"], alpha=0.5, s=10, edgecolors="black", linewidth=0.1)
     ax1.set_xlabel("Area (m²)")
     ax1.set_ylabel("Height (m)")
     ax1.set_title("Height vs Area")
@@ -406,9 +398,7 @@ def create_scatter_plots(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
 
     # Volume vs Area
     ax2 = axes[0, 1]
-    ax2.scatter(
-        gdf["area"], gdf["volume"], alpha=0.5, s=10, edgecolors="black", linewidth=0.1
-    )
+    ax2.scatter(gdf["area"], gdf["volume"], alpha=0.5, s=10, edgecolors="black", linewidth=0.1)
     ax2.set_xlabel("Area (m²)")
     ax2.set_ylabel("Volume (m³)")
     ax2.set_title("Volume vs Area")
@@ -432,9 +422,7 @@ def create_scatter_plots(gdf: gpd.GeoDataFrame, output_path: Path) -> None:
 
     # Volume vs Height
     ax4 = axes[1, 1]
-    ax4.scatter(
-        gdf["height"], gdf["volume"], alpha=0.5, s=10, edgecolors="black", linewidth=0.1
-    )
+    ax4.scatter(gdf["height"], gdf["volume"], alpha=0.5, s=10, edgecolors="black", linewidth=0.1)
     ax4.set_xlabel("Height (m)")
     ax4.set_ylabel("Volume (m³)")
     ax4.set_title("Volume vs Height")
