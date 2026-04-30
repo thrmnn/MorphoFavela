@@ -20,23 +20,36 @@ a stable v1.0 is cut.
   (gitignored) and patched to bypass its QGIS-only `util/__init__.py`.
   No QGIS install needed; only `gdal` (and a `numba`-compatible
   numpy < 2.3, both pulled into the conda env).
-- Vidigal benchmark at 1 m DSM: **n = 2,510 cells, r² = 0.68,
-  slope = 1.01, RMSE = 0.14, bias = −0.05** SVF units. The small
-  negative bias is consistent with the methodological offset
-  (IVF samples passageways at z = 1.5 m; UMEP integrates at the DSM
-  surface). UMEP is aggregated to the 10 m grid only over non-building
-  pixels — without that mask the comparison is contaminated by rooftop
-  pixels that UMEP scores ~1.0 but IVF never samples. The mask brought
-  r² from 0.04 to 0.68.
+- Vidigal benchmark at 1 m DSM, height-matched at z = 1.5 m
+  (`--observer-height` flag added 2026-04-30, building heights lowered
+  by `h` before passing to UMEP — equivalent to lifting the integration
+  plane up by `h`): **n = 2,510 cells, r² = 0.68, slope = 0.96,
+  RMSE = 0.12, bias = +0.01** SVF units. The bias collapse from −0.05
+  (z = 0) to +0.01 (z = 1.5) confirms the systematic offset was the
+  sampling-height difference, not the algorithmic distinction. UMEP is
+  aggregated to the 10 m grid only over non-building pixels — without
+  that mask the comparison is contaminated by rooftop pixels that UMEP
+  scores ~1.0 but IVF never samples. The mask brought r² from 0.04 to
+  0.68.
 - Outputs land in `outputs/{site}/morphometrics/svf/umep_validation/`
   (per-cell scatter PNG, per-cell CSV, summary stats CSV). The scatter
   is copied to `docs/technical_report/figures/figS6_umep_validation.png`
   for the report.
 - Technical report: §4 SVF definition gains a "Cross-validation against
-  UMEP" paragraph with the headline numbers; §10.3 "SVF validation
-  pending" → "SVF validated against UMEP (limitation closed
-  2026-04-29)"; figure index updated with figS5 (wind roses, was
-  missing) and figS6 (UMEP validation). PDF rebuilt.
+  UMEP" paragraph with the height-matched headline numbers; §10.3
+  "SVF validation pending" → "SVF validated against UMEP (limitation
+  closed 2026-04-29, refreshed at z = 1.5 m 2026-04-30)"; figure index
+  updated with figS5 (wind roses, was missing) and figS6 (UMEP
+  validation). PDF rebuilt.
+
+### Added — report-sync hook: figure-without-md WARN
+
+- `.claude/hooks/check_report_sync.py` gains a soft rule: if any
+  `docs/technical_report/figures/*.{png,pdf,svg}` is staged without
+  `technical_report.md`, emit a WARN. Catches the "regenerated
+  figure + stale report numbers" pattern earlier than the existing
+  `.md ↔ .pdf` pairing rule. Stays advisory (exit 0) — cosmetic
+  figure tweaks shouldn't force a report touch.
 
 ### Fixed — `src/exposure` package vs module collision (regression from `ede48ad`)
 
