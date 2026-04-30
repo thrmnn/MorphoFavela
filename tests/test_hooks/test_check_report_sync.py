@@ -247,3 +247,88 @@ def test_exit_0_on_amend(hook, monkeypatch):
     event = _json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit --amend"}})
     rc = _run_main(hook, monkeypatch, event, ["docs/technical_report/technical_report.md"])
     assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# Tests-with-feature advisory (added 2026-04-30)
+# ---------------------------------------------------------------------------
+
+
+def test_feat_without_test_advises(hook):
+    """feat() commits touching src/ without a tests/ file → advisory."""
+    cmd = 'git commit -m "feat(svf): new ray-cast variant"'
+    _, _, advisories = hook.check(["src/svf_v2/compute.py"], commit_command=cmd)
+    assert any("feat/fix without staged test" in a for a in advisories)
+
+
+def test_feat_with_test_silent(hook):
+    """feat() commits with a tests/ file staged → no advisory."""
+    cmd = 'git commit -m "feat(svf): new ray-cast variant"'
+    _, _, advisories = hook.check(
+        ["src/svf_v2/compute.py", "tests/test_svf_v2/test_compute.py"], commit_command=cmd
+    )
+    assert not any("feat/fix without staged test" in a for a in advisories)
+
+
+def test_fix_without_test_advises(hook):
+    """fix() commits touching scripts/ without a tests/ file → advisory."""
+    cmd = 'git commit -m "fix(synthetic-cfd): correct U_mag derivation"'
+    _, _, advisories = hook.check(
+        ["scripts/generate_synthetic_cfd_results.py"], commit_command=cmd
+    )
+    assert any("feat/fix without staged test" in a for a in advisories)
+
+
+def test_chore_without_test_silent(hook):
+    """chore/docs/style commits do NOT trigger the tests-with-feature rule."""
+    for prefix in ("chore", "docs", "style", "refactor", "test"):
+        cmd = f'git commit -m "{prefix}: misc"'
+        _, _, advisories = hook.check(["src/cfd_integration/io.py"], commit_command=cmd)
+        assert not any("feat/fix without staged test" in a for a in advisories), (
+            f"{prefix} should not trigger tests-with-feature"
+        )
+
+
+def test_feat_excluded_dirs_silent(hook):
+    """feat() touching only scripts/debug/ etc. should NOT advise."""
+    cmd = 'git commit -m "feat(debug): new diagnostic"'
+    for excluded in ("scripts/debug/foo.py", "scripts/data_utils/bar.py", "scripts/shell/baz.py"):
+        _, _, advisories = hook.check([excluded], commit_command=cmd)
+        assert not any("feat/fix without staged test" in a for a in advisories), (
+            f"{excluded} should not trigger tests-with-feature"
+        )
+
+
+def test_feat_heredoc_form_advises(hook):
+    """Heredoc-form commit messages (the agent's pattern) also match."""
+    # When the agent uses `git commit -m "$(cat <<'EOF' ...)"`, the literal
+    # `feat(...)` appears inside the command string at line start.
+    cmd = """git commit -m "$(cat <<'EOF'
+feat(hook): new rule
+
+extended detail here.
+
+Co-Authored-By: someone <noreply@example.com>
+EOF
+)" """
+    _, _, advisories = hook.check(["src/something.py"], commit_command=cmd)
+    assert any("feat/fix without staged test" in a for a in advisories)
+
+
+def test_no_feat_fix_in_command_silent(hook):
+    """When commit_command is empty (e.g. unit tests not specifying it),
+    the tests-with-feature rule must NOT fire — be a silent default."""
+    _, _, advisories = hook.check(["src/something.py"])  # no commit_command
+    assert not any("feat/fix without staged test" in a for a in advisories)
+
+
+def test_feat_advisory_does_not_block(hook, monkeypatch):
+    """The tests-with-feature advisory is exit 0, not exit 2."""
+    import json as _json
+
+    event = _json.dumps({
+        "tool_name": "Bash",
+        "tool_input": {"command": 'git commit -m "feat(svf): new variant"'},
+    })
+    rc = _run_main(hook, monkeypatch, event, ["src/svf_v2/compute.py"])
+    assert rc == 0

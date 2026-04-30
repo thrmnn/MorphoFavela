@@ -73,8 +73,32 @@ _ADVISORY_TRIGGER_PATTERNS = [
 ]
 
 
-def check(staged: list[str]) -> tuple[list[str], list[str], list[str]]:
-    """Return (fails, warns, advisories) lists of human-readable messages."""
+# Source paths that count as "feature/fix code" for the tests-with-feature
+# advisory. Test files (under tests/) and the report itself are excluded
+# automatically. Excluded subtrees mirror the pipeline-trigger glob above.
+_CODE_PATH_PATTERN = re.compile(
+    r"^(src/.*\.py|scripts/(?!debug/|data_utils/|shell/)[^/]+\.py)$"
+)
+_TEST_PATH_PATTERN = re.compile(r"^tests/.*\.py$")
+
+# Match `feat(...)` / `feat: ` / `fix(...)` / `fix: ` either at the start
+# of a line (heredoc form: `git commit -m "$(cat <<'EOF'\nfeat(...)`)
+# or right after an opening quote (inline form: `git commit -m "feat(...)"`).
+# The quote/line-start anchor avoids matching "feat" inside prose like
+# "docs: explain the recent feat(svf) addition".
+_FEAT_FIX_RE = re.compile(r"""(?:^|["'`])(feat|fix)[(:]""", re.MULTILINE)
+
+
+def check(
+    staged: list[str], commit_command: str = ""
+) -> tuple[list[str], list[str], list[str]]:
+    """Return (fails, warns, advisories) lists of human-readable messages.
+
+    ``commit_command`` is the raw string of the in-flight ``git commit``
+    invocation. Used to gate commit-type-sensitive rules (e.g. the
+    tests-with-feature advisory only fires on ``feat(...)`` / ``fix(...)``).
+    Pass empty string to skip those rules.
+    """
     fails: list[str] = []
     warns: list[str] = []
     advisories: list[str] = []
@@ -147,6 +171,21 @@ def check(staged: list[str]) -> tuple[list[str], list[str], list[str]]:
             "or explicitly confirm the changes are not pipeline-relevant."
         )
 
+    # Tests-with-feature advisory: feat()/fix() commits that touch src/ or
+    # scripts/ should ideally stage a tests/ file in the same commit. We
+    # only fire when commit_command suggests a feat/fix (regex match);
+    # other types (chore/docs/style/refactor/test) are not covered.
+    if commit_command and _FEAT_FIX_RE.search(commit_command):
+        code_changed = [s for s in staged if _CODE_PATH_PATTERN.match(s)]
+        tests_changed = [s for s in staged if _TEST_PATH_PATTERN.match(s)]
+        if code_changed and not tests_changed:
+            advisories.append(
+                "feat/fix without staged test — confirm intentional or stage "
+                "a tests/ file. Code paths changed: "
+                + ", ".join(code_changed[:5])
+                + ("…" if len(code_changed) > 5 else "")
+            )
+
     return fails, warns, advisories
 
 
@@ -176,7 +215,7 @@ def main() -> int:
     if not staged:
         return 0  # nothing staged → nothing to check
 
-    fails, warns, advisories = check(staged)
+    fails, warns, advisories = check(staged, commit_command=command)
 
     if not (fails or warns or advisories):
         return 0  # silent success
