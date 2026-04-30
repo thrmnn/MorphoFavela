@@ -84,15 +84,18 @@ def _generate_samples(
     z = np.full(n_target, 1.5)
 
     radial_factor = 0.6 + 0.4 * (r / domain_radius)
-    u_mag = u_mag_mean * radial_factor + rng.normal(0, 0.15, n_target)
-    u_mag = np.clip(u_mag, 0.05, None)
+    u_mag_target = u_mag_mean * radial_factor + rng.normal(0, 0.15, n_target)
+    u_mag_target = np.clip(u_mag_target, 0.05, None)
 
     bearing_rad = np.deg2rad(_DIRECTION_DEGREES[direction])
     flow_x = -np.sin(bearing_rad)
     flow_y = -np.cos(bearing_rad)
-    u_comp = u_mag * flow_x + rng.normal(0, 0.05, n_target)
-    v_comp = u_mag * flow_y + rng.normal(0, 0.05, n_target)
+    u_comp = u_mag_target * flow_x + rng.normal(0, 0.05, n_target)
+    v_comp = u_mag_target * flow_y + rng.normal(0, 0.05, n_target)
     w_comp = rng.normal(0, 0.02, n_target)
+    # U_mag derived from the perturbed components so it self-validates against
+    # the validator's `|U_mag - sqrt(U^2+V^2+W^2)| < tol` check.
+    u_mag = np.sqrt(u_comp**2 + v_comp**2 + w_comp**2)
     tke = 0.5 * (u_mag * 0.15) ** 2 + rng.uniform(0, 0.01, n_target)
 
     return pd.DataFrame(
@@ -132,7 +135,7 @@ def generate_site(
     out_root: Path,
     layout: str = "csv",
     n_patches: int | None = None,
-    n_samples_per_direction: int = 5000,
+    n_samples_per_direction: int = 15000,
     seed: int = 42,
     u_ref: float = 6.0,
     domain_radius: float = 250.0,
@@ -224,7 +227,13 @@ def main() -> int:
         default=None,
         help="Limit to first N patches (default: all in campaign_patches.csv).",
     )
-    parser.add_argument("--n-samples", type=int, default=5000, help="Sample points per direction.")
+    parser.add_argument(
+        "--n-samples",
+        type=int,
+        default=15000,
+        help="Sample points per direction (default 15000 — matches the "
+        "validator's expected ~15k/patch for a 250m domain at 2m grid).",
+    )
     parser.add_argument("--seed", type=int, default=42, help="RNG seed for reproducibility.")
     parser.add_argument(
         "--u-ref", type=float, default=6.0, help="Reference inflow wind speed (m/s)."
