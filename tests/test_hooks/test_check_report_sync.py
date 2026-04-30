@@ -177,3 +177,73 @@ def test_unrelated_staged_silent(hook):
     ])
     # No report file, no figure, no scripts/, no paper_figures → silent
     assert not (fails or warns or advisories)
+
+
+# ---------------------------------------------------------------------------
+# Exit-code semantics (blocking flip 2026-04-30)
+# ---------------------------------------------------------------------------
+
+
+def _run_main(hook, monkeypatch, stdin_event, staged):
+    """Invoke hook.main() with a mocked stdin and _staged_files."""
+    import io as _io_mod
+
+    monkeypatch.setattr(hook.sys, "stdin", _io_mod.StringIO(_io_mod.StringIO(stdin_event).read()))
+    monkeypatch.setattr(hook, "_staged_files", lambda: staged)
+    return hook.main()
+
+
+def test_exit_2_on_fail(hook, monkeypatch):
+    """A FAIL finding (md without pdf) blocks the commit (exit 2)."""
+    import json as _json
+
+    event = _json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit -m foo"}})
+    rc = _run_main(hook, monkeypatch, event, ["docs/technical_report/technical_report.md"])
+    assert rc == 2
+
+
+def test_exit_0_on_warn_only(hook, monkeypatch):
+    """A WARN-only finding (figure without md) does NOT block (exit 0)."""
+    import json as _json
+
+    event = _json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit -m foo"}})
+    rc = _run_main(
+        hook, monkeypatch, event, ["docs/technical_report/figures/figS6_umep_validation.png"]
+    )
+    assert rc == 0
+
+
+def test_exit_0_on_advisory_only(hook, monkeypatch):
+    """An advisory-only finding (script change without md) does NOT block."""
+    import json as _json
+
+    event = _json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit -m foo"}})
+    rc = _run_main(hook, monkeypatch, event, ["scripts/compute_morphometry.py"])
+    assert rc == 0
+
+
+def test_exit_0_on_clean_commit(hook, monkeypatch):
+    """No findings → exit 0, silent."""
+    import json as _json
+
+    event = _json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit -m foo"}})
+    rc = _run_main(hook, monkeypatch, event, ["README.md"])
+    assert rc == 0
+
+
+def test_exit_0_on_non_commit_bash(hook, monkeypatch):
+    """Bash commands that aren't `git commit` are not gated by the hook."""
+    import json as _json
+
+    event = _json.dumps({"tool_name": "Bash", "tool_input": {"command": "ls -la"}})
+    rc = _run_main(hook, monkeypatch, event, ["docs/technical_report/technical_report.md"])
+    assert rc == 0
+
+
+def test_exit_0_on_amend(hook, monkeypatch):
+    """`git commit --amend` is an explicit override and bypasses the hook."""
+    import json as _json
+
+    event = _json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit --amend"}})
+    rc = _run_main(hook, monkeypatch, event, ["docs/technical_report/technical_report.md"])
+    assert rc == 0

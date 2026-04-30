@@ -23,8 +23,12 @@ Hook exit semantics in Claude Code:
   exit 2 + stderr  → block tool, show stderr to Claude
   other non-zero   → non-blocking error
 
-This hook always exits 0 (advisory mode). Flip the FAILs to exit 2 if
-you want strict blocking at commit time.
+This hook exits **2 when there is a FAIL finding** (hard rules: .md ↔
+.pdf pairing, paper-figure script without matching PNG copy) and **0
+otherwise**. WARN and advisory findings are surfaced via stderr but do
+not block the commit. The FAIL set is the same set covered by the
+unit-test suite at tests/test_hooks/test_check_report_sync.py — that
+15-test FP-rate floor is what authorizes the blocking flip.
 """
 
 from __future__ import annotations
@@ -177,7 +181,8 @@ def main() -> int:
     if not (fails or warns or advisories):
         return 0  # silent success
 
-    parts = ["[report-sync hook] advisory:"]
+    header = "[report-sync hook] BLOCKING:" if fails else "[report-sync hook] advisory:"
+    parts = [header]
     for f in fails:
         parts.append(f"  FAIL: {f}")
     for w in warns:
@@ -186,8 +191,8 @@ def main() -> int:
         parts.append(a)
     print("\n".join(parts), file=sys.stderr)
 
-    # Always exit 0 — advisory only. Flip to `2 if fails else 0` for blocking.
-    return 0
+    # Block on FAIL (hard rules); WARN/advisory surface via stderr only.
+    return 2 if fails else 0
 
 
 if __name__ == "__main__":
