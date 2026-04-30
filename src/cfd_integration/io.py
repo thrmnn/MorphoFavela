@@ -22,6 +22,17 @@ Two on-disk layouts are supported transparently:
 `load_campaign_results` auto-detects which layout each patch / direction
 uses and dispatches to the appropriate loader; users do not need to
 choose.
+
+Stable API
+----------
+The public surface enumerated in ``__all__`` below is the contract that
+the result-side analysis pipeline (`scripts/analyze_cfd_results.py`,
+`src/cfd_integration/aggregate.py`, `src/cfd_integration/weighting.py`)
+and the `cfd-results-ingestor` subagent depend on. Treat any change to
+the names, signatures, or return types of these symbols as a breaking
+change. Internal helpers (leading underscore) and the private
+`_DEGREE_TO_CARDINAL` mapping are not part of this contract and may
+change without notice.
 """
 
 from __future__ import annotations
@@ -41,9 +52,19 @@ from src.cfd_integration.schema import (
     WindRose,
 )
 
+__all__ = [
+    "CFD_RESULTS_ROOT",
+    "load_campaign_results",
+    "load_patch_csv",
+    "load_patch_parquet",
+    "load_patch_vtu",
+]
+
 logger = logging.getLogger(__name__)
 
-# Default root for CFD results within this repo
+# Default root for CFD results within this repo. Format string with one
+# placeholder (``{site}``); used by ``load_campaign_results`` when no
+# ``results_root`` override is passed.
 CFD_RESULTS_ROOT = "data/{site}/cfd_results"
 
 # Map the Airflow producer's wind_NNN directory name to canonical cardinal.
@@ -104,12 +125,35 @@ def _ensure_u_mag(samples: pd.DataFrame) -> pd.DataFrame:
 def load_patch_csv(csv_path: Path, metadata_path: Optional[Path] = None) -> CFDPatchResult:
     """Load one patch × one wind-direction result from CSV + JSON.
 
-    CSV schema (required columns): x, y, z, U, V, W, U_mag, TKE
-    Optional column: p (pressure)
+    The IVF-native loader. Use `load_patch_parquet` for the Airflow-native
+    parquet form, or `load_campaign_results` to auto-dispatch on layout.
 
-    JSON schema (required keys): patch_id, site, wind_direction, wind_speed_ref
-    Optional keys: converged, residual_final, solver, turbulence_model,
-                   n_iterations, wall_clock_s
+    Parameters
+    ----------
+    csv_path : Path
+        Path to ``sample_points.csv``.
+    metadata_path : Path, optional
+        Path to ``summary.json``. If omitted, looked up next to ``csv_path``.
+
+    Returns
+    -------
+    CFDPatchResult
+        Parsed metadata + samples DataFrame. ``U_mag`` is auto-computed
+        from ``U/V/W`` if missing from the CSV.
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``csv_path`` or the resolved ``metadata_path`` does not exist.
+
+    Notes
+    -----
+    CSV schema (required columns): ``x, y, z, U, V, W, U_mag, TKE``.
+    Optional: ``p`` (pressure).
+
+    JSON schema (required keys): ``patch_id, site, wind_direction,
+    wind_speed_ref``. Optional: ``converged, residual_final, solver,
+    turbulence_model, n_iterations, wall_clock_s``.
     """
     csv_path = Path(csv_path)
     if not csv_path.exists():
@@ -134,14 +178,36 @@ def load_patch_parquet(
 ) -> CFDPatchResult:
     """Load one patch × one wind-direction result from parquet + JSON.
 
-    Mirrors `load_patch_csv` but reads parquet — used to ingest the Airflow
-    producer's native output format. Pass a single ``Path`` for the common
-    case, or a list of ``Path`` to concatenate (used when OpenFOAM emits
-    one parquet per processor decomposition; rows are concatenated in the
-    order given).
+    The Airflow-native loader. Mirrors `load_patch_csv` exactly except for
+    the on-disk format. Use `load_campaign_results` to auto-dispatch.
 
-    Same column schema and metadata schema as `load_patch_csv`. ``U_mag``
-    is auto-computed from U/V/W if missing.
+    Parameters
+    ----------
+    parquet_paths : Path or list[Path]
+        Single ``Path`` for the common case. Pass a list to concatenate
+        row-wise — used when OpenFOAM emits one parquet per processor
+        decomposition. Rows are concatenated in the order given.
+    metadata_path : Path, optional
+        Path to ``summary.json``. If omitted, looked up next to the first
+        parquet file.
+
+    Returns
+    -------
+    CFDPatchResult
+        Same shape as `load_patch_csv` returns. ``U_mag`` auto-computed
+        from ``U/V/W`` if missing.
+
+    Raises
+    ------
+    ValueError
+        If ``parquet_paths`` is an empty list.
+    FileNotFoundError
+        If any parquet path or the resolved ``metadata_path`` does not exist.
+
+    Notes
+    -----
+    Column schema and metadata schema are identical to `load_patch_csv` —
+    see that function's docstring.
     """
     if isinstance(parquet_paths, (str, Path)):
         parquet_paths = [Path(parquet_paths)]
@@ -174,10 +240,28 @@ def load_patch_parquet(
 def load_patch_vtu(vtu_path: Path) -> pd.DataFrame:
     """Load a full 3D field from a `.vtu` file.
 
-    Returns a DataFrame of sample points at the given height (typically extracted
-    via a horizontal slice at z = 1.5m in post-processing).
+    Optional path; the primary supported inputs are CSV/parquet via
+    `load_patch_csv` / `load_patch_parquet`. Use this only when the
+    OpenFOAM agent could not export the pre-sampled CSV/parquet and a
+    full 3D field has to be ingested instead.
 
-    Requires pyvista (optional dependency). Falls back to an error if missing.
+    Parameters
+    ----------
+    vtu_path : Path
+        Path to a ``.vtu`` file.
+
+    Returns
+    -------
+    DataFrame
+        Sample points with columns ``x, y, z`` plus whatever vector
+        (``U, V, W``) and scalar (``k``/``TKE``) fields exist on the
+        mesh. Typically subset to a horizontal slice at z = 1.5 m in
+        post-processing.
+
+    Raises
+    ------
+    ImportError
+        If ``pyvista`` is not installed (it is an optional dependency).
     """
     try:
         import pyvista as pv
@@ -212,23 +296,43 @@ def load_campaign_results(
     results_root: Optional[Path] = None,
     require_all_directions: bool = False,
 ) -> CFDCampaignResult:
-    """Load all CFD results for one site.
+    """Load all CFD results for one site, auto-dispatching by layout.
 
-    Traverses `data/{site}/cfd_results/{patch_id}/{wind_dir}/` and loads every
-    patch × direction combination that has `sample_points.csv` + `summary.json`.
+    The primary entry point. Traverses
+    ``data/{site}/cfd_results/{patch_id}/{wind_dir}/`` and loads every
+    patch × direction combination that has ``summary.json`` plus either
+    ``sample_points.csv`` (IVF native) or one or more ``*.parquet``
+    files (Airflow native). Directories that match neither layout are
+    logged as warnings and skipped.
 
     Parameters
     ----------
     site : str
-        Site name (e.g., 'vidigal').
+        Site name (e.g., ``'vidigal'``, ``'maré'``). Used both as the
+        path-template fill and in the returned ``CFDCampaignResult.site``.
     results_root : Path, optional
-        Override the default path `data/{site}/cfd_results/`.
+        Override the default path ``data/{site}/cfd_results/``. The
+        wind rose, if any, is loaded from ``results_root.parent /
+        wind_rose.json``.
     require_all_directions : bool
-        If True, raise if any patch is missing any of the 8 directions.
+        If True, raise if any patch is missing any of the 8 cardinal
+        directions. Default False (partial coverage is logged but
+        accepted, since real CFD jobs sometimes fail to converge on a
+        subset of directions).
 
     Returns
     -------
     CFDCampaignResult
+        Patches keyed by patch_id, then by cardinal direction. Wind rose
+        attached if a sibling ``wind_rose.json`` exists; ``None`` otherwise.
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``results_root`` does not exist.
+    ValueError
+        If ``require_all_directions=True`` and any patch is missing
+        directions.
     """
     if results_root is None:
         from src.config import PROJECT_ROOT
