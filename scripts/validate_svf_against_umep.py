@@ -68,11 +68,19 @@ def build_dsm(
     site: str,
     pixel_size: float,
     crop_bounds: tuple[float, float, float, float] | None = None,
+    observer_height: float = 0.0,
 ) -> tuple[np.ndarray, dict]:
     """Build a (DTM + building heights) raster from IVF site inputs.
 
     Returns (dsm_array, profile) where profile has rasterio-compatible
     transform + crs + shape so we can re-project sample points later.
+
+    ``observer_height`` shifts the effective integration plane up by
+    that many meters at street pixels. UMEP integrates SVF at the DSM
+    surface; the equivalent of "observer at ground+h" is to lower
+    every building by ``h``. Buildings shorter than ``h`` collapse to
+    ground (the observer looks over them). Set to 1.5 to match IVF's
+    pedestrian-height sampling; set to 0 for the legacy z=0 comparison.
     """
     dtm_path = PROJECT_ROOT / "data" / site / "dtm_extended_300m.tif"
     bld_path = PROJECT_ROOT / "data" / site / "buildings_extended_300m.gpkg"
@@ -127,8 +135,12 @@ def build_dsm(
         all_touched=True,
         dtype=np.float32,
     )
-    dsm = dst + bld_raster
     is_building = bld_raster > 0  # cells where a building footprint hits this pixel
+    if observer_height > 0:
+        bld_effective = np.maximum(bld_raster - observer_height, 0.0).astype(np.float32)
+    else:
+        bld_effective = bld_raster
+    dsm = dst + bld_effective
     profile = {
         "transform": dst_transform,
         "crs": crs,
@@ -136,10 +148,12 @@ def build_dsm(
         "bounds": (left, bottom, right, top),
         "pixel_size": pixel_size,
         "is_building": is_building,
+        "observer_height": float(observer_height),
     }
     logger.info(
-        "DSM built for %s: %d × %d cells at %.1f m, dsm range %.1f–%.1f m",
+        "DSM built for %s @ z=%.1f m: %d × %d cells at %.1f m, dsm range %.1f–%.1f m",
         site,
+        observer_height,
         height,
         width,
         pixel_size,
@@ -274,7 +288,7 @@ def regress(df: pd.DataFrame) -> dict:
     }
 
 
-def plot(df: pd.DataFrame, stats: dict, site: str, out_path: Path) -> None:
+def plot(df: pd.DataFrame, stats: dict, site: str, out_path: Path, observer_height: float = 0.0) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     sub = df[df["used_in_fit"]]
 
@@ -289,7 +303,7 @@ def plot(df: pd.DataFrame, stats: dict, site: str, out_path: Path) -> None:
     ax.set_xlim(*lim)
     ax.set_ylim(*lim)
     ax.set_xlabel("IVF Tregenza-145 SVF (z = 1.5 m)")
-    ax.set_ylabel("UMEP shadow-cast SVF (z = 0)")
+    ax.set_ylabel(f"UMEP shadow-cast SVF (z = {observer_height:g} m)")
     ax.set_aspect("equal")
     ax.legend(loc="lower right", fontsize=8, frameon=False)
     ax.set_title(
@@ -335,6 +349,13 @@ def main() -> int:
         help="Drop cells with fewer than N IVF sample points (default 5).",
     )
     parser.add_argument(
+        "--observer-height",
+        type=float,
+        default=1.5,
+        help="Effective integration height in meters (default 1.5 to match "
+        "IVF pedestrian-height sampling). 0 = legacy z=0 comparison.",
+    )
+    parser.add_argument(
         "--out",
         default=None,
         help="Output dir (default outputs/{site}/morphometrics/svf/umep_validation/).",
@@ -355,7 +376,9 @@ def main() -> int:
     pad = 50.0
     crop = (minx - pad, miny - pad, maxx + pad, maxy + pad)
 
-    dsm, profile = build_dsm(args.site, args.pixel_size, crop)
+    dsm, profile = build_dsm(
+        args.site, args.pixel_size, crop, observer_height=args.observer_height
+    )
     umep_svf = run_umep_svf(dsm, args.pixel_size)
 
     df = compare(grid, umep_svf, profile, min_svf_count=args.min_svf_count)
@@ -370,13 +393,14 @@ def main() -> int:
 
     df.to_csv(out_dir / "per_cell_comparison.csv", index=False)
     pd.DataFrame([stats]).to_csv(out_dir / "summary_stats.csv", index=False)
-    plot(df, stats, args.site, out_dir / "scatter.png")
+    plot(df, stats, args.site, out_dir / "scatter.png", observer_height=args.observer_height)
 
     logger.info("Saved %s", out_dir / "per_cell_comparison.csv")
     logger.info("Saved %s", out_dir / "summary_stats.csv")
     logger.info("Saved %s", out_dir / "scatter.png")
     print(
-        f"site={args.site} n={stats['n']} r2={stats['r2']:.3f} "
+        f"site={args.site} z={args.observer_height:g}m px={args.pixel_size:g}m "
+        f"n={stats['n']} r2={stats['r2']:.3f} "
         f"slope={stats['slope']:.2f} rmse={stats['rmse']:.3f} "
         f"bias={stats['bias_umep_minus_ivf']:+.3f}"
     )

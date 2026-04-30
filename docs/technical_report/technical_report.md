@@ -287,13 +287,17 @@ benchmarked on Vidigal against UMEP's shadow-casting SVF processor
 1 m digital surface model rasterised from the same building footprints
 and DTM. UMEP averages over 153 hemispherical patches via shadow-casting
 on the DSM rather than ray-casting on a 3D mesh; this is an
-algorithmically distinct independent reference. After masking rooftop
-pixels (UMEP includes them, IVF does not because passageway samples
-never fall on roofs) and aggregating UMEP at the same 10 m grid, the
-two engines agree at **r² = 0.68, slope = 1.01, RMSE = 0.14, bias =
-−0.05 SVF units** across n = 2,510 cells. The small negative bias is
-consistent with the ~1.5 m vertical offset between the two methods
-(IVF samples at pedestrian height, UMEP at the DSM surface). See
+algorithmically distinct independent reference. To make the two engines
+height-comparable, we lower every building height by 1.5 m before
+running UMEP — equivalent to lifting the integration plane to
+pedestrian height — and mask rooftop pixels (UMEP otherwise includes
+them, IVF does not because passageway samples never fall on roofs).
+Aggregating UMEP at the same 10 m grid, the two engines agree at
+**r² = 0.68, slope = 0.96, RMSE = 0.12, bias = +0.01 SVF units**
+across n = 2,510 cells. The near-zero bias confirms that the systematic
+offset observed at z = 0 (bias ≈ −0.05) is fully explained by the
+sampling-height difference rather than by the algorithmic distinction
+between ray-casting on a 3D mesh and shadow-casting on a DSM. See
 `scripts/validate_svf_against_umep.py` and
 `outputs/vidigal/morphometrics/svf/umep_validation/`.
 
@@ -840,18 +844,20 @@ Key scripts:
    suite plus `cfd-results-ingestor` agent against the returned
    results will catch most issues.
 
-3. **SVF validated against UMEP** (limitation closed 2026-04-29). The
-   Tregenza 145-patch engine was cross-validated against UMEP's
-   shadow-casting SVF (`svfForProcessing153`, n = 2,510 Vidigal cells,
-   r² = 0.68, slope = 1.01, RMSE = 0.14, bias = −0.05). See §4 SVF
+3. **SVF validated against UMEP** (limitation closed 2026-04-29,
+   refreshed at z = 1.5 m 2026-04-30). The Tregenza 145-patch engine
+   was cross-validated against UMEP's shadow-casting SVF
+   (`svfForProcessing153`, n = 2,510 Vidigal cells, r² = 0.68,
+   slope = 0.96, RMSE = 0.12, bias = +0.01) after height-matching the
+   two engines by lowering building heights by 1.5 m before running
+   UMEP. The bias collapsed from −0.05 (z = 0) to +0.01 (z = 1.5),
+   confirming that the systematic offset is the sampling-height
+   difference rather than the algorithmic distinction. See §4 SVF
    definition for details and `outputs/vidigal/morphometrics/svf/
-   umep_validation/scatter.png` for the per-cell scatter. The remaining
-   unexplained variance is attributable to the methodological offset
-   between IVF (passageway samples at z = 1.5 m on a 3D mesh) and UMEP
-   (DSM-surface integration over 1 m raster pixels) — both are
-   defensible operational definitions of SVF, and their agreement at
-   slope ≈ 1 with small bias is the publication-grade claim the prior
-   note flagged as missing.
+   umep_validation/scatter.png` for the per-cell scatter. Both
+   engines are defensible operational definitions of SVF; their
+   agreement at slope ≈ 1 with near-zero bias is the publication-grade
+   claim the prior note flagged as missing.
 
 4. **Resolution sensitivity is 10 m vs 20 m only.** Finer grids
    (5 m, 2 m) would be prohibitively expensive at site scale but
