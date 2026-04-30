@@ -110,6 +110,22 @@ def check(staged: list[str]) -> tuple[list[str], list[str], list[str]]:
                 f"and copy the PNG into docs/technical_report/figures/ if the figure changed"
             )
 
+    # Soft rule: a figure was regenerated but the .md was not updated.
+    # This catches the "stale numbers next to a refreshed figure" pattern
+    # — the report cites figures by reference, and a figure rebuild often
+    # implies the cited numbers changed.
+    figs_changed = [
+        s for s in staged if re.match(r"^docs/technical_report/figures/.+\.(png|pdf|svg)$", s)
+    ]
+    if figs_changed and not md_in:
+        warns.append(
+            "Report figure(s) staged without technical_report.md: "
+            + ", ".join(Path(f).name for f in figs_changed)
+            + ". If the figure update changed any numbers cited in the report "
+            "(r², slope, n, etc.), update the corresponding §-block. Cosmetic "
+            "tweaks (color, labels, dpi) can be ignored."
+        )
+
     # Advisory: list paths that *might* need a report touch
     triggered = []
     for f in staged:
