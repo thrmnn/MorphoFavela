@@ -40,6 +40,31 @@ Do NOT update the PDF for:
 together.** A stale PDF is worse than no PDF because readers trust the
 rendered artefact.
 
+## Pre-commit reflex
+
+Three muscle habits that are enforced at runtime by
+`.claude/hooks/check_report_sync.py` (advisory or blocking) but should
+also be internalised so the hook is a backstop, not the primary gate:
+
+1. **Rebuild the PDF in the same commit as a `technical_report.md`
+   edit.** `python docs/technical_report/build_pdf.py`. The hook
+   blocks commits where the .md is staged without the .pdf
+   (`exit 2`), so a forgotten rebuild is caught — but reflex beats
+   recovery.
+2. **Commit predecessor work before launching anything > 10 min.**
+   Background jobs (UMEP shadow-cast, CFD runs, large-grid
+   regenerations) die with the agent process. If a partial result
+   was uncommitted when the session ended, it is gone. The pattern
+   is: every successful local result gets committed before the next
+   experiment kicks off, even if the diff is tiny. See
+   `feedback_long_running_jobs.md` in memory for the full rule.
+3. **Stage the test in the same commit as the new behaviour.**
+   `feat(...)` and `fix(...)` commits should land their tests at the
+   same time as the code path. The hook surfaces an advisory when
+   `feat/fix` touches `src/` or `scripts/` without staging a `tests/`
+   file. Override is implicit (advisory does not block); the right
+   correction is to stage the test, not to ignore the advisory.
+
 ## Memory system
 
 Project-specific facts about pipeline state, site data quirks, and
