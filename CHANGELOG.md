@@ -51,6 +51,23 @@ a stable v1.0 is cut.
   `.md ↔ .pdf` pairing rule. Stays advisory (exit 0) — cosmetic
   figure tweaks shouldn't force a report touch.
 
+### Fixed — synthetic CFD generator now self-validates against ingestor
+
+- `scripts/generate_synthetic_cfd_results.py` previously stored a
+  `U_mag` computed from the pre-perturbation magnitude while U/V/W
+  components had independent perturbations added on top, leaving
+  `|U_mag - sqrt(U² + V² + W²)| ≈ 0.10–0.15` on every row.
+  `cfd-results-ingestor` flagged 160/160 patch-directions as WARN
+  for the inconsistency. Fixed by deriving `U_mag` from the perturbed
+  components — now self-validates at machine precision.
+- Default `--n-samples` bumped from 5,000 to 15,000 to match the
+  validator's expected ~15k/patch for a 250 m domain at 2 m grid.
+  Tests pass `n_samples_per_direction` explicitly so they're
+  unaffected (63 CFD tests still green).
+- With both fixes, future synthetic runs hit PASS, leaving WARN/FAIL
+  exclusively as a producer-drift signal when real Airflow results
+  land.
+
 ### Fixed — `src/exposure` package vs module collision (regression from `ede48ad`)
 
 - The deprivation cleanup in `ede48ad` created `src/exposure/` as a

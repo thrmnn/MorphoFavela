@@ -880,9 +880,18 @@ Key scripts:
 
 - [x] Wind ingestion — measured roses for all 5 sites
       (completed 2026-04-27, see §2.3)
-- [ ] Build the result-side analysis pipeline
+- [x] Build the result-side analysis pipeline
       (`scripts/analyze_cfd_results.py`) end-to-end on synthetic CFD
       data so the chain is exercised before VDG-P07 returns
+      (completed 2026-04-29; smoke-tested across all 5 sites
+      2026-04-30: 359–405 covered cells per site, predictor signs
+      consistent with morphology). Producer↔validator loop closed
+      via `cfd-results-ingestor` against the synthetic outputs;
+      both surfaced WARNs fixed in `scripts/generate_synthetic_cfd_results.py`
+      so future synthetic runs hit PASS.
+- [x] Cross-validate SVF against UMEP shadow-cast reference at
+      pedestrian height (closed 2026-04-30 for Vidigal: n = 2,510,
+      r² = 0.68, slope = 0.96, bias = +0.01; see §10.3 and §4).
 - [ ] Optional: 20 m grids already exist; generate the variant Fig S3
       forms (`--variants` flag) if reviewers request the scatter or
       difference-map views
@@ -899,14 +908,25 @@ Key scripts:
 - [ ] Post-process to `sample_points.csv` + `summary.json` per
       simulation
 
-**After CFD results land here:**
+**After CFD results land here.** All of the machinery for these
+steps was built and synthetic-validated in commits `c9d25d6`
+(pipeline) and `0851b5e` (synthetic-generator self-validation);
+each box flips when the same code path is re-run against real
+Airflow output.
 
 - [ ] Verify first patch ingests correctly via `cfd-results-ingestor`
+      (validator already accepts both IVF-native CSV and Airflow-
+      native parquet layouts; tested against synthetic 160/160 cleanly)
 - [ ] Annualise via wind-rose weighting (`src.cfd_integration.weighting`)
-- [ ] Map CFD metrics onto the 10 m grid (nearest-patch v0)
+      — implemented; default weight is `freq_speed`
+- [ ] Map CFD metrics onto the 10 m grid (nearest-patch v0) —
+      implemented; covered cells 359–405 per site under synthetic
 - [ ] Extend Figure 5 to include wind-velocity panel
+      (`outputs/{site}/cfd_analysis/figures/fig5_wind_panel.png`
+      generated under synthetic; awaits real numbers for the report)
 - [ ] Statistical analysis: SVF/λp/terrain as predictors of ACH and
-      stagnation
+      stagnation — predictor regression CSV generated per-site under
+      synthetic with expected sign structure
 - [ ] Health-outcome linkage
 
 ---
