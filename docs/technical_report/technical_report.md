@@ -670,8 +670,14 @@ accepted rather than relaxing the spacing.
 For each selected patch, the maximum building height within the 100 m
 analysis zone is recorded (`H_max_analysis`) and the Blocken (2015)
 minimum-fetch requirement is computed as `5 × H_max`. All 119 patches
-satisfy the constraint with substantial margin — the 250 m domain
-radius always exceeds `5 × H_max` by at least 150 m.
+satisfy the constraint (`blocken_ok = true` in every `patch_meta.json`):
+the 250 m domain radius exceeds `5 × H_max` at every patch, with
+margins ranging from 114 m (RDP-P15, `H_max_analysis` = 27.3 m) to
+215 m (median 180 m). 11 of 119 patches have margins below 150 m, all
+at Rio das Pedras (5/22) or Rocinha (6/25) — the two sites with the
+tallest favela structures (max `H_max_analysis` = 27.3 m at RDP, 22.3 m
+at ROC). Vidigal (max 19.3 m), Maré (18.1 m), and Complexo do Alemão
+(15.7 m) clear the 150 m margin at every patch.
 
 ---
 

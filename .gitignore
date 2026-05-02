@@ -66,3 +66,6 @@ Thumbs.db
 *.ipynb
 
 vendor/
+
+# gstack /retro session data — local-only retrospective snapshots
+.context/
