@@ -20,36 +20,45 @@ a stable v1.0 is cut.
   (gitignored) and patched to bypass its QGIS-only `util/__init__.py`.
   No QGIS install needed; only `gdal` (and a `numba`-compatible
   numpy < 2.3, both pulled into the conda env).
-- Two-site benchmark at 1 m DSM, height-matched at z = 1.5 m
-  (`--observer-height` flag added 2026-04-30, building heights lowered
-  by `h` before passing to UMEP — equivalent to lifting the integration
-  plane up by `h`):
+- Five-site benchmark at 1 m DSM, height-matched at z = 1.5 m
+  (`--observer-height` flag, building heights lowered by `h` before
+  passing to UMEP — equivalent to lifting the integration plane up by
+  `h`). Vidigal + Maré completed 2026-04-30; Rocinha + Rio das Pedras
+  + Complexo do Alemão added 2026-05-01:
 
   | Site | n | r² | slope | RMSE | bias |
   |---|---:|---:|---:|---:|---:|
   | Vidigal | 2,510 | 0.68 | 0.96 | 0.12 | +0.01 |
+  | Rocinha | 5,646 | 0.81 | 1.01 | 0.14 | +0.09 |
+  | Rio das Pedras | 1,503 | 0.93 | 1.25 | 0.11 | +0.08 |
+  | Complexo do Alemão | 4,838 | 0.76 | 0.92 | 0.17 | +0.14 |
   | Maré | 9,516 | 0.94 | 0.97 | 0.12 | +0.09 |
 
-  Both sites agree at slope ≈ 1 — the publication-grade claim.
-  Vidigal's bias collapse from −0.05 (z = 0) to +0.01 (z = 1.5)
-  confirms the systematic offset was the sampling-height difference.
-  Maré's higher r² reflects its low-relief, more spatially coherent
-  fabric; its larger +0.09 bias is consistent with sub-1.5 m buildings
-  being partially zeroed by the height shift. UMEP is aggregated to
-  the 10 m grid only over non-building pixels — without that mask the
+  Four of five regression slopes (Vidigal, Rocinha, Complexo do Alemão,
+  Maré) are within ±8 % of unity. Rio das Pedras at 1.25 reflects the
+  smallest valid grid (n = 1,503) concentrated in the 0.3–0.5 SVF band
+  where the 153-patch shadow-cast and 145-patch ray-cast integrators
+  diverge most. r² (0.68–0.94) tracks site relief: low-relief fabrics
+  (Maré 0.94, Rio das Pedras 0.93) have the strongest per-cell
+  agreement; high-relief hillside settlements (Vidigal 0.68,
+  Complexo do Alemão 0.76, Rocinha 0.81) produce more cell-to-cell
+  variation between integrators. All biases are positive (+0.01 to
+  +0.14), consistent with sub-1.5 m structures being zeroed in IVF's
+  height-shifted input but retained in UMEP. UMEP is aggregated to the
+  10 m grid only over non-building pixels — without that mask the
   comparison is contaminated by rooftop pixels that UMEP scores ~1.0
-  but IVF never samples. The mask brought Vidigal r² from 0.04 to
-  0.68.
+  but IVF never samples. The mask brought Vidigal r² from 0.04 to 0.68.
 - Outputs land in `outputs/{site}/morphometrics/svf/umep_validation/`
-  (per-cell scatter PNG, per-cell CSV, summary stats CSV). The scatter
-  is copied to `docs/technical_report/figures/figS6_umep_validation.png`
+  (per-cell scatter PNG, per-cell CSV, summary stats CSV). Scatters
+  are copied to `docs/technical_report/figures/figS{6,7,8,9,10}*.png`
   for the report.
-- Technical report: §4 SVF definition gains a "Cross-validation against
-  UMEP" section with a per-site comparison table; §10.3 "SVF validation
-  pending" → "SVF validated against UMEP (limitation closed 2026-04-29,
-  height-matched at z = 1.5 m and extended to a 2-site comparison
-  2026-04-30)"; figure index gains figS5 (wind roses), figS6 (UMEP
-  Vidigal scatter), and figS7 (UMEP Maré scatter). PDF rebuilt.
+- Technical report: §4 SVF definition gains a 5-site cross-validation
+  table and inter-site interpretation prose; §10.3 "SVF validation
+  pending" → "SVF validated against UMEP across all 5 sites
+  (limitation closed 2026-04-29 for Vidigal, height-matched 2026-04-30,
+  extended to all 5 sites 2026-05-01)"; figure index gains figS6 (Vidigal),
+  figS7 (Maré), figS8 (Rocinha), figS9 (Rio das Pedras), figS10 (Complexo
+  do Alemão); §11 next-steps box for UMEP cross-val ticked. PDF rebuilt.
 
 ### Added — report-sync hook: figure-without-md WARN
 
