@@ -62,7 +62,6 @@ These are **independent** — run in any order or parallel.
 | `generate_facade_solar_report.py` | — | Interactive HTML dashboard from `run_facade_solar` output | (matplotlib + plotly) |
 | `compute_sectional_porosity.py` | — | Plan-view void fraction at z = 1.5 m as a wind-access proxy | (geopandas / shapely) |
 | `compute_occupancy_density.py` | — | Built-volume / open-space ratio per analysis unit | `src.svf_v2.utils` |
-| `analyze_morphology_risk.py` | — | Hotspot / cluster maps from morphology metrics | `src.spatial_analysis` |
 | `classify_typology.py` | — | Settlement typology k-means clustering | `src.typology` |
 | `plot_street_svf_distribution.py` | — | Histogram of street-level SVF for one or many sites | `src.svf_v2` |
 | `plot_street_svf_with_isolines.py` | — | Street SVF overlaid on DTM hillshade + contours | `src.svf_v2` |
