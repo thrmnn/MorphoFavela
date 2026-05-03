@@ -2,8 +2,22 @@
 
 ## Urban Morphology and CFD Patch Sampling for Wind Simulation Across Five Informal Settlements in Rio de Janeiro
 
-**Version 1.0 — 2026-04-13**
-**Internal technical report (pre-CFD phase)**
+| | |
+|---|---|
+| **Document version** | TR v1.0 (pre-CFD phase) |
+| **Pipeline version** | v5.5 (May 2026 milestone — ROADMAP.md) |
+| **Build date** | 2026-05-03 |
+| **Commit at build** | [`904040e`](https://github.com/thrmnn/MorphoFavela/commit/904040e) |
+| **Author** | Theo Hermann · MIT · `thermann.ai@gmail.com` |
+| **Repository** | https://github.com/thrmnn/MorphoFavela |
+| **License** | MIT (code) · CC-BY-4.0 (this report) |
+| **Audience** | Engineering reviewers; researchers reproducing or extending the pipeline; CFD team consuming the patch contract. *Not* a journal manuscript — that lives separately and cites this report. |
+
+For the **fastest engineering review path**, see
+[`docs/onboarding/engineering_review.md`](../onboarding/engineering_review.md).
+For terminology, see **§0 Glossary** below; for reproducibility, see
+**§12 Reproducibility**; for failure modes and observability, see
+**§13 Failure modes**.
 
 ---
 
@@ -15,6 +29,19 @@ Rio das Pedras, Complexo do Alemão, and Maré. The work supports the Brisa+
 project, which aims to quantify pedestrian-level wind conditions in informal
 urban fabric and link them to health-relevant outcomes (thermal comfort,
 pollutant dispersion, natural ventilation).
+
+**For an engineering reviewer, in three sentences.** *What to use:*
+the 119-patch CFD sampling campaign (per-patch `buildings.gpkg` +
+`terrain.tif` + `patch_meta.json`) and the morphometric grid (10 m,
+20+ indicators per cell) are stable and ready to consume — every output
+path is documented in §8 and reproducible from §12. *What not to trust
+yet:* anything labelled "annualised" or "wind-velocity coupled" in §11,
+because no real OpenFOAM results have returned from the cluster — the
+result-side pipeline is shipped and synthetic-validated end-to-end on
+all 5 sites, but the producer interface has not been exercised against
+real data. *What's pending:* VDG-P07 ingestion (in flight at MIT ORCD),
+followed by incremental submission of the remaining 118 patches and
+annualisation against the measured wind roses.
 
 At time of writing, the pipeline has produced:
 
@@ -41,6 +68,73 @@ are documented and all intermediate outputs preserved in the canonical
 repository layout. This document summarises the methodology, validates
 the sampling design, and specifies the interface between this repository
 and the CFD execution environment.
+
+---
+
+## 0. Glossary / Nomenclature
+
+Domain-specific terms used throughout this report. Each is defined once
+here, with units. Sections cite the term name; the definition lives only
+in this section.
+
+### Morphometric indicators (per 10 m grid cell)
+
+| Term | Symbol | Units | Definition |
+|---|---|---|---|
+| Sky View Factor | SVF | — (0–1) | Fraction of the upper hemisphere visible from a sample point at 1.5 m above ground. Cell value = mean over passageway samples whose centroid falls in the cell. Method: §4.2. |
+| Plan area density (Building Coverage Ratio) | λp, BCR | — (0–1) | Sum of building footprint area in the cell ÷ cell area. Capped at 1.0 to prevent over-counting from overlapping footprints. |
+| Frontal area density | λf | — | Projected vertical surface area per unit horizontal cell area, computed for 8 wind directions; stored as `lambda_f_{N,NE,…,NW}`, plus `lambda_f_mean` (mean across directions) and `lambda_f_max` (worst-case direction). Primary input to wind-canopy drag models. |
+| Volumetric porosity | — | — (0–1) | `1 − (Σ building_volume_in_cell) / (cell_area × H_mean)`. Strongly anti-correlated with λp (r ≈ −0.95). |
+| Height variability | σH | m | Standard deviation of building heights in the cell. NaN if < 2 buildings. |
+| Mean building height | H_mean | m | Arithmetic mean of contributing building heights. Cell-level average — see §1 footnote on aggregation. |
+| Max analysis-patch height | H_max_analysis | m | Tallest building inside a 100 m-diameter analysis patch (used for Blocken fetch check). |
+| Slope, aspect | — | °, ° | Cell-mean terrain slope and aspect from the merged DTM via numpy gradient. Aspect uses circular mean. |
+| Street orientation entropy | — | — (0–1) | Normalised Shannon entropy of street-segment bearings (folded to [0, 180°)) within the cell. 0 = single direction, 1 = uniform. |
+
+### Sky-view conventions
+
+| Term | Definition |
+|---|---|
+| **Tregenza-145** | Equal-area discretisation of the sky hemisphere into 145 patches (Tregenza, 1987). The IVF SVF engine ray-casts into the centroid of each patch from each sample point and reports the unobstructed fraction. |
+| **`svfForProcessing153`** | UMEP's shadow-cast SVF processor with 153-patch sky discretisation (Lindberg & Holmer, 2010, used in SOLWEIG). Used as the independent benchmark in §4.2 / §10.3 cross-validation. |
+| **Height-matched** | Both engines integrate at z = 1.5 m above ground, achieved in IVF via passageway sampling and in UMEP by lowering all building heights by 1.5 m before the shadow-cast. |
+| **Passageway aggregation** | SVF cell value comes from samples on traversable ground (streets, alleys, courtyards) — never centroids inside building footprints, which would bias to 0. |
+
+### CFD sampling
+
+| Term | Definition |
+|---|---|
+| **Analysis patch** | 100 m-diameter circle (radius 50 m, area ≈ 7,854 m²) where pedestrian-level metrics are sampled. |
+| **CFD domain** | 250 m-radius circular domain enclosing the analysis patch; provides flow-development context per Blocken (2015). |
+| **12 strata** | Cross-product of SVF (3 bins: < 0.15, 0.15–0.30, ≥ 0.30) × slope (2 bins: < 15°, ≥ 15°) × λp (2 bins: < 0.5, ≥ 0.5). Stratum IDs encoded `SVFn_SLPn_LPn`. |
+| **Maximin spacing** | Greedy maximin geographic distance between patch centres, with an 80 m floor. Produces a spatially diverse sample within each stratum. |
+| **Blocken radius** | Minimum CFD domain radius for adequate fetch development; the rule of thumb is 5 × H_max. The campaign uses a fixed 250 m radius; per-patch margin = 250 − 5·H_max_analysis. |
+| **Blocken margin** | The actual numerical margin a patch has against the 5 × H_max constraint. For the 119-patch campaign: minimum 114 m (RDP-P15), maximum 215 m, median 180 m; 11/119 patches under 150 m, all at Rio das Pedras or Rocinha. |
+| **`blocken_ok`** | Boolean field in `patch_meta.json` — true iff `5 × H_max_analysis ≤ cfd_domain_radius`. True for all 119 patches in the campaign. |
+
+### Wind / atmosphere
+
+| Term | Definition |
+|---|---|
+| **Wind rose** | Per-site 8-direction frequency × mean-speed climatology, stored as `data/{site}/wind_rose.json`. Used post-hoc to weight the 8 directional CFD simulations into an annualised metric — *not* used for boundary conditions. |
+| **Calm fraction** | Fraction of hourly observations with `\|U\| < 0.5 m/s` or direction = NaN. Excluded from direction binning but recorded explicitly. |
+| **Neutral log-law** | Inflow profile assumed for all CFD runs: `u(z) = (u_*/κ) ln((z+z₀)/z₀)`. Implies neutral atmospheric stability; deliberate methodological simplification (§10.1). |
+| **k-ω SST** | Shear-Stress-Transport k-ω turbulence closure (Menter, 1994). Standard for ABL-scale RANS. |
+| **ACH** | Air change rate per hour: `ACH = 3600 × ⟨\|U\|⟩ / L`, with L the canyon characteristic length. |
+| **TI** | Turbulence intensity: `TI = √(2/3 · TKE) / U_ref`. |
+| **TKE** | Turbulent kinetic energy. |
+| **Stagnation fraction** | Fraction of patch sample points with `\|U\| < 0.5 m/s`. |
+
+### Data sources
+
+| Term | Definition |
+|---|---|
+| **DTM** | Digital terrain model (bare-earth raster). |
+| **DSM** | Digital surface model (DTM plus buildings/vegetation). |
+| **INMET BDMEP** | *Banco de Dados Meteorológicos para Ensino e Pesquisa* — the Brazilian Met. Service's hourly archive. Source for 4 of 5 wind-rose stations (A652, A636, A621, A602). |
+| **ASOS** | Automated Surface Observing System — Iowa State's archive of international airport METAR; source for SBGL Galeão (Maré). |
+| **METAR** | Standardised aviation weather report format. |
+| **EPSG:31983** | SIRGAS 2000 / UTM Zone 23S — the project's canonical projected CRS. |
 
 ---
 
