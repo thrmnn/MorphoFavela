@@ -1001,7 +1001,9 @@ Key scripts:
 
 ## 10. Known Limitations
 
-1. **Neutral stability is assumed.** All five `wind_rose.json` files
+### 10.1 Neutral stability is assumed
+
+All five `wind_rose.json` files
    now carry measured hourly observations (`quality_flag: "measured"`,
    2015–2024 window, n = 64,088–89,439; see §2.3). The methodological
    simplification that remains is the assumption of neutral atmospheric
@@ -1012,17 +1014,21 @@ Key scripts:
    fractions 46 % and 33 %), and a known limitation for the more
    stably stratified nocturnal hours.
 
-2. **CFD results not yet integrated.** `src/cfd_integration/` is
-   tested but has not yet processed real simulation data. Any
-   assumptions about sample-point density, column naming quirks, or
-   edge cases in OpenFOAM output will only surface at first ingestion.
-   The first pilot patch (VDG-P07) is in flight; running the test
-   suite plus `cfd-results-ingestor` agent against the returned
-   results will catch most issues.
+### 10.2 CFD results not yet integrated
 
-3. **SVF validated against UMEP across all 5 sites** (limitation closed
-   2026-04-29 for Vidigal; height-matched at z = 1.5 m for Vidigal and
-   Maré 2026-04-30; extended to all 5 sites 2026-05-01). The
+`src/cfd_integration/` is
+tested but has not yet processed real simulation data. Any
+assumptions about sample-point density, column naming quirks, or
+edge cases in OpenFOAM output will only surface at first ingestion.
+The first pilot patch (VDG-P07) is in flight; running the test
+suite plus `cfd-results-ingestor` agent against the returned
+results will catch most issues.
+
+### 10.3 SVF cross-validation against UMEP
+
+(Limitation closed
+2026-04-29 for Vidigal; height-matched at z = 1.5 m for Vidigal and
+Maré 2026-04-30; extended to all 5 sites 2026-05-01.) The
    Tregenza 145-patch engine was cross-validated against UMEP's
    shadow-casting SVF (`svfForProcessing153`) at z = 1.5 m after
    lowering building heights by 1.5 m to height-match the two engines:
@@ -1049,18 +1055,22 @@ Key scripts:
    (S6 Vidigal, S7 Maré, S8 Rocinha, S9 Rio das Pedras,
    S10 Complexo do Alemão) for per-cell scatters.
 
-4. **Resolution sensitivity is 10 m vs 20 m only.** Finer grids
-   (5 m, 2 m) would be prohibitively expensive at site scale but
-   warrant a spot-check for the CFD patches specifically. Not a
-   priority for the current milestone.
+### 10.4 Resolution sensitivity is 10 m vs 20 m only
 
-5. **Cidade de Deus excluded.** A data integrity issue in the CDD
-   building footprints (geometry inconsistencies; see project memory
-   `project_cdd_data_bug`) leaves CDD outside the 5-site campaign.
-   This is a final decision for the current campaign cycle: the
-   119-patch allocation, OpenFOAM submission, and downstream analysis
-   all assume 5 sites. Re-onboarding CDD is out of scope until the
-   building data is reprocessed upstream of this repository.
+Finer grids
+(5 m, 2 m) would be prohibitively expensive at site scale but
+warrant a spot-check for the CFD patches specifically. Not a
+priority for the current milestone.
+
+### 10.5 Cidade de Deus excluded
+
+A data integrity issue in the CDD
+building footprints (geometry inconsistencies; see project memory
+`project_cdd_data_bug`) leaves CDD outside the 5-site campaign.
+This is a final decision for the current campaign cycle: the
+119-patch allocation, OpenFOAM submission, and downstream analysis
+all assume 5 sites. Re-onboarding CDD is out of scope until the
+building data is reprocessed upstream of this repository.
 
 ---
 

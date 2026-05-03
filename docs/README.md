@@ -19,6 +19,10 @@ docs/
 │   ├── street_svf.md                    # Street-level SVF along centrelines
 │   └── morphometric_indicators.md       # Formal definitions of the 25 indicators
 │
+├── onboarding/                          # Reader paths for first-time visitors
+│   ├── engineering_review.md            # 1-day reading path for engineering reviewers
+│   └── local_setup.md                   # Concentrated troubleshooting (GDAL, conda, GPU)
+│
 ├── PRODUCTION_READINESS_PLAN.md         # Working plan — engineering-review prep
 ├── FAVELA_EXTRACTION_WORKFLOW.md        # GIS workflow for new-site building extraction
 ├── GPU_SVF_EXACT_VALIDATION.md          # GPU-vs-CPU SVF parity report (Phase 3.5)
@@ -29,8 +33,10 @@ docs/
 
 | If you want to … | Read |
 |---|---|
-| Understand the methodology | [`technical_report/technical_report.md`](technical_report/technical_report.md) — full project description |
-| Reproduce a figure or number | TR §12 (Reproducibility) — *being added in the production-readiness pass* |
+| Review this codebase as an engineer | [`onboarding/engineering_review.md`](onboarding/engineering_review.md) — 1-day reading path with time budgets |
+| Get a fresh clone running locally | [`onboarding/local_setup.md`](onboarding/local_setup.md) — concentrated troubleshooting for GDAL, conda, GPU, common errors |
+| Understand the methodology | [`technical_report/technical_report.md`](technical_report/technical_report.md) — full project description (start with the metadata block + §0 Glossary) |
+| Reproduce a figure or number | TR §12 (Reproducibility) — every figure and table mapped to a producer command |
 | Onboard a new site | Project root [`data/README.md`](../data/README.md) + [`FAVELA_EXTRACTION_WORKFLOW.md`](FAVELA_EXTRACTION_WORKFLOW.md) |
 | Compute a specific indicator | [`methodology/morphometric_indicators.md`](methodology/morphometric_indicators.md) |
 | Validate SVF against a benchmark | [`GPU_SVF_EXACT_VALIDATION.md`](GPU_SVF_EXACT_VALIDATION.md) (CPU↔GPU parity) and TR §10.3 (UMEP cross-val) |
