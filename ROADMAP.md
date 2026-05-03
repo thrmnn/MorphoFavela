@@ -337,29 +337,53 @@
 ## Next Steps & Priorities
 
 ### Recently Completed
+- [x] **5-site UMEP cross-validation** closed (2026-05-01) — slopes within ±8 % of unity
+      at 4/5 sites, r² 0.68–0.94, all biases ≥ 0 (height-shifted IVF input zeros sub-1.5 m
+      structures). Vendored UMEP at `vendor/umep_processing/`. Closes §10.3 limitation.
+- [x] **§6.5 Blocken margin claim corrected** (2026-05-02) — min margin 114 m at RDP-P15
+      (not "≥150 m" as previously stated); 11/119 patches under 150 m, all at RdP/Rocinha;
+      `blocken_ok = true` for all 119.
+- [x] **Result-side analysis pipeline** shipped (2026-04-29) —
+      `scripts/analyze_cfd_results.py` + `generate_synthetic_cfd_results.py`; end-to-end
+      synthetic validation on all 5 sites (covered cells 359–405).
+- [x] **Six project subagents + CFD adapter** (2026-04-29) — `cfd-results-ingestor`
+      auto-detects IVF native (cardinal + CSV) and Airflow native (`wind_NNN/` +
+      parquet) layouts.
+- [x] **Wind input for all 5 sites** (2026-04-27) — measured roses 2015–2024,
+      n = 64,088–89,439 hourly records, `quality_flag: "measured"`.
+- [x] **Pilot patch in Airflow** (2026-04-26) — VDG-P07 placed, preflight 7/7.
 - [x] Tregenza 145 equal-area patches (PR #6)
 - [x] Makefile build automation (PR #5)
 - [x] CFD patch selection framework — tiling, 31 features, clustering, export (PR #7)
+      — superseded by Phase 5 stratified sampler in April 2026; clustering-based
+      `src/patch_selection/` removed.
 - [x] Mare onboarding — SVF + morphology + patch selection complete
 - [x] Complexo do Alemao re-extraction (21,729 buildings)
 
 ### High Priority
 
-#### HPC SVF Computation
-- [ ] Run full SVF for Complexo do Alemao (21,729 buildings)
-- [ ] Run full SVF for Vidigal (full extent, not just TLS subset)
+#### HPC SVF Computation ✅ COMPLETE (April 2026)
+- [x] Full SVF for Complexo do Alemão
+- [x] Full SVF for Vidigal (full extent, not just TLS subset)
+- [x] Full SVF for Rocinha, Rio das Pedras, Maré
 
-#### Cross-Area Clustering
-- [ ] Cross-area patch clustering across all 5 CFD campaign areas
-- [ ] Unified typology labels for OpenFOAM domain selection
+#### Cross-Area Clustering — DEPRECATED
+- ~~Cross-area patch clustering across all 5 CFD campaign areas~~
+- ~~Unified typology labels for OpenFOAM domain selection~~
+- *Replaced by 12-strata stratified sampling (Phase 5, 2026-04-09); no longer needed.*
 
-#### OpenFOAM Handoff
-- [ ] Test OpenFOAM mesh generation from exported patch geometries
-- [ ] Validate boundary condition setup for selected patches
+#### OpenFOAM Handoff (in `~/Airflow`)
+- [x] Per-patch exports ready (buildings.gpkg, terrain.tif, patch_meta.json) for all 119
+- [x] Airflow build_patch_case / preflight / write_summary updated for circular patches
+- [x] VDG-P07 preflight 7/7 in `~/Airflow/cases/VDG-P07/`
+- [ ] **Submit VDG-P07 mesh + 8-direction wind campaign to MIT ORCD** (user-driven)
+- [ ] Validate end-to-end pipeline against real CFD return for VDG-P07
+- [ ] Submit remaining 118 patches incrementally
 
 #### Validation
-- [ ] Benchmark SVF results against RayMan, SOLWEIG, or other reference tools
+- [x] **SVF benchmarked against UMEP** (5-site, 2026-05-01) — see Recently Completed
 - [ ] Cross-validate solar irradiance against measured data or pvlib baselines
+      (deferred — not on critical path for CFD campaign)
 
 ### Medium Priority
 
@@ -420,9 +444,15 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
 - [ ] Post-processing: wind velocity at pedestrian height, aggregate to grid cells
 
 ### Next steps (in this repo)
-- [ ] Ingest CFD results via `src/cfd_integration/` (already implemented +
-      tested; awaiting first real campaign output)
-- [ ] Annual-weighted maps using the new measured wind roses
+- [x] **Result-side pipeline implemented + synthetic-validated on all 5 sites**
+      (2026-04-29). Entry points: `ivf-analyze-cfd`, `ivf-synthetic-cfd`. Outputs in
+      `outputs/{site}/cfd_analysis/`.
+- [ ] Ingest first real CFD return (VDG-P07) via `cfd-results-ingestor` agent →
+      `src/cfd_integration/` aggregation
+- [ ] Annual-weighted maps using measured wind roses (`src/cfd_integration/weighting.py`
+      already in place)
+- [ ] Graduate `src/cfd_integration/io.py` to versioned-stable once VDG-P07 ingestion
+      validates the on-disk contract end-to-end
 
 ---
 
@@ -529,6 +559,21 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
 - Nature Cities paper figures: 9 scripts + shared style module (`outputs/paper_figures/`)
 - **Status**: Phase 5 complete, ready for OpenFOAM simulations in CFD repo
 
+### v5.5.0 (late April – early May 2026)
+- Wind input for all 5 sites: INMET BDMEP + Iowa State ASOS pipelines, measured roses
+  2015–2024, `quality_flag: "measured"`
+- Six project subagents under `.claude/agents/` (3 validators + 3 workflow accelerators)
+- `src/cfd_integration/io.py` auto-detects IVF native and Airflow native on-disk layouts
+- Result-side pipeline: `analyze_cfd_results.py` + `generate_synthetic_cfd_results.py`,
+  end-to-end synthetic-validated on all 5 sites
+- 5-site UMEP cross-validation closed (§10.3 limitation): vendored UMEP at
+  `vendor/umep_processing/`, slopes within ±8 % at 4/5 sites
+- Pre-commit hook (`.claude/hooks/check_report_sync.py`) keeps `technical_report.md` ↔
+  `.pdf` ↔ `figures/` in sync; blocking on .md ↔ .pdf pairing, advisory elsewhere
+- Technical report polished: §6.5 Blocken claim corrected, §10.3 closed, full §4 cross-val
+  table, figS6–figS10 supplementary scatters
+- **Status**: Pipeline ready for real CFD returns; awaiting VDG-P07 from MIT ORCD
+
 ### v4.0.0 (March 2025)
 - Urban morphology metrics: plan area density, frontal area density, height variability, street orientation entropy
 - Zone flagging for environmental risk areas
@@ -546,11 +591,13 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
 ## Notes
 
 - Tregenza 145-patch SVF is merged and production-ready
-- Validation against benchmark tools is needed before publication
-- All Phase 2, 3, 3.5, 4, and 4.5 analyses are complete and production-ready
+- SVF validated against UMEP `svfForProcessing153` on all 5 campaign sites (2026-05-01)
+- All Phase 2, 3, 3.5, 4, 4.5, and 5 analyses are complete and production-ready
 - CFD campaign: 5 areas — vidigal, rocinha, riodaspedras, complexo_do_alemao, maré
   (CDD excluded due to broken building data; see `project_cdd_data_bug` memory)
-- CFD simulation execution is handled in a separate repo; this repo produces the
-  patches (`sampling_cfd/campaign_sampling/patches/`) and will ingest results back
-  for Phase 7 analysis
-- Current focus: HPC SVF for remaining areas, cross-area clustering, OpenFOAM handoff
+- CFD simulation execution is handled in a separate repo (`~/Airflow`); this repo
+  produces the patches (`sampling_cfd/campaign_sampling/patches/`) and ingests
+  results via `cfd-results-ingestor` + `src/cfd_integration/` for Phase 7 analysis
+- **Current focus**: VDG-P07 on MIT ORCD (user-driven), then incremental submission
+  of remaining 118 patches; ingestion + annual weighting on this side is plumbed and
+  awaiting real data
