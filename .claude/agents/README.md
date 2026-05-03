@@ -34,6 +34,7 @@ The team is two classes:
 | [`data-contract-checker`](data-contract-checker.md) | Before running pipeline scripts on a site, after pulling new data, or before changing `data/README.md` | Site name (e.g. `vidigal`) or `--all` |
 | [`sampling-auditor`](sampling-auditor.md) | After `run_campaign_sampling.py`, before submitting patches to CFD execution, or to confirm campaign integrity | Site name or `--all` |
 | [`report-sync-auditor`](report-sync-auditor.md) | Before committing pipeline / figure / sampling changes, or to audit a series of recent commits for documentation drift | Git ref range (`HEAD~3..HEAD`), `staged`, or `working` (default) |
+| [`numerical-claims-auditor`](numerical-claims-auditor.md) | Before sending the technical report for external review, after any sampling/grid regeneration, or after a TR edit that touches numbers (counts, percentages, ranges, comparators, summary stats). Targets the §6.5 Blocken-class bug: prose drift from the underlying data. | Markdown path (default `docs/technical_report/technical_report.md`), section anchor like `§6.5`, or `--all-tracked-md` |
 
 ### Workflow accelerators
 
