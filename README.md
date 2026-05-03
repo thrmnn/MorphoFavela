@@ -1,20 +1,25 @@
-# Favela Morphometric Analysis
+# IVF — Informal Settlements Vulnerability Framework
 
-A Python pipeline for calculating morphometric metrics from building footprints with height attributes. Designed for analyzing informal settlement geometry and urban morphology.
+A Python pipeline for the morphometric and CFD-coupled analysis of pedestrian-level wind, solar, and ventilation in dense informal urban form. Targeted at five Rio de Janeiro favelas (Vidigal, Rocinha, Complexo do Alemão, Rio das Pedras, Maré) but written to onboard new sites without code changes.
 
-## Features
+**What this repo does**
 
-- **Multi-area analysis**: Support for comparing multiple study areas (formal vs informal settlements)
-- **Comprehensive metrics**: Building morphometry, extended morphology indicators, environmental performance (SVF, solar access, porosity), and deprivation indices
-- **Area-based filtering**: Automatic filtering policy (applied to informal, skipped for formal areas)
-- **Comparative analysis**: Automated comparison framework with statistical tests and PDF reports
-- **Rich visualizations**: Thematic maps, statistical distributions, side-by-side comparisons
-- **Professional reports**: Clean, academic-style PDF reports with comprehensive findings
-- **Robust validation**: Validates data quality, CRS, and geometry before processing
+- Builds a **10 m morphometric grid** (20+ indicators per cell — SVF, λp, λf, σh, slope, aspect, porosity, …) from building footprints + DTM
+- Generates a **stratified CFD sampling campaign** (119 patches across 5 sites, 12-strata SVF × slope × λp grid, 80 m maximin spacing, 250 m circular domain)
+- Ingests measured **wind input** (INMET BDMEP + Iowa ASOS METAR) into per-site `wind_rose.json` for annual weighting
+- Specifies a **CFD I/O contract** and ingests OpenFOAM-derived wind fields when they return from the simulation cluster
+- Produces the **technical report** ([`docs/technical_report/`](docs/technical_report/)) and Nature Cities paper figures
 
-## Roadmap
+**What this repo does NOT do**
 
-See [ROADMAP.md](ROADMAP.md) for detailed project roadmap. **Current status**: Phases 1-4 complete. Phase 5 (CFD campaign) — 119 patches allocated across 5 sites, ready for OpenFOAM simulations. Paper figures for Nature Cities submission complete.
+- Run OpenFOAM. Mesh generation, case setup, and HPC submission live in a separate repo at `~/Airflow` (MIT ORCD).
+- Host the manuscript. The Nature Cities draft lives elsewhere; this repo provides the technical report that backs it.
+
+**Audience.** Engineers, researchers, and reviewers who need to read the methodology, reproduce a figure, validate a number, or onboard a new site. Start with [`docs/technical_report/technical_report.md`](docs/technical_report/technical_report.md) for the methodology; this README is the operational guide.
+
+## Status
+
+See [ROADMAP.md](ROADMAP.md) for the full roadmap and version history. **As of May 2026**: 5 sites onboarded; 119-patch CFD campaign sampled and exported; wind input complete; result-side analysis pipeline shipped + synthetic-validated end-to-end on all 5 sites; SVF cross-validated against UMEP `svfForProcessing153` on all 5 sites (closes the §10.3 limitation). Pilot patch VDG-P07 in flight at MIT ORCD; ingestion layer plumbed and waiting on first real CFD return.
 
 ## Repository Map
 
@@ -23,7 +28,7 @@ figures. CFD simulations themselves run in a separate repo.
 
 | Concern | Location |
 |---|---|
-| **Morphometric analysis** | `src/`, `scripts/calculate_*.py`, `scripts/run_svf_v2.py`, … |
+| **Morphometric analysis** | `src/morphometry/`, `src/svf_v2/`, `scripts/run_morphometric_audit.py`, `scripts/run_svf_v2.py`, … |
 | **CFD patch sampling** (5 sites × 119 patches) | `scripts/run_pilot_sampling.py`, `scripts/run_campaign_sampling.py` |
 | **CFD I/O contract** (what CFD must produce, how we ingest) | `src/cfd_integration/README.md` |
 | **CFD simulation execution** | **Separate repo at `~/Airflow`** (OpenFOAM + SLURM on MIT ORCD) |
@@ -234,10 +239,15 @@ IVF/
 ├── data/        # gitignored — site rasters, footprints, INMET ZIPs, wind roses
 ├── outputs/     # gitignored — analysis artefacts (paper_figures/*.py is tracked)
 └── docs/
-    ├── technical_report/                 # Canonical deliverable (md + pdf)
-    ├── guides/                           # Per-feature usage guides
-    └── archive/                          # Superseded planning + summary docs
+    ├── technical_report/                 # Canonical deliverable (md + pdf + figures/)
+    ├── methodology/                      # Standalone methodology docs (SVF, sky-exposure, indicators)
+    ├── PRODUCTION_READINESS_PLAN.md      # Engineering-review prep plan (working doc)
+    ├── FAVELA_EXTRACTION_WORKFLOW.md     # GIS extraction workflow
+    ├── GPU_SVF_EXACT_VALIDATION.md       # GPU-vs-CPU SVF parity report
+    └── cfd_sampling_overrides.yaml       # Documented sampling-coverage gap downgrades
 ```
+
+See [`docs/README.md`](docs/README.md) for a one-line summary of each.
 
 ## Configuration + per-module details
 
@@ -265,11 +275,11 @@ IVF/
   with the code): [`docs/technical_report/technical_report.md`](docs/technical_report/technical_report.md)
   + [`.pdf`](docs/technical_report/technical_report.pdf). Rebuild
   with `python docs/technical_report/build_pdf.py`.
+- **Methodology** (per-feature deep dives): [`docs/methodology/`](docs/methodology/)
+  — sky-exposure plane, street-level SVF, the 25 morphometric indicators.
+- **Doc map**: [`docs/README.md`](docs/README.md).
 - **Roadmap + project status**: [`ROADMAP.md`](ROADMAP.md).
 - **Changelog**: [`CHANGELOG.md`](CHANGELOG.md).
-- **Per-feature usage guides**: [`docs/guides/`](docs/guides/).
-- **Superseded planning docs** (kept for archaeology, not a
-  current reference): [`docs/archive/`](docs/archive/).
 
 ## Contributing
 

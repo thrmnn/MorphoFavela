@@ -121,8 +121,8 @@ This repo:
 
 ## Project subagents
 
-The repo ships six Claude Code subagents under
-[`.claude/agents/`](.claude/agents/) — three **validators** (read-only
+The repo ships seven Claude Code subagents under
+[`.claude/agents/`](.claude/agents/) — four **validators** (read-only
 contract checks) and three **workflow accelerators** (multi-step
 orchestration with explicit hand-offs at manual steps).
 
@@ -133,6 +133,7 @@ orchestration with explicit hand-offs at manual steps).
 | [`data-contract-checker`](.claude/agents/data-contract-checker.md) | Pulled new data, added a site, edited `data/README.md`, or about to run a pipeline script on `data/{site}/` |
 | [`sampling-auditor`](.claude/agents/sampling-auditor.md) | Re-ran `run_campaign_sampling.py`, before submitting patches to CFD execution, or to confirm campaign integrity |
 | [`report-sync-auditor`](.claude/agents/report-sync-auditor.md) | Before committing pipeline / figure / sampling changes — flags drift between code and `docs/technical_report/` |
+| [`numerical-claims-auditor`](.claude/agents/numerical-claims-auditor.md) | Before sending the technical report for external review, after any sampling/grid regeneration, or after a TR edit that touches numbers — extracts every numerical claim and verifies it against a traceable source. Targets the §6.5-class prose-drift bug. |
 
 ### Workflow accelerators (modify code, run scripts, hand off at manual steps)
 

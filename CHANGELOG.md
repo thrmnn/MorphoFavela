@@ -8,6 +8,73 @@ a stable v1.0 is cut.
 
 ## [Unreleased]
 
+### Changed — production-readiness cleanup (May 2026, two passes)
+
+- **Pass 1** (`09427fd`, 2026-05-03): −7,351 lines across 39 files.
+  Deleted 26 of 27 docs in `docs/archive/` (the 27th, `Morphometrics.md`,
+  was the only document with lasting reference value and moved to
+  `docs/methodology/morphometric_indicators.md`); 7 ad-hoc design docs
+  in `tests/`; the orphan `feature/gpu-svf-acceleration/` stub README;
+  the empty `tests/test_patch_selection/` directory left over from the
+  April 2026 source deletion; and `scripts/analyze_morphology_risk.py`
+  (zero callers, no `pyproject` entry, no docs reference). Created
+  `docs/methodology/` and moved top-level `SKY_EXPOSURE_METHODOLOGY.md`
+  + `STREET_SVF_USAGE.md` into it.
+- **Pass 2** (`c2808c2`, 2026-05-03): −1,605 lines across 9 files.
+  Deleted the legacy Phase-2 orchestrator trio
+  (`scripts/run_area_analyses.py`, `scripts/calculate_morphology_metrics.py`,
+  `scripts/compute_deprivation_index.py`) — all wrote to the deprecated
+  `outputs/{site}/{svf,solar,porosity,density}/` layout that predated the
+  canonical `morphometrics/`/`sampling_cfd/`/`comparative/` layout;
+  `requirements.txt` (deps now declared exclusively in `pyproject.toml`,
+  with `joblib>=1.3.0` added since it was previously declared only in
+  `requirements.txt`); two stale `docs/guides/*` mini-tutorials that
+  referenced the deleted orchestrator + non-campaign sites
+  (`vidigal_tls`, `copacabana`).
+- Test suite collection unchanged across both passes (577 tests, 508 in
+  the non-integration set). All deletions remain accessible via git
+  history; no behaviour change.
+- Source: [`docs/PRODUCTION_READINESS_PLAN.md`](docs/PRODUCTION_READINESS_PLAN.md)
+  Track A (cleanup), executed against Wave 1 audit results from five
+  parallel `Explore` agents.
+
+### Added — `numerical-claims-auditor` subagent
+
+- Validator-class subagent at
+  [`.claude/agents/numerical-claims-auditor.md`](.claude/agents/numerical-claims-auditor.md)
+  that extracts every numerical claim (counts, percentages, ranges,
+  comparators, summary statistics, dates) from a markdown document
+  (default: `docs/technical_report/technical_report.md`) and verifies
+  each against a traceable source — `campaign_patches.csv`,
+  `patch_meta.json` fields, `summary_stats.csv`, `wind_rose.json`, etc.
+  Reports per-claim VERIFIED / MISMATCH / UNVERIFIABLE. Read-only.
+- Targets the §6.5 Blocken-class bug: prose drift from the underlying
+  data when the constraint check itself is correct. A scripted check
+  cannot replicate this — it requires reading prose, identifying a
+  numerical claim, finding its source, and comparing. Recurring
+  trigger: any TR edit that touches numbers, any sampling/grid
+  regeneration, any pre-release sweep.
+- Brings the project subagent team to seven (4 validators + 3 workflow
+  accelerators). Loaded at session start, so requires Claude Code
+  restart before first use.
+
+### Fixed — §6.5 Blocken margin claim corrected
+
+- Technical report §6.5 previously stated the 250 m CFD domain radius
+  "always exceeds 5 × H_max by at least 150 m". An audit of all 119
+  `patch_meta.json` files showed the actual minimum margin was 114 m
+  (RDP-P15, `H_max_analysis` = 27.3 m), with 11 of 119 patches under
+  150 m — all at Rio das Pedras (5/22) or Rocinha (6/25), the two
+  sites with the tallest analysis-patch structures. The Blocken
+  constraint itself (`5 × H_max ≤ 250 m`) holds at every patch
+  (`blocken_ok = true` in every `patch_meta.json`); only the
+  descriptive prose around the margin had drifted. Rewritten with
+  the actual range (114–215 m, median 180 m) and a per-site
+  breakdown.
+- This drift is the canonical bug class the new
+  `numerical-claims-auditor` agent targets. PDF rebuilt in the
+  same commit (`53396db`).
+
 ### Added — SVF cross-validated against UMEP (closes §10.3 limitation)
 
 - `scripts/validate_svf_against_umep.py` benchmarks the IVF Tregenza-145
