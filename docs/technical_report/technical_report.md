@@ -1122,6 +1122,172 @@ Airflow output.
 
 ---
 
+## 12. Reproducibility
+
+Every numerical claim, table, and figure in this report can be
+regenerated from the committed scripts. This section is the index.
+
+### 12.1 Environment
+
+```bash
+git clone https://github.com/thrmnn/MorphoFavela.git && cd MorphoFavela
+conda create -n IVF python=3.11 && conda activate IVF
+pip install -e ".[dev]"          # add ".[gpu]" for the optional GPU SVF stack
+```
+
+GDAL / GEOS native libraries must be present (`apt install libgdal-dev`
+on Linux, `brew install gdal` on macOS) before `pip install`.
+
+### 12.2 Smoke test (≤ 2 min on a fresh clone)
+
+```bash
+pytest tests/ -m "not integration" -q --tb=short
+# → 508 tests pass; 69 integration tests deselected
+```
+
+If this passes, the codebase is loaded correctly. If GDAL or pyvista
+fail to import, see [`docs/onboarding/local_setup.md`](../onboarding/local_setup.md).
+
+### 12.3 Per-site pipeline
+
+Substitute any of `vidigal | rocinha | riodaspedras | complexo_do_alemao | maré`
+for `<site>`. Inputs must be in place under `data/<site>/` per
+[`data/README.md`](../../data/README.md).
+
+```bash
+# Stage 1: extended building + DTM context (300 m buffer)
+python scripts/build_extended_context.py --area <site> --buffer 300
+
+# Stage 2: morphometric grid + SVF audit + per-site report
+python scripts/run_morphometric_audit.py --area <site>
+# Outputs → outputs/<site>/morphometrics/{grid,svf,figures,report}/
+
+# Stage 3: CFD patch sampling
+python scripts/run_pilot_sampling.py --site <site> \
+  --buildings data/<site>/buildings_extended_300m.gpkg \
+  --dtm data/<site>/dtm_extended_300m.tif
+python scripts/run_campaign_sampling.py
+# Outputs → outputs/<site>/sampling_cfd/campaign_sampling/patches/<PATCH_ID>/
+
+# Stage 4: UMEP cross-validation (optional, ~10–45 min per site)
+python scripts/validate_svf_against_umep.py --site <site> \
+  --pixel-size 1.0 --observer-height 1.5
+# Outputs → outputs/<site>/morphometrics/svf/umep_validation/
+```
+
+### 12.4 Per-figure regeneration
+
+| Figure | Producer | Source path before TR copy |
+|---|---|---|
+| **1** Study sites overview | `python outputs/paper_figures/fig01_study_sites.py` | `outputs/paper_figures/exports/fig01_study_sites.png` |
+| **2** Morphometric distributions | `python outputs/paper_figures/fig02_morphometric_distributions.py` | `outputs/paper_figures/exports/fig02_morphometric_distributions.png` |
+| **3** SVF–λp coupling | `python outputs/paper_figures/fig03_svf_lambda_coupling.py` | `outputs/paper_figures/exports/fig03_svf_lambda_coupling.png` |
+| **4** Sampling design | `python outputs/paper_figures/fig04_sampling_design.py` | `outputs/paper_figures/exports/fig04_sampling_design.png` |
+| **5** Morphometric maps | `python outputs/paper_figures/fig05_morphometric_maps.py` | `outputs/paper_figures/exports/fig05_morphometric_maps.png` |
+| **S1** Correlation matrices | `python outputs/paper_figures/figS1_correlation_matrices.py` | `outputs/paper_figures/exports/figS1_correlation_matrices.png` |
+| **S2** Context extension | `python outputs/paper_figures/figS2_context_extension.py` | `outputs/paper_figures/exports/figS2_context_extension.png` |
+| **S3** Resolution sensitivity | `python outputs/paper_figures/figS3_resolution_sensitivity.py` | `outputs/paper_figures/exports/figS3_resolution_sensitivity.png` |
+| **S5** Wind roses | `python outputs/paper_figures/figS5_wind_roses.py` | `outputs/paper_figures/exports/figS5_wind_roses.png` |
+| **S6–S10** UMEP scatters (per site) | `python scripts/validate_svf_against_umep.py --site <site>` | `outputs/<site>/morphometrics/svf/umep_validation/scatter.png` |
+| campaign-allocation summary | side-effect of `scripts/run_campaign_sampling.py` | `outputs/comparative/final_allocation/fig_campaign_allocation_summary.png` |
+| cross-site feature space | side-effect of `scripts/run_campaign_sampling.py` | `outputs/comparative/final_allocation/fig_campaign_cross_site_featurespace.png` |
+
+After regenerating, copy the figure into `docs/technical_report/figures/`
+and rebuild the PDF:
+
+```bash
+cp outputs/paper_figures/exports/figXX_*.png docs/technical_report/figures/
+python docs/technical_report/build_pdf.py
+```
+
+The pre-commit hook (`.claude/hooks/check_report_sync.py`) blocks
+commits that stage `technical_report.md` without `technical_report.pdf`,
+or vice versa.
+
+**Known orphans:** four pilot-summary figures
+(`fig_all_sites_patches`, `fig_candidate_pool`,
+`fig_patch_metrics_comparison`, `fig_strata_heatmap`) survive on disk
+and are referenced from §6, but their producer was deleted in the April
+2026 `src/patch_selection/` removal and has not been re-implemented.
+Regenerating them is in the next-steps backlog.
+
+### 12.5 Per-table regeneration
+
+| Table | Source | One-liner |
+|---|---|---|
+| §1 Study Sites | `outputs/<site>/morphometrics/grid/grid_metrics.gpkg` | `geopandas.read_file(...)` then aggregate `H_mean`, `lambda_p`, etc. |
+| §2.3 Wind table | `data/<site>/wind_rose.json` | `json.load(...)` → fields `n_records`, `calm_fraction`, `frequencies`, `year_range` |
+| §4.2 / §10.3 UMEP cross-val | `outputs/<site>/morphometrics/svf/umep_validation/summary_stats.csv` | `pandas.read_csv(...)` |
+| §5.2 Typology medians | concat `outputs/<site>/morphometrics/grid/grid_metrics.gpkg` across sites, group by typology (Vidigal+Rocinha = Hillside, CDA = Mixed, RdP+Maré = Flatland), `.median()` |
+| §6.4 Campaign allocation | `outputs/comparative/final_allocation/campaign_allocation_table.csv`, `campaign_strata_summary.csv` |
+| §6.5 Blocken margins | `outputs/<site>/sampling_cfd/campaign_sampling/patches/<PATCH_ID>/patch_meta.json` field `blocken_radius_required`, with margin = `cfd_domain_radius` − `blocken_radius_required` |
+| §9 Validation Summary | each row's "Evidence" column points to the source file |
+
+### 12.6 PDF rebuild
+
+```bash
+python docs/technical_report/build_pdf.py
+# → 15.5 MB PDF, ~10 s on standard hardware (pandoc → WeasyPrint)
+```
+
+The build is deterministic given a fixed `technical_report.md`.
+
+---
+
+## 13. Failure modes & observability
+
+What breaks at each pipeline stage, what success looks like, and how
+the validators surface drift before it ships.
+
+### 13.1 Per-stage success / failure signals
+
+| Stage | Producer | Success signal | Failure signal | Validator |
+|---|---|---|---|---|
+| Site onboarding | `data/<site>/` per `data/README.md` contract | All required files present; CRS = EPSG:31983; `wind_rose.json` quality_flag = "measured" | Missing files; mixed CRS; placeholder wind rose | `data-contract-checker` agent |
+| Building extension | `scripts/build_extended_context.py` | `data/<site>/buildings_extended_300m.gpkg` written; building count > site-only count | Empty geometry; CRS mismatch; sentinel pixels (−9999) survive into the merged DTM | n/a — manual check via `geopandas.info()` |
+| Morphometric grid | `scripts/run_morphometric_audit.py` | `grid_metrics.gpkg` written with all 20+ columns; `svf_count > 0` for every eligible cell; per-site PDF report rendered | NaN-heavy SVF column (passageway sampler failed); cells with `svf_count = 0` returning NaN; report_render fails on missing inputs | n/a — review the per-site PDF |
+| Pilot sampling | `scripts/run_pilot_sampling.py` | 12–15 patches per site; ≥ 1 patch per non-empty stratum; min spacing ≥ 80 m | Stratum coverage gap; min spacing < 80 m; eligibility filter rejects > 95 % of cells | `sampling-auditor` agent |
+| Campaign sampling | `scripts/run_campaign_sampling.py` | 22–25 patches per site; SVF-priority weighting reflected in stratum totals; `blocken_ok = true` in every `patch_meta.json` | Blocken violation; spacing collision; stratum over- or under-allocation | `sampling-auditor` agent |
+| Wind rose ingestion | `scripts/build_wind_rose.py` | `wind_rose.json` with `quality_flag: "measured"`, `n_records ≥ 60,000`, full 8-direction frequency vector | quality_flag "placeholder-prior" (climatological prior never replaced); INMET date-format break post-2019 (silent zero rows) | `wind-ingestion` agent |
+| CFD ingestion | (CFD repo at `~/Airflow` writes; `src/cfd_integration/` reads) | All 8 wind directions present per patch; `sample_points.csv` rows ≥ 10 k; `summary.json` valid | Missing direction; off-axis directory name (e.g. `wind_017/`); column drift in CSV; `\|U_mag − √(U²+V²+W²)\| > 0.01` | `cfd-results-ingestor` agent (auto-detects IVF-native CSV vs Airflow-native parquet layouts) |
+| Annualised aggregation | `scripts/analyze_cfd_results.py` | Per-site `outputs/<site>/cfd_analysis/per_patch_indicators.csv`, `grid_with_cfd.gpkg`; covered cells in 350–410 range per site (synthetic baseline) | Coverage anomaly (cells well outside 350–410); regression sign flips; weighting falls back to uniform when wind rose missing | n/a — verify against synthetic baseline |
+| Report drift | `docs/technical_report/technical_report.md` | Numerical claims trace to source; cross-references resolve; PDF rebuilt | Prose drift from data (the §6.5-class bug); `.md` ↔ `.pdf` desync; figure copy missing | `report-sync-auditor` (commit-time) + `numerical-claims-auditor` (pre-review) |
+
+### 13.2 The four validators
+
+Read-only project subagents under `.claude/agents/` — invoke before
+shipping. Each returns a structured punch list; all four can be run in
+parallel.
+
+- **`data-contract-checker`** — site-level contract per `data/README.md`. Flags missing files, CRS drift, wind-rose placeholder.
+- **`sampling-auditor`** — 12-strata coverage, 80 m spacing, per-patch integrity, Blocken margin. Surfaces `docs/cfd_sampling_overrides.yaml` documented gaps as WARN, not FAIL.
+- **`report-sync-auditor`** — pipeline / figure / sampling change in a diff that didn't update the technical report. Runs against `working`, `staged`, or any git ref range.
+- **`numerical-claims-auditor`** — extracts every numerical claim from `technical_report.md` and verifies against source files. Targets the §6.5-class prose-drift bug. Run before sending the TR for external review.
+
+### 13.3 Pre-commit hook
+
+`.claude/hooks/check_report_sync.py`:
+
+- **Blocks** a commit that stages `technical_report.md` without `technical_report.pdf` (or vice versa).
+- **Warns** when a figure under `docs/technical_report/figures/` is staged without a `technical_report.md` change.
+- **Warns** on `feat:` / `fix:` commits touching `src/` or `scripts/` without staging a corresponding `tests/` file.
+
+The blocking rule is intentional: a stale PDF is strictly worse than no
+PDF, because external readers trust the rendered artefact.
+
+### 13.4 Common failure patterns and where they were caught
+
+| Pattern | Caught by | Example |
+|---|---|---|
+| Prose drift (the canonical bug) | `numerical-claims-auditor` | The §6.5 Blocken miss (May 2026): constraint check correct, prose claim "≥ 150 m" wrong; actual minimum 114 m at RDP-P15 |
+| Producer drift in CFD output | `cfd-results-ingestor` | Synthetic generator's `\|U_mag\|` inconsistent with √(U²+V²+W²); fixed by deriving `U_mag` from perturbed components |
+| Validation propagation miss | `numerical-claims-auditor` (Wave 2 sweep) | §6.5 was fixed; §9's row referring to the same Blocken margin still carried the old "150 m" — caught and propagated in commit 904040e |
+| Stratum coverage gap | `sampling-auditor` | RdP `SVF2_SLP2_LP2`: 7 eligible cells all within 80 m of pilot patches; downgraded from FAIL to WARN via `docs/cfd_sampling_overrides.yaml` |
+| Module/package collision | pytest collection error | `src/exposure.py` shadowed by `src/exposure/`; renamed to `src/exposure/sky_exposure.py` |
+| INMET data quirks | `wind-ingestion` | Date format change post-2019 (YYYY-MM-DD → YYYY/MM/DD); accent-bearing column name `direção_horaria`; server cuts > 5 GB transfers |
+
+---
+
 ## Appendix A — Figure Index
 
 | # | Title | File |
@@ -1179,6 +1345,57 @@ d477935 test(cfd-integration): 46 tests covering schema, IO, aggregation, metric
 - Tregenza, P. R. (1987). Subdivision of the sky hemisphere for
   luminance measurements. *Lighting Research & Technology*, 19(1),
   13–14.
+
+---
+
+## Appendix D — Engineering review checklist
+
+For reviewers reading this document for the first time. The most useful
+feedback is **specific** and falls into one of the categories below;
+phrase observations against a section number and a concrete claim.
+
+### What kind of feedback is most valuable
+
+| Category | Examples of useful feedback |
+|---|---|
+| **Methodology** (highest priority) | Is the SVF–UMEP cross-validation in §10.3 a strong-enough benchmark, given the height-shift transform? Should the σH ↔ H_mean correlation in §4.5 be reported pooled rather than per-site? Is the 12-stratum SVF × slope × λp grid the right axis set for *health-relevant* wind regimes, or is wind direction a missing axis? |
+| **Pipeline / reproducibility** | Does §12 give you enough to actually reproduce a figure on a fresh clone? Are there missing dependencies, hidden setup steps, or unstated assumptions? |
+| **CFD contract** | Read `src/cfd_integration/README.md` — is the input contract specified tightly enough that an independent OpenFOAM team could produce conforming output without back-and-forth? Are the 8-direction sample-point CSVs the right hand-off (vs full VTU)? |
+| **Sampling** | Is 119 patches the right total for 5 sites? Are SVF-priority weights (×2.0 / ×1.0 / ×0.8) defensible? Is the 80 m maximin spacing a constraint or a target? |
+| **Numerical claims** | Spot-checks against the source paths cited in §12.5 are welcome — the `numerical-claims-auditor` ran a sweep on 2026-05-03 and the §9-class propagation miss was the canonical bug. Other §6.5-class bugs may exist. |
+| **Code review** | If something looks wrong on read, file it; the production-readiness pass focused on prose, not module-by-module code. The pre-commit `ruff check` is the only continuous lint gate. |
+
+### What will not produce useful feedback at this stage
+
+- Wordsmithing of methodology prose (the report goes to a journal
+  manuscript next, where copy-editing happens).
+- Suggestions to switch CFD code or turbulence model — the contract is
+  in flight at MIT ORCD; changes require a full re-run cycle.
+- Style preferences for figures — figure design is locked for the
+  Nature Cities submission; only correctness matters here.
+
+### Reviewer's reading path (≈ 1 working day)
+
+| Time | Read |
+|---|---|
+| 10 min | This document's Exec Summary + §0 Glossary |
+| 30 min | §1 Study Sites · §2 Data Sources · §3 Data Preparation |
+| 60 min | §4 Morphometric Grid · §5 Cross-Site Morphology |
+| 90 min | §6 CFD Patch Sampling (the central methodological claim) |
+| 30 min | §7 CFD Integration Pipeline (read alongside `src/cfd_integration/README.md`) |
+| 30 min | §9 Validation Summary · §10 Known Limitations |
+| 30 min | §11 Next Steps · §12 Reproducibility · §13 Failure modes |
+| 60 min | Walk one site end-to-end against §12.3 — pick `vidigal`; the smallest valid grid (n = 1,503 in §10.3) makes it the fastest |
+| Closing | Cite specific §X.Y + claim when filing observations |
+
+### How to file feedback
+
+| Severity | Channel |
+|---|---|
+| Methodological / numerical errors | GitHub issue with section reference + a one-line repro |
+| Suggested next experiments | GitHub issue tagged `discussion` |
+| Pipeline-contract questions | Email the author (`thermann.ai@gmail.com`) — answers usually need design context |
+| Editorial / typographical | Direct message; bulk fixes are batched |
 
 ---
 
