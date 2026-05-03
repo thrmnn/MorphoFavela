@@ -222,8 +222,7 @@ IVF/
 │   ├── compute_sectional_porosity.py     # Porosity
 │   ├── compute_occupancy_density.py      # Density proxy
 │   ├── compute_urban_morphology.py       # Zone-level metrics
-│   ├── analyze_sky_exposure_streets.py   # Sky exposure plane
-│   ├── compute_deprivation_index*.py     # Combined indices
+│   ├── compute_deprivation_index_raster.py # Combined deprivation raster
 │   ├── compare_areas.py                  # Formal vs informal report
 │   ├── run_pilot_sampling.py             # 12-stratum CFD pilot (12-15 patches)
 │   ├── run_campaign_sampling.py          # Full CFD campaign top-up (22-25 patches)

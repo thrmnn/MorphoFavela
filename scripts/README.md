@@ -54,7 +54,6 @@ These are **independent** — run in any order or parallel.
 
 | Script | CLI | Purpose | Library |
 |---|---|---|---|
-| `calculate_morphology_metrics.py` | — | Basic + extended morphology metrics (height, area, λp, λf, σH …) | `src.metrics`, `src.morphology_metrics` |
 | `compute_urban_morphology.py` | — | Zone-level metrics: BCR, FAR, plot ratio, frontal area | `src.urban_morphology` |
 | `run_svf_v2.py` | `ivf-svf` | Sky View Factor (GPU-capable) on a 2 D ground grid | `src.svf_v2` |
 | `compute_solar_access.py` | `ivf-solar` | Hours of direct sun on the winter-solstice ground grid | `src.solar` |
@@ -72,10 +71,8 @@ These are **independent** — run in any order or parallel.
 
 | Script | CLI | Purpose | Library |
 |---|---|---|---|
-| `compute_deprivation_index.py` | — | Unit-level morphological environmental deprivation index | `src.exposure`, `src.solar` |
-| `compute_deprivation_index_raster.py` | — | Raster (continuous) version of the deprivation index | `src.exposure`, `src.solar` |
+| `compute_deprivation_index_raster.py` | — | Continuous 2D raster of environmental deprivation (combines solar + SVF + porosity + occupancy) | `src.exposure`, `src.solar` |
 | `run_morphometric_audit.py` | `ivf-morphometry` | One-shot per-site audit: figures + PDF report | `src.morphometry` |
-| `run_area_analyses.py` | — | Convenience: chains SVF + solar + porosity + density for one area | (calls other scripts) |
 | `compare_areas.py` | `ivf-compare` | Formal-vs-informal comparison report (statistical tests + PDF) | `src.metrics`, scipy.stats |
 | `generate_report.py` | — | Single-area or comparative PDF report | `src.morphometry.report` |
 
@@ -120,13 +117,9 @@ street-level analysis can write a thin CLI wrapper using those
 helpers in <100 lines; the deleted scripts are preserved in git
 history if their implementations are useful as a reference.
 
-The deprivation-index pair
-(`compute_deprivation_index.py` unit-level and
-`compute_deprivation_index_raster.py` raster-level) share their
-core deficit formulas via `src/exposure/deprivation.py`. The two
-scripts continue to exist because they have genuinely different
-semantics — unit-level aggregates rasters into spatial units for
-policy interpretation, raster-level produces a continuous 2D map
-for visualisation. A future consolidation could collapse them onto
-a `--resolution {unit,raster}` flag, but the residual duplication
-is now mostly the I/O and plotting wrappers, not the math.
+The unit-level deprivation script (`compute_deprivation_index.py`)
+was removed on 2026-05-03 alongside the legacy `run_area_analyses.py`
+orchestrator. Only `compute_deprivation_index_raster.py` remains; its
+core formulas live in `src/exposure/deprivation.py` and unit-level
+aggregation is achievable by passing analysis-unit polygons via the
+`--units` flag.
