@@ -30,8 +30,11 @@ At time of writing, the pipeline has produced:
   spacing and SVF-priority weighting to oversample health-relevant low-sky-
   view conditions.
 - **A complete CFD integration pipeline** (`src/cfd_integration/`,
-  46 passing tests) ready to ingest OpenFOAM results when the simulation
-  campaign completes in the parallel CFD repository.
+  63 passing tests) ready to ingest OpenFOAM results when the simulation
+  campaign completes in the parallel CFD repository. The result-side
+  analysis pipeline (`scripts/analyze_cfd_results.py`) is shipped and
+  synthetic-validated end-to-end on all 5 sites; awaiting the first real
+  return (VDG-P07).
 
 The pipeline is fully reproducible from the committed scripts; all inputs
 are documented and all intermediate outputs preserved in the canonical
@@ -46,18 +49,24 @@ and the CFD execution environment.
 Five favelas were selected to span the morphological typologies of Rio
 informal settlements:
 
-| Site | Area | Type | Buildings (extended) | 10 m cells | Mean building height |
-|------|-----:|------|--------------------:|-----------:|--------------------:|
+| Site | Area | Type | Buildings (extended) | 10 m cells | Mean building height † |
+|------|-----:|------|--------------------:|-----------:|----------------------:|
 | Vidigal | 0.30 km² | hillside | 4,600 | 3,169 | 6.3 m |
-| Rocinha | 0.80 km² | hillside | 14,443 | 8,972 | 5.7 m |
-| Rio das Pedras | 0.70 km² | flatland | 11,276 | 7,046 | 5.9 m |
-| Complexo do Alemão | 1.97 km² | mixed | 28,783 | 19,708 | 6.5 m |
-| Maré | 4.34 km² | flatland | 39,333 | 43,419 | 6.4 m |
+| Rocinha | 0.80 km² | hillside | 14,443 | 8,972 | 8.1 m |
+| Rio das Pedras | 0.70 km² | flatland | 11,276 | 7,046 | 8.7 m |
+| Complexo do Alemão | 1.97 km² | mixed | 28,783 | 19,708 | 5.3 m |
+| Maré | 4.34 km² | flatland | 39,333 | 43,419 | 7.1 m |
 | **TOTAL** | **8.11 km²** | | **98,435** | **82,314** | — |
 
 *Extended buildings = site footprints plus context buildings within a 300 m
 buffer (see Section 3.2). Typology assignment drives wind-regime analysis:
 hillside sites span 0–45° slopes; flatland sites cluster near 0°.*
+
+*† Mean building height = mean of `H_mean` across all eligible 10 m grid
+cells per site (`outputs/{site}/morphometrics/grid/grid_metrics.gpkg`).
+This is a cell-area-weighted aggregation, not a per-building mean — short
+ancillary structures contribute less than the multi-storey blocks that
+fill more of the eligible cell area.*
 
 ![Figure 1. Study sites overview.](figures/fig01_study_sites.png)
 
@@ -130,7 +139,7 @@ fractions are shown in **Figure S5**
 |---|---|---|---|---|---|
 | Vidigal / Rocinha (A652 Forte de Copacabana) | 85,103 | 2015–2024 | 1.4 % | E (30 %), W (23 %) | Coastal cliff: bimodal sea-breeze and reverse-channel along the Dois Irmãos saddle. |
 | Rio das Pedras (A636 Jacarepaguá) | 64,088 | 2017–2024 | 46.3 % | SW (26 %), W (20 %) | Sheltered basin, weak winds (Ū ≈ 1.3 m/s); high calm fraction reflects the Jacarepaguá lowland regime, not measurement gaps. |
-| Complexo do Alemão (A621 Vila Militar) | 86,019 | 2015–2024 | 33.1 % | N (26 %), SW (19 %) | North-zone interior; bay sea-breeze + post-frontal SW pattern. |
+| Complexo do Alemão (A621 Vila Militar) | 86,019 | 2015–2024 | 33.1 % | N (25 %), SW (19 %) | North-zone interior; bay sea-breeze + post-frontal SW pattern. |
 | Maré (SBGL Galeão METAR) | 89,439 | 2015–2024 | 3.7 % | SE (26 %), E (19 %) | Bay regime; continuous METAR coverage gives the largest sample. |
 
 **Recommended stations** (verified April 2026 against the INMET
@@ -271,8 +280,11 @@ pedestrian height. Computed at 1.5 m above the ground surface via
 Tregenza 145-patch ray-casting on a sample grid of passageway points;
 the per-cell value is the mean of all sample points whose centroid falls
 within the cell. An `svf_count` column records the number of contributing
-sample points per cell (mean ≈ 13, minimum 1). Cells with no contributing
-samples receive NaN.
+sample points per cell (mean per site ranges from 1.9 (Maré) to 12.9
+(Vidigal); pooled mean 3.5; minimum 1). Cells with no contributing samples
+receive NaN. The cross-site spread reflects passageway density: hillside
+fabrics with narrow, frequent corridors yield more samples per cell than
+flatland blocks where samples concentrate in a few wide streets.
 
 Critically, SVF is **aggregated from passageway samples, not computed at
 grid-cell centroids**. Centroid computation would bias SVF toward 0 for
@@ -387,13 +399,15 @@ Key patterns:
 - **Slope clearly separates typologies.** Hillside sites (Vidigal,
   Rocinha) have most cells at 15–35°; flatland sites (Rio das Pedras,
   Maré) concentrate below 5°; Complexo do Alemão spans both regimes.
-- **λp distributions are similar across sites** (median 0.4–0.7),
-  indicating comparable building-packing density regardless of terrain.
+- **λp medians span 0.43 (Maré) to 0.90 (Rio das Pedras)** — denser
+  than is typical of formal urban fabric. Maré, with its planned-housing
+  block interiors, sits at the low end; Rio das Pedras, the densest
+  informal infill, at the high end.
 - **SVF distributions differ substantially.** Rocinha's dense canopy
   produces a strongly left-skewed distribution (median 0.27); Maré's
   more open layout has a right-skewed distribution (median 0.53).
-- **σH is small everywhere** (median 2–3 m), reflecting the typical 2–3
-  storey construction.
+- **σH is small everywhere** (median 1.6–2.3 m, span across all five
+  sites), reflecting the typical 2–3 storey construction.
 
 ### 4.4 Spatial visualisation
 
@@ -428,12 +442,14 @@ so patterns are directly comparable.
 - **λp ⇄ porosity** is the strongest correlation everywhere (r ≈ −0.95),
   which motivates dropping porosity from the manuscript's distribution
   figure (Figure 2) to avoid redundancy.
-- **SVF ⇄ λp** correlation is strong but not perfect (r ≈ −0.70 to
-  −0.85): variation in building *height* and arrangement breaks the
-  λp↔SVF link at fine scales. This is the structural-coupling finding
-  developed in Section 5.
-- **σH correlates with H_mean** (r ≈ 0.5) because denser cells with more
-  buildings have more variance.
+- **SVF ⇄ λp** correlation is strong but not perfect (r ≈ −0.73 to
+  −0.83 across the five sites): variation in building *height* and
+  arrangement breaks the λp↔SVF link at fine scales. This is the
+  structural-coupling finding developed in Section 5.
+- **σH correlates weakly with H_mean** (per-site r ≈ 0.15–0.43, pooled
+  ≈ 0.25). Earlier prose claimed r ≈ 0.5; the current cross-site number
+  is lower because the bimodal "regular block + tall outliers" pattern
+  saturates in dense favela fabric.
 - **Slope is nearly uncorrelated with morphology**, confirming that
   terrain and urban form are independent stratification axes — a
   necessary condition for the 12-stratum sampling scheme.
@@ -494,17 +510,28 @@ impossibilities).
 
 | Metric | Hillside (VDG+ROC) | Mixed (CDA) | Flatland (RdP+MAR) |
 |--------|-------------------:|------------:|-------------------:|
-| Slope, median | 22° | 8° | 0.8° |
-| SVF, median | 0.31 | 0.37 | 0.50 |
-| λp, median | 0.62 | 0.50 | 0.56 |
-| λf_mean, median | 0.38 | 0.29 | 0.19 |
-| σH, median | 2.4 m | 1.7 m | 2.3 m |
+| Slope, median | 25.7° | 19.3° | 1.5° |
+| SVF, median | 0.34 | 0.37 | 0.43 |
+| λp, median | 0.71 | 0.62 | 0.54 |
+| λf_mean, median | 3.43 | 2.20 | 3.12 |
+| σH, median | 2.0 m | 1.6 m | 2.0 m |
 
-Hillside sites have the highest median frontal area density because
-buildings stacked on slopes present more vertical surface area per
-horizontal unit than their flatland counterparts. This has direct
-implications for wind-canopy drag and for the prevalence of leeward
-recirculation zones that CFD will quantify.
+Source: medians computed from the concatenation of
+`outputs/{site}/morphometrics/grid/grid_metrics.gpkg` across the 12-strata
+eligible cells per site. Note the *Mixed* row reflects only Complexo do
+Alemão (which spans both flat and steep terrain — its slope median sits
+between the typology extremes); aggregating it with either Hillside or
+Flatland would compress that signal.
+
+Two observations matter for the CFD design. First, **λp is uniformly
+high (0.54–0.71)** across all three typologies — informal urban form is
+denser than formal Rio fabric (typical λp in Copacabana ≈ 0.40), so the
+sampling allocation correctly prioritises high-λp strata. Second,
+**hillside and flatland sites carry comparable λf_mean (3.43 vs 3.12)**;
+the Mixed typology dips because Complexo do Alemão has the lowest
+building heights of the campaign (mean H_mean = 5.3 m). Wind-canopy drag
+will therefore not separate cleanly along the hillside↔flatland axis;
+SVF and slope are the dominant discriminators that CFD will quantify.
 
 ---
 
@@ -622,7 +649,7 @@ footprints.
 
 **Figure (campaign allocation).** Total patches per stratum in the
 final 119-patch campaign, segments coloured by site. SVF1_SLP1_LP2
-(low sky view, flat, dense) has the highest patch count (21) after
+(low sky view, flat, dense) has the highest patch count (20) after
 SVF-priority weighting — this is the stratum most relevant to health
 outcomes at the flatland sites and was intentionally oversampled.
 
@@ -687,8 +714,9 @@ at ROC). Vidigal (max 19.3 m), Maré (18.1 m), and Complexo do Alemão
 
 The code to ingest CFD results, aggregate them onto the 10 m
 morphometric grid, and combine directional simulations into an
-annualised ensemble is implemented in `src/cfd_integration/` (1,000
-lines across five modules) and covered by 46 passing unit tests.
+annualised ensemble is implemented in `src/cfd_integration/`
+(~1,100 lines across five modules: `schema.py`, `io.py`, `aggregate.py`,
+`metrics.py`, `weighting.py`) and covered by **63 passing unit tests**.
 
 **Input contract** (documented fully in
 `src/cfd_integration/README.md`, provided to the CFD agent as the
@@ -803,7 +831,16 @@ outputs/
 │
 └── paper_figures/             # manuscript figures
     ├── fig_style.py          # shared style module
-    ├── fig01_...py – figS4_...py
+    ├── fig01_study_sites.py
+    ├── fig02_morphometric_distributions.py
+    ├── fig03_svf_lambda_coupling.py
+    ├── fig04_sampling_design.py
+    ├── fig05_morphometric_maps.py
+    ├── figS1_correlation_matrices.py
+    ├── figS2_context_extension.py
+    ├── figS3_resolution_sensitivity.py
+    ├── figS4_patch_thumbnails.py
+    ├── figS5_wind_roses.py
     ├── README.md
     └── exports/              # rendered PNG + SVG
 ```
@@ -820,12 +857,15 @@ src/
 │   ├── audit.py
 │   ├── figures.py
 │   └── report.py
-├── svf_v2/                    # SVF engine
-│   ├── compute.py
-│   ├── scene.py
-│   ├── sampling.py
+├── svf_v2/                    # SVF engine (Tregenza-145 ray-cast)
+│   ├── compute.py            # per-point and parallel raycast drivers
+│   ├── scene.py              # 3D scene from DTM + footprints
+│   ├── sampling.py           # passageway / street-centreline samplers
 │   ├── paths.py              # per-site path registry
-│   └── ...
+│   ├── io.py                 # per-cell aggregation + raster I/O
+│   ├── utils.py
+│   ├── facades.py            # façade-side sampling
+│   └── visualize.py
 ├── solar/                     # solar access (phase 4)
 └── cfd_integration/           # CFD ingestion (phase 7)
     ├── schema.py
@@ -855,13 +895,13 @@ Key scripts:
 | Building geometry validity | PASS (10 repaired, all sites clean) | `outputs/comparative/audits/rocinha_topology_audit.md` |
 | CRS consistency | PASS | all inputs verified EPSG:31983 on load |
 | SVF passageway aggregation (no centroid artefacts) | PASS | diagnostic in `src/morphometry/grid.py::_aggregate_svf_to_grid` |
-| DTM sentinel value handling | PASS (post-fix) | 15,286 sentinel pixels masked in Vidigal DTM |
-| Extended context eligibility recovery | PASS | 55 % → 20 % domain exclusion at Vidigal |
-| Blocken fetch compliance (all 119 patches) | PASS | minimum margin 150 m over 5 × H_max |
-| Minimum inter-patch spacing (80 m) | PASS | realised minimum: 80–86 m across sites |
+| DTM sentinel value handling | PASS (post-fix) | sentinel = −9999 pixels masked in extended-context merge per `scripts/build_extended_context.py` |
+| Extended context eligibility recovery | PASS | Vidigal eligible cells go from ~0.45 to 0.80 of grid with the 300 m extension; see `outputs/comparative/pilot_summary/candidate_pool_comparison.csv` |
+| Blocken fetch compliance (all 119 patches) | PASS | `blocken_ok = true` in every `patch_meta.json`; margins 114–215 m, median 180 m, with 11/119 < 150 m (all at RDP or Rocinha) |
+| Minimum inter-patch spacing (80 m) | PASS | realised minimum: 80–85 m across sites |
 | Resolution sensitivity (10 m justified) | PASS | Figure S3; 10 m captures features 20 m loses |
 | 12-strata coverage (≥ 1 site per stratum) | PASS | all 12 strata non-empty when pooled |
-| CFD integration unit tests | PASS | 46 / 46 tests |
+| CFD integration unit tests | PASS | 63 / 63 tests |
 
 ---
 
