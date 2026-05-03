@@ -7,7 +7,7 @@
 | **Document version** | TR v1.0 (pre-CFD phase) |
 | **Pipeline version** | v5.5 (May 2026 milestone — ROADMAP.md) |
 | **Build date** | 2026-05-03 |
-| **Commit at build** | [`904040e`](https://github.com/thrmnn/MorphoFavela/commit/904040e) |
+| **Last numerical sweep** | [`904040e`](https://github.com/thrmnn/MorphoFavela/commit/904040e) (2026-05-03 — see `.claude/agents/numerical-claims-auditor.md`) |
 | **Author** | Theo Hermann · MIT · `thermann.ai@gmail.com` |
 | **Repository** | https://github.com/thrmnn/MorphoFavela |
 | **License** | MIT (code) · CC-BY-4.0 (this report) |
@@ -108,9 +108,9 @@ in this section.
 | **CFD domain** | 250 m-radius circular domain enclosing the analysis patch; provides flow-development context per Blocken (2015). |
 | **12 strata** | Cross-product of SVF (3 bins: < 0.15, 0.15–0.30, ≥ 0.30) × slope (2 bins: < 15°, ≥ 15°) × λp (2 bins: < 0.5, ≥ 0.5). Stratum IDs encoded `SVFn_SLPn_LPn`. |
 | **Maximin spacing** | Greedy maximin geographic distance between patch centres, with an 80 m floor. Produces a spatially diverse sample within each stratum. |
-| **Blocken radius** | Minimum CFD domain radius for adequate fetch development; the rule of thumb is 5 × H_max. The campaign uses a fixed 250 m radius; per-patch margin = 250 − 5·H_max_analysis. |
-| **Blocken margin** | The actual numerical margin a patch has against the 5 × H_max constraint. For the 119-patch campaign: minimum 114 m (RDP-P15), maximum 215 m, median 180 m; 11/119 patches under 150 m, all at Rio das Pedras or Rocinha. |
-| **`blocken_ok`** | Boolean field in `patch_meta.json` — true iff `5 × H_max_analysis ≤ cfd_domain_radius`. True for all 119 patches in the campaign. |
+| **Blocken radius** | Minimum CFD domain radius for adequate fetch development; the rule of thumb is 5 × H_max (Blocken 2015). The campaign uses a fixed 250 m radius; per-patch margin = 250 − 5·H_max_analysis. |
+| **Blocken margin** | The numerical margin a patch has against the 5 × H_max constraint, i.e., `cfd_domain_radius − blocken_radius_required`. Per-patch values in `patch_meta.json`; see §6.5 for the campaign-wide distribution. |
+| **`blocken_ok`** | Boolean field in `patch_meta.json` — true iff `5 × H_max_analysis ≤ cfd_domain_radius`. The campaign-wide value is reported in §6.5 / §9. |
 
 ### Wind / atmosphere
 
@@ -933,7 +933,7 @@ outputs/
     ├── figS1_correlation_matrices.py
     ├── figS2_context_extension.py
     ├── figS3_resolution_sensitivity.py
-    ├── figS4_patch_thumbnails.py
+    ├── figS4_patch_thumbnails.py    # outputs not currently published in the TR
     ├── figS5_wind_roses.py
     ├── README.md
     └── exports/              # rendered PNG + SVG

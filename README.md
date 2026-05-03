@@ -17,6 +17,8 @@ A Python pipeline for the morphometric and CFD-coupled analysis of pedestrian-le
 
 **Audience.** Engineers, researchers, and reviewers who need to read the methodology, reproduce a figure, validate a number, or onboard a new site. Start with [`docs/technical_report/technical_report.md`](docs/technical_report/technical_report.md) for the methodology; this README is the operational guide.
 
+> **Reviewing this codebase as an engineer?** Start with [`docs/onboarding/engineering_review.md`](docs/onboarding/engineering_review.md) — 1-day reading path with explicit time budgets per section.
+
 ## Status
 
 See [ROADMAP.md](ROADMAP.md) for the full roadmap and version history. **As of May 2026**: 5 sites onboarded; 119-patch CFD campaign sampled and exported; wind input complete; result-side analysis pipeline shipped + synthetic-validated end-to-end on all 5 sites; SVF cross-validated against UMEP `svfForProcessing153` on all 5 sites (closes the §10.3 limitation). Pilot patch VDG-P07 in flight at MIT ORCD; ingestion layer plumbed and waiting on first real CFD return.
