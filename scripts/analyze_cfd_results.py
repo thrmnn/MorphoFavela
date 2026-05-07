@@ -51,10 +51,27 @@ from src.cfd_integration import (  # noqa: E402
     weighted_by_wind_rose,
 )
 from src.cfd_integration.schema import WIND_DIRECTIONS_8  # noqa: E402
+from src.morphometry.aspect import (  # noqa: E402
+    aspect_to_sincos,
+    aspect_wind_alignment,
+    dominant_wind_direction_deg,
+)
 
 logger = logging.getLogger(__name__)
 
-PREDICTOR_COLS = ("svf", "lambda_p", "slope_deg", "sigma_h")
+# Linear OLS predictors. aspect_deg is circular and is included as the
+# orthogonal pair (aspect_sin, aspect_cos); aspect_wind_alignment is the
+# scalar cosine of the angle between cell aspect and the dominant wind
+# direction (computed from the per-site wind rose).
+PREDICTOR_COLS = (
+    "svf",
+    "lambda_p",
+    "slope_deg",
+    "sigma_h",
+    "aspect_sin",
+    "aspect_cos",
+    "aspect_wind_alignment",
+)
 INDICATOR_COLS = ("annual_U_mean", "annual_U_p10", "annual_stagnation_frac", "annual_TI_mean")
 
 
@@ -200,6 +217,66 @@ def _annualise_per_cell(
     return gpd.GeoDataFrame(pd.concat(cell_frames, ignore_index=True), crs=grid.crs)
 
 
+def _enrich_patches_with_aspect(
+    patches_df: pd.DataFrame,
+    grid: gpd.GeoDataFrame,
+    wind_rose,
+    radius_m: float = 50.0,
+) -> pd.DataFrame:
+    """Attach circular-mean aspect + sin/cos + wind-alignment per patch.
+
+    Aspect is sampled by averaging ``aspect_deg`` (circular mean) over
+    grid cells whose centroids lie within ``radius_m`` of the patch
+    center — i.e. the same 100 m analysis circle used for cell-level
+    annualised indicators. The dominant wind direction is the
+    frequency-weighted circular mean of the per-site wind rose.
+
+    Returns ``patches_df`` augmented with columns:
+        - ``aspect_deg`` (per-patch circular mean over its analysis disk)
+        - ``aspect_sin``, ``aspect_cos`` (orthogonal OLS encoding)
+        - ``aspect_wind_alignment`` (cos angle vs dominant wind dir)
+
+    Patches missing terrain coverage get NaN; OLS drops them.
+    """
+    if "aspect_deg" not in grid.columns:
+        logger.warning("grid_metrics has no aspect_deg column; skipping aspect enrichment")
+        return patches_df
+
+    out = patches_df.copy()
+    centroids = grid.geometry.centroid
+    cx = centroids.x.values
+    cy = centroids.y.values
+    aspect_vals = grid["aspect_deg"].values
+
+    aspects = np.full(len(out), np.nan)
+    for i, row in enumerate(out.itertuples()):
+        dx = cx - row.center_x
+        dy = cy - row.center_y
+        mask = (dx * dx + dy * dy) <= radius_m * radius_m
+        if not mask.any():
+            continue
+        a = aspect_vals[mask]
+        a = a[~np.isnan(a)]
+        if a.size == 0:
+            continue
+        rad = np.deg2rad(a)
+        sx = np.sin(rad).mean()
+        cxm = np.cos(rad).mean()
+        aspects[i] = float(np.rad2deg(np.arctan2(sx, cxm)) % 360.0)
+
+    out["aspect_deg"] = aspects
+    sin_a, cos_a = aspect_to_sincos(aspects)
+    out["aspect_sin"] = sin_a
+    out["aspect_cos"] = cos_a
+
+    wind_dir = dominant_wind_direction_deg(wind_rose) if wind_rose is not None else None
+    if wind_dir is None:
+        out["aspect_wind_alignment"] = np.nan
+    else:
+        out["aspect_wind_alignment"] = aspect_wind_alignment(aspects, wind_dir)
+    return out
+
+
 def _ols(y: np.ndarray, X: np.ndarray) -> dict:
     """Tiny OLS via numpy. Returns coef + R² + residual std.
 
@@ -299,6 +376,8 @@ def analyse(
             site,
             sum(wind_rose.frequencies.values()),
         )
+
+    patches_df = _enrich_patches_with_aspect(patches_df, grid, wind_rose)
 
     campaign = load_campaign_results(
         site, results_root=PROJECT_ROOT / "data" / site / "cfd_results"

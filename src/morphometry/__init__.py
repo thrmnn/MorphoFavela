@@ -8,6 +8,12 @@ Typical usage::
     python scripts/run_morphometric_audit.py --area vidigal
 """
 
+from src.morphometry.aspect import (
+    aspect_quadrant,
+    aspect_to_sincos,
+    aspect_wind_alignment,
+    dominant_wind_direction_deg,
+)
 from src.morphometry.audit import audit_svf
 from src.morphometry.grid import compute_grid_morphometrics
 from src.morphometry.indicators import (
@@ -22,4 +28,8 @@ __all__ = [
     "compute_slope_aspect",
     "compute_lambda_f_directional",
     "audit_svf",
+    "aspect_to_sincos",
+    "aspect_wind_alignment",
+    "aspect_quadrant",
+    "dominant_wind_direction_deg",
 ]

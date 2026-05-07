@@ -88,7 +88,7 @@ in this section.
 | Height variability | σH | m | Standard deviation of building heights in the cell. NaN if < 2 buildings. |
 | Mean building height | H_mean | m | Arithmetic mean of contributing building heights. Cell-level average — see §1 footnote on aggregation. |
 | Max analysis-patch height | H_max_analysis | m | Tallest building inside a 100 m-diameter analysis patch (used for Blocken fetch check). |
-| Slope, aspect | — | °, ° | Cell-mean terrain slope and aspect from the merged DTM via numpy gradient. Aspect uses circular mean. |
+| Slope, aspect | — | °, ° | Cell-mean terrain slope and aspect from the merged DTM via numpy gradient. Aspect uses circular mean. Both are active predictors in the §5.3 aspect analysis (slope as scalar, aspect via sin/cos pair) and the §7.4 CFD regression (aspect adds an aspect↔wind alignment covariate). |
 | Street orientation entropy | — | — (0–1) | Normalised Shannon entropy of street-segment bearings (folded to [0, 180°)) within the cell. 0 = single direction, 1 = uniform. |
 
 ### Sky-view conventions
@@ -471,7 +471,13 @@ distribution across 36 bins.
 
 **Terrain slope and aspect.** Derived from the merged DTM via numpy
 gradient, sampled within each cell and averaged. Aspect uses a circular
-mean to avoid discontinuity at 0°/360°.
+mean to avoid discontinuity at 0°/360°. Aspect is a circular quantity
+and is encoded as the orthogonal pair `(sin α, cos α)` whenever it
+enters a linear regression, so that a north-facing cell at α = 359°
+and one at α = 1° fall close in the predictor space rather than at
+opposite ends. The same module also exposes a quadrant binner
+(N / E / S / W centred on cardinals, edges at the inter-cardinals)
+for stratified summaries (`src/morphometry/aspect.py`).
 
 Implementation: `src/morphometry/grid.py`. The computation is
 deterministic and takes ~30–80 s per site (longest is Complexo do Alemão
@@ -626,6 +632,54 @@ the Mixed typology dips because Complexo do Alemão has the lowest
 building heights of the campaign (mean H_mean = 5.3 m). Wind-canopy drag
 will therefore not separate cleanly along the hillside↔flatland axis;
 SVF and slope are the dominant discriminators that CFD will quantify.
+
+### 5.3 SVF and solar access decouple on sloped terrain
+
+![Figure 6. SVF↔solar dissociation on Vidigal.](figures/fig06_terrain_aspect.png)
+
+**Figure 6.** Per-quadrant median solar hours as a function of SVF, on
+Vidigal's sloped cells (slope ≥ 5°, n = 6,797 along-street points).
+The four traces — one per terrain-aspect quadrant (N / E / S / W) — do
+not collapse onto a single curve. At a fixed SVF ≈ 0.5, an N-facing
+cell receives ≈ 5 hours of direct sun on the winter solstice while an
+S-facing cell receives ≈ 0; the same is true at SVF ≈ 0.7 (8 hr vs
+2 hr). Shaded bands show the inter-quartile range; trace segments where
+the SVF bin contains fewer than 30 cells are dashed (open markers) to
+flag the small-sample tails (W-quadrant beyond SVF ≈ 0.65). Underlay
+scatter is the full set of sample points coloured by aspect bearing,
+making the cloud's directional structure visible.
+
+The headline scientific claim: **SVF and solar hours are not
+interchangeable on sloped terrain in the southern hemisphere.** SVF
+measures total sky visibility; the winter sun in Rio (~22°S) crosses
+the sky to the north, so a south-facing cell can have abundant sky
+visibility while pointing away from the sun's actual path. The W
+quadrant earns the most direct sun by catching the late-afternoon
+descent into the north-west horizon; the S quadrant is structurally
+shaded for the entire winter solstice day. This dissociation is the
+reason the §7 CFD regression uses aspect (via `(sin α, cos α)`) and
+aspect–wind alignment alongside SVF as distinct predictors, rather
+than collapsing them.
+
+The same data is shown spatially in
+[Figure S — terrain-aspect spatial expression](figures/figS_terrain_aspect_spatial.png),
+which maps four encodings of the Vidigal street-point set: terrain
+aspect (compass-coloured), SVF, solar hours, and the disagreement map
+SVF − solar (RdBu_r). Panel (d) of the supplementary figure is
+red-dominant across most of the favela: sky is open but the winter sun
+does not reach.
+
+Per-site regressions of SVF on `(slope, λp, sin α, cos α)` are written
+to `outputs/{site}/morphometrics/aspect_regression.csv` for all five
+sites, with per-quadrant summaries in `aspect_quadrant_summary.csv`.
+Cross-site signal: Vidigal's S/W cells reach SVF ≈ 0.55 vs ≈ 0.38 for
+N-facing; Rocinha shows the inverse (N ≈ 0.37 dominates) on the
+opposite face of the same massif; Complexo do Alemão is indifferent to
+quadrant (~0.38 across all four); Rio das Pedras shows the strongest
+single-site asymmetry (N: 0.31 vs S: 0.11) over a small sloped-cell
+population. Direct regression of solar hours on these predictors runs
+on Vidigal only (R² = 0.24, n = 6,861); cross-site solar coverage is
+the §10.6 follow-up.
 
 ---
 
@@ -898,6 +952,20 @@ for patch_id in campaign.patch_ids():
     # annual = {annual_U_mean, annual_stagnation_frac, annual_ach, ...}
 ```
 
+`scripts/analyze_cfd_results.py` runs the four-step chain
+(annualise per patch → annualise per cell → predictor OLS →
+fig 5 wind panel) and writes `predictor_regression.csv`. Predictors
+are SVF, λp, slope, σ_H, and three terrain-aspect covariates:
+`aspect_sin`, `aspect_cos` (the orthogonal pair for the circular
+aspect, computed per patch as the circular mean of `aspect_deg`
+over the 100 m analysis disk), and `aspect_wind_alignment` =
+cos(aspect − dominant-wind-direction). The dominant wind direction
+is the frequency-weighted circular mean of the per-site wind rose.
+On the synthetic dataset that exercises this chain end-to-end the
+aspect coefficients are at noise level (the synthetic generator
+does not encode aspect into U_mag); they will become non-trivial
+once real CFD returns the directional flow field.
+
 ---
 
 ## 8. Repository Structure
@@ -1071,6 +1139,20 @@ This is a final decision for the current campaign cycle: the
 119-patch allocation, OpenFOAM submission, and downstream analysis
 all assume 5 sites. Re-onboarding CDD is out of scope until the
 building data is reprocessed upstream of this repository.
+
+### 10.6 Direct ground-solar measurements only on Vidigal
+
+`scripts/compute_solar_access.py` produces a winter-solstice solar-
+hours raster + along-street point set for Vidigal only
+(`outputs/vidigal/morphometrics/svf/svf_streets_solar.gpkg`). The
+remaining four sites lean on SVF as the per-cell sky-exposure proxy
+in §5.3, which is justified for cross-site *comparison* but does
+not capture the SVF↔solar-hours dissociation on sloped terrain in
+the southern hemisphere (the Vidigal panel of Figure 6 makes that
+gap explicit). Closing this gap requires running the ground-solar
+ray-cast on Rocinha, Complexo do Alemão, Rio das Pedras, and Maré
+(roughly 30–60 min per site). It is a paper-figure follow-up, not
+a methodology change.
 
 ---
 
