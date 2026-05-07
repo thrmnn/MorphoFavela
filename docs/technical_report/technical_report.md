@@ -637,17 +637,18 @@ SVF and slope are the dominant discriminators that CFD will quantify.
 
 ![Figure 6. SVF↔solar dissociation on Vidigal.](figures/fig06_terrain_aspect.png)
 
-**Figure 6.** Per-quadrant median solar hours as a function of SVF, on
-Vidigal's sloped cells (slope ≥ 5°, n = 6,797 along-street points).
-The four traces — one per terrain-aspect quadrant (N / E / S / W) — do
-not collapse onto a single curve. At a fixed SVF ≈ 0.5, an N-facing
-cell receives ≈ 5 hours of direct sun on the winter solstice while an
-S-facing cell receives ≈ 0; the same is true at SVF ≈ 0.7 (8 hr vs
-2 hr). Shaded bands show the inter-quartile range; trace segments where
-the SVF bin contains fewer than 30 cells are dashed (open markers) to
-flag the small-sample tails (W-quadrant beyond SVF ≈ 0.65). Underlay
-scatter is the full set of sample points coloured by aspect bearing,
-making the cloud's directional structure visible.
+**Figure 6.** Per-quadrant median **winter-solstice** solar hours as a
+function of SVF, on Vidigal's sloped cells (slope ≥ 5°, n = 6,812
+along-street points). The four traces — one per terrain-aspect
+quadrant (N / E / S / W) — do not collapse onto a single curve. At a
+fixed SVF ≈ 0.5 an N-facing cell receives ≈ 5 hours of direct sun on
+the winter solstice while an S-facing cell receives ≈ 0; the same is
+true at SVF ≈ 0.7 (8 hr vs 2 hr). Shaded bands show the inter-quartile
+range; trace segments where the SVF bin contains fewer than 30 cells
+are dashed (open markers) to flag the small-sample tails (W-quadrant
+beyond SVF ≈ 0.65). Underlay scatter is the full set of sample points
+coloured by aspect bearing, making the cloud's directional structure
+visible.
 
 The headline scientific claim: **SVF and solar hours are not
 interchangeable on sloped terrain in the southern hemisphere.** SVF
@@ -669,17 +670,55 @@ SVF − solar (RdBu_r). Panel (d) of the supplementary figure is
 red-dominant across most of the favela: sky is open but the winter sun
 does not reach.
 
-Per-site regressions of SVF on `(slope, λp, sin α, cos α)` are written
-to `outputs/{site}/morphometrics/aspect_regression.csv` for all five
-sites, with per-quadrant summaries in `aspect_quadrant_summary.csv`.
-Cross-site signal: Vidigal's S/W cells reach SVF ≈ 0.55 vs ≈ 0.38 for
-N-facing; Rocinha shows the inverse (N ≈ 0.37 dominates) on the
-opposite face of the same massif; Complexo do Alemão is indifferent to
-quadrant (~0.38 across all four); Rio das Pedras shows the strongest
-single-site asymmetry (N: 0.31 vs S: 0.11) over a small sloped-cell
-population. Direct regression of solar hours on these predictors runs
-on Vidigal only (R² = 0.24, n = 6,861); cross-site solar coverage is
-the §10.6 follow-up.
+Quadrant means on Vidigal sloped cells (winter solstice, 30-min
+sampling, ray-cast against terrain + extruded LiDAR-height footprints):
+N = 3.32 h, E = 2.85 h, S = 1.70 h, W = 4.02 h, with N/E/S/W cell
+counts 1,363 / 2,595 / 2,488 / 366. Direct regression of solar hours
+on `(slope, λp, sin α, cos α)` reaches R² = 0.246 (n = 6,876,
+intercept 5.70 h, `aspect_cos` coefficient = +1.22 — i.e. moving from
+S- to N-facing under fixed slope and λp adds 2.4 h on average).
+Per-site SVF regressions on `(slope, λp, sin α, cos α)` are written
+to `outputs/{site}/morphometrics/aspect_regression.csv` (Vidigal SVF
+R² = 0.599) with per-quadrant summaries in
+`aspect_quadrant_summary.csv`. Cross-site signal: Vidigal sloped grid
+cells show SVF means N = 0.38 / E = 0.44 / S = 0.51 / W = 0.57 — the
+S/W cells have *more open sky* yet the figure shows them receiving
+*less winter sun*, which is exactly the dissociation point.
+
+### 5.4 Seasonal envelope: the worst-case figure understates summer recovery
+
+![Figure 7. Vidigal street-level solar envelope.](figures/fig07_solar_envelope_vidigal.png)
+
+**Figure 7.** Three street-level solar maps on the same point set,
+same scale. (a) Winter solstice (worst case, mean 2.59 h, 36.5 % of
+points fully shaded). (b) Annual proxy: unweighted mean of four
+reference dates — winter and summer solstices plus March and September
+equinoxes (mean 4.53 h, 7.7 % fully shaded). (c) Summer solstice
+(best case, mean 6.21 h, 8.3 % fully shaded). Computed by
+`scripts/run_street_solar.py` (30-min sampling, 5 h–19 h window,
+pvlib sun positions, ray-cast against `scene.stl` = DTM + extruded
+LiDAR footprints), with all four per-date arrays plus annual-mean
+columns written into a single
+`outputs/vidigal/morphometrics/svf/svf_streets_solar.gpkg`.
+
+The seasonal swing on Vidigal is large enough that a winter-only
+analysis substantially understates summer access: 42.4 % of street
+cells gain ≥ 4 hours and 28.2 % gain ≥ 6 hours between winter and
+summer solstice, and 1,564 of the 2,510 winter-zero-hour cells (62 %)
+recover to ≥ 2 h in summer. Mean seasonal range across all street
+cells is 4.25 h. Under the WHO 2-hour daily-sunlight benchmark, 54.1 %
+of Vidigal's street cells fall short on the winter solstice but only
+19.3 % on the summer solstice; **the year-round figure to use for
+comfort, photovoltaic, and health-outcome studies is the annual proxy
+(28.6 % below 2 h)**, not the winter worst case.
+
+The standalone single-panel versions of Figure 7 (a/b/c) live at
+`docs/technical_report/figures/fig07a_solar_winter.png`,
+`fig07b_solar_annual.png`, and `fig07c_solar_summer.png`; they
+re-export from
+`outputs/paper_figures/fig07_solar_envelope_vidigal.py` and use the
+shared 0–12 h colour scale from that script for direct visual
+comparison.
 
 ---
 
@@ -1142,17 +1181,30 @@ building data is reprocessed upstream of this repository.
 
 ### 10.6 Direct ground-solar measurements only on Vidigal
 
-`scripts/compute_solar_access.py` produces a winter-solstice solar-
-hours raster + along-street point set for Vidigal only
-(`outputs/vidigal/morphometrics/svf/svf_streets_solar.gpkg`). The
-remaining four sites lean on SVF as the per-cell sky-exposure proxy
-in §5.3, which is justified for cross-site *comparison* but does
-not capture the SVF↔solar-hours dissociation on sloped terrain in
-the southern hemisphere (the Vidigal panel of Figure 6 makes that
-gap explicit). Closing this gap requires running the ground-solar
-ray-cast on Rocinha, Complexo do Alemão, Rio das Pedras, and Maré
-(roughly 30–60 min per site). It is a paper-figure follow-up, not
-a methodology change.
+`scripts/run_street_solar.py` produces a four-date seasonal
+envelope (winter and summer solstices, two equinoxes, 30-min
+sampling) for Vidigal at
+`outputs/vidigal/morphometrics/svf/svf_streets_solar.gpkg`. The
+gpkg carries `solar_hours_winter / summer / equinox_mar /
+equinox_sep / annual` plus matched irradiance columns; §5.3 and §5.4
+both consume it. The legacy `scripts/compute_solar_access.py`
+remains in the repo but is superseded — its single-date 60-min output
+was replaced by the seasonal runner on 2026-05-07.
+
+The remaining four sites (Rocinha, Complexo do Alemão, Rio das Pedras,
+Maré) lean on SVF as the per-cell sky-exposure proxy. The seasonal
+runner is site-agnostic: only Vidigal and Maré currently have a
+pre-built `scene.stl`, so re-using it on the other three sites first
+requires running `python scripts/run_svf_v2.py --area <site> --mode
+streets` to materialise their scene meshes (~15–30 min per site),
+after which `python scripts/run_street_solar.py --site <site>` adds
+the seasonal envelope (~2 min per site at 16 cores). Total cross-site
+catch-up: ~1.5 hours of compute, no methodology changes.
+
+Until that runs, the §5.4 Figure 7 narrative is Vidigal-only; §5.3
+already states the SVF↔solar dissociation in cross-site terms via
+the shared aspect predictor. Cross-site solar coverage is the next
+paper-figure follow-up, not a methodology gap.
 
 ---
 
@@ -1276,6 +1328,9 @@ python scripts/validate_svf_against_umep.py --site <site> \
 | **3** SVF–λp coupling | `python outputs/paper_figures/fig03_svf_lambda_coupling.py` | `outputs/paper_figures/exports/fig03_svf_lambda_coupling.png` |
 | **4** Sampling design | `python outputs/paper_figures/fig04_sampling_design.py` | `outputs/paper_figures/exports/fig04_sampling_design.png` |
 | **5** Morphometric maps | `python outputs/paper_figures/fig05_morphometric_maps.py` | `outputs/paper_figures/exports/fig05_morphometric_maps.png` |
+| **6** SVF↔solar dissociation | `python outputs/paper_figures/fig06_terrain_aspect.py` | `outputs/paper_figures/exports/fig06_terrain_aspect.png` |
+| **7** Vidigal solar envelope (winter / annual / summer) | `python scripts/run_street_solar.py --site vidigal && python outputs/paper_figures/fig07_solar_envelope_vidigal.py` | `outputs/paper_figures/exports/fig07_solar_envelope_vidigal.png` (+ `fig07a/b/c_*.png` standalone panels) |
+| **S — terrain-aspect spatial** | `python outputs/paper_figures/figS_terrain_aspect_spatial.py` | `outputs/paper_figures/exports/figS_terrain_aspect_spatial.png` |
 | **S1** Correlation matrices | `python outputs/paper_figures/figS1_correlation_matrices.py` | `outputs/paper_figures/exports/figS1_correlation_matrices.png` |
 | **S2** Context extension | `python outputs/paper_figures/figS2_context_extension.py` | `outputs/paper_figures/exports/figS2_context_extension.png` |
 | **S3** Resolution sensitivity | `python outputs/paper_figures/figS3_resolution_sensitivity.py` | `outputs/paper_figures/exports/figS3_resolution_sensitivity.png` |
