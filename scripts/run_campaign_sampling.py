@@ -42,7 +42,7 @@ assign_strata = _pilot.assign_strata
 exclude_edges = _pilot.exclude_edges
 build_strata_summary = _pilot.build_strata_summary
 select_within_stratum = _pilot.select_within_stratum
-validate_blocken = _pilot.validate_blocken
+compute_v1_domain = _pilot.compute_v1_domain
 export_patch_data = _pilot.export_patch_data
 _resolve = _pilot._resolve
 _hillshade = _pilot._hillshade
@@ -329,8 +329,8 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
         new_gdf["patch_id"] = [f"{prefix}-P{n_pilot + i + 1:02d}" for i in range(len(new_gdf))]
         new_gdf["is_pilot"] = False
 
-        # Blocken validation for new patches
-        new_gdf = validate_blocken(new_gdf, buildings, config)
+        # v1 rectangular-domain extents for new patches
+        new_gdf = compute_v1_domain(new_gdf, buildings, config)
     else:
         new_gdf = gpd.GeoDataFrame()
 
@@ -347,10 +347,16 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
         row_data["centroid_x"] = cx
         row_data["centroid_y"] = cy
         row_data["stratum_id"] = pilot_strata[i]
-        # Carry over blocken data from pilot
+        # Carry over per-patch domain extents from pilot (v1 fields).
         row_data["H_max_analysis"] = prow.get("H_max_analysis", 0)
-        row_data["blocken_radius_required"] = prow.get("blocken_radius_required", 0)
-        row_data["blocken_ok"] = True
+        for v1_col in (
+            "domain_upstream_m", "domain_downstream_m", "domain_lateral_m", "domain_top_m",
+            "domain_blockage_frontal_m2", "domain_blockage_cross_section_m2",
+            "domain_blockage_ratio", "domain_blockage_ok",
+            "source_data_required_m",
+        ):
+            if v1_col in prow:
+                row_data[v1_col] = prow[v1_col]
         row_data["_building_coverage"] = prow.get("building_coverage", 0)
         row_data["_domain_coverage"] = 1.0
         pilot_rows.append(row_data)
@@ -389,8 +395,6 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
     (out_dir / "figures").mkdir(exist_ok=True)
     (out_dir / "patches").mkdir(exist_ok=True)
 
-    r = config["cfd_domain_radius"]
-
     # GeoPackage — analysis patches (100 m-diameter circles)
     patches_out = all_patches.copy()
     patches_out["geometry"] = [
@@ -410,7 +414,13 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
         config["col_sigma_h"],
         config["col_h_mean"],
         "H_max_analysis",
-        "blocken_radius_required",
+        "domain_upstream_m",
+        "domain_downstream_m",
+        "domain_lateral_m",
+        "domain_top_m",
+        "domain_blockage_ratio",
+        "domain_blockage_ok",
+        "source_data_required_m",
         "geometry",
     ]
     out_cols = [c for c in out_cols if c in patches_out.columns]
@@ -421,19 +431,23 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
     gpkg_path = out_dir / "campaign_patches.gpkg"
     patches_export.to_file(gpkg_path, layer="analysis_patches", driver="GPKG")
 
-    # Domains layer
-    domains_out = gpd.GeoDataFrame(
-        {
-            "patch_id": all_patches["patch_id"].values,
-            "is_pilot": all_patches["is_pilot"].values,
-        },
-        geometry=[
-            Point(row["centroid_x"], row["centroid_y"]).buffer(r)
-            for _, row in all_patches.iterrows()
-        ],
-        crs=grid.crs,
-    )
-    domains_out.to_file(gpkg_path, layer="cfd_domains", driver="GPKG")
+    # v1 source-data envelope layer (replaces the v0 "cfd_domains" cylindrical layer).
+    if "source_data_required_m" in all_patches.columns:
+        envelopes_out = gpd.GeoDataFrame(
+            {
+                "patch_id": all_patches["patch_id"].values,
+                "is_pilot": all_patches["is_pilot"].values,
+                "source_data_required_m": all_patches["source_data_required_m"].values,
+            },
+            geometry=[
+                Point(row["centroid_x"], row["centroid_y"]).buffer(
+                    float(row["source_data_required_m"])
+                )
+                for _, row in all_patches.iterrows()
+            ],
+            crs=grid.crs,
+        )
+        envelopes_out.to_file(gpkg_path, layer="source_data_envelopes", driver="GPKG")
     logger.info("Saved %s", gpkg_path)
 
     # CSV
@@ -707,8 +721,9 @@ def _generate_campaign_figures(
             axes_arr = np.array([axes_arr])
         axes_flat = np.atleast_2d(axes_arr).flat
 
-        radius = config["cfd_domain_radius"]
-        view_half = 300
+        # v1: per-patch source-data envelope is variable; use a generous fixed
+        # view window for visual consistency across patches.
+        view_half = max(300, int(config.get("data_coverage_radius", 700)))
         bld_sindex = buildings.sindex
 
         for i, (_, row) in enumerate(new_patches.iterrows()):
@@ -738,17 +753,19 @@ def _generate_campaign_figures(
                     zorder=5,
                 )
             )
-            ax.add_patch(
-                plt.Circle(
-                    (cx, cy),
-                    radius,
-                    linewidth=1.0,
-                    edgecolor="#1f77b4",
-                    facecolor="none",
-                    linestyle=":",
-                    zorder=4,
+            r_env = float(row.get("source_data_required_m", 0.0))
+            if r_env > 0:
+                ax.add_patch(
+                    plt.Circle(
+                        (cx, cy),
+                        r_env,
+                        linewidth=1.0,
+                        edgecolor="#1f77b4",
+                        facecolor="none",
+                        linestyle=":",
+                        zorder=4,
+                    )
                 )
-            )
 
             svf = row.get(config["col_svf"])
             lp = row.get(config["col_lambda_p"])
@@ -1074,8 +1091,14 @@ def main():
             config.update(SITE_PRESETS[site])
 
         # Use extended buildings and DTM
-        ext_bld = PROJECT_ROOT / "data" / site / "buildings_extended_300m.gpkg"
-        ext_dtm = PROJECT_ROOT / "data" / site / "dtm_extended_300m.tif"
+        # Default v1 buffer is 700 m (rectangular source-data envelope max ~646 m).
+        # Falls back to the older 300 m extension for sites that haven't been
+        # re-extended yet — the audit script will flag those rows ineligible.
+        ext_bld = PROJECT_ROOT / "data" / site / "buildings_extended_700m.gpkg"
+        ext_dtm = PROJECT_ROOT / "data" / site / "dtm_extended_700m.tif"
+        if not ext_bld.exists():
+            ext_bld = PROJECT_ROOT / "data" / site / "buildings_extended_300m.gpkg"
+            ext_dtm = PROJECT_ROOT / "data" / site / "dtm_extended_300m.tif"
         if ext_bld.exists():
             config["buildings"] = str(ext_bld.relative_to(PROJECT_ROOT))
         if ext_dtm.exists():

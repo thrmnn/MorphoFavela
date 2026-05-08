@@ -56,7 +56,10 @@ def fake_site(tmp_path, monkeypatch):
                 "sigma_h": 1.5,
                 "H_mean": 6.0,
                 "H_max_analysis": 12.0,
-                "blocken_radius_required": 60.0,
+                "domain_lateral_m": 500.0,
+                "domain_blockage_ratio": 0.02,
+                "domain_blockage_ok": True,
+                "source_data_required_m": 583.0,
             }
         )
     patches_df = pd.DataFrame(rows)

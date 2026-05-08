@@ -32,10 +32,47 @@ from scipy.spatial.distance import cdist
 from shapely.geometry import Point, box, mapping
 
 # Analysis patch geometry: 100 m-diameter circle centred on the patch point.
-# Circles (not squares) give isotropic morphometric averaging and match the
-# cylindrical symmetry of the 250 m CFD domain. See docs/technical_report §6.
+# Circles (not squares) give isotropic morphometric averaging and let the
+# same patch be re-used across all 8 wind-direction meshes (see §6).
 PATCH_RADIUS_M = 50.0
+PATCH_DIAMETER_M = 2.0 * PATCH_RADIUS_M  # = W_patch in the v1 manifest
 PATCH_AREA_M2 = math.pi * PATCH_RADIUS_M**2  # ≈ 7853.98 m²
+
+# V1 rectangular per-direction CFD domain (Franke / COST 732 /
+# Tominaga 2008 AIJ / Blocken 2015 wide-obstacle scheme).
+# Canonical contract: src/cfd_integration/rectangular_domain_v1.json.
+V1_BLOCKAGE_GATE = 0.05  # AIJ Tominaga 2008
+V1_LATERAL_FLOOR_FACTOR = 5.0  # lateral ≥ 5 · W_patch
+V1_SAFETY_MARGIN_M = 50.0  # additive on the rotated-rect diagonal
+
+
+def _v1_domain_extents(h_max: float) -> dict:
+    """Per-patch v1 rectangular domain, in metres. See manifest for derivation."""
+    R = PATCH_RADIUS_M
+    W = PATCH_DIAMETER_M
+    upstream = 5.0 * h_max + R
+    downstream = 15.0 * h_max + R
+    lateral = max(5.0 * h_max + R, V1_LATERAL_FLOOR_FACTOR * W)
+    top = 5.0 * h_max
+    cross_section = 2.0 * lateral * top
+    frontal = PATCH_DIAMETER_M * h_max
+    blockage_ratio = frontal / cross_section if cross_section > 0 else float("inf")
+    half_long = 10.0 * h_max + R
+    half_short = lateral
+    source_data_required = (
+        math.ceil(math.sqrt(half_long**2 + half_short**2)) + V1_SAFETY_MARGIN_M
+    )
+    return {
+        "domain_upstream_m": upstream,
+        "domain_downstream_m": downstream,
+        "domain_lateral_m": lateral,
+        "domain_top_m": top,
+        "domain_blockage_frontal_m2": frontal,
+        "domain_blockage_cross_section_m2": cross_section,
+        "domain_blockage_ratio": blockage_ratio,
+        "domain_blockage_ok": blockage_ratio < V1_BLOCKAGE_GATE,
+        "source_data_required_m": source_data_required,
+    }
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -79,12 +116,17 @@ CONFIG = {
     "lambda_p_labels": ["λp<0.5", "λp≥0.5"],
     # --- Domain geometry ---
     "analysis_patch_size": 100,  # metres, diameter of circular analysis zone
-    "cfd_domain_radius": 250,  # metres, circular simulation domain
-    "blocken_fetch_multiple": 5,  # min fetch = this * H_max per patch
+    # V1 rectangular per-direction. The eligibility filter no longer uses a
+    # cylindrical 250 m domain proxy; instead it checks that the source-data
+    # convex hull covers a fixed worst-case envelope around each candidate
+    # patch (the rectangular envelope is per-patch and not knowable until
+    # H_max is computed, so we use a fixed conservative radius here that
+    # bounds the campaign maximum of 646 m).
+    "data_coverage_radius": 700,  # metres — matches buildings_extended_700m.gpkg
     # --- Selection constraints ---
     "min_patch_spacing": 80,  # metres between patch centres
     "min_building_coverage": 0.50,  # fraction of analysis patch
-    "min_domain_data_coverage": 0.70,  # fraction of circular domain
+    "min_domain_data_coverage": 0.70,  # fraction of data_coverage_radius circle
     # --- Allocation ---
     "target_patches": [12, 15],  # [min, max] total patches
     "min_per_stratum": 1,  # minimum per occupied stratum
@@ -387,12 +429,14 @@ def exclude_edges(
     """Remove cells where domain or analysis patch has insufficient coverage.
 
     Two-pass filter:
-      1. Domain data coverage — 250 m circle must overlap ≥70 % of the
-         building-data convex hull.
+      1. Domain data coverage — a worst-case-radius circle (config
+         ``data_coverage_radius``, default 700 m to bound the v1
+         rectangular source-data envelope at ~646 m) must overlap
+         ≥70 % of the building-data convex hull.
       2. Building coverage — 100 m-diameter circular analysis patch must
          have ≥50 % footprint coverage.
     """
-    radius = config["cfd_domain_radius"]
+    radius = config["data_coverage_radius"]
     min_bld_cov = config["min_building_coverage"]
     min_dom_cov = config["min_domain_data_coverage"]
 
@@ -666,29 +710,34 @@ def enforce_spacing(
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  6.  Blocken validation
+#  6.  v1 rectangular-domain extents per patch
 # ═══════════════════════════════════════════════════════════════════
 
 
-def validate_blocken(
+def compute_v1_domain(
     selected: gpd.GeoDataFrame,
     buildings: gpd.GeoDataFrame,
     config: dict,
 ) -> gpd.GeoDataFrame:
-    """Check per-patch Blocken (2015) fetch compliance."""
+    """Compute per-patch v1 rectangular domain extents + blockage gate.
+
+    Replaces the v0 ``validate_blocken`` cylindrical fetch check. Per-row
+    output: H_max_analysis, all four ``domain_*_m`` extents, the blockage
+    frontal/cross-section/ratio/ok triple, and ``source_data_required_m``
+    (the rotated-rectangle envelope radius). Gate is AIJ Tominaga 2008
+    (B < 0.05); see src/cfd_integration/rectangular_domain_v1.json for
+    derivations.
+    """
     selected = selected.copy()
-    radius = config["cfd_domain_radius"]
-    fetch_mult = config["blocken_fetch_multiple"]
     bld_sindex = buildings.sindex
 
-    # Detect height column in raw buildings
     height_col = None
     for col in ["height", "altura"]:
         if col in buildings.columns:
             height_col = col
             break
 
-    h_max_list, req_list, ok_list = [], [], []
+    rows = []
     for _, row in selected.iterrows():
         cx, cy = row["centroid_x"], row["centroid_y"]
         patch = Point(cx, cy).buffer(PATCH_RADIUS_M)
@@ -701,36 +750,33 @@ def validate_blocken(
                     h = bldg.get(height_col, 0)
                     if pd.notna(h) and float(h) > h_max:
                         h_max = float(h)
-        required = fetch_mult * h_max
-        h_max_list.append(h_max)
-        req_list.append(required)
-        ok_list.append(radius >= required)
+        rec = {"H_max_analysis": h_max, **_v1_domain_extents(h_max)}
+        rows.append(rec)
 
-    selected["H_max_analysis"] = h_max_list
-    selected["blocken_radius_required"] = req_list
-    selected["blocken_ok"] = ok_list
+    domain = pd.DataFrame(rows, index=selected.index)
+    for col in domain.columns:
+        selected[col] = domain[col].values
 
-    n_fail = sum(1 for ok in ok_list if not ok)
+    n_fail = int((~selected["domain_blockage_ok"]).sum())
     if n_fail:
         logger.warning(
-            "%d patches FAIL Blocken check (%dx * H_max > %d m radius):",
+            "%d patches FAIL v1 blockage gate (B < %.2f):",
             n_fail,
-            fetch_mult,
-            radius,
+            V1_BLOCKAGE_GATE,
         )
-        for _, row in selected[~selected["blocken_ok"]].iterrows():
+        for _, row in selected[~selected["domain_blockage_ok"]].iterrows():
             logger.warning(
-                "  %s: H_max=%.1f m -> need %d m, have %d m",
+                "  %s: H_max=%.1f m  B=%.3f  lateral=%.0f m",
                 row.get("patch_id", "?"),
                 row["H_max_analysis"],
-                row["blocken_radius_required"],
-                radius,
+                row["domain_blockage_ratio"],
+                row["domain_lateral_m"],
             )
     else:
         logger.info(
-            "All patches pass Blocken compliance (%d m >= %dx * H_max).",
-            radius,
-            fetch_mult,
+            "All %d patches pass v1 blockage gate (B < %.2f, silhouette envelope).",
+            len(selected),
+            V1_BLOCKAGE_GATE,
         )
     return selected
 
@@ -745,8 +791,13 @@ def export_patch_data(
     buildings: gpd.GeoDataFrame,
     config: dict,
 ) -> None:
-    """Write buildings, terrain clip, and metadata JSON for each patch."""
-    radius = config["cfd_domain_radius"]
+    """Write buildings, terrain clip, and metadata JSON for each patch.
+
+    Per-patch buildings + DTM clips use ``source_data_required_m`` (the
+    rotated worst-case rectangular envelope in v1) so the package is
+    self-contained for the per-direction blockMesh. Metadata schema
+    matches src/cfd_integration/rectangular_domain_v1.json.
+    """
     dtm_path = _resolve(config["dtm"])
     patches_dir = _resolve(config["output_dir"]) / "patches"
     bld_sindex = buildings.sindex
@@ -754,18 +805,20 @@ def export_patch_data(
     for _, row in selected.iterrows():
         pid = row["patch_id"]
         cx, cy = row["centroid_x"], row["centroid_y"]
-        circle = Point(cx, cy).buffer(radius)
+        # Per-patch envelope (covers all 8 wind-direction meshes).
+        clip_radius = float(row["source_data_required_m"])
+        circle = Point(cx, cy).buffer(clip_radius)
 
         pdir = patches_dir / pid
         pdir.mkdir(parents=True, exist_ok=True)
 
-        # Buildings within 250 m circle
+        # Buildings within the per-patch envelope
         cands = list(bld_sindex.intersection(circle.bounds))
         domain_blds = buildings.iloc[cands].copy()
         domain_blds = domain_blds[domain_blds.intersects(circle)]
         domain_blds.to_file(pdir / "buildings.gpkg", driver="GPKG")
 
-        # DTM clipped to circle bounding box
+        # DTM clipped to envelope bounding box
         if dtm_path.exists():
             try:
                 with rasterio.open(dtm_path) as src:
@@ -789,7 +842,7 @@ def export_patch_data(
             except Exception as e:
                 logger.warning("DTM clip failed for %s: %s", pid, e)
 
-        # Metadata JSON
+        # Metadata JSON — v1 schema per src/cfd_integration/rectangular_domain_v1.json.
         meta = {
             "patch_id": pid,
             "center_x": float(cx),
@@ -797,7 +850,8 @@ def export_patch_data(
             "stratum_id": str(row["stratum_id"]),
             "analysis_patch_shape": "circle",
             "analysis_patch_diameter": config["analysis_patch_size"],
-            "cfd_domain_radius": radius,
+            "domain_topology": "rectangular_per_direction",
+            "domain_manifest": "src/cfd_integration/rectangular_domain_v1.json",
             config["col_svf"]: _safe_float(row, config["col_svf"]),
             config["col_lambda_p"]: _safe_float(row, config["col_lambda_p"]),
             config["col_slope"]: _safe_float(row, config["col_slope"]),
@@ -807,9 +861,16 @@ def export_patch_data(
             "H_max_analysis": float(row["H_max_analysis"]),
             "building_coverage": float(row["_building_coverage"]),
             "domain_data_coverage": float(row["_domain_coverage"]),
-            "blocken_radius_required": float(row["blocken_radius_required"]),
-            "blocken_ok": bool(row["blocken_ok"]),
-            "n_buildings_in_domain": len(domain_blds),
+            "domain_upstream_m": float(row["domain_upstream_m"]),
+            "domain_downstream_m": float(row["domain_downstream_m"]),
+            "domain_lateral_m": float(row["domain_lateral_m"]),
+            "domain_top_m": float(row["domain_top_m"]),
+            "domain_blockage_frontal_m2": float(row["domain_blockage_frontal_m2"]),
+            "domain_blockage_cross_section_m2": float(row["domain_blockage_cross_section_m2"]),
+            "domain_blockage_ratio": float(row["domain_blockage_ratio"]),
+            "domain_blockage_ok": bool(row["domain_blockage_ok"]),
+            "source_data_required_m": float(row["source_data_required_m"]),
+            "n_buildings_in_envelope": len(domain_blds),
         }
         with open(pdir / "patch_meta.json", "w") as f:
             json.dump(meta, f, indent=2)
@@ -913,10 +974,12 @@ def generate_figure_map(
             )
         )
 
-    # CFD domain circles (blue dotted)
-    r = config["cfd_domain_radius"]
+    # v1 source-data envelope circles (per-patch radius, blue dotted)
     for _, row in selected.iterrows():
         cx, cy = row["centroid_x"], row["centroid_y"]
+        r = float(row.get("source_data_required_m", 0.0))
+        if r <= 0:
+            continue
         ax.add_patch(
             plt.Circle(
                 (cx, cy),
@@ -1088,8 +1151,9 @@ def generate_figure_context(
         axes = np.array([axes])
     axes = np.atleast_2d(axes).flat
 
-    radius = config["cfd_domain_radius"]
-    view_half = 300
+    # Per-patch envelope radius is variable in v1; use a generous fixed
+    # view window for visual consistency across patches.
+    view_half = max(300, int(config.get("data_coverage_radius", 700)))
     bld_sindex = buildings.sindex
 
     for i, (_, row) in enumerate(selected.iterrows()):
@@ -1306,8 +1370,8 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
     selected = selected.sort_values(["stratum_id", "centroid_x"]).reset_index(drop=True)
     selected["patch_id"] = [f"{prefix}-P{i + 1:02d}" for i in range(len(selected))]
 
-    # 8. Blocken validation
-    selected = validate_blocken(selected, buildings, config)
+    # 8. v1 rectangular-domain extents per patch
+    selected = compute_v1_domain(selected, buildings, config)
 
     # Print selected patches
     logger.info("")
@@ -1322,7 +1386,7 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
         "\u03bbp",
         "Slope",
         "Hmax",
-        "Blk.R",
+        "src.R",
         "Stratum",
     )
     logger.info("-" * 100)
@@ -1339,7 +1403,7 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
             lp if pd.notna(lp) else -1,
             slope if pd.notna(slope) else -1,
             row["H_max_analysis"],
-            row["blocken_radius_required"],
+            row["source_data_required_m"],
             row["stratum_id"],
         )
     logger.info("=" * 100)
@@ -1348,8 +1412,6 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "figures").mkdir(exist_ok=True)
     (output_dir / "patches").mkdir(exist_ok=True)
-
-    r = config["cfd_domain_radius"]
 
     # -- GeoPackage (two layers) --
     patches_gdf = selected.copy()
@@ -1372,7 +1434,13 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
         config["col_entropy"],
         "H_max_analysis",
         "_building_coverage",
-        "blocken_radius_required",
+        "domain_upstream_m",
+        "domain_downstream_m",
+        "domain_lateral_m",
+        "domain_top_m",
+        "domain_blockage_ratio",
+        "domain_blockage_ok",
+        "source_data_required_m",
         "geometry",
     ]
     out_cols = [c for c in out_cols if c in patches_gdf.columns]
@@ -1384,20 +1452,26 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
         }
     )
 
-    domains_out = gpd.GeoDataFrame(
+    # v1 envelopes layer: per-patch source-data envelope circle (replaces
+    # the v0 cylindrical "cfd_domains" layer).
+    envelopes_out = gpd.GeoDataFrame(
         {
             "patch_id": selected["patch_id"].values,
+            "source_data_required_m": selected["source_data_required_m"].values,
             "domain_data_coverage": selected["_domain_coverage"].values,
         },
         geometry=[
-            Point(row["centroid_x"], row["centroid_y"]).buffer(r) for _, row in selected.iterrows()
+            Point(row["centroid_x"], row["centroid_y"]).buffer(
+                float(row["source_data_required_m"])
+            )
+            for _, row in selected.iterrows()
         ],
         crs=grid.crs,
     )
 
     gpkg_path = output_dir / "pilot_patches.gpkg"
     patches_out.to_file(gpkg_path, layer="analysis_patches", driver="GPKG")
-    domains_out.to_file(gpkg_path, layer="cfd_domains", driver="GPKG")
+    envelopes_out.to_file(gpkg_path, layer="source_data_envelopes", driver="GPKG")
     logger.info("Saved %s", gpkg_path)
 
     # -- CSV --
@@ -1420,10 +1494,10 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
         input_hashes[key] = _md5(p) if p.exists() else None
 
     warnings_list: list[str] = []
-    for _, row in selected[~selected["blocken_ok"]].iterrows():
+    for _, row in selected[~selected["domain_blockage_ok"]].iterrows():
         warnings_list.append(
-            f"{row['patch_id']}: Blocken radius violated "
-            f"(need {row['blocken_radius_required']:.0f} m, have {r} m)"
+            f"{row['patch_id']}: v1 blockage gate violated "
+            f"(B={row['domain_blockage_ratio']:.3f} ≥ {V1_BLOCKAGE_GATE:.2f})"
         )
 
     log = {
