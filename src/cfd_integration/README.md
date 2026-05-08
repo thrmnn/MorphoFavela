@@ -184,11 +184,23 @@ assumes all of the following:
 
 ### Simulation domain
 
-- **Circular domain, radius 250 m** around each patch center (per the sampling script). Cylindrical OpenFOAM domain — reuse mesh across wind directions by rotating inlet BC.
-- **Pedestrian sampling is only valid within the central 100 m analysis
-  patch** (50 m from center in each direction). The outer 150 m of the domain
-  is for atmospheric flow development and should not be used for quantitative
-  results. This is enforced in `src/cfd_integration/aggregate.py`.
+**Rectangular per-direction (v1, May 2026).** Each patch × wind-direction
+gets its own rectangular `blockMesh` sized per the rules in
+[`rectangular_domain_v1.json`](rectangular_domain_v1.json) — a Franke /
+COST 732 / Blocken (2015) wide-obstacle scheme. Headlines:
+
+- Per-patch extents: `5·H_max + R` upstream, `15·H_max + R` downstream,
+  `max(5·H_max + R, 5·W_patch) = 500 m` lateral each side, `5·H_max` top.
+  R = 50 m (patch radius), W = 100 m (patch diameter).
+- Lateral collapses to a uniform 500 m for all 110 patches because
+  H_max < 90 m everywhere — so blockage is independent of H_max
+  (uniformly 2 % silhouette envelope).
+- Earlier cylindrical 250 m radius scheme is **deprecated** along with
+  the `blocken_radius_required` indicator column.
+
+**Pedestrian sampling is only valid within the central 100 m analysis
+patch** (50 m from center in each direction). The rest of the domain is
+for atmospheric flow development and is not consumed by `aggregate.py`.
 
 ### Turbulence and boundary conditions
 
@@ -197,14 +209,14 @@ assumes all of the following:
 - **Inlet**: logarithmic velocity profile scaled to `wind_speed_ref` at 10 m
   height, with turbulence intensity matching suburban ABL (I ≈ 0.15 at 10 m).
 - **Outlet**: `zeroGradient` for U, k, ω; `fixedValue` p=0.
-- **Top**: `slip` or `symmetryPlane` at domain height (at least 5 × H_max, i.e.,
-  ≥ 75 m for these sites).
+- **Top**: `slip` or `symmetryPlane` at domain height (= `5·H_max`, see
+  manifest).
 - **Ground + buildings**: no-slip walls. Use `nutkRoughWallFunction` on the
   ground with roughness z₀ ≈ 0.03 m (suburban surface class).
-- **Domain height**: minimum 6 × H_max to prevent blockage effects (≥ 90 m for
-  these sites).
-- **Blockage ratio**: each patch's `H_max_analysis` is in its `patch_meta.json`.
-  The 250 m radius × 90 m height domain gives blockage << 3% for all patches.
+- **Blockage ratio**: gated at `< 0.05` (AIJ Tominaga 2008) on the silhouette
+  envelope `D · H_max / (2 · lateral · top)`. With the v1 rectangular rule
+  this is uniformly ≈ 0.02 across the campaign — see
+  `domain_blockage_ratio` per row in `per_patch_indicators.csv`.
 
 ### Meshing
 
