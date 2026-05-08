@@ -879,19 +879,56 @@ without violating the minimum-spacing constraint. This is a genuine
 morphological limitation (the stratum is physically scarce) and was
 accepted rather than relaxing the spacing.
 
-### 6.5 Blocken compliance
+### 6.5 Rectangular per-direction domain compliance
 
-For each selected patch, the maximum building height within the 100 m
-analysis zone is recorded (`H_max_analysis`) and the Blocken (2015)
-minimum-fetch requirement is computed as `5 × H_max`. All 119 patches
-satisfy the constraint (`blocken_ok = true` in every `patch_meta.json`):
-the 250 m domain radius exceeds `5 × H_max` at every patch, with
-margins ranging from 114 m (RDP-P15, `H_max_analysis` = 27.3 m) to
-215 m (median 180 m). 11 of 119 patches have margins below 150 m, all
-at Rio das Pedras (5/22) or Rocinha (6/25) — the two sites with the
-tallest favela structures (max `H_max_analysis` = 27.3 m at RDP, 22.3 m
-at ROC). Vidigal (max 19.3 m), Maré (18.1 m), and Complexo do Alemão
-(15.7 m) clear the 150 m margin at every patch.
+The CFD methodology adopted in May 2026 is rectangular per-direction
+(one `blockMesh` per patch × wind-direction pair) per Franke et al.
+(2007) / COST 732 / Tominaga et al. (2008) AIJ / Blocken (2015). The
+canonical rule set is `src/cfd_integration/rectangular_domain_v1.json`.
+Domain dimensions per patch:
+
+```
+upstream    = 5 · H_max + R_patch
+downstream  = 15 · H_max + R_patch
+lateral     = max(5 · H_max + R_patch,  5 · W_patch)   each side
+top         = 5 · H_max
+```
+
+with R_patch = 50 m (analysis-circle radius) and W_patch = 100 m
+(diameter). Because all 119 patches have H_max < 90 m, the lateral
+floor of `5 · W_patch = 500 m` dominates, and the silhouette-envelope
+blockage `D · H_max / (2 · lateral · top)` collapses to a *uniform*
+2 % across the campaign — independent of H_max, well under the 5 %
+AIJ gate (Tominaga 2008). All 119 patches pass blockage at this gate.
+
+The rotated-rectangle source-data envelope (a single radius per patch
+that covers all 8 wind-direction meshes) ranges 565–646 m across the
+campaign, with the maximum at RDP-P15 (`H_max_analysis = 27.3` m). The
+extended-context layer was extended from 300 m to 700 m on all five
+sites (`buildings_extended_700m.gpkg` / `dtm_extended_700m.tif`) in
+the same migration. After the buffer extension all 119 patches are
+eligible — *no patch was dropped or replaced*, the campaign list is
+intact.
+
+The earlier cylindrical-domain rule (radius 250 m, Blocken minimum
+fetch `5 × H_max`) is deprecated. The indicator column
+`blocken_radius_required` was dropped from both
+`outputs/{site}/sampling_cfd/campaign_sampling/campaign_patches.csv`
+and `outputs/{site}/cfd_analysis/per_patch_indicators.csv` and
+replaced by a per-row `domain_*_m` set (upstream, downstream, lateral,
+top), `domain_blockage_ratio` and `domain_blockage_ok`,
+`source_data_required_m`, `source_data_extent_m`, and `eligible`.
+Real per-direction frontal area density `λ_F` is also recorded per
+patch (8 directions + mean + max), but is *not* the blockage gating
+quantity. `λ_F = Σ(projected_facade × height) / disk_area` is the
+canopy-parameterisation form (Tominaga 2008 §3) — sum of all building
+facades, no shadowing — and routinely exceeds 1.0 in dense favela
+patches (campaign median λ_F max = 1.32, p90 = 2.10, max = 2.96 at
+ROC-P01). The CFD blockage gate uses the AIJ benchmark *silhouette
+envelope* `D · H_max` instead: the worst-case projected obstacle area
+in any wind direction, bounded by treating the analysis circle as a
+solid block. λ_F is reported alongside for the §4 morphometric tables
+and downstream urban-canopy analyses.
 
 ---
 
@@ -929,9 +966,10 @@ INMET BDMEP / Iowa ASOS records; see §2.3 and Figure S5).
 - **`aggregate.py`** — spatial aggregation onto the morphometric grid.
   Primary function `aggregate_to_grid()` maps CFD samples onto individual
   10 m cells whose centroid falls inside the 100 m-diameter circular
-  analysis patch (the scientifically defensible zone per Blocken 2015). `aggregate_to_domain()` is a
-  supplementary function that includes the full 250 m radius for
-  robustness checks.
+  analysis patch (the scientifically defensible zone per Tominaga 2008 /
+  Blocken 2015). `aggregate_to_domain()` is a supplementary function
+  that includes the rest of the rectangular domain (out to the
+  per-direction blockMesh boundary) for robustness checks.
 - **`metrics.py`** — health-relevant scalar quantities:
   - `velocity_magnitude()` — √(U² + V² + W²)
   - `stagnation_fraction()` — fraction of samples with |U| < threshold
@@ -956,8 +994,11 @@ meshing, post-processing, and convergence targets) is documented in
 **`src/cfd_integration/README.md`**. Key decisions baked into the
 contract:
 
-- **Simulation domain:** cylindrical, 250 m radius, ≥ 6 × H_max height
-  (≥ 90 m). Pedestrian sampling only valid within the central 100 m-
+- **Simulation domain:** rectangular per-direction (one `blockMesh`
+  per patch × wind-direction). Per-patch extents `5/15/5/5 · H_max + R`
+  with `lateral = max(5·H+R, 5·W) = 500 m` for our 100 m patches.
+  Top = `5 · H_max`. See `rectangular_domain_v1.json` for the full rule
+  set. Pedestrian sampling only valid within the central 100 m-
   diameter circular analysis patch.
 - **Turbulence model:** k-ω SST (standard RANS for ABL flows at this
   scale).
@@ -1227,6 +1268,15 @@ paper-figure follow-up, not a methodology gap.
       pedestrian height across all 5 sites (closed 2026-05-01;
       slopes 0.92–1.25 with four of five within ±8 % of unity;
       see §10.3 and §4).
+- [x] Migrate the campaign domain methodology from cylindrical
+      (radius 250 m) to rectangular per-direction (Franke / COST 732
+      / Blocken 2015 wide-obstacle scheme); audit all 119 patches
+      against the new rule set; extend `buildings_extended_*` and
+      `dtm_extended_*` from 300 m to 700 m on all five sites; drop
+      the deprecated `blocken_radius_required` indicator column;
+      publish `src/cfd_integration/rectangular_domain_v1.json` as
+      the canonical contract (closed 2026-05-08, see §6.5; 119/119
+      eligible after the buffer extension, no patches dropped).
 - [ ] Optional: 20 m grids already exist; generate the variant Fig S3
       forms (`--variants` flag) if reviewers request the scatter or
       difference-map views
@@ -1237,8 +1287,12 @@ paper-figure follow-up, not a methodology gap.
 
 - [ ] Implement OpenFOAM case from per-patch exports (template in
       `outputs/{site}/sampling_cfd/campaign_sampling/patches/{id}/`)
-- [ ] Validate pipeline on VDG-P07 (in flight at MIT ORCD)
-- [ ] Mesh convergence study
+      using the v1 rectangular domain rule set
+- [x] ~~Validate pipeline on VDG-P07~~ — VDG-P07 cylindrical pilot
+      killed 2026-05-08 in favour of selecting fresh pilots from the
+      v1 rectangular campaign (see §6.5); pilot picks deferred to the
+      Airflow side
+- [ ] Mesh convergence study (one v1 pilot per morphology stratum)
 - [ ] Run full 952-simulation campaign
 - [ ] Post-process to `sample_points.csv` + `summary.json` per
       simulation
@@ -1299,8 +1353,9 @@ for `<site>`. Inputs must be in place under `data/<site>/` per
 [`data/README.md`](../../data/README.md).
 
 ```bash
-# Stage 1: extended building + DTM context (300 m buffer)
-python scripts/build_extended_context.py --area <site> --buffer 300
+# Stage 1: extended building + DTM context — buffer must cover the
+# v1 rectangular CFD source-data envelope (max 646 m). Use 700 m.
+python scripts/build_extended_context.py --area <site> --buffer 700
 
 # Stage 2: morphometric grid + SVF audit + per-site report
 python scripts/run_morphometric_audit.py --area <site>
@@ -1308,12 +1363,23 @@ python scripts/run_morphometric_audit.py --area <site>
 
 # Stage 3: CFD patch sampling
 python scripts/run_pilot_sampling.py --site <site> \
-  --buildings data/<site>/buildings_extended_300m.gpkg \
-  --dtm data/<site>/dtm_extended_300m.tif
+  --buildings data/<site>/buildings_extended_700m.gpkg \
+  --dtm data/<site>/dtm_extended_700m.tif
 python scripts/run_campaign_sampling.py
 # Outputs → outputs/<site>/sampling_cfd/campaign_sampling/patches/<PATCH_ID>/
 
-# Stage 4: UMEP cross-validation (optional, ~10–45 min per site)
+# Stage 4: rectangular-domain v1 audit + indicator migration (cross-site,
+# run once after all per-site sampling is complete)
+python scripts/audit_rectangular_domain.py
+python scripts/migrate_indicators_rectangular_v1.py --apply
+# Outputs → outputs/comparative/cfd_methodology/audit_v1.csv
+#         + augmented columns in campaign_patches.csv + per_patch_indicators.csv
+
+# Stage 5: street-level solar envelope (winter / annual / summer)
+python scripts/run_street_solar.py --site <site> --n-jobs -1
+# Outputs → outputs/<site>/morphometrics/svf/svf_streets_solar.gpkg
+
+# Stage 6: UMEP cross-validation (optional, ~10–45 min per site)
 python scripts/validate_svf_against_umep.py --site <site> \
   --pixel-size 1.0 --observer-height 1.5
 # Outputs → outputs/<site>/morphometrics/svf/umep_validation/
