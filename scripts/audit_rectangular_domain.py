@@ -1,4 +1,4 @@
-"""Phase 0.5 audit: 110 patches against rectangular per-direction CFD criteria.
+"""Phase 0.5 audit: 119 patches against rectangular per-direction CFD criteria.
 
 Applies AIJ Tominaga (2008) / Blocken (2015) rectangular-domain rules to
 the existing campaign and reports per-stratum pass rate. Read-only against

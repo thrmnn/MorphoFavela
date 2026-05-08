@@ -3,7 +3,7 @@
   "created": "2026-05-08",
   "convention": "AIJ Tominaga et al. (2008) / Blocken (2015) / Franke et al. (2007) / COST 732",
   "topology": "rectangular_per_direction",
-  "purpose": "Single source of truth for the IVF↔CFD contract: domain extent, blockage, and source-data eligibility for the 110-patch CFD campaign. The CFD repo (Airflow runtime) consumes this manifest to size each patch's per-direction blockMesh, the IVF repo writes per_patch_indicators.csv consistent with it.",
+  "purpose": "Single source of truth for the IVF↔CFD contract: domain extent, blockage, and source-data eligibility for the 119-patch CFD campaign (22+22+25+25+25 across vidigal/riodaspedras/rocinha/complexo_do_alemao/maré). The CFD repo (Airflow runtime) consumes this manifest to size each patch's per-direction blockMesh, the IVF repo writes per_patch_indicators.csv consistent with it.",
   "patch_geometry": {
     "diameter_m": 100.0,
     "radius_m": 50.0,
@@ -17,7 +17,7 @@
     "lateral_m_formula": "max(5 * H_max + R_patch, 5 * W_patch)",
     "top_m_formula": "5 * H_max",
     "reference_height_field": "H_max_analysis (column in per_patch_indicators.csv)",
-    "regime_note": "For all 110 patches H_max < 90 m, so 5 W_patch = 500 m dominates the lateral. Lateral is therefore uniformly 500 m across the campaign, which makes blockage independent of H_max."
+    "regime_note": "For all 119 patches H_max < 90 m (campaign max H_max = 27.3 m at RDP-P15), so 5 W_patch = 500 m dominates the lateral. Lateral is therefore uniformly 500 m across the campaign, which makes blockage independent of H_max."
   },
   "blockage": {
     "gate": 0.05,

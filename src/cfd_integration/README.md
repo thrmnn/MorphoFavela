@@ -192,7 +192,7 @@ COST 732 / Blocken (2015) wide-obstacle scheme. Headlines:
 - Per-patch extents: `5·H_max + R` upstream, `15·H_max + R` downstream,
   `max(5·H_max + R, 5·W_patch) = 500 m` lateral each side, `5·H_max` top.
   R = 50 m (patch radius), W = 100 m (patch diameter).
-- Lateral collapses to a uniform 500 m for all 110 patches because
+- Lateral collapses to a uniform 500 m for all 119 patches because
   H_max < 90 m everywhere — so blockage is independent of H_max
   (uniformly 2 % silhouette envelope).
 - Earlier cylindrical 250 m radius scheme is **deprecated** along with
