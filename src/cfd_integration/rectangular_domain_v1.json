@@ -70,12 +70,18 @@
     ]
   },
   "campaign_eligibility_at_v1": {
-    "n_patches_total": 110,
-    "n_blockage_ok": 110,
-    "n_source_data_ok": "site-dependent: 22/22 once buildings_extended_700m.gpkg is present",
-    "n_eligible": "110/110 once all 5 sites have buffer = 700 m",
+    "n_patches_total": 119,
+    "n_per_site": {
+      "vidigal": 22,
+      "riodaspedras": 22,
+      "rocinha": 25,
+      "complexo_do_alemao": 25,
+      "maré": 25
+    },
+    "n_blockage_ok": 119,
+    "n_eligible_target": "119/119 once all 5 sites have buffer ≥ 700 m",
     "re_stratification_required": false,
-    "rationale": "All failures are uniformly source-data-extent-only after the silhouette-envelope gate passes. A buffer extension lifts the entire campaign to 100% eligibility without dropping or replacing any patch."
+    "rationale": "All failures are uniformly source-data-extent-only after the silhouette-envelope gate passes. A buffer extension lifts the entire campaign to 100% eligibility without dropping or replacing any patch. CDA / Maré / Rocinha each carry 25 patches per the original sampling allocation; Vidigal and Rio das Pedras carry 22."
   },
   "implementation": {
     "audit_script": "scripts/audit_rectangular_domain.py",

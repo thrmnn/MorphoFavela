@@ -1,13 +1,24 @@
-"""Phase 3: migrate per_patch_indicators.csv to rectangular-domain v1 schema.
+"""Phase 3: migrate the campaign indicator files to rectangular-domain v1 schema.
 
-Augments ``outputs/{site}/cfd_analysis/per_patch_indicators.csv`` with the
-new columns from ``outputs/comparative/cfd_methodology/audit_v1.csv`` and
-drops the deprecated cylindrical-domain column ``blocken_radius_required``.
+Augments two CSVs per site with the new audit columns and drops the
+deprecated cylindrical-domain column ``blocken_radius_required``:
 
-The audit script is read-only; this is the writer that lands the new
-fields into the canonical per-patch indicator file. Idempotent: re-running
-on an already-migrated CSV is a no-op (existing new columns are refreshed
-from audit_v1.csv).
+1. **campaign_patches.csv** (canonical, 119 rows total) — read by
+   ``analyze_cfd_results.py`` as the source of truth for centers +
+   covariates. All 119 patches get the new columns.
+2. **per_patch_indicators.csv** (downstream, 110 rows total) — generated
+   by the analysis pipeline when CFD results land. Only the 110 rows it
+   currently carries are updated; the missing 9 (CDA / Maré / Rocinha
+   went 22 → 25 after the synthetic CFD pass) get the new columns the
+   next time ``analyze_cfd_results.py`` rebuilds the file from
+   campaign_patches.
+
+Both files are dropped of ``blocken_radius_required`` (cylindrical
+artifact, no downstream consumers in src/cfd_integration/ or
+analyze_cfd_results.py).
+
+Idempotent: re-running on an already-migrated CSV refreshes the new
+columns from audit_v1.csv without duplicating them.
 
 Run::
 
@@ -56,24 +67,20 @@ NEW_COLUMNS = [
 ]
 
 
-def _migrate_one(audit: pd.DataFrame, site: str, apply: bool) -> tuple[int, int]:
-    path = PROJECT_ROOT / "outputs" / site / "cfd_analysis" / "per_patch_indicators.csv"
+def _migrate_file(path: Path, audit: pd.DataFrame, site: str, apply: bool) -> tuple[int, int, str]:
     if not path.exists():
-        print(f"  [SKIP] {site}: indicator file missing at {path}")
-        return 0, 0
+        return 0, 0, f"  [SKIP] {site}: file missing at {path}"
 
     df = pd.read_csv(path)
     n_before = len(df.columns)
 
-    # Drop deprecated columns (silently if absent).
     drop_cols = [c for c in DEPRECATED if c in df.columns]
     if drop_cols:
         df = df.drop(columns=drop_cols)
 
     site_audit = audit[audit["site"] == site].copy()
     if site_audit.empty:
-        print(f"  [WARN] {site}: no rows in audit_v1.csv — skipping")
-        return 0, 0
+        return 0, 0, f"  [WARN] {site}: no rows in audit_v1.csv — skipping {path.name}"
 
     # Drop any existing NEW_COLUMNS so the merge is idempotent.
     present_new = [c for c in NEW_COLUMNS if c in df.columns]
@@ -87,14 +94,26 @@ def _migrate_one(audit: pd.DataFrame, site: str, apply: bool) -> tuple[int, int]
     n_added = n_after - n_before + len(drop_cols)
     n_eligible = int(df["eligible"].sum()) if "eligible" in df.columns else 0
 
-    print(
-        f"  {site:24s}  rows={len(df):3d}  cols {n_before}→{n_after}  "
+    msg = (
+        f"  {path.name:30s}  rows={len(df):3d}  cols {n_before}→{n_after}  "
         f"+{n_added} new, -{len(drop_cols)} deprecated  eligible={n_eligible}/{len(df)}"
     )
 
     if apply:
         df.to_csv(path, index=False)
-    return n_added, n_eligible
+    return n_added, n_eligible, msg
+
+
+def _migrate_one(audit: pd.DataFrame, site: str, apply: bool) -> tuple[int, int]:
+    canon = PROJECT_ROOT / "outputs" / site / "sampling_cfd" / "campaign_sampling" / "campaign_patches.csv"
+    derived = PROJECT_ROOT / "outputs" / site / "cfd_analysis" / "per_patch_indicators.csv"
+
+    print(f"  {site}:")
+    n1, e1, m1 = _migrate_file(canon, audit, site, apply)
+    print(m1)
+    _, _, m2 = _migrate_file(derived, audit, site, apply)
+    print(m2)
+    return n1, e1
 
 
 def main() -> int:

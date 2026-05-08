@@ -102,7 +102,13 @@ OUT_DIR = PROJECT_ROOT / "outputs" / "comparative" / "cfd_methodology"
 
 
 def _load_indicators(site: str) -> pd.DataFrame:
-    path = PROJECT_ROOT / "outputs" / site / "cfd_analysis" / "per_patch_indicators.csv"
+    """Load per-patch covariates from campaign_patches.csv (the canonical
+    source of truth for centers + covariates, per analyze_cfd_results.py).
+    The downstream per_patch_indicators.csv only carries 22 rows per site
+    on three of the five sites (CDA / Maré / Rocinha were topped up to 25
+    after the synthetic CFD pass), so we read campaign_patches directly
+    to cover all 119 patches."""
+    path = PROJECT_ROOT / "outputs" / site / "sampling_cfd" / "campaign_sampling" / "campaign_patches.csv"
     df = pd.read_csv(path)
     df.insert(0, "site", site)
     return df
