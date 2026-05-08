@@ -79,8 +79,21 @@ PATCH_RADIUS_M = PATCH_DIAMETER_M / 2.0           # 50 m — analysis circle rad
 PATCH_AREA_M2 = math.pi * PATCH_RADIUS_M ** 2     # 7854 m²
 BLOCKAGE_GATE = 0.05                              # AIJ Tominaga 2008
 SAFETY_MARGIN_M = 50.0                            # additive safety on rotated-rect diagonal
-DEFAULT_SOURCE_EXTENT_M = 300.0                   # current buildings_extended_300m.gpkg buffer
 SITE_CRS = "EPSG:31983"                           # SIRGAS 2000 / UTM 23S
+
+
+def _largest_extended_buffer(site: str) -> int:
+    """Return the largest buffer (m) for which buildings_extended_{N}m.gpkg
+    exists for this site. Defaults to 300 if none found."""
+    site_dir = PROJECT_ROOT / "data" / site
+    buffers = []
+    for path in site_dir.glob("buildings_extended_*m.gpkg"):
+        try:
+            n = int(path.stem.replace("buildings_extended_", "").replace("m", ""))
+            buffers.append(n)
+        except ValueError:
+            continue
+    return max(buffers) if buffers else 300
 WIND_DIRECTIONS = {
     "N": 0.0, "NE": 45.0, "E": 90.0, "SE": 135.0,
     "S": 180.0, "SW": 225.0, "W": 270.0, "NW": 315.0,
@@ -95,8 +108,8 @@ def _load_indicators(site: str) -> pd.DataFrame:
     return df
 
 
-def _load_buildings(site: str) -> gpd.GeoDataFrame:
-    path = PROJECT_ROOT / "data" / site / "buildings_extended_300m.gpkg"
+def _load_buildings(site: str, buffer_m: int) -> gpd.GeoDataFrame:
+    path = PROJECT_ROOT / "data" / site / f"buildings_extended_{buffer_m}m.gpkg"
     bld = gpd.read_file(path)
     if bld.crs is None or str(bld.crs).upper() != SITE_CRS:
         bld = bld.to_crs(SITE_CRS)
@@ -187,7 +200,7 @@ def _compute_gates(df: pd.DataFrame) -> pd.DataFrame:
     df["source_data_required_m"] = (
         (half_long ** 2 + half_short ** 2).pow(0.5).apply(math.ceil) + SAFETY_MARGIN_M
     )
-    df["source_data_extent_m"] = DEFAULT_SOURCE_EXTENT_M
+    # source_data_extent_m is set per-site by the caller (see main()).
     df["source_data_ok"] = df["source_data_extent_m"] >= df["source_data_required_m"]
 
     df["eligible"] = df["domain_blockage_ok"] & df["source_data_ok"]
@@ -313,16 +326,18 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     parts = []
     for site in SITES:
+        buffer_m = _largest_extended_buffer(site)
         df = _load_indicators(site)
-        bld = _load_buildings(site)
+        bld = _load_buildings(site, buffer_m)
         zones = _build_patch_zones(df)
         df["lambda_p_patch"] = _compute_patch_lambda_p(bld, zones).values
         lf = _compute_lambda_f(bld, zones)
         for col in lf.columns:
             df[col] = lf[col].values
         df = df.rename(columns={"lambda_p": "lambda_p_grid_center"})
+        df["source_data_extent_m"] = float(buffer_m)
         parts.append(df)
-        print(f"  {site}: λ_F computed for {len(df)} patches × 8 directions")
+        print(f"  {site:24s} buffer={buffer_m}m  λ_F for {len(df)} patches × 8 directions")
     print()
 
     df = pd.concat(parts, ignore_index=True)

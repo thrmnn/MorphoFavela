@@ -1,0 +1,92 @@
+{
+  "version": "1.0",
+  "created": "2026-05-08",
+  "convention": "AIJ Tominaga et al. (2008) / Blocken (2015) / Franke et al. (2007) / COST 732",
+  "topology": "rectangular_per_direction",
+  "purpose": "Single source of truth for the IVF↔CFD contract: domain extent, blockage, and source-data eligibility for the 110-patch CFD campaign. The CFD repo (Airflow runtime) consumes this manifest to size each patch's per-direction blockMesh, the IVF repo writes per_patch_indicators.csv consistent with it.",
+  "patch_geometry": {
+    "diameter_m": 100.0,
+    "radius_m": 50.0,
+    "shape": "circular_disk",
+    "area_m2": 7853.98
+  },
+  "domain_extent": {
+    "rule": "Blocken 2015 §3.3 wide-obstacle: lateral scales with the larger of (5 H_max + R_patch) and 5 W_patch.",
+    "upstream_m_formula": "5 * H_max + R_patch",
+    "downstream_m_formula": "15 * H_max + R_patch",
+    "lateral_m_formula": "max(5 * H_max + R_patch, 5 * W_patch)",
+    "top_m_formula": "5 * H_max",
+    "reference_height_field": "H_max_analysis (column in per_patch_indicators.csv)",
+    "regime_note": "For all 110 patches H_max < 90 m, so 5 W_patch = 500 m dominates the lateral. Lateral is therefore uniformly 500 m across the campaign, which makes blockage independent of H_max."
+  },
+  "blockage": {
+    "gate": 0.05,
+    "gate_source": "Tominaga et al. (2008) AIJ guidelines for practical applications of CFD to pedestrian wind environment around buildings",
+    "frontal_area_envelope": "silhouette",
+    "frontal_area_formula": "D * H_max",
+    "frontal_area_note": "Silhouette upper bound: treat the patch as a single solid block of dimensions D x H_max. AIJ benchmark convention for wide-cluster CFD. Real silhouette is at most this value (gaps between buildings can only reduce it).",
+    "cross_section_formula": "(2 * lateral_m) * top_m",
+    "alternative_estimators_reported": {
+      "lambda_f_max": "Per-direction sum-of-facades density via compute_frontal_area_ratio. Canopy-parameterisation quantity, not a CFD blockage gate. Routinely > 1.0 in dense favela patches; reported in audit_v1.csv for §4 morphometric tables only.",
+      "lambda_p_patch": "Footprint area in the 100 m disk / disk area. Replaces the 10 m grid-cell BCR in the per_patch_indicators.csv lambda_p column for blockage purposes."
+    }
+  },
+  "source_data": {
+    "envelope_geometry": "Half-diagonal of the rotated rectangular box (20 H_max + 2 R_patch) long × (2 * lateral_m) wide, plus a 50 m additive safety margin. One radius covers all 8 wind directions.",
+    "required_m_formula": "ceil(sqrt((10 * H_max + R_patch)^2 + lateral_m^2)) + 50",
+    "available_extents_m": [300, 700],
+    "default_extent_for_campaign_m": 700,
+    "max_required_observed_m": 646,
+    "max_required_patch": "RDP-P15 (H_max = 27.3 m)"
+  },
+  "deprecated_fields": [
+    {
+      "name": "blocken_radius_required",
+      "reason": "Cylindrical-domain proxy. Replaced by source_data_required_m which uses the rectangular rotated-box diagonal."
+    }
+  ],
+  "per_patch_indicator_schema": {
+    "added_columns": [
+      "lambda_p_patch",
+      "lambda_f_N", "lambda_f_NE", "lambda_f_E", "lambda_f_SE",
+      "lambda_f_S", "lambda_f_SW", "lambda_f_W", "lambda_f_NW",
+      "lambda_f_mean", "lambda_f_max", "lambda_f_max_dir",
+      "domain_upstream_m", "domain_downstream_m", "domain_lateral_m", "domain_top_m",
+      "domain_blockage_frontal_m2", "domain_blockage_cross_section_m2",
+      "domain_blockage_ratio", "domain_blockage_ok", "lambda_f_blockage_diag",
+      "source_data_required_m", "source_data_extent_m", "source_data_ok",
+      "eligible"
+    ],
+    "removed_columns": ["blocken_radius_required"],
+    "preserved_columns": [
+      "patch_id", "is_pilot", "center_x", "center_y", "stratum_id",
+      "svf", "lambda_p", "slope_deg", "porosity", "sigma_h",
+      "H_mean", "H_max_analysis",
+      "aspect_deg", "aspect_sin", "aspect_cos", "aspect_wind_alignment",
+      "n_directions", "weight_method",
+      "annual_TI_mean", "annual_TKE_mean", "annual_U_mean", "annual_U_median",
+      "annual_U_p10", "annual_U_p90", "annual_stagnation_frac",
+      "annual_vent_efficiency", "annual_wind_speed_ref"
+    ]
+  },
+  "campaign_eligibility_at_v1": {
+    "n_patches_total": 110,
+    "n_blockage_ok": 110,
+    "n_source_data_ok": "site-dependent: 22/22 once buildings_extended_700m.gpkg is present",
+    "n_eligible": "110/110 once all 5 sites have buffer = 700 m",
+    "re_stratification_required": false,
+    "rationale": "All failures are uniformly source-data-extent-only after the silhouette-envelope gate passes. A buffer extension lifts the entire campaign to 100% eligibility without dropping or replacing any patch."
+  },
+  "implementation": {
+    "audit_script": "scripts/audit_rectangular_domain.py",
+    "migration_script": "scripts/migrate_indicators_rectangular_v1.py",
+    "audit_artifact": "outputs/comparative/cfd_methodology/audit_v1.csv (gitignored, regenerable)",
+    "indicator_artifact_pattern": "outputs/{site}/cfd_analysis/per_patch_indicators.csv (gitignored)",
+    "manifest_canonical_location": "src/cfd_integration/rectangular_domain_v1.json (this file, tracked)"
+  },
+  "references": [
+    "Tominaga, Y., Mochida, A., Yoshie, R., Kataoka, H., Nozu, T., Yoshikawa, M., Shirasawa, T. (2008). AIJ guidelines for practical applications of CFD to pedestrian wind environment around buildings. Journal of Wind Engineering and Industrial Aerodynamics, 96(10-11), 1749-1761.",
+    "Franke, J., Hellsten, A., Schlünzen, K.H., Carissimo, B. (eds.) (2007). Best practice guideline for the CFD simulation of flows in the urban environment. COST Action 732, COST Office, Brussels.",
+    "Blocken, B. (2015). Computational Fluid Dynamics for urban physics: Importance, scales, possibilities, limitations and ten tips and tricks towards accurate and reliable simulations. Building and Environment, 91, 219-245."
+  ]
+}
