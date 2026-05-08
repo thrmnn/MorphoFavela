@@ -14,12 +14,16 @@ other figure in the repo. Outputs land in `figures/exports/`.
 |--------|--------|-------------|
 | 0.1 | `figures/fig_0_1_overview.py` | Conceptual framework + Rio map by typology + 3D excerpts of the five sites |
 | 0.2 | `figures/fig_0_2_landscape.py` | Vidigal 6-panel choropleth (SVF, λp, porosity, λf, σH, slope) + cross-favela ridge plots |
+| 0.3 | `figures/fig_0_3_performance.py` | Environmental performance: wind/sun maps for 4 representative patches + ACH and sun-hours distributions |
+| 0.4 | `figures/fig_0_4_diagnostic.py` | ★ Headline. 4-state diagnostic taxonomy (5 site maps + 2D performance scatter + stacked bars across hillside/mixed/flatland aggregates) |
 
 ## Regenerate
 
 ```bash
 python docs/manuscript/figures/fig_0_1_overview.py
 python docs/manuscript/figures/fig_0_2_landscape.py
+python docs/manuscript/figures/fig_0_3_performance.py
+python docs/manuscript/figures/fig_0_4_diagnostic.py
 ```
 
 Style is shared with `outputs/paper_figures/fig_style.py` (Tol muted palette,
