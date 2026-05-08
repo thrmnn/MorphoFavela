@@ -105,12 +105,12 @@ in this section.
 | Term | Definition |
 |---|---|
 | **Analysis patch** | 100 m-diameter circle (radius 50 m, area ≈ 7,854 m²) where pedestrian-level metrics are sampled. |
-| **CFD domain** | 250 m-radius circular domain enclosing the analysis patch; provides flow-development context per Blocken (2015). |
+| **CFD domain** | Per-direction rectangular `blockMesh` sized to `5/15/5/5 · H_max + R_patch` upstream/downstream/lateral/top, with a `5 · W_patch = 500 m` lateral floor (Blocken 2015 wide-obstacle). One mesh per patch × wind-direction = 952 meshes for 119 patches × 8 directions. Canonical rule set: `src/cfd_integration/rectangular_domain_v1.json`. |
 | **12 strata** | Cross-product of SVF (3 bins: < 0.15, 0.15–0.30, ≥ 0.30) × slope (2 bins: < 15°, ≥ 15°) × λp (2 bins: < 0.5, ≥ 0.5). Stratum IDs encoded `SVFn_SLPn_LPn`. |
 | **Maximin spacing** | Greedy maximin geographic distance between patch centres, with an 80 m floor. Produces a spatially diverse sample within each stratum. |
-| **Blocken radius** | Minimum CFD domain radius for adequate fetch development; the rule of thumb is 5 × H_max (Blocken 2015). The campaign uses a fixed 250 m radius; per-patch margin = 250 − 5·H_max_analysis. |
-| **Blocken margin** | The numerical margin a patch has against the 5 × H_max constraint, i.e., `cfd_domain_radius − blocken_radius_required`. Per-patch values in `patch_meta.json`; see §6.5 for the campaign-wide distribution. |
-| **`blocken_ok`** | Boolean field in `patch_meta.json` — true iff `5 × H_max_analysis ≤ cfd_domain_radius`. The campaign-wide value is reported in §6.5 / §9. |
+| **Silhouette blockage** | CFD blockage gating quantity. `B = D · H_max / (2 · lateral · top)` — treats the 100 m analysis disk as a single solid block of height H_max (AIJ benchmark convention for wide-cluster CFD). Gate: `B < 0.05` (Tominaga 2008). Uniform 2 % across the campaign once 5·W lateral floor dominates. |
+| **λ_F (frontal area density)** | Per-direction `Σ(projected_facade × height) / disk_area`, computed for 8 wind directions. The literature canopy-parameterisation form (Tominaga 2008 §3) — sums all facades, no shadowing, routinely > 1.0 in dense favela patches. Reported per-row alongside the blockage gate but *not* the gating quantity (silhouette envelope is). |
+| **Source-data envelope** | The half-diagonal of the rotated worst-case rectangular domain plus a 50 m additive safety margin. Bounds the per-patch radius needed in `buildings_extended_*.gpkg` and `dtm_extended_*.tif` to cover all 8 wind-direction meshes. Range across the campaign: 565–646 m; `buildings_extended_700m.gpkg` covers all 119 patches. |
 
 ### Wind / atmosphere
 
@@ -306,27 +306,42 @@ Raw footprints undergo three processing steps before use:
 
 ### 3.2 Extended building context
 
-**Problem.** Each CFD simulation domain is a circular region of 250 m
-radius around the analysis patch. When the patch is near the favela
-perimeter, the domain extends beyond available building data, leaving the
-outer annulus without context. A naïve sampling restricted to patches
-fully within the favela excludes 55 % of candidate cells at Vidigal.
+**Problem.** Each CFD simulation needs building + terrain context out
+to the rectangular per-direction domain envelope (§6.5,
+`rectangular_domain_v1.json`). The rotated worst-case rectangle has
+half-diagonal 565–646 m across our 119-patch campaign — the
+campaign-maximum is RDP-P15 at 646 m (`H_max_analysis` = 27.3 m). A
+naïve sampling restricted to patches fully within the favela excludes
+55 % of candidate cells at Vidigal.
 
-**Solution.** The city-wide RJ building dataset is clipped to a 300 m
-buffer around each favela boundary and merged with the site-specific
-dataset, preferring site data where footprints overlap (deduplication via
-spatial join on the boundary polygon).
+**Solution.** Two passes:
+
+1. **Initial 300 m extension** (used by the original eligibility filter
+   and SVF cross-validation). The city-wide RJ building dataset is
+   clipped to a 300 m buffer around each favela boundary and merged
+   with the site-specific dataset, preferring site data where
+   footprints overlap (deduplication via spatial join). This is the
+   buffer documented in Figure S2.
+2. **700 m extension for v1 CFD domains** (May 2026 migration). The
+   same merge, larger buffer — covers the rectangular source-data
+   envelope of every campaign patch, including RDP-P15 at 646 m. All
+   five sites have both `buildings_extended_300m.gpkg` and
+   `buildings_extended_700m.gpkg` (and matching DTMs); the CFD-side
+   `build_patch_case.py` uses the 700 m product.
 
 ![Figure S2. Context extension validation.](figures/figS2_context_extension.png)
 
-**Figure S2.** Context extension for Vidigal. Left: site buildings (blue)
-within the boundary and context buildings (orange) from city-wide data
-within the 300 m buffer. Middle: candidate-pool sensitivity to buffer
-distance — 0 m yields 980 eligible cells (31 %); 300 m yields 1,697
-(54 %); 400 m only adds 77 more (diminishing returns). Right: pilot patch
-locations on the extended footprint — without the extension, patches
-cluster on the interior 600 m × 250 m; with it, they span the full
-1,040 m × 310 m.
+**Figure S2.** Context extension for Vidigal at the original 300 m
+buffer. Left: site buildings (blue) within the boundary and context
+buildings (orange) from city-wide data within the 300 m buffer. Middle:
+candidate-pool sensitivity to buffer distance — 0 m yields 980 eligible
+cells (31 %); 300 m yields 1,697 (54 %); 400 m only adds 77 more
+(diminishing returns at the eligibility-filter level). Right: pilot
+patch locations on the extended footprint — without the extension,
+patches cluster on the interior; with it, they span the full favela
+plus its immediate fringe. The 700 m v1 buffer extends the same
+construction further; counts grow to 10,713 buildings at Vidigal,
+46,390 at Maré.
 
 Extended buildings per site:
 
@@ -728,13 +743,15 @@ comparison.
 
 Each CFD simulation corresponds to one **analysis patch** of interest
 — a 100 m-diameter circle (radius 50 m, area ≈ 7 854 m²) — embedded in
-a 250 m-radius circular domain that provides flow-development context
-(per Blocken 2015 and COST Action 732). The circular patch shape
-matches the cylindrical symmetry of the CFD domain, avoids corner
-artefacts in morphometric averaging, and produces isotropic coverage
-independent of building-grid orientation. To characterise the
-morphological diversity of the five sites with a finite simulation
-budget, patches are allocated across **twelve stratification bins**:
+a per-direction rectangular domain whose extents follow the
+Franke / COST 732 / Tominaga 2008 / Blocken 2015 wide-obstacle scheme
+(see §6.5 and `src/cfd_integration/rectangular_domain_v1.json`). The
+circular patch shape is independent of the rectangular mesh: it avoids
+corner artefacts in morphometric averaging, gives isotropic coverage
+independent of building-grid orientation, and is symmetric across all
+8 wind-direction meshes. To characterise the morphological diversity
+of the five sites with a finite simulation budget, patches are
+allocated across **twelve stratification bins**:
 
 - SVF: 3 bins (SVF < 0.15, 0.15 ≤ SVF < 0.30, SVF ≥ 0.30)
 - Slope: 2 bins (< 15°, ≥ 15°)
@@ -747,10 +764,13 @@ SVF < 0.15 + slope ≥ 15° + λp ≥ 0.5.
 
 A cell is an eligible patch centre if:
 
-1. The 250 m CFD domain is fully covered by available building data
-   (the extended buildings from Section 3.2). Measured as the fraction
-   of the circular domain that intersects the convex hull of the
-   extended footprints; threshold 0.7.
+1. The CFD source-data envelope (rotated worst-case rectangle, half-
+   diagonal `√((10·H_max + R_patch)² + lateral²) + 50 m` per the v1
+   manifest) is fully covered by available building data. The original
+   sampler used a 250 m-radius proxy at sampling time; the post-hoc v1
+   audit (`scripts/audit_rectangular_domain.py`) re-checks every
+   campaign patch against the rectangular envelope using the 700 m
+   extended-context buffer (§3.2, §6.5).
 2. Within the 100 m-diameter circular analysis patch, building
    footprint coverage (∑ intersection area ÷ π·50² ≈ 7 854 m²) ≥ 0.5.
    This also implicitly rejects patches clipped by the site boundary,
@@ -1139,7 +1159,7 @@ Key scripts:
 | SVF passageway aggregation (no centroid artefacts) | PASS | diagnostic in `src/morphometry/grid.py::_aggregate_svf_to_grid` |
 | DTM sentinel value handling | PASS (post-fix) | sentinel = −9999 pixels masked in extended-context merge per `scripts/build_extended_context.py` |
 | Extended context eligibility recovery | PASS | Vidigal eligible cells go from ~0.45 to 0.80 of grid with the 300 m extension; see `outputs/comparative/pilot_summary/candidate_pool_comparison.csv` |
-| Blocken fetch compliance (all 119 patches) | PASS | `blocken_ok = true` in every `patch_meta.json`; margins 114–215 m, median 180 m, with 11/119 < 150 m (all at RDP or Rocinha) |
+| Rectangular-domain v1 eligibility (all 119 patches) | PASS | `eligible = true` in every row of `outputs/comparative/cfd_methodology/audit_v1.csv`; uniform 2 % silhouette blockage (well under 5 % AIJ); source-data envelope 565–646 m covered by `buildings_extended_700m.gpkg` on all 5 sites |
 | Minimum inter-patch spacing (80 m) | PASS | realised minimum: 80–85 m across sites |
 | Resolution sensitivity (10 m justified) | PASS | Figure S3; 10 m captures features 20 m loses |
 | 12-strata coverage (≥ 1 site per stratum) | PASS | all 12 strata non-empty when pooled |
@@ -1433,7 +1453,7 @@ Regenerating them is in the next-steps backlog.
 | §4.2 / §10.3 UMEP cross-val | `outputs/<site>/morphometrics/svf/umep_validation/summary_stats.csv` | `pandas.read_csv(...)` |
 | §5.2 Typology medians | concat `outputs/<site>/morphometrics/grid/grid_metrics.gpkg` across sites, group by typology (Vidigal+Rocinha = Hillside, CDA = Mixed, RdP+Maré = Flatland), `.median()` |
 | §6.4 Campaign allocation | `outputs/comparative/final_allocation/campaign_allocation_table.csv`, `campaign_strata_summary.csv` |
-| §6.5 Blocken margins | `outputs/<site>/sampling_cfd/campaign_sampling/patches/<PATCH_ID>/patch_meta.json` field `blocken_radius_required`, with margin = `cfd_domain_radius` − `blocken_radius_required` |
+| §6.5 Rectangular-domain audit | `outputs/comparative/cfd_methodology/audit_v1.csv` (one row per patch, fields `domain_*_m`, `domain_blockage_ratio`, `domain_blockage_ok`, `source_data_required_m`, `source_data_extent_m`, `eligible`). Producer: `scripts/audit_rectangular_domain.py`. |
 | §9 Validation Summary | each row's "Evidence" column points to the source file |
 
 ### 12.6 PDF rebuild
@@ -1457,10 +1477,11 @@ the validators surface drift before it ships.
 | Stage | Producer | Success signal | Failure signal | Validator |
 |---|---|---|---|---|
 | Site onboarding | `data/<site>/` per `data/README.md` contract | All required files present; CRS = EPSG:31983; `wind_rose.json` quality_flag = "measured" | Missing files; mixed CRS; placeholder wind rose | `data-contract-checker` agent |
-| Building extension | `scripts/build_extended_context.py` | `data/<site>/buildings_extended_300m.gpkg` written; building count > site-only count | Empty geometry; CRS mismatch; sentinel pixels (−9999) survive into the merged DTM | n/a — manual check via `geopandas.info()` |
+| Building extension | `scripts/build_extended_context.py --buffer 700` | `data/<site>/buildings_extended_700m.gpkg` and matching DTM written; building count > site-only count | Empty geometry; CRS mismatch; sentinel pixels (−9999) survive into the merged DTM | `data-contract-checker` agent |
+| Rectangular-domain audit | `scripts/audit_rectangular_domain.py` then `scripts/migrate_indicators_rectangular_v1.py --apply` | `outputs/comparative/cfd_methodology/audit_v1.csv` written with 119 rows, all `eligible = true`; both `campaign_patches.csv` and `per_patch_indicators.csv` carry the new `domain_*_m` columns | Any `eligible = false` row; mismatch between audit row count and campaign size; `blocken_radius_required` column survives migration | n/a — `audit_v1_pivot.csv` per-stratum table |
 | Morphometric grid | `scripts/run_morphometric_audit.py` | `grid_metrics.gpkg` written with all 20+ columns; `svf_count > 0` for every eligible cell; per-site PDF report rendered | NaN-heavy SVF column (passageway sampler failed); cells with `svf_count = 0` returning NaN; report_render fails on missing inputs | n/a — review the per-site PDF |
 | Pilot sampling | `scripts/run_pilot_sampling.py` | 12–15 patches per site; ≥ 1 patch per non-empty stratum; min spacing ≥ 80 m | Stratum coverage gap; min spacing < 80 m; eligibility filter rejects > 95 % of cells | `sampling-auditor` agent |
-| Campaign sampling | `scripts/run_campaign_sampling.py` | 22–25 patches per site; SVF-priority weighting reflected in stratum totals; `blocken_ok = true` in every `patch_meta.json` | Blocken violation; spacing collision; stratum over- or under-allocation | `sampling-auditor` agent |
+| Campaign sampling | `scripts/run_campaign_sampling.py` | 22–25 patches per site; SVF-priority weighting reflected in stratum totals; `eligible = true` in every row of `audit_v1.csv` after the rectangular-domain audit | Spacing collision; stratum over- or under-allocation; `eligible = false` rows in audit output | `sampling-auditor` agent |
 | Wind rose ingestion | `scripts/build_wind_rose.py` | `wind_rose.json` with `quality_flag: "measured"`, `n_records ≥ 60,000`, full 8-direction frequency vector | quality_flag "placeholder-prior" (climatological prior never replaced); INMET date-format break post-2019 (silent zero rows) | `wind-ingestion` agent |
 | CFD ingestion | (CFD repo at `~/Airflow` writes; `src/cfd_integration/` reads) | All 8 wind directions present per patch; `sample_points.csv` rows ≥ 10 k; `summary.json` valid | Missing direction; off-axis directory name (e.g. `wind_017/`); column drift in CSV; `\|U_mag − √(U²+V²+W²)\| > 0.01` | `cfd-results-ingestor` agent (auto-detects IVF-native CSV vs Airflow-native parquet layouts) |
 | Annualised aggregation | `scripts/analyze_cfd_results.py` | Per-site `outputs/<site>/cfd_analysis/per_patch_indicators.csv`, `grid_with_cfd.gpkg`; covered cells in 350–410 range per site (synthetic baseline) | Coverage anomaly (cells well outside 350–410); regression sign flips; weighting falls back to uniform when wind rose missing | n/a — verify against synthetic baseline |
