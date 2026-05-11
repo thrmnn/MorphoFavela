@@ -33,6 +33,9 @@ audit.
 | `aggregate_by_building_floor(...)` | Roll up to per-floor of each building |
 | `assess_who_threshold(...)` | Compliance against the WHO ≥ 2 hr rule |
 | `WHO_SUNLIGHT_THRESHOLD_HOURS` (= 2.0) | The threshold constant |
+| `sunlit_matrix_to_wide_gdf(...)` | Reshape an `(N, M)` sunlit matrix into a wide-format GeoDataFrame with one `lit_T{HHMM}` column per timestep (dataviz animation) |
+| `compute_sun_positions_with_times(...)` | Sun altitude/azimuth paired with tz-aware local timestamps (used by the animation pipeline) |
+| `build_animation_manifest(...)` | Wrap the per-frame manifest with run-level provenance |
 
 ## Submodules
 
@@ -44,6 +47,8 @@ audit.
   equinox, summer solstice composites)
 - `io.py` — readers / writers for the .npy + .gpkg outputs
 - `visualize.py` — heatmaps + dashboards (interactive HTML report)
+- `animation.py` — wide-format per-hour sunlit GeoDataFrame for dataviz
+  (paired with `scripts/run_solar_animation.py`)
 
 ## Typical usage
 
@@ -57,6 +62,12 @@ python scripts/compute_solar_access.py \
 # Façade analysis with HTML dashboard:
 python scripts/run_facade_solar.py --area vidigal
 python scripts/generate_facade_solar_report.py --area vidigal
+
+# Per-hour sunlit GIS layer for dataviz animations.
+# Reuses the SAME observer points as svf_streets_solar.gpkg and
+# appends one lit_T{HHMM} bool column per timestep, so the
+# animation overlays cleanly on the seasonal envelope.
+python scripts/run_solar_animation.py --site vidigal
 ```
 
 ## Tests

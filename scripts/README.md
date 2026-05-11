@@ -59,6 +59,7 @@ These are **independent** — run in any order or parallel.
 | `compute_solar_access.py` | `ivf-solar` | Hours of direct sun on the winter-solstice ground grid | `src.solar` |
 | `run_facade_solar.py` | `ivf-facade-solar` | Per-storey façade solar exposure + WHO threshold compliance | `src.solar.facade` |
 | `generate_facade_solar_report.py` | — | Interactive HTML dashboard from `run_facade_solar` output | (matplotlib + plotly) |
+| `run_solar_animation.py` | — | Per-hour sunlit GeoPackage + manifest for dataviz animations. Reuses the observers from `svf_streets_solar.gpkg` (same geometry as the seasonal envelope) and appends one `lit_T{HHMM}` bool column per timestep. Writes to `outputs/{site}/dataviz/solar/`. | `src.solar.animation` |
 | `compute_sectional_porosity.py` | — | Plan-view void fraction at z = 1.5 m as a wind-access proxy | (geopandas / shapely) |
 | `compute_occupancy_density.py` | — | Built-volume / open-space ratio per analysis unit | `src.svf_v2.utils` |
 | `classify_typology.py` | — | Settlement typology k-means clustering | `src.typology` |

@@ -5,6 +5,11 @@ Provides sun position computation, clear-sky irradiance models, and
 ray-casting-based sunlit/shadow determination for urban environments.
 """
 
+from src.solar.animation import (
+    build_animation_manifest,
+    compute_sun_positions_with_times,
+    sunlit_matrix_to_wide_gdf,
+)
 from src.solar.compute import (
     compute_solar_access_grid,
     compute_solar_access_streets,
@@ -63,4 +68,8 @@ __all__ = [
     "aggregate_by_building",
     "aggregate_by_building_floor",
     "WHO_SUNLIGHT_THRESHOLD_HOURS",
+    # animation (dataviz)
+    "compute_sun_positions_with_times",
+    "sunlit_matrix_to_wide_gdf",
+    "build_animation_manifest",
 ]
