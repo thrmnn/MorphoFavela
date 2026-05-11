@@ -17,13 +17,7 @@ other figure in the repo. Outputs land in `figures/exports/`.
 | 0.3 | `figures/fig_0_3_performance.py` | Environmental performance: wind/sun maps for 4 representative patches + ACH and sun-hours distributions |
 | 0.4 | `figures/fig_0_4_diagnostic.py` | ★ Headline. 4-state diagnostic taxonomy (5 site maps + 2D performance scatter + stacked bars across hillside/mixed/flatland aggregates) |
 | 0.5 | `figures/fig_0_5_predictors.py` | Statistical findings: RF permutation importance, partial-dependence curves, logistic forest plot with interactions, SVF→U_mean changepoint regression |
-| 0.6 A | `figures/fig_0_6_proposition_interventions.py` | **Proposition.** Counterfactual morphological levers (SVF +0.10, λp −0.10, σH ×0.5) → % of failing cells recovered, per typology + cost-effectiveness frontier |
-| 0.6 B | `figures/fig_0_6_proposition_sensitivity.py` | **Proposition.** Threshold-dial sensitivity audit: 3×3 (U_vent × sun_h) small multiples + cell-level stability map + per-typology compound-failure heatmap |
-| 0.6 C | `figures/fig_0_6_proposition_climate.py` | **Proposition.** Wind-stilling stress test: 4-state shift under {U×1.00, U×0.85, U×0.70} + cell-level state-flip maps + typology vulnerability ladder |
-
-Figures with the `proposition_` infix are *candidate* journal figures —
-pick one (or merge motifs) before final manuscript layout. The other
-`fig_0_x` figures are committed manuscript artefacts.
+| 0.6 | `figures/fig_0_6_climate_stress.py` | Wind-stilling stress test: 4-state shift under {U×1.00, U×0.85, U×0.70} + cell-level state-flip maps + typology vulnerability ladder |
 
 ## Regenerate
 
@@ -37,11 +31,8 @@ python docs/manuscript/figures/fig_0_4_diagnostic.py
 python scripts/run_diagnostic_models.py
 python docs/manuscript/figures/fig_0_5_predictors.py
 
-# Fig 0.6 candidates (each is standalone; A/B reuse build_cell_table /
-# fig_0_4 infrastructure).
-python docs/manuscript/figures/fig_0_6_proposition_interventions.py
-python docs/manuscript/figures/fig_0_6_proposition_sensitivity.py
-python docs/manuscript/figures/fig_0_6_proposition_climate.py
+# Fig 0.6 reuses the 4-state classifier from fig_0_4_diagnostic.
+python docs/manuscript/figures/fig_0_6_climate_stress.py
 ```
 
 Style is shared with `outputs/paper_figures/fig_style.py` (Tol muted palette,
