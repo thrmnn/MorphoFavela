@@ -31,3 +31,20 @@ by `scaffold_from_ivf.py VDG-P02` from the IVF vidigal envelope
 (per_patch_indicators + buildings/dtm_extended_300m).
 
 _generated 2026-05-18 15:42_
+
+## Launch readiness — council + premortem verdict (2026-05-18, LOCKED)
+
+**Do NOT 8-dir launch.** 3-lens council + premortem-auditor: the dense+steep
+mesh recipe holds <10% (fails ~85%) on VDG-P02 — categorically outside the
+band VDG-P07 (λp 0.285) defines. Plan = serial gated ladder:
+**G0** wait for VDG-P07 smoke#2 verdict → **G1** ONE instrumented mesh-only
+smoke (worst-incidence, no solver) as a *failure-boundary-characterization*
+experiment → **G2** 1-dir full → **G3** 8-dir. Deliverable this cycle = a
+parameterized failure boundary, not 8 results.
+
+Escalation pre-authorized (mesh-doctor, merge-before-refine): ① STL pre-merge
+of sub-cell/party-wall gaps (favela buildings share walls — physically
+truthful) ② planar-terrain transform (rotate 26.6°→flat; zero physical cost)
+③ drop prism layers (fine/better for ACH) ④ surgical post-merge refinement.
+No blind retries (operator directive). Full register: Airflow
+`tracking/premortem_VDG-P02_2026-05-18.md`.
