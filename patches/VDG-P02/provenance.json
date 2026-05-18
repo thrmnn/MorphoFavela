@@ -1,0 +1,62 @@
+{
+  "patch_id": "VDG-P02",
+  "site": "vidigal",
+  "stratum_id": "SVF1_SLP2_LP2",
+  "contract": "rectangular_domain_v1",
+  "contract_version": "1.0",
+  "crs": "EPSG:31983",
+  "crs_name": "SIRGAS 2000 / UTM zone 23S",
+  "candidate_rationale": {
+    "selected_as": "next pilot candidate after VDG-P07",
+    "reason": "only Vidigal patch with substantial terrestrial-LiDAR coverage",
+    "tls_overlap_pct_of_analysis_disk": 66.6,
+    "tls_reference": "convex hull of data/vidigal_tls/raw/vidigal_LoD2.gpkg",
+    "enables": "direct TLS validation of CFD building geometry",
+    "caveat": "extreme morphology (lambda_p~0.96, slope~26.6deg, SVF~0.07, 1825 bldgs) \u2014 hardest patch in catalog; dense+steep mesh recipe (nSurfaceLayers=1, maxThicknessToMedialRatio=0.05) applies but may be insufficient -> expect possible escalation to mesh-doctor / STL simplification. NOT launched: gated on VDG-P07 smoke recipe verdict + operator decision."
+  },
+  "snapshot": {
+    "by": "orcd-driving Claude (tablet->laptop ssh)",
+    "at": "2026-05-18T15:42:08",
+    "source": {
+      "repo": "Airflow",
+      "branch": "feature/rectangular-ach-pipeline",
+      "commit": "bf163be",
+      "commit_subject": "feat(cfd): scaffold VDG-P02 Vidigal pilot patch (rectangular_domain_v1)",
+      "path": "cases/VDG-P02/",
+      "generator": "scripts/pipeline/scaffold_from_ivf.py VDG-P02"
+    }
+  },
+  "inputs_sha256": {
+    "buildings.gpkg": "ce3875ba13e4626ca38ed48458640747921b195ff2e9c05dd65bb90f0939e510",
+    "patch_meta.json": "2c2fe6090e4defb8e459dc54a6326b64da56beb1162ec7f86169519993b0540a",
+    "preflight_report.json": "2461ecf6de70a203fb21b0b58dcdd55348bc650f0f54dab46b2fcd901cede8bc",
+    "terrain.tif": "d0da4321efad92301f3adfcd0c5dbaee296d0445c5f3a76bee2dac32e7313cad"
+  },
+  "patch_meta": {
+    "patch_id": "VDG-P02",
+    "center_x": 680356.7399997711,
+    "center_y": 7455970.080299854,
+    "stratum_id": "SVF1_SLP2_LP2",
+    "analysis_patch_shape": "circle",
+    "analysis_patch_diameter": 100.0,
+    "cfd_domain_radius": 250.0,
+    "svf": 0.0735294117647058,
+    "lambda_p": 0.9599937459051566,
+    "slope_deg": 26.61089937700736,
+    "porosity": 0.0539334982930186,
+    "sigma_h": 1.226023936910512,
+    "H_mean": 8.462857142857143,
+    "H_max_analysis": 13.93,
+    "building_coverage": 0.49337277271863306,
+    "domain_data_coverage": 1.0,
+    "n_buildings_in_domain": 1825,
+    "schema_version": 1,
+    "contract": "rectangular_domain_v1",
+    "domain_upstream_m": 119.65,
+    "domain_downstream_m": 258.95,
+    "domain_lateral_m": 500.0,
+    "domain_top_m": 69.65,
+    "domain_blockage_ratio": 0.02,
+    "source_data_required_m": 585.0
+  }
+}
