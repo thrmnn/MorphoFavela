@@ -1,0 +1,113 @@
+{
+  "patch_id": "VDG-P07",
+  "timestamp": "2026-05-18T13:54:11.966308+00:00",
+  "checks": [
+    {
+      "check": "files_present",
+      "pass": true,
+      "details": {
+        "buildings.gpkg": {
+          "exists": true,
+          "bytes": 634880
+        },
+        "terrain.tif": {
+          "exists": true,
+          "bytes": 42057
+        },
+        "patch_meta.json": {
+          "exists": true,
+          "bytes": 792
+        }
+      }
+    },
+    {
+      "check": "metadata_schema",
+      "pass": true,
+      "details": {
+        "keys_present": [
+          "patch_id",
+          "center_x",
+          "center_y",
+          "stratum_id",
+          "analysis_patch_shape",
+          "analysis_patch_diameter",
+          "cfd_domain_radius",
+          "svf",
+          "lambda_p",
+          "slope_deg",
+          "porosity",
+          "sigma_h",
+          "H_mean",
+          "H_max_analysis",
+          "building_coverage",
+          "domain_data_coverage",
+          "n_buildings_in_domain",
+          "schema_version",
+          "contract",
+          "domain_upstream_m",
+          "domain_downstream_m",
+          "domain_lateral_m",
+          "domain_top_m",
+          "domain_blockage_ratio",
+          "source_data_required_m"
+        ]
+      }
+    },
+    {
+      "check": "crs_consistency",
+      "pass": true,
+      "details": {
+        "buildings_epsg": 31983,
+        "terrain_epsg": 31983
+      }
+    },
+    {
+      "check": "building_data",
+      "pass": true,
+      "details": {
+        "n_rows": 1033,
+        "n_valid_height": 1028,
+        "fraction_valid": 0.995,
+        "patch_meta_expected": 1033
+      }
+    },
+    {
+      "check": "domain_coverage",
+      "pass": true,
+      "details": {
+        "buildings_in_domain": 1033,
+        "meta_n_buildings": 1033,
+        "terrain_covers_domain": true
+      }
+    },
+    {
+      "check": "z0_blocken",
+      "pass": true,
+      "details": {
+        "z0_ground": 0.02,
+        "z0_ground_source": "default_paved_urban_resolved",
+        "z0_inlet": 0.883,
+        "z0_inlet_source": "macdonald_1998",
+        "d_over_H": 0.532,
+        "displacement_d_m": 2.824,
+        "Ks_m": 0.3917,
+        "z_p_m": 0.47,
+        "blocken_ratio": 0.833,
+        "blocken_ok": true
+      }
+    },
+    {
+      "check": "no_collision",
+      "pass": true,
+      "details": {
+        "tmp_vdg-p07_test": {
+          "exists": false
+        },
+        "tmp_vdg-p07_campaign": {
+          "exists": false
+        }
+      }
+    }
+  ],
+  "pass_all": true
+}
