@@ -44,6 +44,7 @@ from shapely.geometry import Point
 
 # reuse the tested single-patch QGIS generator's helpers
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
 import build_qgis_project as bqp  # noqa: E402
 
 EPSG = 31983
@@ -169,6 +170,67 @@ def tls_layers(repo: Path, p02_disk):
     return lod2, hull_gdf, ov_gdf, pct
 
 
+# ---- real-run-equivalent metrics ------------------------------------------
+
+def compute_metrics(repo: Path, meta: dict) -> pd.DataFrame:
+    """Per-direction patch metrics via the *real* result-side pipeline.
+
+    Runs ``src.cfd_integration.aggregate_to_patch`` on the synthetic
+    samples — exactly the aggregation a real CFD return would go
+    through — so the table is "what the full real run would yield"
+    (the field is synthetic, the metrics machinery is not). Adds an
+    8-direction mean row.
+    """
+    from src.cfd_integration import aggregate_to_patch, load_patch_csv
+
+    cxy = (meta["center_x"], meta["center_y"])
+    H = meta["H_mean"]
+    root = repo / "data/vidigal/cfd_results_synthetic/VDG-P02"
+    rows = []
+    for d in WIND8:
+        pr = load_patch_csv(root / d / "sample_points.csv")
+        a = aggregate_to_patch(pr, cxy, 100.0, canopy_height=H,
+                               stagnation_threshold=0.5)
+        a1 = aggregate_to_patch(pr, cxy, 100.0, canopy_height=H,
+                                stagnation_threshold=LAWSON)
+        rows.append({
+            "dir": d,
+            "U_mean": round(a["U_mean"], 3),
+            "U_p10": round(a["U_p10"], 3),
+            "calm_%<0.5": round(a["stagnation_frac"] * 100, 1),
+            "stag_%<Lawson1.0": round(a1["stagnation_frac"] * 100, 1),
+            "vent_eff": round(a["vent_efficiency"], 3),
+            "ACH": round(a.get("ach_patch", float("nan")), 1),
+            "TKE_mean": round(a["TKE_mean"], 3),
+        })
+    df = pd.DataFrame(rows)
+    mean = {"dir": "8-dir mean", **{c: round(df[c].mean(), 3)
+            for c in df.columns if c != "dir"}}
+    return pd.concat([df, pd.DataFrame([mean])], ignore_index=True)
+
+
+def _metrics_table_html(df: pd.DataFrame) -> str:
+    head = "".join(f"<th>{c}</th>" for c in df.columns)
+    body = ""
+    for _, r in df.iterrows():
+        em = ' style="font-weight:700;border-top:2px solid #888"' \
+            if r["dir"] == "8-dir mean" else ""
+        body += "<tr>" + "".join(
+            f"<td{em}>{r[c]}</td>" for c in df.columns) + "</tr>"
+    return (
+        '<div style="position:fixed;bottom:14px;left:14px;z-index:9999;'
+        'background:#fff;border:1px solid #999;border-radius:5px;'
+        'padding:7px 9px;font:11px/1.35 monospace;max-height:42vh;'
+        'overflow:auto;box-shadow:0 1px 6px rgba(0,0,0,.25)">'
+        '<div style="font:600 11px sans-serif;margin-bottom:4px">'
+        'VDG-P02 patch metrics — real pipeline on '
+        '<span style="color:#b00">SYNTHETIC</span> field '
+        '(aggregate_to_patch, Ø100 m disk)</div>'
+        f'<table style="border-collapse:collapse"><tr>{head}</tr>{body}'
+        '</table></div>'
+    )
+
+
 # ---- QGIS bundle -----------------------------------------------------------
 
 def umag_ramp(f):  # blue(calm/bad)→cyan→yellow→red(windy) — turbo-ish
@@ -178,7 +240,7 @@ def umag_ramp(f):  # blue(calm/bad)→cyan→yellow→red(windy) — turbo-ish
 
 
 def build_qgis(repo: Path, out: Path, camp, meta, p02_disk_gdf,
-               lod2, hull_gdf, ov_gdf, pct) -> int:
+               lod2, hull_gdf, ov_gdf, pct, metrics: pd.DataFrame) -> int:
     qg = out / "qgis"
     (qg / "layers").mkdir(parents=True, exist_ok=True)
     (qg / "rasters").mkdir(parents=True, exist_ok=True)
@@ -279,17 +341,27 @@ def build_qgis(repo: Path, out: Path, camp, meta, p02_disk_gdf,
                          zipfile.ZIP_DEFLATED) as z:
         z.writestr("vidigal_patches.qgs", qgs)
 
+    metrics.to_csv(out / "metrics.csv", index=False)
+
     (out / "README.txt").write_text(
         "Vidigal patch inspection — QGIS bundle\n"
         "======================================\n\n"
         "Open vidigal_patches.qgz in QGIS (EPSG:31983, styles embedded).\n"
-        "Datasources are relative; keep this folder inside the IVF repo.\n\n"
+        "The folder is self-contained (terrain copied in); datasources are\n"
+        "relative to it.\n\n"
         f"VDG-P02 ∩ TLS LoD2 convex hull = {pct:.1f}% of the Ø100 m disk\n"
         "(provenance figure: 66.6%).\n\n"
-        "WARNING: the 'Synthetic U_mag' rasters are NOT a CFD solve. They\n"
-        "come from scripts/generate_synthetic_cfd_results.py (summary.json\n"
-        "carries synthetic:true + provenance) and exist for dataviz /\n"
-        "figure-format prototyping only. Do not cite as results.\n")
+        "metrics.csv — per-direction + 8-dir-mean patch metrics from the\n"
+        "REAL result-side pipeline (src.cfd_integration.aggregate_to_patch:\n"
+        "U_mean, U_p10, calm/Lawson stagnation %, ventilation efficiency,\n"
+        "ACH, TKE) run on the synthetic field — i.e. the numbers the full\n"
+        "real CFD run would produce, with a synthetic input.\n\n"
+        "WARNING: the synthetic U_mag rasters and the metrics derived from\n"
+        "them are NOT a CFD solve. They come from\n"
+        "scripts/generate_synthetic_cfd_results.py (summary.json carries\n"
+        "synthetic:true + provenance, model=blockage_v1+building_aware_lee)\n"
+        "and exist for dataviz / figure-format prototyping only. Do not\n"
+        "cite as results.\n")
 
     miss = [s for (_n, s, _p, _g, _st) in layers if not (out / s).exists()]
     if miss:
@@ -315,7 +387,7 @@ def _img_overlay(arr, transform, name, show):
 
 
 def build_html(repo: Path, out_html: Path, camp, meta, p02_disk_gdf,
-               lod2, hull_gdf, ov_gdf, pct) -> int:
+               lod2, hull_gdf, ov_gdf, pct, metrics: pd.DataFrame) -> int:
     def to4326(g):
         return g.to_crs(4326)
 
@@ -340,38 +412,34 @@ def build_html(repo: Path, out_html: Path, camp, meta, p02_disk_gdf,
         ).add_to(g_all)
     g_all.add_to(m)
 
-    # --- group 2: VDG-P02 ↔ TLS overlap
-    g_tls = folium.FeatureGroup(name="VDG-P02 ↔ TLS overlap", show=True)
-    folium.GeoJson(to4326(gpd.read_file(
-        repo / "patches/VDG-P02/inputs/buildings.gpkg").to_crs(EPSG)),
-        style_function=lambda _f: {"color": "#555", "weight": 0.3,
-                                   "fillColor": "#888", "fillOpacity": 0.35},
-        name="VDG-P02 buildings").add_to(g_tls)
-    folium.GeoJson(to4326(lod2),
-        style_function=lambda _f: {"color": "#0078c8", "weight": 0.5,
-                                   "fillColor": "#0078c8", "fillOpacity": 0.12},
-        name="TLS LoD2 footprints").add_to(g_tls)
-    folium.GeoJson(to4326(hull_gdf),
-        style_function=lambda _f: {"color": "#0078c8", "weight": 2,
-                                   "dashArray": "6 4", "fill": False},
-        tooltip="TLS LoD2 convex hull").add_to(g_tls)
-    folium.GeoJson(to4326(p02_disk_gdf),
-        style_function=lambda _f: {"color": "#ff7f00", "weight": 3,
-                                   "fill": False},
-        tooltip="VDG-P02 Ø100 m analysis disk").add_to(g_tls)
-    folium.GeoJson(to4326(ov_gdf),
-        style_function=lambda _f: {"color": "#00a050", "weight": 2,
-                                   "fillColor": "#00d070", "fillOpacity": 0.45},
-        tooltip=f"VDG-P02 ∩ TLS = {pct:.1f}% of the analysis disk"
-        ).add_to(g_tls)
-    folium.Marker(
-        [centre4326.y, centre4326.x],
-        icon=folium.DivIcon(html=(
-            '<div style="font:600 11px sans-serif;color:#b00;'
-            'background:#fff;border:1px solid #b00;padding:1px 4px;'
-            f'border-radius:3px">VDG-P02 — TLS overlap {pct:.1f}%</div>')),
-    ).add_to(g_tls)
-    g_tls.add_to(m)
+    # --- groups 2..7: each its own toggle in the layer control
+    def layer(name, gdf, style, show=True, tooltip=None):
+        fg = folium.FeatureGroup(name=name, show=show)
+        folium.GeoJson(to4326(gdf), style_function=lambda _f, s=style: s,
+                       tooltip=tooltip).add_to(fg)
+        fg.add_to(m)
+
+    layer("Buildings (VDG-P02 footprints)",
+          gpd.read_file(repo / "patches/VDG-P02/inputs/buildings.gpkg").to_crs(EPSG),
+          {"color": "#555", "weight": 0.3, "fillColor": "#888",
+           "fillOpacity": 0.35})
+    layer("TLS LoD2 footprints", lod2,
+          {"color": "#0078c8", "weight": 0.5, "fillColor": "#0078c8",
+           "fillOpacity": 0.12})
+    layer("TLS zone (LoD2 convex hull)", hull_gdf,
+          {"color": "#0078c8", "weight": 2, "dashArray": "6 4",
+           "fill": False}, tooltip="TLS LoD2 convex hull")
+    layer("VDG-P02 Ø100 m analysis disk", p02_disk_gdf,
+          {"color": "#ff7f00", "weight": 3, "fill": False},
+          tooltip="VDG-P02 Ø100 m analysis disk")
+    layer("VDG-P02 CFD domain (8-dir QC)",
+          bqp.domain_qc(cx, cy, meta),
+          {"color": "#777", "weight": 1, "dashArray": "4 3",
+           "fill": False}, show=False)
+    layer("VDG-P02 ∩ TLS overlap", ov_gdf,
+          {"color": "#00a050", "weight": 2, "fillColor": "#00d070",
+           "fillOpacity": 0.45},
+          tooltip=f"VDG-P02 ∩ TLS = {pct:.1f}% of the analysis disk")
 
     # --- group 3: synthetic U_mag (mean shown; 8 dirs available)
     x, y, u = (np.concatenate([_synthetic_umag(repo, "VDG-P02", d)[i]
@@ -400,6 +468,7 @@ def build_html(repo: Path, out_html: Path, camp, meta, p02_disk_gdf,
         '<span style="color:#b00">SYNTHETIC U_mag (not a CFD solve)</span>'
         '</div>')
     m.get_root().html.add_child(banner)
+    m.get_root().html.add_child(folium.Element(_metrics_table_html(metrics)))
     folium.LayerControl(collapsed=False).add_to(m)
     out_html.parent.mkdir(parents=True, exist_ok=True)
     m.save(str(out_html))
@@ -424,11 +493,12 @@ def main() -> int:
         print(f"  ! TLS overlap {pct:.1f}% deviates from provenance 66.6% "
               f"(hull definition may differ)", file=sys.stderr)
 
+    metrics = compute_metrics(repo, meta)
     out = repo / "outputs/vidigal/dataviz/vidigal_patch_viz"
     rc = build_qgis(repo, out, camp, meta, p02_disk_gdf,
-                    lod2, hull_gdf, ov_gdf, pct)
+                    lod2, hull_gdf, ov_gdf, pct, metrics)
     rc |= build_html(repo, repo / "outputs/vidigal/dataviz/vidigal_patch_inspection.html",
-                     camp, meta, p02_disk_gdf, lod2, hull_gdf, ov_gdf, pct)
+                     camp, meta, p02_disk_gdf, lod2, hull_gdf, ov_gdf, pct, metrics)
     return rc
 
 
