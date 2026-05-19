@@ -155,6 +155,52 @@ def test_generate_site_patch_filter_and_synthetic_flag(fake_site):
     assert len(df) > 0
 
 
+def test_building_aware_field_is_solid_inside_and_directional():
+    """Footprints kill the flow; the lee shelter flips with the wind."""
+    import geopandas as gpd
+    from shapely.geometry import box
+
+    bld = gpd.GeoDataFrame(
+        {"height": [12.0]}, geometry=[box(-10, -10, 10, 10)], crs="EPSG:31983"
+    )
+
+    def run(direction):
+        rng = np.random.default_rng(0)
+        return _generate_samples_rect(
+            0.0, 0.0, 60.0, 120.0, 80.0, 2.0, direction, rng, 4.0, buildings=bld
+        )
+
+    dn = run("N")
+    ds = run("S")
+
+    # inside the footprint → essentially no pedestrian flow
+    inside = dn[(dn.x.abs() < 8) & (dn.y.abs() < 8)]
+    assert len(inside) > 0
+    assert inside.U_mag.mean() < 0.5
+
+    # immediate lee vs immediate windward of the block (same direction):
+    # u_bg is symmetric in ±s, so a clear deficit is the wake itself.
+    # wind-from-N → air travels to world -y; downwind band is y∈[-40,-15].
+    def band(d, lo, hi):
+        m = (d.y > lo) & (d.y < hi) & (d.x.abs() < 8)
+        return d.loc[m, "U_mag"].mean()
+
+    lee_n = band(dn, -40, -15)      # behind block for N
+    windward_n = band(dn, 15, 40)   # in front of block for N
+    assert lee_n < 0.75 * windward_n
+
+    # same physical band, opposite wind: lee for N is open/windward for S
+    lee_s_region_under_s = band(ds, -40, -15)
+    assert lee_n < 0.8 * lee_s_region_under_s
+
+    # U_mag stays self-consistent with the components
+    rec = np.sqrt(dn.U**2 + dn.V**2 + dn.W**2)
+    assert np.allclose(dn.U_mag, rec, atol=1e-9)
+
+    assert _provenance(42, 2.0, 6.0, building_aware=True)["building_aware"] is True
+    assert "building_aware" in _provenance(42, 2.0, 6.0, building_aware=True)["model"]
+
+
 def test_generate_site_legacy_path_still_works(fake_site):
     """grid_spacing=None must preserve the circular-cloud API the
     analyze-pipeline tests depend on."""
