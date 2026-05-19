@@ -40,6 +40,8 @@ Common across both layouts:
 - `patch_id`: from `outputs/{site}/sampling_cfd/campaign_sampling/campaign_patches.csv` (e.g., `VDG-P01`, `MAR-P07`)
 - Sample-row schema and `summary.json` schema are identical between the two layouts (Layout B's parquet uses the same column names as Layout A's CSV).
 
+> **Synthetic results.** `scripts/generate_synthetic_cfd_results.py` emits this exact contract for pipeline exercise and figure prototyping before real OpenFOAM returns. Synthetic trees carry `"synthetic": true` plus a `provenance` block in every `summary.json` and are written to a **separate root** (`data/{site}/cfd_results_synthetic/`), never the ingestor-default `cfd_results/`. The loader ignores the extra keys, so a stray synthetic tree under `cfd_results/` would *not* self-flag — keep them physically separate.
+
 ### `sample_points.csv` (required)
 
 A horizontal slice of the velocity/TKE field at **pedestrian height z = 1.5 m**
