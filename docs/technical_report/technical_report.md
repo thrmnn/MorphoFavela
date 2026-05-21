@@ -657,30 +657,34 @@ SVF and slope are the dominant discriminators that CFD will quantify.
 
 ### 5.3 SVF and solar access decouple on sloped terrain
 
-![Figure 6. SVF↔solar dissociation on Vidigal.](figures/fig06_terrain_aspect.png)
+![Figure 6. Cross-site SVF↔solar dissociation on sloped terrain.](figures/fig06_terrain_aspect.png)
 
 **Figure 6.** Per-quadrant median **winter-solstice** solar hours as a
-function of SVF, on Vidigal's sloped cells (slope ≥ 5°, n = 6,812
-along-street points). The four traces — one per terrain-aspect
-quadrant (N / E / S / W) — do not collapse onto a single curve. At a
-fixed SVF ≈ 0.5 an N-facing cell receives ≈ 5 hours of direct sun on
-the winter solstice while an S-facing cell receives ≈ 0; the same is
-true at SVF ≈ 0.7 (8 hr vs 2 hr). Shaded bands show the inter-quartile
-range; trace segments where the SVF bin contains fewer than 30 cells
-are dashed (open markers) to flag the small-sample tails (W-quadrant
-beyond SVF ≈ 0.65). Underlay scatter is the full set of sample points
-coloured by aspect bearing, making the cloud's directional structure
-visible.
+function of SVF, on every site's sloped cells (slope ≥ 5°). Each panel
+holds a single site: four traces (N / E / S / W) plus the underlay
+scatter coloured by aspect bearing. Shaded bands show the
+inter-quartile range; trace segments where the SVF bin contains fewer
+than 30 cells are dashed (open markers) to flag the small-sample
+tails. The four available sites all show the same shape — the N
+trace sits well above the S trace at every SVF — and the per-site
+quadrant means in the summary panel give N − S ranging from +1.6 h
+(Vidigal) to +3.0 h (Rocinha). Maré is pending; its street-solar
+pipeline has not yet been run.
 
-The headline scientific claim: **SVF and solar hours are not
-interchangeable on sloped terrain in the southern hemisphere.** SVF
-measures total sky visibility; the winter sun in Rio (~22°S) crosses
-the sky to the north, so a south-facing cell can have abundant sky
-visibility while pointing away from the sun's actual path. The W
-quadrant earns the most direct sun by catching the late-afternoon
-descent into the north-west horizon; the S quadrant is structurally
-shaded for the entire winter solstice day. This dissociation is the
-reason the §7 CFD regression uses aspect (via `(sin α, cos α)`) and
+The headline scientific claim, now cross-site: **SVF and solar hours
+are not interchangeable on sloped terrain in the southern
+hemisphere.** SVF measures total sky visibility; the winter sun in
+Rio (~22°S) crosses the sky to the north, so a south-facing cell can
+have abundant sky visibility while pointing away from the sun's
+actual path. The W quadrant earns the most direct sun by catching the
+late-afternoon descent into the north-west horizon; the S quadrant is
+structurally shaded for the entire winter solstice day. This
+dissociation is *not* a hillside-only phenomenon: Rio das Pedras has
+only ≈ 1.3 k street points above the 5° threshold (vs ≈ 35–44 k on
+the hillside sites) but those few sloped cells reproduce the same
++2.9 h N − S contrast. The dissociation is southern-hemisphere
+physics; the typology controls only how many cells experience it. The
+§7 CFD regression therefore uses aspect (via `(sin α, cos α)`) and
 aspect–wind alignment alongside SVF as distinct predictors, rather
 than collapsing them.
 
@@ -692,15 +696,23 @@ SVF − solar (RdBu_r). Panel (d) of the supplementary figure is
 red-dominant across most of the favela: sky is open but the winter sun
 does not reach.
 
-Quadrant means on Vidigal sloped cells (winter solstice, 30-min
+Cross-site quadrant means on sloped cells (winter solstice, 30-min
 sampling, ray-cast against terrain + extruded LiDAR-height footprints):
-N = 3.32 h, E = 2.85 h, S = 1.70 h, W = 4.02 h, with N/E/S/W cell
-counts 1,363 / 2,595 / 2,488 / 366. Direct regression of solar hours
-on `(slope, λp, sin α, cos α)` reaches R² = 0.246 (n = 6,876,
-intercept 5.70 h, `aspect_cos` coefficient = +1.22 — i.e. moving from
-S- to N-facing under fixed slope and λp adds 2.4 h on average).
-Per-site SVF regressions on `(slope, λp, sin α, cos α)` are written
-to `outputs/{site}/morphometrics/aspect_regression.csv` (Vidigal SVF
+
+| Site | n | N | E | S | W | N − S |
+|---|--:|--:|--:|--:|--:|--:|
+| Vidigal | 6,812 | 3.32 | 2.85 | 1.70 | 4.02 | +1.62 |
+| Rocinha | 34,771 | 3.60 | 1.55 | 0.62 | 2.23 | +2.99 |
+| Complexo do Alemão | 43,741 | 4.94 | 3.62 | 2.06 | 3.29 | +2.88 |
+| Rio das Pedras | 1,346 | 3.41 | 1.49 | 0.54 | 1.77 | +2.87 |
+| Maré | {mare_aspect_n} | {mare_aspect_N} | {mare_aspect_E} | {mare_aspect_S} | {mare_aspect_W} | {mare_aspect_NS} |
+
+Direct regression of solar hours on `(slope, λp, sin α, cos α)` on
+Vidigal reaches R² = 0.246 (n = 6,876, intercept 5.70 h,
+`aspect_cos` coefficient = +1.22 — i.e. moving from S- to N-facing
+under fixed slope and λp adds 2.4 h on average). Per-site SVF
+regressions on `(slope, λp, sin α, cos α)` are written to
+`outputs/{site}/morphometrics/aspect_regression.csv` (Vidigal SVF
 R² = 0.599) with per-quadrant summaries in
 `aspect_quadrant_summary.csv`. Cross-site signal: Vidigal sloped grid
 cells show SVF means N = 0.38 / E = 0.44 / S = 0.51 / W = 0.57 — the
@@ -1228,6 +1240,36 @@ the per-cell 4-state label; the figure script
 (`docs/manuscript/figures/fig_0_7_proposition_clustering.py`) runs
 the libpysal/esda statistics on it.
 
+![Figure 0.8 — Terrain confound: does typology survive slope control?](figures/fig_0_8_terrain_confound.png)
+
+**Figure 0.8.** Terrain confound test for the headline typology
+finding. Panel (a) stratifies the 4-state diagnostic by slope bin
+(0–5°, 5–15°, 15–25°, ≥ 25°) per site; compound-failure share rises
+monotonically with slope on Vidigal (0 % → 22 %) and Rocinha
+(3 % → 9 %). Panel (b) maps each site coloured by slope bin with
+compound-failure cells outlined in red — the outlines concentrate on
+the steeper (darker blue) cells in hillside sites. Panel (c) is the
+proposition: % compound-failure cells per typology, *stratified by
+slope bin*. **At slope < 5° the hillside − flatland gap is −2 pp; at
+the steepest slope bin it is +2 pp.** When slope is controlled the
+typology label nearly stops doing work, which means most of the
+"hillside is more compound-failure-prone" signal in Fig 0.4 and the
+typology ladder in Fig 0.6 is *slope acting through the typology
+label*, not a residual morphology effect. The honest reading: slope
+is a stronger predictor than typology categoricals once both are
+available. The n in each bin is shown — the flatland steep-bin
+(n = 26) and hillside flat-bin (n = 40) are small, so the proposition
+is the rough magnitude (gap close to zero at controlled slope), not
+the sign of an individual pp value. Maré is excluded until its
+street-solar pipeline lands; the flatland row in panel (c) is Rio das
+Pedras only. Synthetic CFD; the slope-stratification operates on the
+4-state label so the same panel re-renders unchanged once real CFD
+arrives. Pipeline:
+`docs/manuscript/figures/fig_0_8_terrain_confound.py` reads
+`outputs/{site}/cfd_analysis/grid_with_cfd.gpkg`, aggregates
+street-solar into 10 m cells, merges `slope_deg` from
+`grid_metrics.gpkg`, and produces the panel set.
+
 ---
 
 ## 8. Repository Structure
@@ -1564,7 +1606,8 @@ python scripts/validate_svf_against_umep.py --site <site> \
 | **3** SVF–λp coupling | `python outputs/paper_figures/fig03_svf_lambda_coupling.py` | `outputs/paper_figures/exports/fig03_svf_lambda_coupling.png` |
 | **4** Sampling design | `python outputs/paper_figures/fig04_sampling_design.py` | `outputs/paper_figures/exports/fig04_sampling_design.png` |
 | **5** Morphometric maps | `python outputs/paper_figures/fig05_morphometric_maps.py` | `outputs/paper_figures/exports/fig05_morphometric_maps.png` |
-| **6** SVF↔solar dissociation | `python outputs/paper_figures/fig06_terrain_aspect.py` | `outputs/paper_figures/exports/fig06_terrain_aspect.png` |
+| **6** SVF↔solar dissociation (cross-site) | `python outputs/paper_figures/fig06_terrain_aspect.py` | `outputs/paper_figures/exports/fig06_terrain_aspect.png` |
+| **0.8** Terrain confound (slope ladder) | `python docs/manuscript/figures/fig_0_8_terrain_confound.py` | `docs/manuscript/figures/exports/fig_0_8_terrain_confound.png` |
 | **7** Vidigal solar envelope (winter / annual / summer) | `python scripts/run_street_solar.py --site vidigal && python outputs/paper_figures/fig07_solar_envelope_vidigal.py` | `outputs/paper_figures/exports/fig07_solar_envelope_vidigal.png` (+ `fig07a/b/c_*.png` standalone panels) |
 | **S — terrain-aspect spatial** | `python outputs/paper_figures/figS_terrain_aspect_spatial.py` | `outputs/paper_figures/exports/figS_terrain_aspect_spatial.png` |
 | **S1** Correlation matrices | `python outputs/paper_figures/figS1_correlation_matrices.py` | `outputs/paper_figures/exports/figS1_correlation_matrices.png` |
@@ -1701,6 +1744,7 @@ PDF, because external readers trust the rendered artefact.
 | 0.5 | Manuscript: predictors + typology contrast | `fig_0_5_predictors.png` |
 | 0.6 | Manuscript: climate-stress robustness (wind-stilling 4-state shift) | `fig_0_6_climate_stress.png` |
 | 0.7 | Manuscript: spatial clustering of compound failure (proposition) | `fig_0_7_clustering.png` |
+| 0.8 | Manuscript: terrain confound (slope-stratified 4-state shares) | `fig_0_8_terrain_confound.png` |
 
 All figures in `docs/technical_report/figures/`.
 
