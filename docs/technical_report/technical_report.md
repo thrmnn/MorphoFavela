@@ -57,7 +57,7 @@ At time of writing, the pipeline has produced:
   spacing and SVF-priority weighting to oversample health-relevant low-sky-
   view conditions.
 - **A complete CFD integration pipeline** (`src/cfd_integration/`,
-  63 passing tests) ready to ingest OpenFOAM results when the simulation
+  71 passing tests) ready to ingest OpenFOAM results when the simulation
   campaign completes in the parallel CFD repository. The result-side
   analysis pipeline (`scripts/analyze_cfd_results.py`) is shipped and
   synthetic-validated end-to-end on all 5 sites; awaiting the first real
@@ -149,7 +149,7 @@ informal settlements:
 | Rocinha | 0.80 km² | hillside | 14,443 | 8,972 | 8.1 m | 3.30 h |
 | Rio das Pedras | 0.70 km² | flatland | 11,276 | 7,046 | 8.7 m | 3.14 h |
 | Complexo do Alemão | 1.97 km² | mixed | 28,783 | 19,708 | 5.3 m | 5.03 h |
-| Maré | 4.34 km² | flatland | 39,333 | 43,419 | 7.1 m | {mare_annual} h |
+| Maré | 4.34 km² | flatland | 39,333 | 43,419 | 7.1 m | 7.07 h |
 | **TOTAL** | **8.11 km²** | | **98,435** | **82,314** | — | — |
 
 *Extended buildings = site footprints plus context buildings within a 300 m
@@ -705,7 +705,7 @@ sampling, ray-cast against terrain + extruded LiDAR-height footprints):
 | Rocinha | 34,771 | 3.60 | 1.55 | 0.62 | 2.23 | +2.99 |
 | Complexo do Alemão | 43,741 | 4.94 | 3.62 | 2.06 | 3.29 | +2.88 |
 | Rio das Pedras | 1,346 | 3.41 | 1.49 | 0.54 | 1.77 | +2.87 |
-| Maré | {mare_aspect_n} | {mare_aspect_N} | {mare_aspect_E} | {mare_aspect_S} | {mare_aspect_W} | {mare_aspect_NS} |
+| Maré | 8,228 | 4.96 | 5.24 | 4.59 | 5.91 | +0.37 |
 
 Direct regression of solar hours on `(slope, λp, sin α, cos α)` on
 Vidigal reaches R² = 0.246 (n = 6,876, intercept 5.70 h,
@@ -757,7 +757,7 @@ both site-agnostic — the canonical fig07 wrapper for Vidigal is a
 | Rocinha | 38,690 | 2.08 | 3.30 | 4.56 | 67.1 % | 49.1 % | 34.1 % | 2.48 |
 | Complexo do Alemão | 47,508 | 3.22 | 5.03 | 6.66 | 44.2 % | 20.9 % | 12.9 % | 3.45 |
 | Rio das Pedras | 16,905 | 1.99 | 3.14 | 4.22 | 62.5 % | 44.0 % | 29.7 % | 2.23 |
-| Maré | {mare_n} | {mare_winter} | {mare_annual} | {mare_summer} | {mare_who_w} % | {mare_who_a} % | {mare_who_s} % | {mare_range} |
+| Maré | 84,147 | 5.20 | 7.07 | 8.70 | 27.8 % | 9.9 % | 5.3 % | 3.50 |
 
 Two structural patterns:
 
@@ -765,7 +765,7 @@ Two structural patterns:
   (3.45 h) have the largest winter→summer recoveries — terrain shadowing
   on hillside structures depresses the winter floor harder, which the
   high summer sun then erases. The flatland sites recover less in
-  absolute terms (Rocinha 2.48 h, RdP 2.23 h, Maré {mare_range} h)
+  absolute terms (Rocinha 2.48 h, RdP 2.23 h, Maré 3.50 h)
   because their winter floor was less depressed: the fabric is denser
   and shadowing is canyon-driven rather than terrain-driven, so summer
   doesn't lift the worst cells as far.
@@ -786,7 +786,7 @@ Cross-site comparison by aspect quadrant:
 show large winter N–S contrasts (Rocinha N − S = +2.80 h; Vidigal
 +1.56 h) — the §5.3 dissociation made cross-site. Flatland sites
 collapse: Rio das Pedras' winter N − S contrast is just +0.55 h
-(Maré {mare_NS_w} h). Complexo do Alemão's mixed terrain shows a
+(Maré +0.79 h). Complexo do Alemão's mixed terrain shows a
 hillside-like +2.74 h winter contrast.
 
 The standalone single-panel versions of Figure 7 (a/b/c) live at
@@ -1022,7 +1022,7 @@ The code to ingest CFD results, aggregate them onto the 10 m
 morphometric grid, and combine directional simulations into an
 annualised ensemble is implemented in `src/cfd_integration/`
 (~1,100 lines across five modules: `schema.py`, `io.py`, `aggregate.py`,
-`metrics.py`, `weighting.py`) and covered by **63 passing unit tests**.
+`metrics.py`, `weighting.py`) and covered by **71 passing unit tests**.
 
 **Input contract** (documented fully in
 `src/cfd_integration/README.md`, provided to the CFD agent as the
@@ -1367,7 +1367,7 @@ Key scripts:
 | Minimum inter-patch spacing (80 m) | PASS | realised minimum: 80–85 m across sites |
 | Resolution sensitivity (10 m justified) | PASS | Figure S3; 10 m captures features 20 m loses |
 | 12-strata coverage (≥ 1 site per stratum) | PASS | all 12 strata non-empty when pooled |
-| CFD integration unit tests | PASS | 63 / 63 tests |
+| CFD integration unit tests | PASS | 71 / 71 tests |
 
 ---
 
@@ -1551,8 +1551,9 @@ on Linux, `brew install gdal` on macOS) before `pip install`.
 ### 12.2 Smoke test (≤ 2 min on a fresh clone)
 
 ```bash
-pytest tests/ -m "not integration" -q --tb=short
-# → 508 tests pass; 69 integration tests deselected
+python -m pytest tests/ -m "not integration" -q --tb=short
+# → 552 tests pass; 69 integration tests deselected
+# (use `python -m pytest` to bypass any older user-site `pytest` on PATH)
 ```
 
 If this passes, the codebase is loaded correctly. If GDAL or pyvista
@@ -1653,7 +1654,9 @@ Regenerating them is in the next-steps backlog.
 
 ```bash
 python docs/technical_report/build_pdf.py
-# → 15.5 MB PDF, ~10 s on standard hardware (pandoc → WeasyPrint)
+# → 30.1 MB PDF, ~15 s on standard hardware (pandoc → WeasyPrint)
+# build_pdf.py prints the exact size and elapsed seconds at the end so future
+# audits can verify these numbers against the live run, not against the prose.
 ```
 
 The build is deterministic given a fixed `technical_report.md`.

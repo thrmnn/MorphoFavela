@@ -35,7 +35,7 @@ contract.
 ```bash
 make test          # full suite, fail-fast
 make test-fast     # only the synthetic-geometry tests (≤ 5 s total)
-pytest tests/test_cfd_integration -v   # single-module deep dive
+python -m pytest tests/test_cfd_integration -v   # single-module deep dive
 ```
 
 Tests are organised by module:
