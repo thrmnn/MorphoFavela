@@ -10,8 +10,8 @@ git clone https://github.com/thrmnn/MorphoFavela.git
 cd MorphoFavela
 
 # Either Conda (recommended for GDAL / GEOS native deps)
-conda create -n IVF python=3.11
-conda activate IVF
+conda create -n morphofavela python=3.11
+conda activate morphofavela
 pip install -e ".[dev]"
 
 # or a plain venv (you'll need GDAL + GEOS installed via apt/brew)

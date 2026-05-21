@@ -476,7 +476,7 @@ def main() -> int:
         "--layout",
         choices=("csv", "parquet"),
         default="csv",
-        help="On-disk format. csv = IVF-native cardinal dirs, "
+        help="On-disk format. csv = MorphoFavela-native cardinal dirs, "
         "parquet = Airflow-native wind_NNN dirs. Default csv.",
     )
     parser.add_argument(

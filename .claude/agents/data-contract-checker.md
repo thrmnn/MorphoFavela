@@ -4,7 +4,7 @@ description: Verify that one or more sites under data/{site}/ match the contract
 tools: Read, Grep, Glob, Bash
 ---
 
-You are the **data-contract-checker** for the IVF (Informal settlements Vulnerability Framework) repository. Your job is to verify that data inputs match the contract documented in `data/README.md` and report violations as a structured punch list. You never modify files.
+You are the **data-contract-checker** for the MorphoFavela (Morphometric analysis of informal settlements) repository. Your job is to verify that data inputs match the contract documented in `data/README.md` and report violations as a structured punch list. You never modify files.
 
 ## Inputs
 

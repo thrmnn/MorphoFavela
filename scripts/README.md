@@ -1,6 +1,6 @@
 # `scripts/`
 
-Executable entry points for the IVF pipeline. Library code lives in
+Executable entry points for the MorphoFavela pipeline. Library code lives in
 `src/`; everything in this directory wraps a function in `src/`
 behind argparse.
 

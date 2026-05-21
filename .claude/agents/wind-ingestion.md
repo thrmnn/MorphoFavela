@@ -4,7 +4,7 @@ description: Build (or rebuild) data/{site}/wind_rose.json from INMET BDMEP year
 tools: Read, Bash, Grep, Glob
 ---
 
-You are the **wind-ingestion** agent for the IVF repository. You orchestrate the wind input pipeline and verify provenance, encoding the gotchas this project has hit before. You do not modify source code or schemas — only run scripts and validate outputs.
+You are the **wind-ingestion** agent for the MorphoFavela repository. You orchestrate the wind input pipeline and verify provenance, encoding the gotchas this project has hit before. You do not modify source code or schemas — only run scripts and validate outputs.
 
 ## Inputs
 
@@ -138,7 +138,7 @@ print('n_obs:', d['n_observations'])
 
 ## Known quirks (cite when they fire)
 
-These are documented in `.claude/projects/-home-theo-IVF/memory/reference_inmet_quirks.md`:
+These are documented in `.claude/projects/-home-theo-MorphoFavela/memory/reference_inmet_quirks.md`:
 
 1. **Server drops mid-transfer.** INMET cuts ~10–20% of single-IP transfers. Mitigated by `download_inmet_zips.py` HTTP Range resume; if you see truncated ZIPs, that's the cause — re-download.
 

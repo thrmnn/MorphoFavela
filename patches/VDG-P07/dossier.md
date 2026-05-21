@@ -1,6 +1,6 @@
 # Patch dossier — VDG-P07 (Vidigal, Rio de Janeiro)
 
-> IVF↔CFD contract-v1 traceability record. Authored on the patch-overlay-prep
+> MorphoFavela↔CFD contract-v1 traceability record. Authored on the patch-overlay-prep
 > branch `feat/vdg-p07-overlay-prep`. This file is the single provenance anchor
 > for everything under `patches/VDG-P07/`.
 
@@ -11,7 +11,7 @@
 | `patch_id` | **VDG-P07** |
 | Site | vidigal (Vidigal favela, Rio de Janeiro) |
 | Stratum | `SVF3_SLP1_LP1` |
-| Contract | `rectangular_domain_v1` (IVF↔CFD, v1.0, 2026-05-08) |
+| Contract | `rectangular_domain_v1` (MorphoFavela↔CFD, v1.0, 2026-05-08) |
 | CRS | **EPSG:31983** — SIRGAS 2000 / UTM zone 23S (verified on buildings + terrain) |
 | Inputs origin | CFD repo `Airflow`, branch `feature/rectangular-ach-pipeline`, commit `78af4241a5e597d200c12a89be58eeb593ff27ec` ("feat(cfd): scaffold VDG-P07 Vidigal pilot patch (rectangular_domain_v1)") |
 | Snapshot taken | by the patch-overlay-prep agent (tablet→laptop over ssh), from `~/Airflow/cases/VDG-P07/` |
@@ -83,7 +83,7 @@ z0_blocken ok, no_collision). Vendored verbatim.
 
 ## 4. CFD linkage
 
-- Contract: IVF `src/cfd_integration/rectangular_domain_v1.json` (domain
+- Contract: MorphoFavela `src/cfd_integration/rectangular_domain_v1.json` (domain
   sizing/blockage) + `src/cfd_integration/README.md` (result format).
 - Per-direction georef params are emitted by the CFD case scaffold into
   `tmp_<slug>_dir<NNN>/case_meta.json`:
@@ -105,7 +105,7 @@ z0_blocken ok, no_collision). Vendored verbatim.
 
 ## 5. Wind rose (composite weights)
 
-`IVF/data/vidigal/wind_rose.json` — **`quality_flag: "measured"`** (NOT a
+`MorphoFavela/data/vidigal/wind_rose.json` — **`quality_flag: "measured"`** (NOT a
 placeholder): INMET Forte de Copacabana **A652**, 2015–2024, n=85,103
 (1,214 calm <0.5 m/s excluded). Strongly bimodal sea-breeze regime —
 E `f=0.303`, W `f=0.228` (E+W ≈ 53 %), SE highest mean speed 3.37 m/s.

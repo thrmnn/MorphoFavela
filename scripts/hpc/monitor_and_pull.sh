@@ -3,12 +3,12 @@
 # Monitor HPC jobs, pull results when done, and generate visualizations.
 #
 # Usage:
-#   bash scripts/hpc/monitor_and_pull.sh                # monitor all IVF jobs
+#   bash scripts/hpc/monitor_and_pull.sh                # monitor all MorphoFavela jobs
 #   bash scripts/hpc/monitor_and_pull.sh --once          # check once, don't loop
 #   bash scripts/hpc/monitor_and_pull.sh --poll 120      # check every 120s (default: 300)
 #
 # What it does:
-#   1. Polls SLURM queue for your IVF pipeline jobs
+#   1. Polls SLURM queue for your MorphoFavela pipeline jobs
 #   2. When a job completes, pulls outputs via rsync
 #   3. Runs local visualization generation for completed areas
 #   4. Logs everything to logs/monitor.log
@@ -82,7 +82,7 @@ pull_area() {
         --exclude='*.stl' --exclude='*.vtk' --exclude='*.npz' \
         --exclude='*' \
         -e ssh \
-        "orcd:~/IVF/outputs/${area}/" \
+        "orcd:~/MorphoFavela/outputs/${area}/" \
         "outputs/${area}/" \
         >> "${LOG_FILE}" 2>&1
 
@@ -91,7 +91,7 @@ pull_area() {
         --include="pipeline_*.out" --include="pipeline_*.err" \
         --exclude='*' \
         -e ssh \
-        "orcd:~/IVF/logs/" \
+        "orcd:~/MorphoFavela/logs/" \
         "logs/" \
         >> "${LOG_FILE}" 2>&1
 
@@ -296,7 +296,7 @@ while true; do
                 generate_comparison "${ALL_COMPLETED[@]}"
             fi
         else
-            log "No IVF pipeline jobs found in queue or recent history"
+            log "No MorphoFavela pipeline jobs found in queue or recent history"
         fi
         break
     fi

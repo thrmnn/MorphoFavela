@@ -27,7 +27,7 @@ deep-canyon). The dense+steep mesh recipe applies; it may still hit the
 
 ## Inputs (vendored, sha256 in inputs/SHA256SUMS)
 buildings.gpkg, terrain.tif, patch_meta.json, preflight_report.json — generated
-by `scaffold_from_ivf.py VDG-P02` from the IVF vidigal envelope
+by `scaffold_from_ivf.py VDG-P02` from the MorphoFavela vidigal envelope
 (per_patch_indicators + buildings/dtm_extended_300m).
 
 _generated 2026-05-18 15:42_

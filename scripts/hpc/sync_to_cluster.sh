@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Sync IVF repo + data to HPC cluster, and pull results back.
+# Sync MorphoFavela repo + data to HPC cluster, and pull results back.
 #
 # Usage:
 #   # Push code + data to cluster:
-#   ./scripts/hpc/sync_to_cluster.sh push user@cluster:/path/to/IVF
+#   ./scripts/hpc/sync_to_cluster.sh push user@cluster:/path/to/MorphoFavela
 #
 #   # Pull results from cluster:
-#   ./scripts/hpc/sync_to_cluster.sh pull user@cluster:/path/to/IVF
+#   ./scripts/hpc/sync_to_cluster.sh pull user@cluster:/path/to/MorphoFavela
 #
 #   # Dry-run (see what would transfer):
-#   ./scripts/hpc/sync_to_cluster.sh push user@cluster:/path/to/IVF --dry-run
+#   ./scripts/hpc/sync_to_cluster.sh push user@cluster:/path/to/MorphoFavela --dry-run
 # ============================================================================
 
 set -euo pipefail
@@ -23,9 +23,9 @@ if [[ -z "$ACTION" || -z "$REMOTE" ]]; then
     echo "Usage: $0 {push|pull} user@host:/remote/path [--dry-run]"
     echo ""
     echo "Examples:"
-    echo "  $0 push theo@hpc.uni.edu:~/IVF"
-    echo "  $0 pull theo@hpc.uni.edu:~/IVF"
-    echo "  $0 push theo@hpc.uni.edu:~/IVF --dry-run"
+    echo "  $0 push theo@hpc.uni.edu:~/MorphoFavela"
+    echo "  $0 pull theo@hpc.uni.edu:~/MorphoFavela"
+    echo "  $0 push theo@hpc.uni.edu:~/MorphoFavela --dry-run"
     exit 1
 fi
 

@@ -1,4 +1,4 @@
-# IVF — Informal Settlements Vulnerability Framework
+# MorphoFavela — Morphometric analysis of informal settlements
 
 A Python pipeline for the morphometric and CFD-coupled analysis of pedestrian-level wind, solar, and ventilation in dense informal urban form. Targeted at five Rio de Janeiro favelas (Vidigal, Rocinha, Complexo do Alemão, Rio das Pedras, Maré) but written to onboard new sites without code changes.
 
@@ -67,7 +67,7 @@ one site" path. Substitute another site name for `vidigal` to repeat.
 
 ```bash
 git clone https://github.com/thrmnn/MorphoFavela.git && cd MorphoFavela
-conda create -n IVF python=3.11 && conda activate IVF
+conda create -n morphofavela python=3.11 && conda activate morphofavela
 pip install -e ".[dev]"
 ```
 
@@ -183,7 +183,7 @@ PNGs already published in the technical report live in
 
 ```bash
 git clone https://github.com/thrmnn/MorphoFavela.git && cd MorphoFavela
-conda create -n IVF python=3.11 && conda activate IVF
+conda create -n morphofavela python=3.11 && conda activate morphofavela
 pip install -e ".[dev]"          # add ".[gpu]" for PyTorch3D-backed SVF
 ```
 
@@ -206,7 +206,7 @@ contain and where each file comes from — is documented in
 ## Project Structure
 
 ```
-IVF/
+MorphoFavela/
 ├── README.md, ROADMAP.md, CLAUDE.md      # Entry points (see also Repository Map above)
 │
 ├── src/                                  # Library code (importable)

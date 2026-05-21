@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """VTI → georeferenced GeoTIFF for the LMA τ / ACH overlay deliverable.
 
-Implements the 3-member council verdict (unanimous) for the IVF↔CFD
+Implements the 3-member council verdict (unanimous) for the MorphoFavela↔CFD
 georeferencing step. It supersedes the *composite* of
 ``Airflow/scripts/postprocess/lma_aggregate_directions.py``, which
 (1) averages τ arithmetically, (2) defaults to uniform 1/N, (3) never
@@ -41,10 +41,10 @@ Verdict conformance (numbers = verdict points):
     outside-disk==nodata. --dry-run prints the resolved georef_spec;
     --self-test runs the synthetic gate with NO CFD input.
 
-Run (env: miniconda3/envs/IVF):
+Run (env: miniconda3/envs/MorphoFavela):
   vti2geotiff.py --self-test
-  vti2geotiff.py --patch VDG-P07 --repo-root ~/IVF --smoke-vti PATH --dry-run
-  vti2geotiff.py --patch VDG-P07 --repo-root ~/IVF       # full 8-dir composite
+  vti2geotiff.py --patch VDG-P07 --repo-root ~/MorphoFavela --smoke-vti PATH --dry-run
+  vti2geotiff.py --patch VDG-P07 --repo-root ~/MorphoFavela       # full 8-dir composite
 """
 from __future__ import annotations
 
@@ -393,7 +393,7 @@ def main():
     try:
         import pyvista as pv
     except ImportError:
-        raise SystemExit("needs env miniconda3/envs/IVF (pyvista).")
+        raise SystemExit("needs env miniconda3/envs/MorphoFavela (pyvista).")
 
     # disk bbox + halo → snapped target grid (verdict §5)
     b = (cx - ANALYSIS_RADIUS_M - HALO_M, cy - ANALYSIS_RADIUS_M - HALO_M,

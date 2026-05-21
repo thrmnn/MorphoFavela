@@ -31,7 +31,7 @@ from scripts.generate_synthetic_cfd_results import generate_site  # noqa: E402
 def fake_site(tmp_path, monkeypatch):
     """Build a self-contained fake site under tmp_path with all required files.
 
-    Mirrors the IVF layout: outputs/{site}/sampling_cfd/campaign_sampling/
+    Mirrors the MorphoFavela layout: outputs/{site}/sampling_cfd/campaign_sampling/
     campaign_patches.csv, outputs/{site}/morphometrics/grid/grid_metrics.gpkg,
     data/{site}/wind_rose.json. The pipeline is rerooted via monkeypatch on
     PROJECT_ROOT in both the generator and orchestrator modules.

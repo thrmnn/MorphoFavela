@@ -9,9 +9,9 @@ modification.
 
 ## Required outputs per simulation
 
-Each simulation = **one patch × one wind direction**. For each, produce one of two equivalent on-disk layouts; the IVF ingestion side auto-detects (`load_campaign_results`).
+Each simulation = **one patch × one wind direction**. For each, produce one of two equivalent on-disk layouts; the MorphoFavela ingestion side auto-detects (`load_campaign_results`).
 
-### Layout A — IVF native (CSV + cardinal direction dirs)
+### Layout A — MorphoFavela native (CSV + cardinal direction dirs)
 
 ```
 data/{site}/cfd_results/{patch_id}/{wind_direction}/

@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python /home/theo/IVF/.claude/hooks/check_report_sync.py"
+            "command": "python /home/theo/MorphoFavela/.claude/hooks/check_report_sync.py"
           }
         ]
       }

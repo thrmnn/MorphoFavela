@@ -22,8 +22,8 @@ the RDP-P20 case_meta sample: wind 45° → rot 135°). Phase 3 consumes the
 authoritative `rotation_rad_local_ccw` from each direction's case_meta.json
 and regenerates this QC layer exactly; the attribute `indicative=1` marks it.
 
-Run:  ~/miniconda3/envs/IVF/bin/python scripts/cfd_overlay/build_qgis_project.py \
-          --patch VDG-P07 [--repo-root ~/IVF]
+Run:  ~/miniconda3/envs/MorphoFavela/bin/python scripts/cfd_overlay/build_qgis_project.py \
+          --patch VDG-P07 [--repo-root ~/MorphoFavela]
 """
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Technical Report Generator for IVF Urban Morphology Analysis.
+Technical Report Generator for MorphoFavela Urban Morphology Analysis.
 
 Collects analysis outputs for one or more areas and generates a technical
 report in Markdown and/or PDF format.
@@ -483,7 +483,7 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
         lines.append(f"## Comparative Study: {area_label}\n")
     else:
         lines.append(f"## Area Study: {area_label}\n")
-    lines.append("**Informal Ventilation Flows (IVF) Project**")
+    lines.append("**Informal Ventilation Flows (MorphoFavela) Project**")
     lines.append("Massachusetts Institute of Technology")
     lines.append(f"**Date:** {now}")
     lines.append("")
@@ -537,7 +537,7 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
 
     # ── 2. Methodology & Workflow ────────────────────────────────────────
     lines.append(_section_header(2, "2. Methodology & Workflow"))
-    lines.append("The IVF analysis pipeline comprises the following phases:\n")
+    lines.append("The MorphoFavela analysis pipeline comprises the following phases:\n")
     phases = [
         (
             "Data Acquisition & Preprocessing",
@@ -821,7 +821,7 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
     lines.append("")
 
     lines.append("---\n")
-    lines.append(f"*Report generated on {now} by `scripts/generate_report.py` | IVF Project, MIT*")
+    lines.append(f"*Report generated on {now} by `scripts/generate_report.py` | MorphoFavela Project, MIT*")
 
     return "\n".join(lines)
 
@@ -835,7 +835,7 @@ def _apply_swiss_style():
     """Configure matplotlib for Swiss design aesthetics.
 
     Builds on the publication base style from src.cartography and overlays
-    the IVF report-specific typography and colour choices.
+    the MorphoFavela report-specific typography and colour choices.
     """
     # Start from the shared publication base
     apply_publication_style()
@@ -985,7 +985,7 @@ def _pdf_title_page(pdf: PdfPages, areas_data: List[Dict], mode: str):
     fig.text(
         0.5,
         0.38,
-        "Informal Ventilation Flows (IVF)",
+        "Informal Ventilation Flows (MorphoFavela)",
         ha="center",
         va="center",
         fontsize=11,
@@ -1758,7 +1758,7 @@ def generate_pdf(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate IVF technical report (Markdown / PDF).",
+        description="Generate MorphoFavela technical report (Markdown / PDF).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent("""\
         Examples:

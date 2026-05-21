@@ -79,7 +79,7 @@ run_svf() {
 # Main
 # ---------------------------------------------------------------------------
 
-echo "IVF -- SVF v2 batch job"
+echo "MorphoFavela -- SVF v2 batch job"
 echo "Host    : $(hostname)"
 echo "CPUs    : ${N_JOBS}"
 echo "Memory  : ${SLURM_MEM_PER_NODE:-unknown}"

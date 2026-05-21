@@ -196,7 +196,7 @@ requires multiple sequential days.
 
 ## Validation gates (must pass before sending to engineering)
 
-- [ ] **Fresh clone test** — wipe `~/IVF`, `git clone`, follow README, `pytest tests/ -m "not integration"` passes; first figure renders locally
+- [ ] **Fresh clone test** — wipe `~/MorphoFavela`, `git clone`, follow README, `pytest tests/ -m "not integration"` passes; first figure renders locally
 - [ ] **PDF rebuilds clean** — `python docs/technical_report/build_pdf.py` succeeds; PDF size sane; no missing-figure boxes; TOC populated
 - [ ] **Cross-reference scan** — script (or grep + manual) confirms every "(see §X)" in TR resolves
 - [ ] **Numerical-claims scan** — every percentage / count / comparator in TR has a verifiable source (script + output file path)

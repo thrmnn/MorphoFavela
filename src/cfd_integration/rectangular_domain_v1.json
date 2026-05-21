@@ -3,7 +3,7 @@
   "created": "2026-05-08",
   "convention": "AIJ Tominaga et al. (2008) / Blocken (2015) / Franke et al. (2007) / COST 732",
   "topology": "rectangular_per_direction",
-  "purpose": "Single source of truth for the IVF↔CFD contract: domain extent, blockage, and source-data eligibility for the 119-patch CFD campaign (22+22+25+25+25 across vidigal/riodaspedras/rocinha/complexo_do_alemao/maré). The CFD repo (Airflow runtime) consumes this manifest to size each patch's per-direction blockMesh, the IVF repo writes per_patch_indicators.csv consistent with it.",
+  "purpose": "Single source of truth for the MorphoFavela↔CFD contract: domain extent, blockage, and source-data eligibility for the 119-patch CFD campaign (22+22+25+25+25 across vidigal/riodaspedras/rocinha/complexo_do_alemao/maré). The CFD repo (Airflow runtime) consumes this manifest to size each patch's per-direction blockMesh, the MorphoFavela repo writes per_patch_indicators.csv consistent with it.",
   "patch_geometry": {
     "diameter_m": 100.0,
     "radius_m": 50.0,

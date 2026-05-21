@@ -95,9 +95,9 @@ in this section.
 
 | Term | Definition |
 |---|---|
-| **Tregenza-145** | Equal-area discretisation of the sky hemisphere into 145 patches (Tregenza, 1987). The IVF SVF engine ray-casts into the centroid of each patch from each sample point and reports the unobstructed fraction. |
+| **Tregenza-145** | Equal-area discretisation of the sky hemisphere into 145 patches (Tregenza, 1987). The MorphoFavela SVF engine ray-casts into the centroid of each patch from each sample point and reports the unobstructed fraction. |
 | **`svfForProcessing153`** | UMEP's shadow-cast SVF processor with 153-patch sky discretisation (Lindberg & Holmer, 2010, used in SOLWEIG). Used as the independent benchmark in §4.2 / §10.3 cross-validation. |
-| **Height-matched** | Both engines integrate at z = 1.5 m above ground, achieved in IVF via passageway sampling and in UMEP by lowering all building heights by 1.5 m before the shadow-cast. |
+| **Height-matched** | Both engines integrate at z = 1.5 m above ground, achieved in MorphoFavela via passageway sampling and in UMEP by lowering all building heights by 1.5 m before the shadow-cast. |
 | **Passageway aggregation** | SVF cell value comes from samples on traversable ground (streets, alleys, courtyards) — never centroids inside building footprints, which would bias to 0. |
 
 ### CFD sampling
@@ -419,10 +419,10 @@ algorithmically distinct independent reference. To make the two engines
 height-comparable, we lower every building height by 1.5 m before
 running UMEP — equivalent to lifting the integration plane to
 pedestrian height — and mask rooftop pixels (UMEP otherwise includes
-them, IVF does not because passageway samples never fall on roofs).
+them, MorphoFavela does not because passageway samples never fall on roofs).
 Aggregating UMEP at the same 10 m grid across all five sites:
 
-| Site | n | r² | slope | RMSE | bias (UMEP − IVF) |
+| Site | n | r² | slope | RMSE | bias (UMEP − MorphoFavela) |
 |---|---:|---:|---:|---:|---:|
 | Vidigal | 2,510 | 0.68 | 0.96 | 0.12 | +0.01 |
 | Rocinha | 5,646 | 0.81 | 1.01 | 0.14 | +0.09 |
@@ -449,11 +449,11 @@ similar average obstruction. High-relief hillside settlements
 cell-to-cell variation between integrators because each cell sits in a
 distinct local viewshed.
 
-All five biases are positive (UMEP integrates over more sky than IVF),
+All five biases are positive (UMEP integrates over more sky than MorphoFavela),
 ranging from +0.01 (Vidigal) to +0.14 (Complexo do Alemão). The
 direction is consistent with the +1.5 m raised-observer transform
 applied to building heights before running UMEP: structures shorter
-than 1.5 m get partially or fully zeroed in IVF's input, opening
+than 1.5 m get partially or fully zeroed in MorphoFavela's input, opening
 additional sky in the UMEP comparison. Sites with substantial single-
 storey residential coverage (Complexo do Alemão, Maré, Rocinha,
 Rio das Pedras) sit in the +0.08 to +0.14 range; Vidigal's +0.01
@@ -1419,7 +1419,7 @@ Maré 2026-04-30; extended to all 5 sites 2026-05-01.) The
    0.3–0.5 SVF band where the 153-patch shadow-cast and 145-patch
    ray-cast integrations diverge most. Both engines are defensible
    operational definitions of SVF; the 5-site slope-≈-1 cluster
-   establishes that the IVF Tregenza-145 ray-cast engine is consistent
+   establishes that the MorphoFavela Tregenza-145 ray-cast engine is consistent
    with an independent benchmark across the full morphological range
    represented in the campaign. See §4 cross-validation table for
    per-site interpretation and
@@ -1516,7 +1516,7 @@ each box flips when the same code path is re-run against real
 Airflow output.
 
 - [ ] Verify first patch ingests correctly via `cfd-results-ingestor`
-      (validator already accepts both IVF-native CSV and Airflow-
+      (validator already accepts both MorphoFavela-native CSV and Airflow-
       native parquet layouts; tested against synthetic 160/160 cleanly)
 - [ ] Annualise via wind-rose weighting (`src.cfd_integration.weighting`)
       — implemented; default weight is `freq_speed`
@@ -1541,7 +1541,7 @@ regenerated from the committed scripts. This section is the index.
 
 ```bash
 git clone https://github.com/thrmnn/MorphoFavela.git && cd MorphoFavela
-conda create -n IVF python=3.11 && conda activate IVF
+conda create -n morphofavela python=3.11 && conda activate morphofavela
 pip install -e ".[dev]"          # add ".[gpu]" for the optional GPU SVF stack
 ```
 
@@ -1679,7 +1679,7 @@ the validators surface drift before it ships.
 | Pilot sampling | `scripts/run_pilot_sampling.py` | 12–15 patches per site; ≥ 1 patch per non-empty stratum; min spacing ≥ 80 m | Stratum coverage gap; min spacing < 80 m; eligibility filter rejects > 95 % of cells | `sampling-auditor` agent |
 | Campaign sampling | `scripts/run_campaign_sampling.py` | 22–25 patches per site; SVF-priority weighting reflected in stratum totals; `eligible = true` in every row of `audit_v1.csv` after the rectangular-domain audit | Spacing collision; stratum over- or under-allocation; `eligible = false` rows in audit output | `sampling-auditor` agent |
 | Wind rose ingestion | `scripts/build_wind_rose.py` | `wind_rose.json` with `quality_flag: "measured"`, `n_records ≥ 60,000`, full 8-direction frequency vector | quality_flag "placeholder-prior" (climatological prior never replaced); INMET date-format break post-2019 (silent zero rows) | `wind-ingestion` agent |
-| CFD ingestion | (CFD repo at `~/Airflow` writes; `src/cfd_integration/` reads) | All 8 wind directions present per patch; `sample_points.csv` rows ≥ 10 k; `summary.json` valid | Missing direction; off-axis directory name (e.g. `wind_017/`); column drift in CSV; `\|U_mag − √(U²+V²+W²)\| > 0.01` | `cfd-results-ingestor` agent (auto-detects IVF-native CSV vs Airflow-native parquet layouts) |
+| CFD ingestion | (CFD repo at `~/Airflow` writes; `src/cfd_integration/` reads) | All 8 wind directions present per patch; `sample_points.csv` rows ≥ 10 k; `summary.json` valid | Missing direction; off-axis directory name (e.g. `wind_017/`); column drift in CSV; `\|U_mag − √(U²+V²+W²)\| > 0.01` | `cfd-results-ingestor` agent (auto-detects MorphoFavela-native CSV vs Airflow-native parquet layouts) |
 | Annualised aggregation | `scripts/analyze_cfd_results.py` | Per-site `outputs/<site>/cfd_analysis/per_patch_indicators.csv`, `grid_with_cfd.gpkg`; covered cells in 350–410 range per site (synthetic baseline) | Coverage anomaly (cells well outside 350–410); regression sign flips; weighting falls back to uniform when wind rose missing | n/a — verify against synthetic baseline |
 | Report drift | `docs/technical_report/technical_report.md` | Numerical claims trace to source; cross-references resolve; PDF rebuilt | Prose drift from data (the §6.5-class bug); `.md` ↔ `.pdf` desync; figure copy missing | `report-sync-auditor` (commit-time) + `numerical-claims-auditor` (pre-review) |
 

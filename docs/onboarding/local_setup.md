@@ -10,7 +10,7 @@ and the common errors that show up on a fresh machine.
 
 ```bash
 git clone https://github.com/thrmnn/MorphoFavela.git && cd MorphoFavela
-conda create -n IVF python=3.11 && conda activate IVF
+conda create -n morphofavela python=3.11 && conda activate morphofavela
 pip install -e ".[dev]"
 pytest tests/ -m "not integration" -q --tb=short
 # → 508 tests pass; 69 integration tests deselected

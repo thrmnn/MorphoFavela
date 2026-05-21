@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Validate the IVF Tregenza-145 SVF engine against UMEP's shadow-casting SVF.
+"""Validate the MorphoFavela Tregenza-145 SVF engine against UMEP's shadow-casting SVF.
 
 This closes the §10.3 limitation in `docs/technical_report/technical_report.md`:
 "SVF validation against benchmark tools pending."
 
 The two engines use algorithmically distinct approaches:
 
-* **IVF (this repo).** Ray-casting on a triangle mesh through 145 Tregenza
+* **MorphoFavela (this repo).** Ray-casting on a triangle mesh through 145 Tregenza
   hemispherical patches; sampling at street-level (z = 1.5 m above ground).
 * **UMEP** (Lindberg & Holmer 2010, used in SOLWEIG). Shadow-casting on a
   digital surface model through 153 hemispherical patches; integrated at
   the DSM surface (effectively z = 0 above ground for street pixels).
 
 Agreement between the two is what we want to bank for the methods chapter.
-A systematic offset is expected (UMEP at ground-level vs IVF at 1.5 m);
+A systematic offset is expected (UMEP at ground-level vs MorphoFavela at 1.5 m);
 the slope and r² of the per-cell scatter is what reviewers care about.
 
 UMEP source is auto-fetched on first run into ``vendor/umep_processing/``
@@ -70,7 +70,7 @@ def build_dsm(
     crop_bounds: tuple[float, float, float, float] | None = None,
     observer_height: float = 0.0,
 ) -> tuple[np.ndarray, dict]:
-    """Build a (DTM + building heights) raster from IVF site inputs.
+    """Build a (DTM + building heights) raster from MorphoFavela site inputs.
 
     Returns (dsm_array, profile) where profile has rasterio-compatible
     transform + crs + shape so we can re-project sample points later.
@@ -79,7 +79,7 @@ def build_dsm(
     that many meters at street pixels. UMEP integrates SVF at the DSM
     surface; the equivalent of "observer at ground+h" is to lower
     every building by ``h``. Buildings shorter than ``h`` collapse to
-    ground (the observer looks over them). Set to 1.5 to match IVF's
+    ground (the observer looks over them). Set to 1.5 to match MorphoFavela's
     pedestrian-height sampling; set to 0 for the legacy z=0 comparison.
     """
     dtm_path = PROJECT_ROOT / "data" / site / "dtm_extended_300m.tif"
@@ -205,7 +205,7 @@ def aggregate_umep_to_grid(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Aggregate UMEP SVF over each 10 m grid cell, masking out building pixels.
 
-    For an apples-to-apples comparison with IVF (whose grid-cell SVF is the
+    For an apples-to-apples comparison with MorphoFavela (whose grid-cell SVF is the
     mean of passage-level samples — never on rooftops), we average UMEP SVF
     only over the non-building DSM pixels inside each cell's footprint.
 
@@ -302,7 +302,7 @@ def plot(df: pd.DataFrame, stats: dict, site: str, out_path: Path, observer_heig
     ax.plot(xs, stats["slope"] * xs + stats["intercept"], "r-", lw=1.2, label="OLS fit")
     ax.set_xlim(*lim)
     ax.set_ylim(*lim)
-    ax.set_xlabel("IVF Tregenza-145 SVF (z = 1.5 m)")
+    ax.set_xlabel("MorphoFavela Tregenza-145 SVF (z = 1.5 m)")
     ax.set_ylabel(f"UMEP shadow-cast SVF (z = {observer_height:g} m)")
     ax.set_aspect("equal")
     ax.legend(loc="lower right", fontsize=8, frameon=False)
@@ -322,7 +322,7 @@ def plot(df: pd.DataFrame, stats: dict, site: str, out_path: Path, observer_heig
         lw=1.0,
         label=f"bias = {stats['bias_umep_minus_ivf']:+.3f}",
     )
-    ax.set_xlabel("UMEP − IVF (SVF units)")
+    ax.set_xlabel("UMEP − MorphoFavela (SVF units)")
     ax.set_ylabel("cells")
     ax.legend(fontsize=8, frameon=False)
     ax.set_title(f"RMSE = {stats['rmse']:.3f}   MAE = {stats['mae']:.3f}", fontsize=9)
@@ -346,14 +346,14 @@ def main() -> int:
         "--min-svf-count",
         type=int,
         default=5,
-        help="Drop cells with fewer than N IVF sample points (default 5).",
+        help="Drop cells with fewer than N MorphoFavela sample points (default 5).",
     )
     parser.add_argument(
         "--observer-height",
         type=float,
         default=1.5,
         help="Effective integration height in meters (default 1.5 to match "
-        "IVF pedestrian-height sampling). 0 = legacy z=0 comparison.",
+        "MorphoFavela pedestrian-height sampling). 0 = legacy z=0 comparison.",
     )
     parser.add_argument(
         "--out",

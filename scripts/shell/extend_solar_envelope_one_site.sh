@@ -16,7 +16,7 @@ if [[ -z "${SITE}" ]]; then
     exit 2
 fi
 
-cd /home/theo/IVF
+cd /home/theo/MorphoFavela
 
 echo "============================================================"
 echo "  EXTEND SOLAR ENVELOPE — site=${SITE}"

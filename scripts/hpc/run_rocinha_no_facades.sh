@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --partition=mit_normal
 
-PROJECT_ROOT="${SLURM_SUBMIT_DIR:-$HOME/IVF}"
+PROJECT_ROOT="${SLURM_SUBMIT_DIR:-$HOME/MorphoFavela}"
 cd "${PROJECT_ROOT}"
 mkdir -p logs
 

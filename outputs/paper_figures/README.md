@@ -18,7 +18,7 @@ All scripts are standalone and regenerable from pipeline outputs.
 ## Regenerate all figures
 
 ```bash
-cd /path/to/IVF
+cd /path/to/MorphoFavela
 for f in outputs/paper_figures/fig*.py; do python3 "$f"; done
 ```
 

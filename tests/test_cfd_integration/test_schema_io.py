@@ -239,7 +239,7 @@ class TestLoadCampaignAutodetect:
         """One direction CSV, another parquet — both load."""
         root = tmp_path / "cfd_results"
 
-        # IVF native: N
+        # MorphoFavela native: N
         d_n = root / "TST-P01" / "N"
         d_n.mkdir(parents=True)
         synthetic_samples.to_csv(d_n / "sample_points.csv", index=False)

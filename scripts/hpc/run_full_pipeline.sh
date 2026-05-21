@@ -9,7 +9,7 @@
 #SBATCH --partition=mit_normal
 #
 # ==========================================================================
-# Full IVF analysis pipeline for HPC (SLURM)
+# Full MorphoFavela analysis pipeline for HPC (SLURM)
 #
 # Runs ALL analyses for one or more areas:
 #   1. SVF v2 (streets, grid, facades)
@@ -27,8 +27,8 @@
 # Setup — must happen BEFORE set -e so module sourcing doesn't kill the script
 # ---------------------------------------------------------------------------
 
-# Use SLURM_SUBMIT_DIR (where sbatch was invoked) or fall back to ~/IVF
-PROJECT_ROOT="${SLURM_SUBMIT_DIR:-$HOME/IVF}"
+# Use SLURM_SUBMIT_DIR (where sbatch was invoked) or fall back to ~/MorphoFavela
+PROJECT_ROOT="${SLURM_SUBMIT_DIR:-$HOME/MorphoFavela}"
 cd "${PROJECT_ROOT}"
 mkdir -p logs
 
@@ -64,7 +64,7 @@ else
 fi
 
 echo "================================================================"
-echo "  IVF Full Analysis Pipeline"
+echo "  MorphoFavela Full Analysis Pipeline"
 echo "  Host    : $(hostname)"
 echo "  CPUs    : ${N_JOBS}"
 echo "  Memory  : ${SLURM_MEM_PER_NODE:-unknown}"

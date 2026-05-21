@@ -272,12 +272,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--data-rj-dir",
-        default="/home/theo/IVF/data/RJ",
+        default="/home/theo/MorphoFavela/data/RJ",
         help="Directory containing city-wide RJ shapefiles",
     )
     parser.add_argument(
         "--output-base-dir",
-        default="/home/theo/IVF/data",
+        default="/home/theo/MorphoFavela/data",
         help="Base directory for output area folders",
     )
     parser.add_argument(

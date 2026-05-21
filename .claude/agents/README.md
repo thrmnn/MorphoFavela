@@ -1,4 +1,4 @@
-# `.claude/agents/` — IVF project subagents
+# `.claude/agents/` — MorphoFavela project subagents
 
 Project-scoped Claude Code subagents that travel with the repo. Each
 agent is a single markdown file with YAML frontmatter (`name`,
@@ -40,7 +40,7 @@ The team is two classes:
 
 | Name | When to invoke | Inputs |
 |---|---|---|
-| [`site-onboarder`](site-onboarder.md) | Adding a new favela site to the IVF dataset (walks the 7-step `data/README.md` checklist; stops at the manual DTM-clip step) | Site key, building footprint path, boundary path, station code or `asos`, optional buffer/label/colour |
+| [`site-onboarder`](site-onboarder.md) | Adding a new favela site to the MorphoFavela dataset (walks the 7-step `data/README.md` checklist; stops at the manual DTM-clip step) | Site key, building footprint path, boundary path, station code or `asos`, optional buffer/label/colour |
 | [`wind-ingestion`](wind-ingestion.md) | Building or rebuilding `wind_rose.json` from INMET BDMEP or Iowa ASOS METAR (encodes the 3 known INMET quirks) | Site key + station code or `asos`; optional years range |
 | [`cfd-results-ingestor`](cfd-results-ingestor.md) | When CFD outputs return from `~/Airflow` to `data/{site}/cfd_results/` — validate schema and flag the known producer drift | Site key; optional patch ID list; optional `aggregate` flag |
 

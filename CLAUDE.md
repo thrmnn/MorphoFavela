@@ -68,7 +68,7 @@ also be internalised so the hook is a backstop, not the primary gate:
 ## Memory system
 
 Project-specific facts about pipeline state, site data quirks, and
-outstanding work live in `.claude/projects/-home-theo-IVF/memory/`. Update
+outstanding work live in `.claude/projects/-home-theo-MorphoFavela/memory/`. Update
 those memories when you learn something durable — not in this CLAUDE.md.
 
 ## Project subagents

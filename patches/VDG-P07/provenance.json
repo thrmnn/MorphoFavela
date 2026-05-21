@@ -63,7 +63,7 @@
     "snap_target_for_overlay": true
   },
   "wind_rose": {
-    "path": "IVF/data/vidigal/wind_rose.json",
+    "path": "MorphoFavela/data/vidigal/wind_rose.json",
     "quality_flag": "measured",
     "station_id": "A652",
     "station_name": "Forte de Copacabana",

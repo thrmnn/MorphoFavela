@@ -188,7 +188,7 @@ def _title_page(pdf: PdfPages, area: str):
     fig.text(
         0.5,
         0.44,
-        "Informal Ventilation Flows (IVF)",
+        "Informal Ventilation Flows (MorphoFavela)",
         ha="center",
         va="center",
         fontsize=12,
