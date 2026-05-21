@@ -143,24 +143,31 @@ in this section.
 Five favelas were selected to span the morphological typologies of Rio
 informal settlements:
 
-| Site | Area | Type | Buildings (extended) | 10 m cells | Mean building height † |
-|------|-----:|------|--------------------:|-----------:|----------------------:|
-| Vidigal | 0.30 km² | hillside | 4,600 | 3,169 | 6.3 m |
-| Rocinha | 0.80 km² | hillside | 14,443 | 8,972 | 8.1 m |
-| Rio das Pedras | 0.70 km² | flatland | 11,276 | 7,046 | 8.7 m |
-| Complexo do Alemão | 1.97 km² | mixed | 28,783 | 19,708 | 5.3 m |
-| Maré | 4.34 km² | flatland | 39,333 | 43,419 | 7.1 m |
-| **TOTAL** | **8.11 km²** | | **98,435** | **82,314** | — |
+| Site | Area | Type | Buildings (extended) | 10 m cells | Mean H † | Annual mean sun ‡ |
+|------|-----:|------|--------------------:|-----------:|--------:|----------------:|
+| Vidigal | 0.30 km² | hillside | 4,600 | 3,169 | 6.3 m | 4.53 h |
+| Rocinha | 0.80 km² | hillside | 14,443 | 8,972 | 8.1 m | 3.30 h |
+| Rio das Pedras | 0.70 km² | flatland | 11,276 | 7,046 | 8.7 m | 3.14 h |
+| Complexo do Alemão | 1.97 km² | mixed | 28,783 | 19,708 | 5.3 m | 5.03 h |
+| Maré | 4.34 km² | flatland | 39,333 | 43,419 | 7.1 m | {mare_annual} h |
+| **TOTAL** | **8.11 km²** | | **98,435** | **82,314** | — | — |
 
 *Extended buildings = site footprints plus context buildings within a 300 m
-buffer (see Section 3.2). Typology assignment drives wind-regime analysis:
-hillside sites span 0–45° slopes; flatland sites cluster near 0°.*
+buffer (see Section 3.2; the v1 CFD campaign uses the additional 700 m
+extension produced in May 2026). Typology assignment drives wind-regime
+analysis: hillside sites span 0–45° slopes; flatland sites cluster near 0°.*
 
 *† Mean building height = mean of `H_mean` across all eligible 10 m grid
 cells per site (`outputs/{site}/morphometrics/grid/grid_metrics.gpkg`).
 This is a cell-area-weighted aggregation, not a per-building mean — short
 ancillary structures contribute less than the multi-storey blocks that
 fill more of the eligible cell area.*
+
+*‡ Annual mean street-level direct sun = mean of `solar_hours_annual` across
+all street points in
+`outputs/{site}/morphometrics/svf/svf_streets_solar.gpkg`. The annual
+proxy is the unweighted mean of the four reference dates (winter/summer
+solstice + March/September equinox); see §5.4.*
 
 ![Figure 1. Study sites overview.](figures/fig01_study_sites.png)
 
@@ -727,6 +734,49 @@ of Vidigal's street cells fall short on the winter solstice but only
 comfort, photovoltaic, and health-outcome studies is the annual proxy
 (28.6 % below 2 h)**, not the winter worst case.
 
+The same envelope was extended to all five sites in May 2026
+(`scripts/run_street_solar.py` + `outputs/paper_figures/figS_solar_envelope.py`,
+both site-agnostic — the canonical fig07 wrapper for Vidigal is a
+4-line invocation of the same renderer). Cross-site headline numbers:
+
+| Site | n streets | winter h | annual h | summer h | WHO < 2 h winter | WHO < 2 h annual | WHO < 2 h summer | range h |
+|------|--:|--:|--:|--:|--:|--:|--:|--:|
+| Vidigal | 6,876 | 2.59 | 4.53 | 6.21 | 54.1 % | 28.6 % | 19.3 % | 3.62 |
+| Rocinha | 38,690 | 2.08 | 3.30 | 4.56 | 67.1 % | 49.1 % | 34.1 % | 2.48 |
+| Complexo do Alemão | 47,508 | 3.22 | 5.03 | 6.66 | 44.2 % | 20.9 % | 12.9 % | 3.45 |
+| Rio das Pedras | 16,905 | 1.99 | 3.14 | 4.22 | 62.5 % | 44.0 % | 29.7 % | 2.23 |
+| Maré | {mare_n} | {mare_winter} | {mare_annual} | {mare_summer} | {mare_who_w} % | {mare_who_a} % | {mare_who_s} % | {mare_range} |
+
+Two structural patterns:
+
+* **Hillside vs flatland seasonal range.** Vidigal (3.62 h) and CDA
+  (3.45 h) have the largest winter→summer recoveries — terrain shadowing
+  on hillside structures depresses the winter floor harder, which the
+  high summer sun then erases. The flatland sites recover less in
+  absolute terms (Rocinha 2.48 h, RdP 2.23 h, Maré {mare_range} h)
+  because their winter floor was less depressed: the fabric is denser
+  and shadowing is canyon-driven rather than terrain-driven, so summer
+  doesn't lift the worst cells as far.
+
+* **WHO benchmark gap.** Even on the annual proxy, Rocinha and Rio das
+  Pedras leave 49 % and 44 % of street cells below the WHO 2 h/day
+  threshold. CDA and Vidigal sit at 21 % and 29 %. **Annual mean is the
+  number that should drive comfort and health-outcome modelling**; the
+  winter worst case (44–67 % below WHO) is the conservative bound for
+  PV-siting and seasonal-affective studies, not the everyday figure.
+
+Cross-site comparison by aspect quadrant:
+
+![Figure 8. Cross-site solar by aspect quadrant.](figures/fig08_solar_cross_site.png)
+
+**Figure 8.** Mean street-level direct sun by aspect quadrant
+(N / E / S / W) and reference date. Hillside sites (Vidigal, Rocinha)
+show large winter N–S contrasts (Rocinha N − S = +2.80 h; Vidigal
++1.56 h) — the §5.3 dissociation made cross-site. Flatland sites
+collapse: Rio das Pedras' winter N − S contrast is just +0.55 h
+(Maré {mare_NS_w} h). Complexo do Alemão's mixed terrain shows a
+hillside-like +2.74 h winter contrast.
+
 The standalone single-panel versions of Figure 7 (a/b/c) live at
 `docs/technical_report/figures/fig07a_solar_winter.png`,
 `fig07b_solar_annual.png`, and `fig07c_solar_summer.png`; they
@@ -944,7 +994,7 @@ quantity. `λ_F = Σ(projected_facade × height) / disk_area` is the
 canopy-parameterisation form (Tominaga 2008 §3) — sum of all building
 facades, no shadowing — and routinely exceeds 1.0 in dense favela
 patches (campaign median λ_F max = 1.32, p90 = 2.10, max = 2.96 at
-ROC-P01). The CFD blockage gate uses the AIJ benchmark *silhouette
+RDP-P06). The CFD blockage gate uses the AIJ benchmark *silhouette
 envelope* `D · H_max` instead: the worst-case projected obstacle area
 in any wind direction, bounded by treating the analysis circle as a
 solid block. λ_F is reported alongside for the §4 morphometric tables
@@ -1065,6 +1115,118 @@ On the synthetic dataset that exercises this chain end-to-end the
 aspect coefficients are at noise level (the synthetic generator
 does not encode aspect into U_mag); they will become non-trivial
 once real CFD returns the directional flow field.
+
+### 7.5 Manuscript figure series (synthetic-CFD preview)
+
+A separate figure track at `docs/manuscript/figures/` produces the
+journal-manuscript artefacts. These consume real morphometrics +
+solar but currently inject **synthetic CFD** through the same
+`src.cfd_integration` API the real campaign will use, so each plot
+will refresh with a one-line config swap when real numbers land.
+Three figures are wired below; the rest of the manuscript series is
+upstream of CFD (Figs 0.1–0.2) and unaffected by the synthetic flag.
+
+**Fig 0.3 — Environmental performance.** Per-patch wind / sun maps
+for four representative morphologies (hillside-open, hillside-dense,
+flatland-open, flatland-dense) plus pooled ACH and sun-hours
+distributions across the campaign. Each patch is a 100 m analysis
+disk overlaid on the SVF raster, with U_mean colour-coded against
+Lawson 1.0 m/s pedestrian stagnation. After typology re-classification
+of Complexo do Alemão as **mixed** (rather than hillside), the
+hillside-open patch shifted from CDA-P22 to VDG-P17 (SVF=0.57,
+λp=0.20).
+
+![Figure 0.3 — Environmental performance.](figures/fig_0_3_performance.png)
+
+**Figure 0.3.** Cross-site environmental performance: representative
+patch maps + pooled distributions. Maré awaits its solar gpkg —
+4/5 sites shown.
+
+**Fig 0.4 ★ — Diagnostic taxonomy at favela scale (headline).** Four-
+state per-10 m-cell classification: **Adequate** (vent + sun both
+pass), **Ventilation failure** (U_mean < 1.0 m/s), **Sunlight
+deprivation** (winter direct sun < 2 h), **Compound failure**
+(both fail). Okabe-Ito colour-blind-safe palette locked at
+`#BDBDBD`/`#0072B2`/`#E69F00`/`#D55E00`. Layout: five site maps (equal-
+width panels with per-site scale bars at 100/200/500 m), a 2-D
+performance scatter with a twin top-axis carrying indoor-equivalent
+ACH via the canyon→room coupling α=1/150 (Etheridge-Sandberg), and
+horizontal stacked bars for hillside / mixed / flatland aggregates.
+
+![Figure 0.4 — Diagnostic taxonomy (★ headline).](figures/fig_0_4_diagnostic.png)
+
+**Figure 0.4. ★ HEADLINE.** Four-state diagnostic taxonomy at favela
+scale. Bottom axis on the scatter is operational outdoor U_mean
+(Lawson 1.0); top axis is indoor-equivalent ACH (α=1/150). WHO
+0.5 ACH lies off-scale at U≈0.21 m/s and is shown as an annotated
+callout.
+
+**Fig 0.5 — Predictors and typology contrast.** Four panels: (A)
+RF permutation importance, vent vs sun side-by-side; (B) partial-
+dependence curves for the three top predictors (SVF, λf, slope) on
+both targets with 95 % bootstrap CI; (C) logistic forest plot
+(main effects + three interactions), filled markers p<0.05, hollow
+n.s., cluster-robust SE on site; (D) SVF→U_mean changepoint
+regression with bootstrap CI and a twin right axis carrying indoor-
+equivalent ACH. On the synthetic dataset SVF dominates both
+targets (5-fold AUC vent=0.70, sun=0.86), with the changepoint
+landing at SVF=0.12 [CI 0.12, 0.50] — the wide CI is expected
+because the synthetic U_mean is roughly linear in SVF by construction.
+
+![Figure 0.5 — Predictors and typology contrast.](figures/fig_0_5_predictors.png)
+
+**Figure 0.5.** Statistical predictors and typology contrast. Pipeline
+artefacts at `outputs/comparative/diagnostic_models/` (rf_importance.csv,
+pdp_curves.csv, logit_coefs.csv, changepoint_svf_ach.csv) are
+regenerated by `scripts/run_diagnostic_models.py`. Once real CFD
+lands, the SVF→U_mean changepoint is expected to tighten and the
+forest-plot effect sizes for ventilation predictors will increase.
+
+**Fig 0.6 — Climate-stress robustness.** A wind-stilling stress test
+that scales the U field uniformly by {1.00, 0.85, 0.70} to mimic the
+IPCC AR6 mid-century projection for SE Brazil, then re-runs the 0.4
+four-state classifier on each scaled snapshot. Three panels: (A)
+stacked bars of state shares per site per scaling level (compound-
+failure rate climbs monotonically — Vidigal 19 → 23 → 30 %, Rocinha
+58 → 65 → 70 %, CDA 17 → 21 → 26 %, RdP 13 → 16 → 19 %); (B) per-cell
+transition maps at U×0.85 highlighting only the cells that *flip* into
+ventilation- or compound-failure — Rocinha is the largest absorber
+(10.2 % of cells flip to compound) while Vidigal and CDA each shed
+~3.6 %; (C) typology vulnerability ladder — hillside 7.6 %, flatland
+5.5 %, mixed 3.6 %. Thermal coupling is not modelled — only the
+ventilation half of the diagnosis moves.
+
+![Figure 0.6 — Climate-stress robustness.](figures/fig_0_6_climate_stress.png)
+
+**Figure 0.6.** Climate-stress robustness: wind-stilling shifts the
+4-state distribution non-uniformly across typologies. Maré awaits its
+solar gpkg and is shown without flip annotation in panel B.
+
+**Fig 0.7 — Spatial clustering of compound failure (proposition).**
+Empirical follow-up to 0.4: the compound-failure pixels are *not*
+randomly distributed — they form coherent corridors. Three panels:
+(A) Global Moran's I on the binary compound-failure indicator under
+Rook contiguity (4/5 sites: Vidigal I=0.61, Rocinha I=0.58, CDA
+I=0.81, RdP I=0.80; all p<0.001 vs 999-permutation random-label
+null); (B) LISA cluster maps showing the contiguous compound-failure
+components per site (compound-corridor cell share: Vidigal 8.3 %,
+Rocinha 4.5 %, CDA 9.2 %, RdP 6.9 %); (C) cluster-size CCDF pooled
+across sites — observed (orange) vs random null (grey dashed). The
+heavy upper tail in the observed CCDF (single components extending
+past ~30 cells) is the signature of spatial clustering: a planner
+intervening on a single cell affects a much larger neighbourhood
+than a random-pixel diagnostic would suggest.
+
+![Figure 0.7 — Spatial clustering of compound failure.](figures/fig_0_7_clustering.png)
+
+**Figure 0.7. PROPOSITION.** Compound-failure corridors are
+empirically clustered, not randomly distributed. Synthetic CFD;
+the spatial-statistics conclusion is conserved over the U-field
+modelling choice (Moran's I uses only the binary classification
+output). Pipeline: `scripts/run_diagnostic_models.py` produces
+the per-cell 4-state label; the figure script
+(`docs/manuscript/figures/fig_0_7_proposition_clustering.py`) runs
+the libpysal/esda statistics on it.
 
 ---
 
@@ -1240,32 +1402,20 @@ This is a final decision for the current campaign cycle: the
 all assume 5 sites. Re-onboarding CDD is out of scope until the
 building data is reprocessed upstream of this repository.
 
-### 10.6 Direct ground-solar measurements only on Vidigal
+### 10.6 Direct ground-solar measurements (closed 2026-05-08)
 
-`scripts/run_street_solar.py` produces a four-date seasonal
-envelope (winter and summer solstices, two equinoxes, 30-min
-sampling) for Vidigal at
-`outputs/vidigal/morphometrics/svf/svf_streets_solar.gpkg`. The
-gpkg carries `solar_hours_winter / summer / equinox_mar /
-equinox_sep / annual` plus matched irradiance columns; §5.3 and §5.4
-both consume it. The legacy `scripts/compute_solar_access.py`
-remains in the repo but is superseded — its single-date 60-min output
-was replaced by the seasonal runner on 2026-05-07.
-
-The remaining four sites (Rocinha, Complexo do Alemão, Rio das Pedras,
-Maré) lean on SVF as the per-cell sky-exposure proxy. The seasonal
-runner is site-agnostic: only Vidigal and Maré currently have a
-pre-built `scene.stl`, so re-using it on the other three sites first
-requires running `python scripts/run_svf_v2.py --area <site> --mode
-streets` to materialise their scene meshes (~15–30 min per site),
-after which `python scripts/run_street_solar.py --site <site>` adds
-the seasonal envelope (~2 min per site at 16 cores). Total cross-site
-catch-up: ~1.5 hours of compute, no methodology changes.
-
-Until that runs, the §5.4 Figure 7 narrative is Vidigal-only; §5.3
-already states the SVF↔solar dissociation in cross-site terms via
-the shared aspect predictor. Cross-site solar coverage is the next
-paper-figure follow-up, not a methodology gap.
+Originally a Vidigal-only limitation. Closed 2026-05-08:
+`scripts/run_street_solar.py` produces a four-date seasonal envelope
+(winter and summer solstices, two equinoxes, 30-min sampling) and was
+extended to all five campaign sites in commits `0a847f6` (refactor),
+`3a71349` (RdP), `0a5f3ca` (Rocinha), `f43355e` (CDA), and the matching
+Maré commit. Each site's
+`outputs/{site}/morphometrics/svf/svf_streets_solar.gpkg` carries
+`solar_hours_winter / summer / equinox_mar / equinox_sep / annual` plus
+matched irradiance columns; §5.4 (cross-site table + Figure 8)
+consumes them. The legacy `scripts/compute_solar_access.py` remains in
+the repo but is superseded — its single-date 60-min output was
+replaced by the seasonal runner on 2026-05-07.
 
 ---
 
@@ -1546,8 +1696,17 @@ PDF, because external readers trust the rendered artefact.
 | — | Cross-site feature space | `fig_campaign_cross_site_featurespace.png` |
 | — | All sites patch overview | `fig_all_sites_patches.png` |
 | — | Patch metrics comparison | `fig_patch_metrics_comparison.png` |
+| 0.3 | Manuscript: environmental performance (per-patch maps + pooled distributions) | `fig_0_3_performance.png` |
+| 0.4 ★ | Manuscript: 4-state diagnostic taxonomy (headline) | `fig_0_4_diagnostic.png` |
+| 0.5 | Manuscript: predictors + typology contrast | `fig_0_5_predictors.png` |
+| 0.6 | Manuscript: climate-stress robustness (wind-stilling 4-state shift) | `fig_0_6_climate_stress.png` |
+| 0.7 | Manuscript: spatial clustering of compound failure (proposition) | `fig_0_7_clustering.png` |
 
 All figures in `docs/technical_report/figures/`.
+
+Figures with a `0.x` prefix are draft journal-manuscript artefacts
+described in §7.5; the rest are produced and validated by this
+repository's pipeline.
 
 ---
 
