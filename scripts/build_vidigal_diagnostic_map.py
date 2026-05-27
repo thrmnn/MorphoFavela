@@ -44,7 +44,7 @@ STATE_VENT_ONLY = 2
 STATE_COMPOUND = 3
 STATE_NODATA = 4
 
-STATE_COLORS = ["#FFFFFF", "#D9D9D9", "#7F7F7F", "#111111", "#F4F0E8"]
+STATE_COLORS = ["#FFFFFF", "#D9D9D9", "#7F7F7F", "#E76F51", "#F4F0E8"]
 STATE_LABELS = [
     "adequate (both thresholds pass)",
     f"sunlight fail only (winter sun < {THRESHOLD_SUN_HRS:.0f} h)",
