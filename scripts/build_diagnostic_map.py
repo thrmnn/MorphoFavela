@@ -25,6 +25,7 @@ Output per site:
     outputs/<site>/paper_figures/fig_<site>_diagnostic_map.png
     outputs/<site>/paper_figures/diagnostic_stats.json
 """
+
 from __future__ import annotations
 
 import argparse
@@ -36,7 +37,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import patches as mpatches
-from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib.colors import BoundaryNorm, ListedColormap
 from scipy.spatial import cKDTree
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -50,8 +51,8 @@ SITE_DISPLAY = {
     "riodaspedras": "RIO DAS PEDRAS",
 }
 
-THRESHOLD_SUN_HRS = 2.0       # WHO winter direct-sun floor.
-THRESHOLD_LAMBDA_F = 0.35     # Skimming-flow regime (Grimmond & Oke 1999).
+THRESHOLD_SUN_HRS = 2.0  # WHO winter direct-sun floor.
+THRESHOLD_LAMBDA_F = 0.35  # Skimming-flow regime (Grimmond & Oke 1999).
 
 STATE_ADEQUATE = 0
 STATE_SUN_ONLY = 1
@@ -72,17 +73,28 @@ STATE_LABELS = [
 def site_paths(site: str) -> dict:
     return {
         "grid": PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg",
-        "solar": PROJECT_ROOT / "outputs" / site / "morphometrics" / "svf" / "svf_streets_solar.gpkg",
+        "solar": PROJECT_ROOT
+        / "outputs"
+        / site
+        / "morphometrics"
+        / "svf"
+        / "svf_streets_solar.gpkg",
         "bldg": PROJECT_ROOT / "data" / site / "buildings_extended_300m.gpkg",
         "out_dir": PROJECT_ROOT / "outputs" / site / "paper_figures",
-        "out_png": PROJECT_ROOT / "outputs" / site / "paper_figures" / f"fig_{site}_diagnostic_map.png",
+        "out_png": PROJECT_ROOT
+        / "outputs"
+        / site
+        / "paper_figures"
+        / f"fig_{site}_diagnostic_map.png",
         "out_stats": PROJECT_ROOT / "outputs" / site / "paper_figures" / "diagnostic_stats.json",
     }
 
 
 def aggregate_solar_to_cells(
-    grid: gpd.GeoDataFrame, solar_path: Path,
-    max_radius: float = 25.0, k: int = 3,
+    grid: gpd.GeoDataFrame,
+    solar_path: Path,
+    max_radius: float = 25.0,
+    k: int = 3,
 ) -> gpd.GeoDataFrame:
     """Aggregate winter solar hours to grid cells.
 
@@ -141,8 +153,12 @@ def render(site: str, grid: gpd.GeoDataFrame, state: np.ndarray, paths: dict) ->
     grid_to_plot["state"] = state
     classified = grid_to_plot[grid_to_plot["state"] != STATE_NODATA]
     classified.plot(
-        ax=ax, column="state", cmap=cmap, norm=norm,
-        edgecolor="#FFFFFF", linewidth=0.12,
+        ax=ax,
+        column="state",
+        cmap=cmap,
+        norm=norm,
+        edgecolor="#FFFFFF",
+        linewidth=0.12,
     )
 
     if paths["bldg"].exists():
@@ -162,30 +178,46 @@ def render(site: str, grid: gpd.GeoDataFrame, state: np.ndarray, paths: dict) ->
         spine.set_visible(False)
 
     counts = {s: int((state == s).sum()) for s in range(5)}
-    total_known = sum(counts[s] for s in (STATE_ADEQUATE, STATE_SUN_ONLY,
-                                          STATE_VENT_ONLY, STATE_COMPOUND))
+    total_known = sum(
+        counts[s] for s in (STATE_ADEQUATE, STATE_SUN_ONLY, STATE_VENT_ONLY, STATE_COMPOUND)
+    )
     legend_handles = []
     for s in (STATE_ADEQUATE, STATE_SUN_ONLY, STATE_VENT_ONLY, STATE_COMPOUND):
         share = counts[s] / total_known if total_known else 0.0
-        label = f"{STATE_LABELS[s]}  —  {share*100:.0f}%"
-        legend_handles.append(mpatches.Patch(
-            facecolor=STATE_COLORS[s], edgecolor="#555555", linewidth=0.6,
-            label=label,
-        ))
+        label = f"{STATE_LABELS[s]}  —  {share * 100:.0f}%"
+        legend_handles.append(
+            mpatches.Patch(
+                facecolor=STATE_COLORS[s],
+                edgecolor="#555555",
+                linewidth=0.6,
+                label=label,
+            )
+        )
     leg = ax.legend(
-        handles=legend_handles, loc="lower left", frameon=False,
-        bbox_to_anchor=(0.0, -0.12), fontsize=10, handlelength=1.6,
-        handleheight=1.0, borderpad=0.4, labelspacing=0.6, ncol=2,
+        handles=legend_handles,
+        loc="lower left",
+        frameon=False,
+        bbox_to_anchor=(0.0, -0.12),
+        fontsize=10,
+        handlelength=1.6,
+        handleheight=1.0,
+        borderpad=0.4,
+        labelspacing=0.6,
+        ncol=2,
         columnspacing=2.0,
     )
     for txt in leg.get_texts():
         txt.set_color("#222222")
 
     ax.text(
-        0.01, 1.02,
+        0.01,
+        1.02,
         f"{SITE_DISPLAY[site]}  ·  diagnostic map (pre-CFD; geometric λf proxy for ventilation)",
-        transform=ax.transAxes, fontsize=9.5, color="#666666",
-        ha="left", va="bottom",
+        transform=ax.transAxes,
+        fontsize=9.5,
+        color="#666666",
+        ha="left",
+        va="bottom",
     )
 
     bar_y = 0.02
@@ -194,14 +226,24 @@ def render(site: str, grid: gpd.GeoDataFrame, state: np.ndarray, paths: dict) ->
     bbox_full = grid.total_bounds
     span = bbox_full[2] - bbox_full[0]
     bar_w = scale_m / span * (1 - 0.02)
-    ax.add_patch(mpatches.Rectangle(
-        (bar_x0, bar_y), bar_w, 0.008,
-        transform=ax.transAxes, color="#222222",
-    ))
+    ax.add_patch(
+        mpatches.Rectangle(
+            (bar_x0, bar_y),
+            bar_w,
+            0.008,
+            transform=ax.transAxes,
+            color="#222222",
+        )
+    )
     ax.text(
-        bar_x0 + bar_w / 2, bar_y + 0.018,
-        f"{scale_m} m", transform=ax.transAxes,
-        fontsize=8.5, color="#444444", ha="center", va="bottom",
+        bar_x0 + bar_w / 2,
+        bar_y + 0.018,
+        f"{scale_m} m",
+        transform=ax.transAxes,
+        fontsize=8.5,
+        color="#444444",
+        ha="center",
+        va="bottom",
     )
 
     paths["out_dir"].mkdir(parents=True, exist_ok=True)
@@ -234,10 +276,18 @@ def render(site: str, grid: gpd.GeoDataFrame, state: np.ndarray, paths: dict) ->
 
     print(f"\n[{site}] wrote {paths['out_png']}")
     print(f"  n cells: {len(grid)} (classified {total_known})")
-    print(f"    adequate:        {counts[STATE_ADEQUATE]:5d}  ({stats['shares']['adequate']*100:5.1f}%)")
-    print(f"    sun-fail only:   {counts[STATE_SUN_ONLY]:5d}  ({stats['shares']['sun_only']*100:5.1f}%)")
-    print(f"    vent-fail only:  {counts[STATE_VENT_ONLY]:5d}  ({stats['shares']['vent_only']*100:5.1f}%)")
-    print(f"    compound-fail:   {counts[STATE_COMPOUND]:5d}  ({stats['shares']['compound']*100:5.1f}%)")
+    print(
+        f"    adequate:        {counts[STATE_ADEQUATE]:5d}  ({stats['shares']['adequate'] * 100:5.1f}%)"
+    )
+    print(
+        f"    sun-fail only:   {counts[STATE_SUN_ONLY]:5d}  ({stats['shares']['sun_only'] * 100:5.1f}%)"
+    )
+    print(
+        f"    vent-fail only:  {counts[STATE_VENT_ONLY]:5d}  ({stats['shares']['vent_only'] * 100:5.1f}%)"
+    )
+    print(
+        f"    compound-fail:   {counts[STATE_COMPOUND]:5d}  ({stats['shares']['compound'] * 100:5.1f}%)"
+    )
     print(f"    no data:         {counts[STATE_NODATA]:5d}")
     return stats
 

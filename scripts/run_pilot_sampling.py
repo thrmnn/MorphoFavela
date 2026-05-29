@@ -38,6 +38,11 @@ PATCH_RADIUS_M = 50.0
 PATCH_DIAMETER_M = 2.0 * PATCH_RADIUS_M  # = W_patch in the v1 manifest
 PATCH_AREA_M2 = math.pi * PATCH_RADIUS_M**2  # ≈ 7853.98 m²
 
+# Reference radius for the CFD domain circle in debug plots. Matches the
+# canonical `cfd_domain_radius` (patch_meta); the production domain is the
+# rectangular v1 extents below — this circle is a visual reference only.
+CFD_DOMAIN_RADIUS_M = 250.0
+
 # V1 rectangular per-direction CFD domain (Franke / COST 732 /
 # Tominaga 2008 AIJ / Blocken 2015 wide-obstacle scheme).
 # Canonical contract: src/cfd_integration/rectangular_domain_v1.json.
@@ -59,9 +64,7 @@ def _v1_domain_extents(h_max: float) -> dict:
     blockage_ratio = frontal / cross_section if cross_section > 0 else float("inf")
     half_long = 10.0 * h_max + R
     half_short = lateral
-    source_data_required = (
-        math.ceil(math.sqrt(half_long**2 + half_short**2)) + V1_SAFETY_MARGIN_M
-    )
+    source_data_required = math.ceil(math.sqrt(half_long**2 + half_short**2)) + V1_SAFETY_MARGIN_M
     return {
         "domain_upstream_m": upstream,
         "domain_downstream_m": downstream,
@@ -73,6 +76,7 @@ def _v1_domain_extents(h_max: float) -> dict:
         "domain_blockage_ok": blockage_ratio < V1_BLOCKAGE_GATE,
         "source_data_required_m": source_data_required,
     }
+
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -1189,7 +1193,7 @@ def generate_figure_context(
         ax.add_patch(
             plt.Circle(
                 (cx, cy),
-                radius,
+                CFD_DOMAIN_RADIUS_M,
                 linewidth=1.0,
                 edgecolor="#1f77b4",
                 facecolor="none",
@@ -1461,9 +1465,7 @@ def run_sampling(config: dict) -> gpd.GeoDataFrame:
             "domain_data_coverage": selected["_domain_coverage"].values,
         },
         geometry=[
-            Point(row["centroid_x"], row["centroid_y"]).buffer(
-                float(row["source_data_required_m"])
-            )
+            Point(row["centroid_x"], row["centroid_y"]).buffer(float(row["source_data_required_m"]))
             for _, row in selected.iterrows()
         ],
         crs=grid.crs,

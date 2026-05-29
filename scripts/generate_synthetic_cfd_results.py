@@ -144,9 +144,7 @@ def _generate_samples(
     )
 
 
-def _building_field(
-    xg, yg, ny, nx, grid_spacing, buildings, u_bg, rng
-):
+def _building_field(xg, yg, ny, nx, grid_spacing, buildings, u_bg, rng):
     """Building-aware multiplicative modulation of a background field.
 
     The sample grid is regular in the flow frame (rows = cross-wind t,
@@ -161,12 +159,8 @@ def _building_field(
     """
     import geopandas as gpd
 
-    pts = gpd.GeoDataFrame(
-        geometry=gpd.points_from_xy(xg, yg), crs=buildings.crs
-    )
-    j = gpd.sjoin(
-        pts, buildings[["height", "geometry"]], predicate="within", how="left"
-    )
+    pts = gpd.GeoDataFrame(geometry=gpd.points_from_xy(xg, yg), crs=buildings.crs)
+    j = gpd.sjoin(pts, buildings[["height", "geometry"]], predicate="within", how="left")
     h_in = j["height"].groupby(level=0).first().reindex(range(len(pts))).to_numpy()
     inside = ~np.isnan(h_in)
     bmask = inside.reshape(ny, nx).astype(float)
@@ -257,9 +251,7 @@ def _generate_samples_rect(
     u_bg = np.where(in_patch, u_mag_mean * bowl, u_bg)
 
     if buildings is not None and len(buildings):
-        u_field, wake = _building_field(
-            x, y, ny, nx, grid_spacing, buildings, u_bg, rng
-        )
+        u_field, wake = _building_field(x, y, ny, nx, grid_spacing, buildings, u_bg, rng)
     else:
         bulk_wake = (S > 0) & (np.abs(T) < patch_radius * 2.0)
         wf = 1.0 - 0.45 * np.exp(-np.clip(S, 0, None) / 220.0)
@@ -300,8 +292,9 @@ def _git_short_commit() -> str:
         return "unknown"
 
 
-def _provenance(seed: int, grid_spacing: float | None, u_ref: float,
-                building_aware: bool = False) -> dict:
+def _provenance(
+    seed: int, grid_spacing: float | None, u_ref: float, building_aware: bool = False
+) -> dict:
     """Provenance block embedded in every summary.json so synthetic
     results are self-identifying and reproducible."""
     if grid_spacing is None:
@@ -376,9 +369,7 @@ def generate_site(
 
         buildings = gpd.read_file(buildings_path).to_crs(31983)
         if "height" not in buildings.columns:
-            raise ValueError(
-                f"{buildings_path}: building-aware sampler needs a 'height' column"
-            )
+            raise ValueError(f"{buildings_path}: building-aware sampler needs a 'height' column")
 
     patches_csv = (
         PROJECT_ROOT
@@ -400,8 +391,7 @@ def generate_site(
 
     rng = np.random.default_rng(seed)
     out_root.mkdir(parents=True, exist_ok=True)
-    provenance = _provenance(seed, grid_spacing, u_ref,
-                             building_aware=buildings is not None)
+    provenance = _provenance(seed, grid_spacing, u_ref, building_aware=buildings is not None)
 
     coverage = {"site": site, "n_patches": len(patches_df), "patches": {}}
     for _, row in patches_df.iterrows():

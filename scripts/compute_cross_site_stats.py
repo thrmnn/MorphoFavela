@@ -17,6 +17,7 @@ Output:
     outputs/paper_figures/cross_site_stats.json
     outputs/paper_figures/cross_site_stats.md   (human-readable summary)
 """
+
 from __future__ import annotations
 
 import json
@@ -39,8 +40,9 @@ THRESHOLD_SUN_HRS = 2.0
 THRESHOLD_LAMBDA_F = 0.35
 
 
-def aggregate_solar(grid: gpd.GeoDataFrame, solar_path: Path,
-                    max_radius: float = 25.0, k: int = 3) -> gpd.GeoDataFrame:
+def aggregate_solar(
+    grid: gpd.GeoDataFrame, solar_path: Path, max_radius: float = 25.0, k: int = 3
+) -> gpd.GeoDataFrame:
     sol = gpd.read_file(solar_path)[["solar_hours_winter", "geometry"]]
     j = gpd.sjoin(sol, grid[["zone_id", "geometry"]], how="inner", predicate="within")
     primary = j.groupby("zone_id")["solar_hours_winter"].median().reset_index()
@@ -72,9 +74,9 @@ def classify(grid: gpd.GeoDataFrame) -> pd.Series:
     both = built & sun_known & vent_known
     state = pd.Series("nodata", index=grid.index, dtype=object)
     state[both & (sun >= THRESHOLD_SUN_HRS) & (vent <= THRESHOLD_LAMBDA_F)] = "adequate"
-    state[both & (sun <  THRESHOLD_SUN_HRS) & (vent <= THRESHOLD_LAMBDA_F)] = "sun_only"
-    state[both & (sun >= THRESHOLD_SUN_HRS) & (vent >  THRESHOLD_LAMBDA_F)] = "vent_only"
-    state[both & (sun <  THRESHOLD_SUN_HRS) & (vent >  THRESHOLD_LAMBDA_F)] = "compound"
+    state[both & (sun < THRESHOLD_SUN_HRS) & (vent <= THRESHOLD_LAMBDA_F)] = "sun_only"
+    state[both & (sun >= THRESHOLD_SUN_HRS) & (vent > THRESHOLD_LAMBDA_F)] = "vent_only"
+    state[both & (sun < THRESHOLD_SUN_HRS) & (vent > THRESHOLD_LAMBDA_F)] = "compound"
     return state
 
 
@@ -101,7 +103,9 @@ def quick_pearson(a: pd.Series, b: pd.Series) -> float | None:
 
 def stats_for_site(site: str) -> dict[str, Any]:
     grid_path = PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg"
-    solar_path = PROJECT_ROOT / "outputs" / site / "morphometrics" / "svf" / "svf_streets_solar.gpkg"
+    solar_path = (
+        PROJECT_ROOT / "outputs" / site / "morphometrics" / "svf" / "svf_streets_solar.gpkg"
+    )
     grid = gpd.read_file(grid_path)
     grid = aggregate_solar(grid, solar_path)
     state = classify(grid)
@@ -111,12 +115,22 @@ def stats_for_site(site: str) -> dict[str, Any]:
 
     counts = built["state"].value_counts().to_dict()
     total = int(built_mask.sum())
-    shares = {k: counts.get(k, 0) / total if total else 0.0
-              for k in ("adequate", "sun_only", "vent_only", "compound")}
+    shares = {
+        k: counts.get(k, 0) / total if total else 0.0
+        for k in ("adequate", "sun_only", "vent_only", "compound")
+    }
 
     descriptors = {}
-    for col in ("svf", "lambda_p", "lambda_f_mean", "porosity", "H_mean", "sigma_h", "slope_deg",
-                "street_orientation_entropy"):
+    for col in (
+        "svf",
+        "lambda_p",
+        "lambda_f_mean",
+        "porosity",
+        "H_mean",
+        "sigma_h",
+        "slope_deg",
+        "street_orientation_entropy",
+    ):
         if col in built.columns:
             s = built[col].dropna()
             descriptors[col] = {
@@ -134,12 +148,20 @@ def stats_for_site(site: str) -> dict[str, Any]:
 
     slope_corr = {}
     if "slope_deg" in built.columns:
-        for other in ("svf", "lambda_p", "lambda_f_mean", "porosity", "sigma_h", "street_orientation_entropy"):
+        for other in (
+            "svf",
+            "lambda_p",
+            "lambda_f_mean",
+            "porosity",
+            "sigma_h",
+            "street_orientation_entropy",
+        ):
             if other in built.columns:
                 slope_corr[other] = quick_pearson(built["slope_deg"], built[other])
     lambda_porosity_corr = (
         quick_pearson(built["lambda_p"], built["porosity"])
-        if {"lambda_p", "porosity"}.issubset(built.columns) else None
+        if {"lambda_p", "porosity"}.issubset(built.columns)
+        else None
     )
 
     pct_below_2h = None
@@ -174,8 +196,10 @@ def stats_for_site(site: str) -> dict[str, Any]:
 def aggregate(per_site: list[dict[str, Any]]) -> dict[str, Any]:
     def pooled(group_sites: set[str]) -> dict[str, Any]:
         total = sum(s["n_built_cells"] for s in per_site if s["site"] in group_sites)
-        counts = {k: sum(s["counts"][k] for s in per_site if s["site"] in group_sites)
-                  for k in ("adequate", "sun_only", "vent_only", "compound")}
+        counts = {
+            k: sum(s["counts"][k] for s in per_site if s["site"] in group_sites)
+            for k in ("adequate", "sun_only", "vent_only", "compound")
+        }
         shares = {k: (v / total if total else 0.0) for k, v in counts.items()}
         return {"n_built_cells": total, "counts": counts, "shares": shares}
 
@@ -195,8 +219,10 @@ def cross_site_ranges(per_site: list[dict[str, Any]]) -> dict[str, Any]:
             d = s["descriptors"].get(key)
             if d is None:
                 continue
-            mins.append(d["min"]); maxs.append(d["max"])
-            p05.append(d["p05"]); p95.append(d["p95"])
+            mins.append(d["min"])
+            maxs.append(d["max"])
+            p05.append(d["p05"])
+            p95.append(d["p95"])
         if mins:
             out[key] = {
                 "site_min_min": float(min(mins)),
@@ -205,12 +231,28 @@ def cross_site_ranges(per_site: list[dict[str, Any]]) -> dict[str, Any]:
                 "site_p95_max": float(max(p95)),
             }
     out["pct_sun_below_2h_range"] = {
-        "min": float(min(s["pct_sun_below_2h"] for s in per_site if s["pct_sun_below_2h"] is not None)),
-        "max": float(max(s["pct_sun_below_2h"] for s in per_site if s["pct_sun_below_2h"] is not None)),
+        "min": float(
+            min(s["pct_sun_below_2h"] for s in per_site if s["pct_sun_below_2h"] is not None)
+        ),
+        "max": float(
+            max(s["pct_sun_below_2h"] for s in per_site if s["pct_sun_below_2h"] is not None)
+        ),
     }
     out["pct_lambda_f_above_0_35_range"] = {
-        "min": float(min(s["pct_lambda_f_above_0_35"] for s in per_site if s["pct_lambda_f_above_0_35"] is not None)),
-        "max": float(max(s["pct_lambda_f_above_0_35"] for s in per_site if s["pct_lambda_f_above_0_35"] is not None)),
+        "min": float(
+            min(
+                s["pct_lambda_f_above_0_35"]
+                for s in per_site
+                if s["pct_lambda_f_above_0_35"] is not None
+            )
+        ),
+        "max": float(
+            max(
+                s["pct_lambda_f_above_0_35"]
+                for s in per_site
+                if s["pct_lambda_f_above_0_35"] is not None
+            )
+        ),
     }
     return out
 
@@ -227,8 +269,8 @@ def write_summary_md(stats: dict[str, Any], path: Path) -> None:
         sh = s["shares"]
         lines.append(
             f"| {s['site']} | {s['typology']} | {s['n_built_cells']:,} | "
-            f"{sh['adequate']*100:.1f}% | {sh['sun_only']*100:.1f}% | "
-            f"{sh['vent_only']*100:.1f}% | {sh['compound']*100:.1f}% |"
+            f"{sh['adequate'] * 100:.1f}% | {sh['sun_only'] * 100:.1f}% | "
+            f"{sh['vent_only'] * 100:.1f}% | {sh['compound'] * 100:.1f}% |"
         )
     lines.append("")
     lines.append("## Aggregates")
@@ -238,28 +280,36 @@ def write_summary_md(stats: dict[str, Any], path: Path) -> None:
         sh = a["shares"]
         lines.append(
             f"- **{k}**: {a['n_built_cells']:,} cells — "
-            f"adequate {sh['adequate']*100:.1f}%, sun-only {sh['sun_only']*100:.1f}%, "
-            f"vent-only {sh['vent_only']*100:.1f}%, compound {sh['compound']*100:.1f}%"
+            f"adequate {sh['adequate'] * 100:.1f}%, sun-only {sh['sun_only'] * 100:.1f}%, "
+            f"vent-only {sh['vent_only'] * 100:.1f}%, compound {sh['compound'] * 100:.1f}%"
         )
     lines.append("")
     lines.append("## Cross-site ranges")
     lines.append("")
     for key, r in stats["cross_site_ranges"].items():
         if isinstance(r, dict) and "site_min_min" in r:
-            lines.append(f"- **{key}**: range across sites = "
-                         f"[{r['site_min_min']:.3f}, {r['site_max_max']:.3f}]  "
-                         f"(P5–P95 envelope = [{r['site_p05_min']:.3f}, {r['site_p95_max']:.3f}])")
+            lines.append(
+                f"- **{key}**: range across sites = "
+                f"[{r['site_min_min']:.3f}, {r['site_max_max']:.3f}]  "
+                f"(P5–P95 envelope = [{r['site_p05_min']:.3f}, {r['site_p95_max']:.3f}])"
+            )
         elif isinstance(r, dict) and "min" in r:
-            lines.append(f"- **{key}**: per-site range = "
-                         f"[{r['min']*100:.1f}%, {r['max']*100:.1f}%]")
+            lines.append(
+                f"- **{key}**: per-site range = [{r['min'] * 100:.1f}%, {r['max'] * 100:.1f}%]"
+            )
     lines.append("")
     lines.append("## Slope independence (Pearson r vs slope, by site)")
     lines.append("")
-    lines.append("| Site | r(slope, SVF) | r(slope, λp) | r(slope, λf) | r(slope, porosity) | r(slope, σH) | r(slope, entropy) | abs-max |")
+    lines.append(
+        "| Site | r(slope, SVF) | r(slope, λp) | r(slope, λf) | r(slope, porosity) | r(slope, σH) | r(slope, entropy) | abs-max |"
+    )
     lines.append("|---|---:|---:|---:|---:|---:|---:|---:|")
     for s in stats["per_site"]:
         sp = s["slope_pearson"]
-        def fmt(v): return "—" if v is None else f"{v:+.3f}"
+
+        def fmt(v):
+            return "—" if v is None else f"{v:+.3f}"
+
         lines.append(
             f"| {s['site']} | {fmt(sp.get('svf'))} | {fmt(sp.get('lambda_p'))} | "
             f"{fmt(sp.get('lambda_f_mean'))} | {fmt(sp.get('porosity'))} | "
@@ -291,8 +341,8 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "cross_site_stats.json").write_text(json.dumps(stats, indent=2, ensure_ascii=False))
     write_summary_md(stats, out_dir / "cross_site_stats.md")
-    print(f"wrote {out_dir/'cross_site_stats.json'}")
-    print(f"wrote {out_dir/'cross_site_stats.md'}")
+    print(f"wrote {out_dir / 'cross_site_stats.json'}")
+    print(f"wrote {out_dir / 'cross_site_stats.md'}")
 
 
 if __name__ == "__main__":

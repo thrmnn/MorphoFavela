@@ -127,9 +127,7 @@ def fake_site(tmp_path, monkeypatch):
     sampling = tmp_path / "outputs" / "fakesite" / "sampling_cfd" / "campaign_sampling"
     sampling.mkdir(parents=True)
     pd.DataFrame(rows).to_csv(sampling / "campaign_patches.csv", index=False)
-    monkeypatch.setattr(
-        "scripts.generate_synthetic_cfd_results.PROJECT_ROOT", tmp_path
-    )
+    monkeypatch.setattr("scripts.generate_synthetic_cfd_results.PROJECT_ROOT", tmp_path)
     return tmp_path
 
 
@@ -160,9 +158,7 @@ def test_building_aware_field_is_solid_inside_and_directional():
     import geopandas as gpd
     from shapely.geometry import box
 
-    bld = gpd.GeoDataFrame(
-        {"height": [12.0]}, geometry=[box(-10, -10, 10, 10)], crs="EPSG:31983"
-    )
+    bld = gpd.GeoDataFrame({"height": [12.0]}, geometry=[box(-10, -10, 10, 10)], crs="EPSG:31983")
 
     def run(direction):
         rng = np.random.default_rng(0)
@@ -185,8 +181,8 @@ def test_building_aware_field_is_solid_inside_and_directional():
         m = (d.y > lo) & (d.y < hi) & (d.x.abs() < 8)
         return d.loc[m, "U_mag"].mean()
 
-    lee_n = band(dn, -40, -15)      # behind block for N
-    windward_n = band(dn, 15, 40)   # in front of block for N
+    lee_n = band(dn, -40, -15)  # behind block for N
+    windward_n = band(dn, 15, 40)  # in front of block for N
     assert lee_n < 0.75 * windward_n
 
     # same physical band, opposite wind: lee for N is open/windward for S

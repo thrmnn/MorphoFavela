@@ -350,9 +350,14 @@ def run_campaign_site(config: dict, target: int) -> gpd.GeoDataFrame | None:
         # Carry over per-patch domain extents from pilot (v1 fields).
         row_data["H_max_analysis"] = prow.get("H_max_analysis", 0)
         for v1_col in (
-            "domain_upstream_m", "domain_downstream_m", "domain_lateral_m", "domain_top_m",
-            "domain_blockage_frontal_m2", "domain_blockage_cross_section_m2",
-            "domain_blockage_ratio", "domain_blockage_ok",
+            "domain_upstream_m",
+            "domain_downstream_m",
+            "domain_lateral_m",
+            "domain_top_m",
+            "domain_blockage_frontal_m2",
+            "domain_blockage_cross_section_m2",
+            "domain_blockage_ratio",
+            "domain_blockage_ok",
             "source_data_required_m",
         ):
             if v1_col in prow:

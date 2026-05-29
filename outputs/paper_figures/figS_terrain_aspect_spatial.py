@@ -37,7 +37,6 @@ from fig_style import (  # noqa: E402
     save_fig,
 )
 
-
 QUADRANT_COLORS = {
     "N": "#1F6FB0",
     "E": "#2CA02C",
@@ -79,9 +78,9 @@ def main() -> None:
     )
     if solar.crs != grid.crs:
         solar = solar.to_crs(grid.crs)
-    pts = gpd.sjoin(
-        solar, grid[["geometry", "aspect_deg"]], how="left", predicate="within"
-    ).drop(columns="index_right")
+    pts = gpd.sjoin(solar, grid[["geometry", "aspect_deg"]], how="left", predicate="within").drop(
+        columns="index_right"
+    )
     pts = pts.dropna(subset=["aspect_deg", "svf", "solar_hours"])
     pts["solar_norm"] = pts["solar_hours"] / 11.0
     pts["disagreement"] = pts["svf"] - pts["solar_norm"]
@@ -105,7 +104,14 @@ def main() -> None:
     panel_specs = [
         ("(a) terrain aspect", pts["aspect_deg"], compass_cmap, 0, 360, "deg from N"),
         ("(b) SVF", pts["svf"], "viridis", 0, 1, "SVF (0–1)"),
-        ("(c) winter solar hours (normalised)", pts["solar_norm"], "viridis", 0, 1, "solar / 11 hr"),
+        (
+            "(c) winter solar hours (normalised)",
+            pts["solar_norm"],
+            "viridis",
+            0,
+            1,
+            "solar / 11 hr",
+        ),
         (
             "(d) disagreement = SVF − solar  (the headline)",
             pts["disagreement"],

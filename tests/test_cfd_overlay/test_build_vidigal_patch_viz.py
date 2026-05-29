@@ -52,17 +52,19 @@ def test_bin_umag_to_grid_means_and_nodata():
     # most cells are empty → NaN
     assert np.isnan(arr).sum() > arr.size / 2
     # north-up transform: origin half a pixel NW of the min point
-    assert transform.c == pytest.approx(-1.0)   # x0 - spacing/2
-    assert transform.f == pytest.approx(11.0)   # y_max + spacing/2
+    assert transform.c == pytest.approx(-1.0)  # x0 - spacing/2
+    assert transform.f == pytest.approx(11.0)  # y_max + spacing/2
     assert transform.a == pytest.approx(2.0)
     assert transform.e == pytest.approx(-2.0)
 
 
 def test_metrics_table_html_renders_rows_and_synthetic_marker():
-    df = pd.DataFrame([
-        {"dir": "N", "U_mean": 0.34, "calm_%<0.5": 70.1},
-        {"dir": "8-dir mean", "U_mean": 0.34, "calm_%<0.5": 70.5},
-    ])
+    df = pd.DataFrame(
+        [
+            {"dir": "N", "U_mean": 0.34, "calm_%<0.5": 70.1},
+            {"dir": "8-dir mean", "U_mean": 0.34, "calm_%<0.5": 70.5},
+        ]
+    )
     out = _metrics_table_html(df)
     assert "<table" in out and "</table>" in out
     assert "0.34" in out and "70.1" in out

@@ -251,11 +251,17 @@ def run_site(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Street-level seasonal solar envelope.")
-    parser.add_argument("--site", default=None, help=f"One site, e.g. 'vidigal'. Choose from {ALL_SITES}.")
+    parser.add_argument(
+        "--site", default=None, help=f"One site, e.g. 'vidigal'. Choose from {ALL_SITES}."
+    )
     parser.add_argument("--all-sites", action="store_true", help="Run every site in ALL_SITES.")
     parser.add_argument("--interval", type=int, default=30, help="Sun-position timestep (min).")
-    parser.add_argument("--hour-start", type=int, default=5, help="Earliest hour of day (5 catches summer dawn).")
-    parser.add_argument("--hour-end", type=int, default=19, help="Latest hour of day (19 catches summer dusk).")
+    parser.add_argument(
+        "--hour-start", type=int, default=5, help="Earliest hour of day (5 catches summer dawn)."
+    )
+    parser.add_argument(
+        "--hour-end", type=int, default=19, help="Latest hour of day (19 catches summer dusk)."
+    )
     parser.add_argument(
         "--n-jobs",
         type=int,

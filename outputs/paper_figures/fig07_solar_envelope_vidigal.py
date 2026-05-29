@@ -15,7 +15,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from figS_solar_envelope import render_envelope  # noqa: E402
 
-
 SUPTITLE = (
     "Vidigal — street-level solar envelope.  Same points, same scale, three reference cases.\n"
     "(a) §5.3 winter dissociation panel; (b) the figure year-round comfort & PV studies "

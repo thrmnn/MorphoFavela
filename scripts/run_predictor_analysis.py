@@ -19,6 +19,7 @@ Outputs:
   outputs/paper_figures/rf_pooled_data.parquet    — feature/target table
   outputs/paper_figures/rf_pd_curves.json         — partial-dependence values
 """
+
 from __future__ import annotations
 
 import json
@@ -64,8 +65,9 @@ FEATURE_LABELS = {
 }
 
 
-def aggregate_solar(grid: gpd.GeoDataFrame, solar_path: Path,
-                    max_radius: float = 25.0, k: int = 3) -> gpd.GeoDataFrame:
+def aggregate_solar(
+    grid: gpd.GeoDataFrame, solar_path: Path, max_radius: float = 25.0, k: int = 3
+) -> gpd.GeoDataFrame:
     sol = gpd.read_file(solar_path)[["solar_hours_winter", "geometry"]]
     j = gpd.sjoin(sol, grid[["zone_id", "geometry"]], how="inner", predicate="within")
     primary = j.groupby("zone_id")["solar_hours_winter"].median().reset_index()
@@ -89,8 +91,12 @@ def aggregate_solar(grid: gpd.GeoDataFrame, solar_path: Path,
 
 
 def load_site(site: str) -> pd.DataFrame:
-    grid = gpd.read_file(PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg")
-    grid = aggregate_solar(grid, PROJECT_ROOT / "outputs" / site / "morphometrics" / "svf" / "svf_streets_solar.gpkg")
+    grid = gpd.read_file(
+        PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg"
+    )
+    grid = aggregate_solar(
+        grid, PROJECT_ROOT / "outputs" / site / "morphometrics" / "svf" / "svf_streets_solar.gpkg"
+    )
     built = (grid["lambda_p"].fillna(0) > 0.01) | (grid["building_count"] > 0)
     sun_known = grid["solar_hours_winter"].notna()
     vent_known = grid["lambda_f_mean"].notna()
@@ -126,25 +132,38 @@ def loso_cv_rf(df: pd.DataFrame, target: str = "sun_fail") -> dict:
         X_test = test[FEATURES].values
         y_test = test[target].values
         rf = RandomForestClassifier(
-            n_estimators=300, max_depth=None, min_samples_leaf=10,
-            n_jobs=-1, random_state=42, class_weight="balanced",
+            n_estimators=300,
+            max_depth=None,
+            min_samples_leaf=10,
+            n_jobs=-1,
+            random_state=42,
+            class_weight="balanced",
         )
         rf.fit(X_train, y_train)
         proba = rf.predict_proba(X_test)[:, 1]
         auc = roc_auc_score(y_test, proba)
         rf_score = rf.score(X_test, y_test)
         perm = permutation_importance(
-            rf, X_test, y_test, n_repeats=10, random_state=42, n_jobs=-1,
+            rf,
+            X_test,
+            y_test,
+            n_repeats=10,
+            random_state=42,
+            n_jobs=-1,
         )
         importance_runs.append({f: float(v) for f, v in zip(FEATURES, perm.importances_mean)})
-        fold_results.append({
-            "held_out": held_out,
-            "n_train": int(len(train)),
-            "n_test": int(len(test)),
-            "test_accuracy": float(rf_score),
-            "test_roc_auc": float(auc),
-            "permutation_importance": {f: float(v) for f, v in zip(FEATURES, perm.importances_mean)},
-        })
+        fold_results.append(
+            {
+                "held_out": held_out,
+                "n_train": int(len(train)),
+                "n_test": int(len(test)),
+                "test_accuracy": float(rf_score),
+                "test_roc_auc": float(auc),
+                "permutation_importance": {
+                    f: float(v) for f, v in zip(FEATURES, perm.importances_mean)
+                },
+            }
+        )
     return {"fold_results": fold_results, "importance_runs": importance_runs}
 
 
@@ -152,12 +171,22 @@ def pooled_rf_with_pd(df: pd.DataFrame, target: str = "sun_fail") -> dict:
     X = df[FEATURES].values
     y = df[target].values
     rf = RandomForestClassifier(
-        n_estimators=300, max_depth=None, min_samples_leaf=10,
-        n_jobs=-1, random_state=42, class_weight="balanced",
+        n_estimators=300,
+        max_depth=None,
+        min_samples_leaf=10,
+        n_jobs=-1,
+        random_state=42,
+        class_weight="balanced",
     )
     rf.fit(X, y)
     perm = permutation_importance(
-        rf, X, y, n_repeats=10, random_state=42, n_jobs=-1, max_samples=10000,
+        rf,
+        X,
+        y,
+        n_repeats=10,
+        random_state=42,
+        n_jobs=-1,
+        max_samples=10000,
     )
     importance = sorted(
         [(f, float(v)) for f, v in zip(FEATURES, perm.importances_mean)],
@@ -169,7 +198,11 @@ def pooled_rf_with_pd(df: pd.DataFrame, target: str = "sun_fail") -> dict:
         idx = FEATURES.index(feat)
         try:
             pd_result = partial_dependence(
-                rf, X, [idx], kind="average", grid_resolution=40,
+                rf,
+                X,
+                [idx],
+                kind="average",
+                grid_resolution=40,
             )
             pd_curves[feat] = {
                 "grid": pd_result["grid_values"][0].tolist(),
@@ -187,6 +220,7 @@ def pooled_rf_with_pd(df: pd.DataFrame, target: str = "sun_fail") -> dict:
 
 def pooled_logit_with_interactions(df: pd.DataFrame, target: str = "sun_fail") -> dict:
     import statsmodels.api as sm
+
     feats_std = df[FEATURES].copy()
     feats_std = (feats_std - feats_std.mean()) / feats_std.std()
     feats_std["slope_x_northness"] = feats_std["slope_deg"] * feats_std["northness"]
@@ -222,10 +256,12 @@ def pooled_logit_with_interactions(df: pd.DataFrame, target: str = "sun_fail") -
             ys = sub[target].values
             try:
                 m = sm.Logit(ys, Xs).fit(disp=False, maxiter=200)
-                loso_coefs.append({
-                    "held_out": held_out,
-                    "coefficients": {name: float(m.params[name]) for name in Xs.columns},
-                })
+                loso_coefs.append(
+                    {
+                        "held_out": held_out,
+                        "coefficients": {name: float(m.params[name]) for name in Xs.columns},
+                    }
+                )
             except Exception:
                 continue
         out["loso_folds"] = loso_coefs
@@ -275,7 +311,7 @@ def main() -> None:
 
     print("pooled RF + partial dependence ...")
     pooled_rf = pooled_rf_with_pd(df)
-    print(f"  Top features by permutation importance:")
+    print("  Top features by permutation importance:")
     for f, v in pooled_rf["permutation_importance"][:5]:
         print(f"    {f:34s} {v:+.4f}")
 
@@ -292,8 +328,10 @@ def main() -> None:
         for name in ("slope_x_northness", "slope_x_svf", "slope_deg", "northness", "svf"):
             if name in logit["coefficients"]:
                 c = logit["coefficients"][name]
-                print(f"    {name:24s} beta={c['estimate']:+.3f}  p={c['p']:.3g}  "
-                      f"95% CI [{c['ci_low']:+.3f}, {c['ci_high']:+.3f}]")
+                print(
+                    f"    {name:24s} beta={c['estimate']:+.3f}  p={c['p']:.3g}  "
+                    f"95% CI [{c['ci_low']:+.3f}, {c['ci_high']:+.3f}]"
+                )
     else:
         print(f"  logit ERROR: {logit['error']}")
 
@@ -317,11 +355,15 @@ def main() -> None:
         },
         "logit_interactions": logit,
     }
-    (out_dir / "rf_predictor_stats.json").write_text(json.dumps(stats, indent=2, ensure_ascii=False))
-    (out_dir / "rf_pd_curves.json").write_text(json.dumps(pooled_rf["pd_curves"], indent=2, ensure_ascii=False))
-    print(f"\nwrote {out_dir/'rf_predictor_stats.json'}")
-    print(f"wrote {out_dir/'rf_pd_curves.json'}")
-    print(f"wrote {out_dir/'rf_pooled_data.parquet'}")
+    (out_dir / "rf_predictor_stats.json").write_text(
+        json.dumps(stats, indent=2, ensure_ascii=False)
+    )
+    (out_dir / "rf_pd_curves.json").write_text(
+        json.dumps(pooled_rf["pd_curves"], indent=2, ensure_ascii=False)
+    )
+    print(f"\nwrote {out_dir / 'rf_predictor_stats.json'}")
+    print(f"wrote {out_dir / 'rf_pd_curves.json'}")
+    print(f"wrote {out_dir / 'rf_pooled_data.parquet'}")
 
 
 if __name__ == "__main__":

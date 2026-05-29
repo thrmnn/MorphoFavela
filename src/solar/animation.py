@@ -143,13 +143,9 @@ def sunlit_matrix_to_wide_gdf(
             f"sunlit_matrix has {n_sun} columns but {len(sun_frames)} sun frames provided"
         )
     if observers.shape[0] != n_pts:
-        raise ValueError(
-            f"observers has {observers.shape[0]} rows but sunlit_matrix has {n_pts}"
-        )
+        raise ValueError(f"observers has {observers.shape[0]} rows but sunlit_matrix has {n_pts}")
     if base_gdf is not None and len(base_gdf) != n_pts:
-        raise ValueError(
-            f"base_gdf has {len(base_gdf)} rows but sunlit_matrix has {n_pts}"
-        )
+        raise ValueError(f"base_gdf has {len(base_gdf)} rows but sunlit_matrix has {n_pts}")
 
     timestep_hours = interval_minutes / 60.0
 

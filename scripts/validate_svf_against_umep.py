@@ -288,7 +288,9 @@ def regress(df: pd.DataFrame) -> dict:
     }
 
 
-def plot(df: pd.DataFrame, stats: dict, site: str, out_path: Path, observer_height: float = 0.0) -> None:
+def plot(
+    df: pd.DataFrame, stats: dict, site: str, out_path: Path, observer_height: float = 0.0
+) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     sub = df[df["used_in_fit"]]
 
@@ -376,9 +378,7 @@ def main() -> int:
     pad = 50.0
     crop = (minx - pad, miny - pad, maxx + pad, maxy + pad)
 
-    dsm, profile = build_dsm(
-        args.site, args.pixel_size, crop, observer_height=args.observer_height
-    )
+    dsm, profile = build_dsm(args.site, args.pixel_size, crop, observer_height=args.observer_height)
     umep_svf = run_umep_svf(dsm, args.pixel_size)
 
     df = compare(grid, umep_svf, profile, min_svf_count=args.min_svf_count)

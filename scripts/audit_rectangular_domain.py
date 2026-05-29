@@ -75,11 +75,11 @@ from src.urban_morphology import compute_frontal_area_ratio  # noqa: E402
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SITES = ["vidigal", "riodaspedras", "rocinha", "complexo_do_alemao", "maré"]
 PATCH_DIAMETER_M = 100.0
-PATCH_RADIUS_M = PATCH_DIAMETER_M / 2.0           # 50 m — analysis circle radius
-PATCH_AREA_M2 = math.pi * PATCH_RADIUS_M ** 2     # 7854 m²
-BLOCKAGE_GATE = 0.05                              # AIJ Tominaga 2008
-SAFETY_MARGIN_M = 50.0                            # additive safety on rotated-rect diagonal
-SITE_CRS = "EPSG:31983"                           # SIRGAS 2000 / UTM 23S
+PATCH_RADIUS_M = PATCH_DIAMETER_M / 2.0  # 50 m — analysis circle radius
+PATCH_AREA_M2 = math.pi * PATCH_RADIUS_M**2  # 7854 m²
+BLOCKAGE_GATE = 0.05  # AIJ Tominaga 2008
+SAFETY_MARGIN_M = 50.0  # additive safety on rotated-rect diagonal
+SITE_CRS = "EPSG:31983"  # SIRGAS 2000 / UTM 23S
 
 
 def _largest_extended_buffer(site: str) -> int:
@@ -94,9 +94,17 @@ def _largest_extended_buffer(site: str) -> int:
         except ValueError:
             continue
     return max(buffers) if buffers else 300
+
+
 WIND_DIRECTIONS = {
-    "N": 0.0, "NE": 45.0, "E": 90.0, "SE": 135.0,
-    "S": 180.0, "SW": 225.0, "W": 270.0, "NW": 315.0,
+    "N": 0.0,
+    "NE": 45.0,
+    "E": 90.0,
+    "SE": 135.0,
+    "S": 180.0,
+    "SW": 225.0,
+    "W": 270.0,
+    "NW": 315.0,
 }
 OUT_DIR = PROJECT_ROOT / "outputs" / "comparative" / "cfd_methodology"
 
@@ -108,7 +116,14 @@ def _load_indicators(site: str) -> pd.DataFrame:
     on three of the five sites (CDA / Maré / Rocinha were topped up to 25
     after the synthetic CFD pass), so we read campaign_patches directly
     to cover all 119 patches."""
-    path = PROJECT_ROOT / "outputs" / site / "sampling_cfd" / "campaign_sampling" / "campaign_patches.csv"
+    path = (
+        PROJECT_ROOT
+        / "outputs"
+        / site
+        / "sampling_cfd"
+        / "campaign_sampling"
+        / "campaign_patches.csv"
+    )
     df = pd.read_csv(path)
     df.insert(0, "site", site)
     return df
@@ -195,17 +210,15 @@ def _compute_gates(df: pd.DataFrame) -> pd.DataFrame:
 
     # Diagnostic: blockage if we used λ_F × disk_area (literature canopy-
     # parameterisation quantity). Reported alongside but not used to gate.
-    df["lambda_f_blockage_diag"] = (
-        lf_max * PATCH_AREA_M2 / df["domain_blockage_cross_section_m2"]
-    )
+    df["lambda_f_blockage_diag"] = lf_max * PATCH_AREA_M2 / df["domain_blockage_cross_section_m2"]
 
     # Source-data extent: half-diagonal of the rotated box
     # (20 H + 2 R) long × 2 · lateral wide, plus safety. One radius covers all 8 dirs.
-    half_long = 10.0 * h + R                # half of the 20H + 2R length
-    half_short = df["domain_lateral_m"]     # half of the 2 × lateral width
-    df["source_data_required_m"] = (
-        (half_long ** 2 + half_short ** 2).pow(0.5).apply(math.ceil) + SAFETY_MARGIN_M
-    )
+    half_long = 10.0 * h + R  # half of the 20H + 2R length
+    half_short = df["domain_lateral_m"]  # half of the 2 × lateral width
+    df["source_data_required_m"] = (half_long**2 + half_short**2).pow(0.5).apply(
+        math.ceil
+    ) + SAFETY_MARGIN_M
     # source_data_extent_m is set per-site by the caller (see main()).
     df["source_data_ok"] = df["source_data_extent_m"] >= df["source_data_required_m"]
 
@@ -214,18 +227,15 @@ def _compute_gates(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _pivot_pass_rate(df: pd.DataFrame) -> pd.DataFrame:
-    g = (
-        df.groupby(["site", "stratum_id"], as_index=False)
-        .agg(
-            n=("patch_id", "count"),
-            n_blockage_ok=("domain_blockage_ok", "sum"),
-            n_source_ok=("source_data_ok", "sum"),
-            n_eligible=("eligible", "sum"),
-            mean_lambda_p_patch=("lambda_p_patch", "mean"),
-            mean_lambda_f_max=("lambda_f_max", "mean"),
-            mean_H_max=("H_max_analysis", "mean"),
-            mean_blockage=("domain_blockage_ratio", "mean"),
-        )
+    g = df.groupby(["site", "stratum_id"], as_index=False).agg(
+        n=("patch_id", "count"),
+        n_blockage_ok=("domain_blockage_ok", "sum"),
+        n_source_ok=("source_data_ok", "sum"),
+        n_eligible=("eligible", "sum"),
+        mean_lambda_p_patch=("lambda_p_patch", "mean"),
+        mean_lambda_f_max=("lambda_f_max", "mean"),
+        mean_H_max=("H_max_analysis", "mean"),
+        mean_blockage=("domain_blockage_ratio", "mean"),
     )
     g["pass_rate"] = g["n_eligible"] / g["n"]
     return g.sort_values(["site", "stratum_id"])
@@ -238,11 +248,13 @@ def _print_report(df: pd.DataFrame, pivot: pd.DataFrame) -> None:
     n_elig = int(df["eligible"].sum())
 
     print("=" * 78)
-    print(f"  PHASE 0.5 AUDIT — rectangular domain (real λ_F + Blocken wide-obstacle + AIJ 5%)")
+    print("  PHASE 0.5 AUDIT — rectangular domain (real λ_F + Blocken wide-obstacle + AIJ 5%)")
     print(f"  n = {n} patches across 5 sites")
     print("=" * 78)
     print()
-    print(f"  Blockage gate  (B < {BLOCKAGE_GATE:.2f}):   {n_block}/{n}  ({100 * n_block / n:5.1f}%)")
+    print(
+        f"  Blockage gate  (B < {BLOCKAGE_GATE:.2f}):   {n_block}/{n}  ({100 * n_block / n:5.1f}%)"
+    )
     print(f"  Source-data gate (300 m):       {n_src}/{n}  ({100 * n_src / n:5.1f}%)")
     print(f"  ELIGIBLE (both gates):          {n_elig}/{n}  ({100 * n_elig / n:5.1f}%)")
     print()
@@ -250,7 +262,7 @@ def _print_report(df: pd.DataFrame, pivot: pd.DataFrame) -> None:
     print("  λ_F max (patch-scale, worst of 8 directions): distribution")
     for q in [0.10, 0.25, 0.50, 0.75, 0.90]:
         v = df["lambda_f_max"].quantile(q)
-        print(f"    p{int(100*q):02d} = {v:.3f}")
+        print(f"    p{int(100 * q):02d} = {v:.3f}")
     print(f"    min = {df['lambda_f_max'].min():.3f}   max = {df['lambda_f_max'].max():.3f}")
     print()
 
@@ -273,8 +285,15 @@ def _print_report(df: pd.DataFrame, pivot: pd.DataFrame) -> None:
     print("  Per-stratum eligibility, sorted worst-first:")
     print()
     cols = [
-        "site", "stratum_id", "n", "n_eligible", "pass_rate",
-        "mean_lambda_p_patch", "mean_lambda_f_max", "mean_H_max", "mean_blockage",
+        "site",
+        "stratum_id",
+        "n",
+        "n_eligible",
+        "pass_rate",
+        "mean_lambda_p_patch",
+        "mean_lambda_f_max",
+        "mean_H_max",
+        "mean_blockage",
     ]
     p = pivot.sort_values("pass_rate")[cols]
     print(p.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
@@ -286,7 +305,9 @@ def _print_report(df: pd.DataFrame, pivot: pd.DataFrame) -> None:
         for _, r in fail.iterrows():
             why = []
             if not r["domain_blockage_ok"]:
-                why.append(f"B={r['domain_blockage_ratio']:.3f} (worst dir={r['lambda_f_max_dir']})")
+                why.append(
+                    f"B={r['domain_blockage_ratio']:.3f} (worst dir={r['lambda_f_max_dir']})"
+                )
             if not r["source_data_ok"]:
                 why.append(
                     f"src={int(r['source_data_required_m'])}m>{int(r['source_data_extent_m'])}m"
@@ -312,17 +333,17 @@ def _print_report(df: pd.DataFrame, pivot: pd.DataFrame) -> None:
     if src_only_fail and not block_only_fail and not both_fail:
         max_needed = int(df["source_data_required_m"].max())
         suggested = ((max_needed + 49) // 50 + 1) * 50  # round up to next 50 + buffer
-        print(f"  ALL FAILURES ARE SOURCE-DATA EXTENT ONLY.")
+        print("  ALL FAILURES ARE SOURCE-DATA EXTENT ONLY.")
         print(f"  Max required: {max_needed} m. Suggested extension: {suggested} m.")
-        print(f"  No re-stratification needed — buffer extension lifts the entire")
-        print(f"  campaign to 100% eligibility.")
+        print("  No re-stratification needed — buffer extension lifts the entire")
+        print("  campaign to 100% eligibility.")
         print()
     else:
         risky = pivot.groupby("stratum_id").agg(n=("n", "sum"), n_eligible=("n_eligible", "sum"))
         risky["pass_rate"] = risky["n_eligible"] / risky["n"]
         dropped = risky[risky["n_eligible"] == 0]
         if len(dropped):
-            print(f"  STRATA AT RISK — zero eligible patches across all sites:")
+            print("  STRATA AT RISK — zero eligible patches across all sites:")
             for stratum, row in dropped.iterrows():
                 print(f"    {stratum}: 0/{int(row['n'])} eligible")
             print()
@@ -350,15 +371,30 @@ def main() -> int:
     df = _compute_gates(df)
 
     keep_cols = [
-        "site", "patch_id", "is_pilot", "stratum_id",
-        "lambda_p_grid_center", "lambda_p_patch",
+        "site",
+        "patch_id",
+        "is_pilot",
+        "stratum_id",
+        "lambda_p_grid_center",
+        "lambda_p_patch",
         *[f"lambda_f_{lbl}" for lbl in WIND_DIRECTIONS],
-        "lambda_f_mean", "lambda_f_max", "lambda_f_max_dir",
-        "H_max_analysis", "H_mean",
-        "domain_upstream_m", "domain_downstream_m", "domain_lateral_m", "domain_top_m",
-        "domain_blockage_frontal_m2", "domain_blockage_cross_section_m2",
-        "domain_blockage_ratio", "domain_blockage_ok", "lambda_f_blockage_diag",
-        "source_data_required_m", "source_data_extent_m", "source_data_ok",
+        "lambda_f_mean",
+        "lambda_f_max",
+        "lambda_f_max_dir",
+        "H_max_analysis",
+        "H_mean",
+        "domain_upstream_m",
+        "domain_downstream_m",
+        "domain_lateral_m",
+        "domain_top_m",
+        "domain_blockage_frontal_m2",
+        "domain_blockage_cross_section_m2",
+        "domain_blockage_ratio",
+        "domain_blockage_ok",
+        "lambda_f_blockage_diag",
+        "source_data_required_m",
+        "source_data_extent_m",
+        "source_data_ok",
         "eligible",
     ]
     audit = df[keep_cols].copy()

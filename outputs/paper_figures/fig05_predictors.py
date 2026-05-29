@@ -12,6 +12,7 @@ Four panels:
 Inputs: outputs/paper_figures/rf_predictor_stats.json and rf_pd_curves.json
 produced by scripts/run_predictor_analysis.py.
 """
+
 from __future__ import annotations
 
 import json
@@ -23,11 +24,10 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fig_style import (
-    SIZE_DOUBLE,
+    PROJECT_ROOT,
     WIDTH_DOUBLE,
     apply_style,
     save_fig,
-    PROJECT_ROOT,
 )
 
 STATS_PATH = PROJECT_ROOT / "outputs" / "paper_figures" / "rf_predictor_stats.json"
@@ -62,8 +62,7 @@ def panel_importance(ax, stats: dict) -> None:
     ax.set_yticklabels(labels, fontsize=6.5)
     ax.invert_yaxis()
     ax.set_xlabel("permutation importance\n(mean accuracy drop, balanced RF)", fontsize=6.5)
-    ax.set_title("(A) Permutation importance — sunlight failure",
-                 loc="left", fontsize=7.5, pad=3)
+    ax.set_title("(A) Permutation importance — sunlight failure", loc="left", fontsize=7.5, pad=3)
     ax.tick_params(axis="x", labelsize=6)
     for spine in ("top", "right"):
         ax.spines[spine].set_visible(False)
@@ -73,11 +72,14 @@ def panel_importance(ax, stats: dict) -> None:
     auc_min = stats["loso"]["auc_min"]
     auc_max = stats["loso"]["auc_max"]
     ax.text(
-        0.98, 0.04,
+        0.98,
+        0.04,
         f"LOSO ROC-AUC: {auc_mean:.2f}\n  range {auc_min:.2f}--{auc_max:.2f}",
-        transform=ax.transAxes, ha="right", va="bottom", fontsize=5.5,
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
-                  edgecolor="#888888", linewidth=0.4),
+        transform=ax.transAxes,
+        ha="right",
+        va="bottom",
+        fontsize=5.5,
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="#888888", linewidth=0.4),
     )
 
 
@@ -105,16 +107,27 @@ def panel_pd(ax_grid, stats: dict, pd_curves: dict) -> None:
             if thr is not None:
                 ax.axvline(thr, color="#222222", lw=0.6, ls=":")
                 ax.text(
-                    thr, 0.96, f"SVF={thr:.2f}", fontsize=5.5,
-                    rotation=90, ha="right", va="top", color="#222222",
+                    thr,
+                    0.96,
+                    f"SVF={thr:.2f}",
+                    fontsize=5.5,
+                    rotation=90,
+                    ha="right",
+                    va="top",
+                    color="#222222",
                 )
         if i == 0:
             ax.set_ylabel("P(sunlight fail)", fontsize=6.5)
         else:
             ax.set_yticklabels([])
     ax_grid[1].text(
-        0.5, 1.10, "(B) Partial-dependence — top 3 features",
-        transform=ax_grid[1].transAxes, fontsize=7.5, ha="center", va="bottom",
+        0.5,
+        1.10,
+        "(B) Partial-dependence — top 3 features",
+        transform=ax_grid[1].transAxes,
+        fontsize=7.5,
+        ha="center",
+        va="bottom",
     )
 
 
@@ -149,10 +162,15 @@ def panel_coefficients(ax, stats: dict) -> None:
     lo = [coefs[n]["ci_low"] for n in name_order]
     hi = [coefs[n]["ci_high"] for n in name_order]
     ax.errorbar(
-        est, y,
+        est,
+        y,
         xerr=[np.array(est) - np.array(lo), np.array(hi) - np.array(est)],
-        fmt="o", color="#222222", ecolor="#444444",
-        markersize=3.0, capsize=2.0, lw=0.8,
+        fmt="o",
+        color="#222222",
+        ecolor="#444444",
+        markersize=3.0,
+        capsize=2.0,
+        lw=0.8,
     )
     # LOSO fold lines behind pooled
     loso_folds = stats["logit_interactions"].get("loso_folds", [])
@@ -165,8 +183,7 @@ def panel_coefficients(ax, stats: dict) -> None:
     ax.set_yticklabels([pretty[n] for n in name_order], fontsize=6.5)
     ax.invert_yaxis()
     ax.set_xlabel("standardized logit coefficient (95% CI)\nfaint lines = LOSO folds", fontsize=6.5)
-    ax.set_title("(C) Pooled logistic regression coefficients",
-                 loc="left", fontsize=7.5, pad=3)
+    ax.set_title("(C) Pooled logistic regression coefficients", loc="left", fontsize=7.5, pad=3)
     ax.tick_params(axis="x", labelsize=6)
     for spine in ("top", "right"):
         ax.spines[spine].set_visible(False)
@@ -175,11 +192,16 @@ def panel_coefficients(ax, stats: dict) -> None:
     pr2 = stats["logit_interactions"].get("pseudo_r2")
     if pr2 is not None:
         ax.text(
-            0.98, 0.04,
+            0.98,
+            0.04,
             f"pseudo $R^2$ = {pr2:.2f}  ·  n = {stats['logit_interactions']['n']:,}",
-            transform=ax.transAxes, ha="right", va="bottom", fontsize=5.5,
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
-                      edgecolor="#888888", linewidth=0.4),
+            transform=ax.transAxes,
+            ha="right",
+            va="bottom",
+            fontsize=5.5,
+            bbox=dict(
+                boxstyle="round,pad=0.3", facecolor="white", edgecolor="#888888", linewidth=0.4
+            ),
         )
 
 
@@ -195,17 +217,25 @@ def panel_deferred(ax) -> None:
         spine.set_color("#888888")
     ax.set_facecolor("#fbfbfb")
     ax.text(
-        0.5, 0.62,
+        0.5,
+        0.62,
         "SVF–ACH changepoint",
         transform=ax.transAxes,
-        ha="center", va="center", fontsize=8.0, color="#444444",
+        ha="center",
+        va="center",
+        fontsize=8.0,
+        color="#444444",
         fontweight="bold",
     )
     ax.text(
-        0.5, 0.46,
+        0.5,
+        0.46,
         "deferred to the CFD-validation paper\n(target variable requires per-cell ACH\nfrom the concurrent OpenFOAM RANS campaign)",
         transform=ax.transAxes,
-        ha="center", va="center", fontsize=6.0, color="#666666",
+        ha="center",
+        va="center",
+        fontsize=6.0,
+        color="#666666",
     )
     ax.set_title("(D) Pre-registered for v2", loc="left", fontsize=7.5, pad=3, color="#666666")
 
@@ -217,10 +247,12 @@ def main() -> None:
 
     fig = plt.figure(figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 0.72))
     gs = fig.add_gridspec(
-        nrows=2, ncols=4,
+        nrows=2,
+        ncols=4,
         width_ratios=[1.0, 0.55, 0.55, 0.55],
         height_ratios=[1.0, 1.0],
-        wspace=0.55, hspace=0.45,
+        wspace=0.55,
+        hspace=0.45,
     )
     ax_a = fig.add_subplot(gs[0, 0])
     panel_importance(ax_a, stats)

@@ -21,7 +21,6 @@ import geopandas as gpd
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from matplotlib.colors import ListedColormap
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
@@ -35,6 +34,7 @@ from fig_style import (  # noqa: E402
     apply_style,
     save_fig,
 )
+
 sys.path.insert(0, str(PROJECT_ROOT))
 from src.morphometry.aspect import aspect_quadrant  # noqa: E402
 
@@ -79,13 +79,9 @@ def _build_compass_cmap() -> ListedColormap:
 
 def _load_site(site: str) -> gpd.GeoDataFrame | None:
     solar_path = (
-        PROJECT_ROOT / "outputs" / site / "morphometrics" / "svf"
-        / "svf_streets_solar.gpkg"
+        PROJECT_ROOT / "outputs" / site / "morphometrics" / "svf" / "svf_streets_solar.gpkg"
     )
-    grid_path = (
-        PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid"
-        / "grid_metrics.gpkg"
-    )
+    grid_path = PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg"
     if not solar_path.exists():
         return None
     solar = gpd.read_file(solar_path)
@@ -93,9 +89,7 @@ def _load_site(site: str) -> gpd.GeoDataFrame | None:
     if solar.crs != grid.crs:
         solar = solar.to_crs(grid.crs)
     keep = grid[["geometry", "aspect_deg", "slope_deg"]]
-    pts = gpd.sjoin(solar, keep, how="left", predicate="within").drop(
-        columns="index_right"
-    )
+    pts = gpd.sjoin(solar, keep, how="left", predicate="within").drop(columns="index_right")
     pts = pts.dropna(subset=["aspect_deg", "svf", "solar_hours_winter"])
     pts = pts[pts["slope_deg"].fillna(0) >= SLOPE_THRESHOLD].copy()
     if pts.empty:
@@ -125,19 +119,31 @@ def _quadrant_trace(
     return centres, med, q25, q75, counts
 
 
-def _draw_panel(ax: plt.Axes, pts: gpd.GeoDataFrame | None, site: str,
-                cmap: ListedColormap, *, is_pending: bool = False) -> None:
+def _draw_panel(
+    ax: plt.Axes,
+    pts: gpd.GeoDataFrame | None,
+    site: str,
+    cmap: ListedColormap,
+    *,
+    is_pending: bool = False,
+) -> None:
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.3, 10.5)
     ax.axhline(0, color="0.85", lw=0.4, zorder=0)
-    ax.set_title(SITE_LABELS[site], fontsize=8, pad=3, fontweight="bold",
-                 color="#222")
+    ax.set_title(SITE_LABELS[site], fontsize=8, pad=3, fontweight="bold", color="#222")
 
     if is_pending or pts is None or len(pts) < MIN_PANEL_N:
-        ax.text(0.5, 0.5,
-                "(pending)" if is_pending else f"sparse\nn = {0 if pts is None else len(pts)}",
-                transform=ax.transAxes, ha="center", va="center",
-                fontsize=8, color="#888", style="italic")
+        ax.text(
+            0.5,
+            0.5,
+            "(pending)" if is_pending else f"sparse\nn = {0 if pts is None else len(pts)}",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=8,
+            color="#888",
+            style="italic",
+        )
         ax.tick_params(axis="both", labelsize=5.5, length=2, width=0.4, pad=2)
         return
 
@@ -161,28 +167,49 @@ def _draw_panel(ax: plt.Axes, pts: gpd.GeoDataFrame | None, site: str,
         solid = finite & (counts >= MIN_BIN_N)
         if solid.any():
             ax.fill_between(
-                centres[solid], q25[solid], q75[solid],
-                color=QUADRANT_COLORS[q], alpha=0.18, linewidth=0,
+                centres[solid],
+                q25[solid],
+                q75[solid],
+                color=QUADRANT_COLORS[q],
+                alpha=0.18,
+                linewidth=0,
                 zorder=2,
             )
             ax.plot(
-                centres[solid], med[solid],
-                color=QUADRANT_COLORS[q], lw=1.6, marker="o", ms=3.0,
+                centres[solid],
+                med[solid],
+                color=QUADRANT_COLORS[q],
+                lw=1.6,
+                marker="o",
+                ms=3.0,
                 zorder=3,
             )
         weak = finite & (counts < MIN_BIN_N) & (counts > 0)
         if weak.any():
             ax.plot(
-                centres[weak], med[weak],
-                color=QUADRANT_COLORS[q], lw=0.9, ls=(0, (2, 1.5)),
-                marker="o", ms=2.5, mfc="white", mew=0.7, alpha=0.7,
+                centres[weak],
+                med[weak],
+                color=QUADRANT_COLORS[q],
+                lw=0.9,
+                ls=(0, (2, 1.5)),
+                marker="o",
+                ms=2.5,
+                mfc="white",
+                mew=0.7,
+                alpha=0.7,
                 zorder=3,
             )
 
-    ax.text(0.99, 0.02,
-            f"n = {len(pts):,}",
-            transform=ax.transAxes, ha="right", va="bottom",
-            fontsize=5.0, color="0.4")
+    ax.text(
+        0.99,
+        0.02,
+        f"n = {len(pts):,}",
+        transform=ax.transAxes,
+        ha="right",
+        va="bottom",
+        fontsize=5.0,
+        color="0.4",
+    )
     ax.tick_params(axis="both", labelsize=5.5, length=2, width=0.4, pad=2)
 
 
@@ -197,85 +224,169 @@ def _quadrant_means(pts: gpd.GeoDataFrame) -> dict[str, tuple[float, int]]:
     return out
 
 
-def _draw_summary(ax: plt.Axes,
-                  per_site: dict[str, dict[str, tuple[float, int]]],
-                  ordered: list[str]) -> None:
+def _draw_summary(
+    ax: plt.Axes, per_site: dict[str, dict[str, tuple[float, int]]], ordered: list[str]
+) -> None:
     ax.set_xticks([])
     ax.set_yticks([])
     for sp in ax.spines.values():
         sp.set_visible(False)
 
     # Header
-    ax.text(0.0, 0.97, "Quadrant means (winter solstice, slope ≥ 5°)",
-            transform=ax.transAxes, ha="left", va="top",
-            fontsize=6.5, fontweight="bold", color="#222")
+    ax.text(
+        0.0,
+        0.97,
+        "Quadrant means (winter solstice, slope ≥ 5°)",
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        fontsize=6.5,
+        fontweight="bold",
+        color="#222",
+    )
 
     # Column header
     col_x = [0.34, 0.50, 0.66, 0.82]
     for q, x in zip(QUADRANTS, col_x):
-        ax.text(x, 0.86, q, transform=ax.transAxes, ha="center", va="top",
-                fontsize=6.5, fontweight="bold", color=QUADRANT_COLORS[q])
-    ax.text(0.95, 0.86, "N − S", transform=ax.transAxes, ha="right",
-            va="top", fontsize=6, fontweight="bold", color="#444")
+        ax.text(
+            x,
+            0.86,
+            q,
+            transform=ax.transAxes,
+            ha="center",
+            va="top",
+            fontsize=6.5,
+            fontweight="bold",
+            color=QUADRANT_COLORS[q],
+        )
+    ax.text(
+        0.95,
+        0.86,
+        "N − S",
+        transform=ax.transAxes,
+        ha="right",
+        va="top",
+        fontsize=6,
+        fontweight="bold",
+        color="#444",
+    )
 
     y = 0.78
     for site in ordered:
         if site not in per_site:
-            ax.text(0.0, y, SITE_LABELS[site], transform=ax.transAxes,
-                    ha="left", va="top", fontsize=6, color="#888",
-                    style="italic")
-            ax.text(0.95, y, "pending", transform=ax.transAxes, ha="right",
-                    va="top", fontsize=5.5, color="#888", style="italic")
+            ax.text(
+                0.0,
+                y,
+                SITE_LABELS[site],
+                transform=ax.transAxes,
+                ha="left",
+                va="top",
+                fontsize=6,
+                color="#888",
+                style="italic",
+            )
+            ax.text(
+                0.95,
+                y,
+                "pending",
+                transform=ax.transAxes,
+                ha="right",
+                va="top",
+                fontsize=5.5,
+                color="#888",
+                style="italic",
+            )
             y -= 0.105
             continue
         means = per_site[site]
         n_total = sum(n for _, n in means.values())
-        ax.text(0.0, y, f"{SITE_LABELS[site]} (n={n_total:,})",
-                transform=ax.transAxes, ha="left", va="top", fontsize=6,
-                color="#222")
+        ax.text(
+            0.0,
+            y,
+            f"{SITE_LABELS[site]} (n={n_total:,})",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=6,
+            color="#222",
+        )
         for q, x in zip(QUADRANTS, col_x):
             v, n = means[q]
             if np.isfinite(v):
-                ax.text(x, y, f"{v:.2f}", transform=ax.transAxes,
-                        ha="center", va="top", fontsize=6,
-                        color="#222")
+                ax.text(
+                    x,
+                    y,
+                    f"{v:.2f}",
+                    transform=ax.transAxes,
+                    ha="center",
+                    va="top",
+                    fontsize=6,
+                    color="#222",
+                )
             else:
-                ax.text(x, y, "—", transform=ax.transAxes,
-                        ha="center", va="top", fontsize=6, color="#aaa")
+                ax.text(
+                    x,
+                    y,
+                    "—",
+                    transform=ax.transAxes,
+                    ha="center",
+                    va="top",
+                    fontsize=6,
+                    color="#aaa",
+                )
         n_v, _ = means["N"]
         s_v, _ = means["S"]
         if np.isfinite(n_v) and np.isfinite(s_v):
             gap = n_v - s_v
             color = "#1F6FB0" if gap > 0 else "#D62728"
-            ax.text(0.95, y, f"{gap:+.2f}", transform=ax.transAxes,
-                    ha="right", va="top", fontsize=6, fontweight="bold",
-                    color=color)
+            ax.text(
+                0.95,
+                y,
+                f"{gap:+.2f}",
+                transform=ax.transAxes,
+                ha="right",
+                va="top",
+                fontsize=6,
+                fontweight="bold",
+                color=color,
+            )
         y -= 0.105
 
-    ax.text(0.0, y - 0.05,
-            "Hillside sites (Vidigal, Rocinha) show N − S > 0:\n"
-            "south-facing slopes are structurally shaded on the\n"
-            "winter solstice in the southern hemisphere. Flatland\n"
-            "fabrics have too few sloped cells to support the test.\n"
-            "Maré pending: street-solar pipeline not yet run.",
-            transform=ax.transAxes, ha="left", va="top", fontsize=5.5,
-            color="#444", linespacing=1.5)
+    ax.text(
+        0.0,
+        y - 0.05,
+        "Hillside sites (Vidigal, Rocinha) show N − S > 0:\n"
+        "south-facing slopes are structurally shaded on the\n"
+        "winter solstice in the southern hemisphere. Flatland\n"
+        "fabrics have too few sloped cells to support the test.\n"
+        "Maré pending: street-solar pipeline not yet run.",
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        fontsize=5.5,
+        color="#444",
+        linespacing=1.5,
+    )
 
 
 def _draw_legend(ax: plt.Axes) -> None:
     handles = [
-        Line2D([0], [0], color=QUADRANT_COLORS["N"], lw=1.6, marker="o",
-               ms=3, label="N-facing"),
-        Line2D([0], [0], color=QUADRANT_COLORS["E"], lw=1.6, marker="o",
-               ms=3, label="E-facing"),
-        Line2D([0], [0], color=QUADRANT_COLORS["S"], lw=1.6, marker="o",
-               ms=3, label="S-facing"),
-        Line2D([0], [0], color=QUADRANT_COLORS["W"], lw=1.6, marker="o",
-               ms=3, label="W-facing"),
-        Patch(facecolor="0.7", edgecolor="none", alpha=0.4,
-              label="±IQR (n ≥ 30)"),
-        Line2D([0], [0], color="0.4", lw=0.9, ls=(0, (2, 1.5)), marker="o",
-               ms=2.5, mfc="white", label="n < 30 (sparse)"),
+        Line2D([0], [0], color=QUADRANT_COLORS["N"], lw=1.6, marker="o", ms=3, label="N-facing"),
+        Line2D([0], [0], color=QUADRANT_COLORS["E"], lw=1.6, marker="o", ms=3, label="E-facing"),
+        Line2D([0], [0], color=QUADRANT_COLORS["S"], lw=1.6, marker="o", ms=3, label="S-facing"),
+        Line2D([0], [0], color=QUADRANT_COLORS["W"], lw=1.6, marker="o", ms=3, label="W-facing"),
+        Patch(facecolor="0.7", edgecolor="none", alpha=0.4, label="±IQR (n ≥ 30)"),
+        Line2D(
+            [0],
+            [0],
+            color="0.4",
+            lw=0.9,
+            ls=(0, (2, 1.5)),
+            marker="o",
+            ms=2.5,
+            mfc="white",
+            label="n < 30 (sparse)",
+        ),
     ]
     ax.legend(
         handles=handles,
@@ -303,18 +414,26 @@ def main() -> None:
         if pts is not None:
             quadrant_means[site] = _quadrant_means(pts)
             mn = quadrant_means[site]
-            print(f"  {site:<22} n={len(pts):5,}  "
-                  f"N={mn['N'][0]:.2f}  E={mn['E'][0]:.2f}  "
-                  f"S={mn['S'][0]:.2f}  W={mn['W'][0]:.2f}  "
-                  f"N-S={mn['N'][0]-mn['S'][0]:+.2f}")
+            print(
+                f"  {site:<22} n={len(pts):5,}  "
+                f"N={mn['N'][0]:.2f}  E={mn['E'][0]:.2f}  "
+                f"S={mn['S'][0]:.2f}  W={mn['W'][0]:.2f}  "
+                f"N-S={mn['N'][0] - mn['S'][0]:+.2f}"
+            )
         else:
             print(f"  {site:<22} (no solar — pending)")
 
     fig = plt.figure(figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 0.62))
     outer = gridspec.GridSpec(
-        2, 3, figure=fig,
-        hspace=0.36, wspace=0.16,
-        left=0.06, right=0.97, top=0.90, bottom=0.08,
+        2,
+        3,
+        figure=fig,
+        hspace=0.36,
+        wspace=0.16,
+        left=0.06,
+        right=0.97,
+        top=0.90,
+        bottom=0.08,
     )
 
     # Site order on the grid: Vidigal, Rocinha, CDA (top); RdP, Maré, summary (bottom).
@@ -329,18 +448,15 @@ def main() -> None:
     for site, (r, c) in placements:
         ax = fig.add_subplot(outer[r, c])
         is_pending = site == "maré"
-        _draw_panel(ax, panel_data.get(site), site, cmap,
-                    is_pending=is_pending)
+        _draw_panel(ax, panel_data.get(site), site, cmap, is_pending=is_pending)
         if r == 1:
             ax.set_xlabel("SVF", fontsize=6.5, labelpad=2)
         if c == 0:
-            ax.set_ylabel("hours of direct winter sun", fontsize=6.5,
-                          labelpad=2)
+            ax.set_ylabel("hours of direct winter sun", fontsize=6.5, labelpad=2)
         axes.append(ax)
 
     # Bottom-right: quadrant-mean summary table + legend stacked.
-    summary_gs = outer[1, 2].subgridspec(2, 1, height_ratios=[1.55, 1.0],
-                                          hspace=0.10)
+    summary_gs = outer[1, 2].subgridspec(2, 1, height_ratios=[1.55, 1.0], hspace=0.10)
     ax_sum = fig.add_subplot(summary_gs[0, 0])
     _draw_summary(ax_sum, quadrant_means, list(SITE_ORDER))
     ax_leg = fig.add_subplot(summary_gs[1, 0])
@@ -352,15 +468,24 @@ def main() -> None:
 
     fig.suptitle(
         "SVF and direct winter sun decouple on sloped terrain — five sites",
-        fontsize=9, y=0.97, fontweight="bold", color="#1a1a1a",
+        fontsize=9,
+        y=0.97,
+        fontweight="bold",
+        color="#1a1a1a",
     )
-    fig.text(0.5, 0.935,
-             "Per-aspect-quadrant median solar hours vs SVF on cells with "
-             "slope ≥ 5°. Winter sun in the southern hemisphere bypasses "
-             "S-facing slopes; this dissociation is visible on hillside sites "
-             "and absent on flatland fabrics that have too few sloped cells.",
-             ha="center", va="top", fontsize=5.8, style="italic",
-             color="#666")
+    fig.text(
+        0.5,
+        0.935,
+        "Per-aspect-quadrant median solar hours vs SVF on cells with "
+        "slope ≥ 5°. Winter sun in the southern hemisphere bypasses "
+        "S-facing slopes; this dissociation is visible on hillside sites "
+        "and absent on flatland fabrics that have too few sloped cells.",
+        ha="center",
+        va="top",
+        fontsize=5.8,
+        style="italic",
+        color="#666",
+    )
 
     save_fig(fig, "fig06_terrain_aspect")
 

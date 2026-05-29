@@ -37,7 +37,7 @@ gpu = [
 ]
 dev = [
     "pytest",
-    "ruff",
+    "ruff==0.15.15",
 ]
 
 [tool.setuptools.packages.find]

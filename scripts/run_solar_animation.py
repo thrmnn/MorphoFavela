@@ -207,9 +207,7 @@ def main() -> int:
         default=None,
         help="Override output dir (default: outputs/{site}/dataviz/solar/{date_label}).",
     )
-    parser.add_argument(
-        "--no-preview", action="store_true", help="Skip the preview PNG."
-    )
+    parser.add_argument("--no-preview", action="store_true", help="Skip the preview PNG.")
     args = parser.parse_args()
 
     t0 = time.time()
@@ -219,9 +217,7 @@ def main() -> int:
     if args.output_dir is not None:
         output_dir = args.output_dir
     else:
-        output_dir = (
-            PROJECT_ROOT / "outputs" / args.site / "dataviz" / "solar" / date_label
-        )
+        output_dir = PROJECT_ROOT / "outputs" / args.site / "dataviz" / "solar" / date_label
     output_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Site: %s", args.site)
     logger.info("Date: %s  (timezone: %s)", args.date, args.timezone)

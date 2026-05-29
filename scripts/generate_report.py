@@ -821,7 +821,9 @@ def generate_markdown(areas_data: List[Dict[str, Any]], mode: str = "single") ->
     lines.append("")
 
     lines.append("---\n")
-    lines.append(f"*Report generated on {now} by `scripts/generate_report.py` | MorphoFavela Project, MIT*")
+    lines.append(
+        f"*Report generated on {now} by `scripts/generate_report.py` | MorphoFavela Project, MIT*"
+    )
 
     return "\n".join(lines)
 
