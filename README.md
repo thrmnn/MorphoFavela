@@ -1,4 +1,4 @@
-# IVF — Informal Settlements Vulnerability Framework
+# MorphoFavela — Morphometric analysis of informal settlements
 
 A Python pipeline for the morphometric and CFD-coupled analysis of pedestrian-level wind, solar, and ventilation in dense informal urban form. Targeted at five Rio de Janeiro favelas (Vidigal, Rocinha, Complexo do Alemão, Rio das Pedras, Maré) but written to onboard new sites without code changes.
 
@@ -16,8 +16,6 @@ A Python pipeline for the morphometric and CFD-coupled analysis of pedestrian-le
 - Host the manuscript. The Nature Cities draft lives elsewhere; this repo provides the technical report that backs it.
 
 **Audience.** Engineers, researchers, and reviewers who need to read the methodology, reproduce a figure, validate a number, or onboard a new site. Start with [`docs/technical_report/technical_report.md`](docs/technical_report/technical_report.md) for the methodology; this README is the operational guide.
-
-> **Reviewing this codebase as an engineer?** Start with [`docs/onboarding/engineering_review.md`](docs/onboarding/engineering_review.md) — 1-day reading path with explicit time budgets per section.
 
 ## Status
 
@@ -67,7 +65,7 @@ one site" path. Substitute another site name for `vidigal` to repeat.
 
 ```bash
 git clone https://github.com/thrmnn/MorphoFavela.git && cd MorphoFavela
-conda create -n IVF python=3.11 && conda activate IVF
+conda create -n morphofavela python=3.11 && conda activate morphofavela
 pip install -e ".[dev]"
 ```
 
@@ -181,20 +179,31 @@ PNGs already published in the technical report live in
 
 ## Installation
 
+The recommended path is Conda via the pinned [`environment.yml`](environment.yml),
+which pulls the native GDAL / GEOS / PROJ stack that geopandas, rasterio,
+and fiona link against:
+
 ```bash
 git clone https://github.com/thrmnn/MorphoFavela.git && cd MorphoFavela
-conda create -n IVF python=3.11 && conda activate IVF
+conda env create -f environment.yml      # python 3.11 + pinned deps + the package
+conda activate morphofavela
+```
+
+Or a lighter unpinned setup (you supply GDAL / GEOS via `apt`/`brew`):
+
+```bash
+conda create -n morphofavela python=3.11 && conda activate morphofavela
 pip install -e ".[dev]"          # add ".[gpu]" for PyTorch3D-backed SVF
 ```
 
-GDAL / GEOS native libraries are required (`apt install libgdal-dev`
-on Linux, `brew install gdal` on macOS). See
+GDAL / GEOS native libraries are required for the pip path (`apt install
+libgdal-dev` on Linux, `brew install gdal` on macOS). See
 [`CONTRIBUTING.md`](CONTRIBUTING.md) for pre-commit setup and the
 test/lint workflow.
 
 After `pip install -e .` the most-used scripts are available as
-`ivf-*` console commands (e.g. `ivf-svf --area vidigal`,
-`ivf-wind-rose --site maré --asos-csv ...`). The walkthrough below
+`mf-*` console commands (e.g. `mf-svf --area vidigal`,
+`mf-wind-rose --site maré --asos-csv ...`). The walkthrough below
 uses `python scripts/foo.py` form for clarity, but the two
 invocations are interchangeable. See
 [`scripts/README.md`](scripts/README.md) for the full mapping.
@@ -206,8 +215,8 @@ contain and where each file comes from — is documented in
 ## Project Structure
 
 ```
-IVF/
-├── README.md, ROADMAP.md, CLAUDE.md      # Entry points (see also Repository Map above)
+MorphoFavela/
+├── README.md, ROADMAP.md                 # Entry points (see also Repository Map above)
 │
 ├── src/                                  # Library code (importable)
 │   ├── morphometry/                      # Core morphometric metrics
@@ -243,7 +252,6 @@ IVF/
 └── docs/
     ├── technical_report/                 # Canonical deliverable (md + pdf + figures/)
     ├── methodology/                      # Standalone methodology docs (SVF, sky-exposure, indicators)
-    ├── PRODUCTION_READINESS_PLAN.md      # Engineering-review prep plan (working doc)
     ├── FAVELA_EXTRACTION_WORKFLOW.md     # GIS extraction workflow
     ├── GPU_SVF_EXACT_VALIDATION.md       # GPU-vs-CPU SVF parity report
     └── cfd_sampling_overrides.yaml       # Documented sampling-coverage gap downgrades
@@ -267,7 +275,9 @@ See [`docs/README.md`](docs/README.md) for a one-line summary of each.
   - [`src/visualization/README.md`](src/visualization/README.md) — building / zone-level chart helpers
 - **Paper figures** (Nature Cities): see
   [`outputs/paper_figures/README.md`](outputs/paper_figures/README.md).
-- **Pinned dependencies**: see [`pyproject.toml`](pyproject.toml).
+- **Dependencies**: declared in [`pyproject.toml`](pyproject.toml)
+  (version floors); pinned exactly in [`environment.yml`](environment.yml)
+  for reproduction.
 - **Linting + formatting**: ruff is gating CI; configuration is in
   the `[tool.ruff]` section of `pyproject.toml`.
 
@@ -282,6 +292,32 @@ See [`docs/README.md`](docs/README.md) for a one-line summary of each.
 - **Doc map**: [`docs/README.md`](docs/README.md).
 - **Roadmap + project status**: [`ROADMAP.md`](ROADMAP.md).
 - **Changelog**: [`CHANGELOG.md`](CHANGELOG.md).
+
+## Data availability
+
+This repository ships the **analysis code, pipelines, paper-figure
+scripts, and the technical report** — not the raw input geodata.
+
+The building footprints, DTM rasters, and per-patch CFD inputs for the
+five favelas are **not redistributed here**, for two reasons:
+
+1. **Privacy.** Publishing precise footprints and coordinates of
+   dwellings in informal settlements carries ethical risk for
+   residents. We avoid releasing data that pinpoints individual
+   structures.
+2. **Licensing.** Some source rasters originate from municipal datasets
+   whose terms do not permit redistribution.
+
+**To reproduce results:**
+
+- Supply your own inputs under `data/{site}/` following the contract in
+  [`data/README.md`](data/README.md), or
+- Contact the author (`thermann.ai@gmail.com`) for the processed inputs
+  used in the paper. Derived, aggregated, non-identifying outputs are
+  available on request, subject to a data-use agreement.
+
+Wind input is built from public sources (INMET BDMEP and Iowa State
+ASOS METAR) and is fully reproducible from the scripts in this repo.
 
 ## Contributing
 

@@ -49,6 +49,7 @@ from fig_style import (  # noqa: E402
     apply_style,
     save_fig,
 )
+
 from src.morphometry.aspect import aspect_quadrant  # noqa: E402
 
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "maré"]
@@ -81,7 +82,9 @@ def _load_site_solar_quadrants(site: str) -> pd.DataFrame | None:
     drops near-flat cells, and returns a long-format DataFrame.
     """
     grid_path = PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg"
-    solar_path = PROJECT_ROOT / "outputs" / site / "morphometrics" / "svf" / "svf_streets_solar.gpkg"
+    solar_path = (
+        PROJECT_ROOT / "outputs" / site / "morphometrics" / "svf" / "svf_streets_solar.gpkg"
+    )
     if not grid_path.exists() or not solar_path.exists():
         return None
 
@@ -118,9 +121,7 @@ def _load_site_solar_quadrants(site: str) -> pd.DataFrame | None:
     return pd.DataFrame(rows)
 
 
-def _draw_panel(
-    ax: plt.Axes, df: pd.DataFrame, season_col: str, title: str, ymax: float
-) -> None:
+def _draw_panel(ax: plt.Axes, df: pd.DataFrame, season_col: str, title: str, ymax: float) -> None:
     ax.set_title(title, fontsize=8, loc="left", pad=2)
     sub = df[df["season"] == season_col]
     for site in SITES:
@@ -173,9 +174,7 @@ def main() -> int:
     ymax = float(df["mean_h"].max()) * 1.10
     ymax = max(ymax, 1.0)  # guard for empty data
 
-    fig, axes = plt.subplots(
-        1, 4, figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 0.32), sharey=True
-    )
+    fig, axes = plt.subplots(1, 4, figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 0.32), sharey=True)
     for ax, (col, title) in zip(axes, SEASONS):
         _draw_panel(ax, df, col, title, ymax)
         # Only the first panel shows the y-axis label (others share).
@@ -212,7 +211,7 @@ def main() -> int:
         if sub.empty:
             continue
         v = {r["quadrant"]: r["mean_h"] for _, r in sub.iterrows()}
-        contrast = (v.get("N", np.nan) - v.get("S", np.nan))
+        contrast = v.get("N", np.nan) - v.get("S", np.nan)
         print(
             f"  {SITE_LABELS[site]:24s}  "
             f"{v.get('N', np.nan):5.2f}  {v.get('E', np.nan):5.2f}  "

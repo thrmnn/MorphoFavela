@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 title: >-
-  IVF — Informal Settlements Vulnerability Framework: morphometric and
+  MorphoFavela — Morphometric analysis of informal settlements:
   CFD-coupled analysis of pedestrian-level wind, solar, and ventilation
   in Rio de Janeiro favelas
 message: >-
@@ -16,7 +16,7 @@ authors:
       Massachusetts Institute of Technology
 repository-code: 'https://github.com/thrmnn/MorphoFavela'
 abstract: >-
-  IVF is a Python pipeline for analysing the morphometry, environmental
+  MorphoFavela is a Python pipeline for analysing the morphometry, environmental
   performance, and CFD-derived ventilation of informal settlements. It
   combines GIS-based building/terrain extraction, sky-view-factor and
   solar-access computation, stratified CFD patch sampling (119 patches

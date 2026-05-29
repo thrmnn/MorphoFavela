@@ -10,7 +10,7 @@ and the common errors that show up on a fresh machine.
 
 ```bash
 git clone https://github.com/thrmnn/MorphoFavela.git && cd MorphoFavela
-conda create -n IVF python=3.11 && conda activate IVF
+conda create -n morphofavela python=3.11 && conda activate morphofavela
 pip install -e ".[dev]"
 pytest tests/ -m "not integration" -q --tb=short
 # → 508 tests pass; 69 integration tests deselected
@@ -164,11 +164,10 @@ quirks bite:
 3. **Column names are accent-bearing** — `direção_horaria`, not
    `direcao_horaria`. Read with `encoding='latin-1'`.
 
-The `wind-ingestion` agent (under `.claude/agents/`) encodes all three
-quirks; for any new station, invoke it rather than re-implementing.
+`scripts/build_wind_rose.py` (via `extract_inmet_stations.py`) already
+handles all three quirks; reuse it rather than re-implementing.
 
 ## When in doubt
 
 - File a GitHub issue with: `python -V`, OS + version, conda vs venv, the full traceback, and what you tried.
 - Check `data/{site}/PROVENANCE.md` (when present) — many "bugs" are upstream raster gaps documented there.
-- The four project subagents under `.claude/agents/` (read-only validators) catch most contract violations before they show up as cryptic runtime errors. Run them when you're stuck.

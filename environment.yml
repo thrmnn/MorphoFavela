@@ -1,0 +1,49 @@
+# Reproducible Conda environment for MorphoFavela.
+#
+#   conda env create -f environment.yml
+#   conda activate morphofavela
+#   pip install -e .          # already run by the pip section below
+#
+# Conda (via conda-forge) is the recommended installer because it pulls the
+# native GDAL / GEOS / PROJ stack that geopandas, rasterio and fiona link
+# against — far less fragile than building those wheels under pip.
+#
+# Versions are pinned to those used to produce the paper results. If the
+# solver cannot satisfy the `gdal` pin on your platform, relax it to
+# `gdal>=3.10` and let rasterio/fiona/geopandas select a compatible build.
+name: morphofavela
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  # --- geospatial / native stack ---
+  - gdal=3.12.4
+  - geopandas=1.1.3
+  - shapely=2.1.2
+  - rasterio=1.5.0
+  - fiona=1.10.1
+  - pyogrio=0.12.1
+  # --- scientific core ---
+  - numpy=2.2.6
+  - pandas=2.3.3
+  - scipy=1.17.1
+  - scikit-learn=1.8.0
+  - numba=0.61.2
+  - llvmlite=0.44.0
+  - joblib=1.5.3
+  - pyarrow=23.0.1
+  # --- spatial statistics ---
+  - libpysal=4.14.1
+  - esda=2.8.2
+  # --- solar / 3D / viz ---
+  - pvlib=0.15.0
+  - pyvista=0.47.1
+  - matplotlib=3.10.8
+  - folium=0.20.0
+  - ipywidgets=8.1.8
+  - tqdm=4.67.3
+  # --- pip-only packages + the project itself ---
+  - pip:
+      - pyviewfactor==1.0.0
+      - -e .

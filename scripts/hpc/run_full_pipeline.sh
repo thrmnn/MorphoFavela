@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=ivf-pipeline
+#SBATCH --job-name=mf-pipeline
 #SBATCH --output=logs/pipeline_%j.out
 #SBATCH --error=logs/pipeline_%j.err
 #SBATCH --time=12:00:00
@@ -9,7 +9,7 @@
 #SBATCH --partition=mit_normal
 #
 # ==========================================================================
-# Full IVF analysis pipeline for HPC (SLURM)
+# Full MorphoFavela analysis pipeline for HPC (SLURM)
 #
 # Runs ALL analyses for one or more areas:
 #   1. SVF v2 (streets, grid, facades)
@@ -27,8 +27,8 @@
 # Setup — must happen BEFORE set -e so module sourcing doesn't kill the script
 # ---------------------------------------------------------------------------
 
-# Use SLURM_SUBMIT_DIR (where sbatch was invoked) or fall back to ~/IVF
-PROJECT_ROOT="${SLURM_SUBMIT_DIR:-$HOME/IVF}"
+# Use SLURM_SUBMIT_DIR (where sbatch was invoked) or fall back to ~/MorphoFavela
+PROJECT_ROOT="${SLURM_SUBMIT_DIR:-$HOME/MorphoFavela}"
 cd "${PROJECT_ROOT}"
 mkdir -p logs
 
@@ -36,7 +36,7 @@ mkdir -p logs
 source /etc/profile.d/modules.sh 2>/dev/null || source /usr/share/modules/init/bash 2>/dev/null || true
 module load miniforge/25.11.0-0
 eval "$(conda shell.bash hook)"
-conda activate ivf
+conda activate morphofavela
 
 set -euo pipefail
 
@@ -64,7 +64,7 @@ else
 fi
 
 echo "================================================================"
-echo "  IVF Full Analysis Pipeline"
+echo "  MorphoFavela Full Analysis Pipeline"
 echo "  Host    : $(hostname)"
 echo "  CPUs    : ${N_JOBS}"
 echo "  Memory  : ${SLURM_MEM_PER_NODE:-unknown}"

@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="/home/theo/IVF"
-BASE_OUTPUT="/home/theo/IVF/outputs/vidigal_tls"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+BASE_OUTPUT="${PROJECT_ROOT}/outputs/vidigal_tls"
 
-STL="/home/theo/IVF/data/vidigal_tls/raw/full_scan.stl"
-ROADS="/home/theo/IVF/data/vidigal_tls/raw/roads_vidigal.shp"
-FOOTPRINTS="/home/theo/IVF/data/vidigal_tls/raw/vidigal_buildings.shp"
-DTM="/home/theo/IVF/data/vidigal_tls/raw/vidigal_dtm_cropped.tif"
+STL="${PROJECT_ROOT}/data/vidigal_tls/raw/full_scan.stl"
+ROADS="${PROJECT_ROOT}/data/vidigal_tls/raw/roads_vidigal.shp"
+FOOTPRINTS="${PROJECT_ROOT}/data/vidigal_tls/raw/vidigal_buildings.shp"
+DTM="${PROJECT_ROOT}/data/vidigal_tls/raw/vidigal_dtm_cropped.tif"
 
 SPACINGS=(0.5 1 1.5 3)
 SKY_PATCHES=300
 
-source /home/theo/miniconda3/etc/profile.d/conda.sh
-conda activate IVF
+source "$(conda info --base)/etc/profile.d/conda.sh"
+conda activate morphofavela
 
 cd "${PROJECT_ROOT}"
 

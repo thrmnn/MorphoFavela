@@ -98,9 +98,7 @@ def _per_site_regression(grid: gpd.GeoDataFrame, solar: gpd.GeoDataFrame | None)
     rows = []
 
     sin_a, cos_a = aspect_to_sincos(grid["aspect_deg"].values)
-    X_grid = np.column_stack(
-        [grid["slope_deg"].values, grid["lambda_p"].values, sin_a, cos_a]
-    )
+    X_grid = np.column_stack([grid["slope_deg"].values, grid["lambda_p"].values, sin_a, cos_a])
 
     for response in ("svf",):
         if response not in grid.columns:
@@ -119,9 +117,7 @@ def _per_site_regression(grid: gpd.GeoDataFrame, solar: gpd.GeoDataFrame | None)
 
     if solar is not None and not solar.empty and "solar_hours" in solar.columns:
         sin_a, cos_a = aspect_to_sincos(solar["aspect_deg"].values)
-        X_sol = np.column_stack(
-            [solar["slope_deg"].values, solar["lambda_p"].values, sin_a, cos_a]
-        )
+        X_sol = np.column_stack([solar["slope_deg"].values, solar["lambda_p"].values, sin_a, cos_a])
         fit = _ols(solar["solar_hours"].values.astype(float), X_sol)
         row = {
             "response": "solar_hours",

@@ -2,7 +2,7 @@
 
 Two on-disk layouts are supported transparently:
 
-1. **IVF native** — cardinal direction directory + CSV samples:
+1. **MorphoFavela native** — cardinal direction directory + CSV samples:
 
        data/{site}/cfd_results/{patch_id}/{N|NE|E|SE|S|SW|W|NW}/
            sample_points.csv     # primary data (REQUIRED)
@@ -85,7 +85,7 @@ def _normalize_wind_direction(name: str) -> Optional[str]:
     """Return the canonical cardinal name for a wind-direction directory.
 
     Accepts both layouts:
-      - IVF native: ``N``, ``NE``, …, ``NW`` → returned unchanged.
+      - MorphoFavela native: ``N``, ``NE``, …, ``NW`` → returned unchanged.
       - Airflow native: ``wind_000``, ``wind_045``, …, ``wind_315`` → mapped.
 
     Returns None for anything else (callers should warn-and-skip).
@@ -125,7 +125,7 @@ def _ensure_u_mag(samples: pd.DataFrame) -> pd.DataFrame:
 def load_patch_csv(csv_path: Path, metadata_path: Optional[Path] = None) -> CFDPatchResult:
     """Load one patch × one wind-direction result from CSV + JSON.
 
-    The IVF-native loader. Use `load_patch_parquet` for the Airflow-native
+    The MorphoFavela-native loader. Use `load_patch_parquet` for the Airflow-native
     parquet form, or `load_campaign_results` to auto-dispatch on layout.
 
     Parameters
@@ -301,7 +301,7 @@ def load_campaign_results(
     The primary entry point. Traverses
     ``data/{site}/cfd_results/{patch_id}/{wind_dir}/`` and loads every
     patch × direction combination that has ``summary.json`` plus either
-    ``sample_points.csv`` (IVF native) or one or more ``*.parquet``
+    ``sample_points.csv`` (MorphoFavela native) or one or more ``*.parquet``
     files (Airflow native). Directories that match neither layout are
     logged as warnings and skipped.
 

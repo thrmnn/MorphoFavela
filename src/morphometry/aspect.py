@@ -32,7 +32,9 @@ QUADRANT_EDGES = (45.0, 135.0, 225.0, 315.0)
 QUADRANT_LABELS = ("N", "E", "S", "W")
 
 
-def aspect_to_sincos(aspect_deg: np.ndarray | Iterable[float] | float) -> tuple[np.ndarray, np.ndarray]:
+def aspect_to_sincos(
+    aspect_deg: np.ndarray | Iterable[float] | float,
+) -> tuple[np.ndarray, np.ndarray]:
     """Encode aspect as orthogonal (sin, cos) covariates for OLS.
 
     Returns two arrays the same shape as the input. NaN-in -> NaN-out.

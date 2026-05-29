@@ -9,9 +9,9 @@ modification.
 
 ## Required outputs per simulation
 
-Each simulation = **one patch × one wind direction**. For each, produce one of two equivalent on-disk layouts; the IVF ingestion side auto-detects (`load_campaign_results`).
+Each simulation = **one patch × one wind direction**. For each, produce one of two equivalent on-disk layouts; the MorphoFavela ingestion side auto-detects (`load_campaign_results`).
 
-### Layout A — IVF native (CSV + cardinal direction dirs)
+### Layout A — MorphoFavela native (CSV + cardinal direction dirs)
 
 ```
 data/{site}/cfd_results/{patch_id}/{wind_direction}/
@@ -40,13 +40,19 @@ Common across both layouts:
 - `patch_id`: from `outputs/{site}/sampling_cfd/campaign_sampling/campaign_patches.csv` (e.g., `VDG-P01`, `MAR-P07`)
 - Sample-row schema and `summary.json` schema are identical between the two layouts (Layout B's parquet uses the same column names as Layout A's CSV).
 
+> **Synthetic results.** `scripts/generate_synthetic_cfd_results.py` emits this exact contract for pipeline exercise and figure prototyping before real OpenFOAM returns. Synthetic trees carry `"synthetic": true` plus a `provenance` block in every `summary.json` and are written to a **separate root** (`data/{site}/cfd_results_synthetic/`), never the ingestor-default `cfd_results/`. The loader ignores the extra keys, so a stray synthetic tree under `cfd_results/` would *not* self-flag — keep them physically separate.
+
 ### `sample_points.csv` (required)
 
 A horizontal slice of the velocity/TKE field at **pedestrian height z = 1.5 m**
-above ground, sampled on a regular grid at 2 m spacing covering the full 250 m
-circular CFD domain.
+above ground, sampled on a regular grid at 2 m spacing covering the full
+per-direction rectangular CFD domain (see "Simulation domain" below for the
+`rectangular_domain_v1` rule). Earlier cylindrical 250 m radius scheme is
+deprecated.
 
-**Required columns** (one row per sample point, ~49,000 rows per 250 m domain):
+**Required columns** (one row per sample point; row count varies with the
+rectangular extents — e.g. VDG-P02 at 2 m spacing yields ≈ 95 k rows. Only
+the central 100 m analysis patch is consumed downstream):
 
 | Column | Unit | Description |
 |--------|------|-------------|
@@ -310,7 +316,7 @@ Before handing off results:
 - [ ] All 119 patches × 8 directions = 952 simulations attempted
 - [ ] Each `sample_points.csv` has the 8 required columns and z ≈ 1.5 for all rows
 - [ ] Each `summary.json` includes `wind_speed_ref` and convergence flag
-- [ ] Domain radius and mesh convergence verified on MAR-P07
+- [ ] Domain extents (per `rectangular_domain_v1.json`) and mesh convergence verified on MAR-P07
 - [ ] Wind rose JSON delivered for each site
 - [ ] Loading test: `load_patch_csv("data/vidigal/cfd_results/VDG-P01/N/sample_points.csv")` succeeds
 - [ ] Non-converged simulations flagged but included

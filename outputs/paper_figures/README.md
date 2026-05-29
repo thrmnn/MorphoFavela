@@ -1,16 +1,32 @@
-# Paper Figures — Brisa+ Nature Cities
+# Paper figures — technical-report + presentations track
 
-Publication figures for the morphometric analysis of informal settlements.
+Reproducible figure scripts **targeted at the internal technical report
+(`docs/technical_report/`) and stakeholder presentations**. Despite the
+directory name ("paper_figures"), this is the *internal* communication
+track — not the academic-paper track.
+
+> **Two-track convention.** This directory is the *technical-report +
+> presentations* track. `docs/manuscript/figures/` is the *academic paper*
+> track. The two serve different audiences (internal stakeholders vs.
+> peer reviewers) and different standards (project narrative vs. journal
+> style). Do not mix them. The directory name "paper_figures" is
+> historical (this set was originally drafted for a paper before the
+> two-track split was formalised); it now serves the TR.
+
 All scripts are standalone and regenerable from pipeline outputs.
 
 ## Regenerate all figures
 
 ```bash
-cd /path/to/IVF
+cd /path/to/MorphoFavela
 for f in outputs/paper_figures/fig*.py; do python3 "$f"; done
 ```
 
-## Main Figures
+Exports land in `exports/` (gitignored — copy the relevant PNGs into
+`docs/technical_report/figures/` before rebuilding the TR PDF). All
+scripts use `fig_style.save_fig` which writes both PNG and SVG.
+
+## Main figures
 
 | Figure | Script | Data sources | Description |
 |--------|--------|-------------|-------------|
@@ -19,8 +35,11 @@ for f in outputs/paper_figures/fig*.py; do python3 "$f"; done
 | Fig 3 | `fig03_svf_lambda_coupling.py` | 10m grids (pooled), campaign patches | Per-site 2D KDE contours (50%/90%) with marginals |
 | Fig 4 | `fig04_sampling_design.py` | Campaign patches, grids, strata summary | Feature space + allocation bar chart + site maps |
 | Fig 5 | `fig05_morphometric_maps.py` | Vidigal + Mare grids, buildings, DTM | 2x3 spatial maps: SVF, lambda_p, slope |
+| Fig 6 | `fig06_terrain_aspect.py` | Per-site `svf_streets_solar.gpkg` | Cross-site SVF↔solar dissociation; per-site aspect-quadrant table |
+| Fig 7 | `fig07_solar_envelope_vidigal.py` | Vidigal solar envelope | Single-site envelope deep dive |
+| Fig 8 | `fig08_solar_cross_site.py` | All-site solar gpkg | Cross-site annual sun-hours summary; prints Maré N–S contrast |
 
-## Supplementary Figures
+## Supplementary figures
 
 | Figure | Script | Data sources | Description |
 |--------|--------|-------------|-------------|
@@ -28,19 +47,14 @@ for f in outputs/paper_figures/fig*.py; do python3 "$f"; done
 | Fig S2 | `figS2_context_extension.py` | Extended buildings, buffer analysis | Context validation: buildings, candidate pool, patch maps |
 | Fig S3 | `figS3_resolution_sensitivity.py` | 10m + 20m grids | Distribution overlay: 10m vs 20m KDEs across 5 sites × 5 indicators (canonical). `--variants` flag regenerates supplementary scatter and difference-map variants. |
 | Fig S4 | `figS4_patch_thumbnails.py` | Campaign patches, buildings | Per-site patch thumbnails (one page per site) |
+| Fig S5 | `figS5_wind_roses.py` | Per-site wind_rose.json | Cross-site wind roses |
 
 ## Style
 
-All figures use `fig_style.py` for consistent colors, fonts, and sizing.
-Site colors: Tol muted palette (warm = hillside, cool = flatland).
-White backgrounds on all exports.
-
-## Specs
-
-- Nature Cities single column: 88 mm | double column: 180 mm
-- Font: 7 pt Liberation Sans
-- Resolution: 600 DPI PNG + SVG vector
-- Exports in `exports/`
+`fig_style.py` is the **shared** style module — both this track and the
+manuscript track import from it for consistent palettes and typography.
+Site colors: Tol muted palette (warm = hillside, cool = flatland). White
+backgrounds on all exports. Specs target TR (A4) and slide aspect ratios.
 
 ## SVF data source
 
@@ -48,8 +62,22 @@ The SVF column in morphometric grids is aggregated from passageway-level
 sample points (1.5 m height, 145-ray Tregenza hemisphere), not grid-cell
 centroids. See docstring in `fig05_morphometric_maps.py` for details.
 
+## Cross-reference
+
+For figures **targeted at the final academic paper**, see
+`docs/manuscript/README.md`. Those have different communication
+objectives, different export paths (`docs/manuscript/figures/exports/`
+is tracked, this directory's `exports/` is not), and may use journal
+formatting conventions when they diverge from the TR.
+
 ## Revision history
 
+- **v4** (2026-05-21): Two-track convention codified. Directory README
+  retitled from "Paper Figures — Brisa+ Nature Cities" to "technical-
+  report + presentations track" to match its actual purpose; the
+  paper-candidate track lives at `docs/manuscript/figures/`. Fig 6
+  upgraded to cross-site (was Vidigal-only). Fig 8 (solar cross-site)
+  added. Figure tables synced with current scripts on disk.
 - **v3** (2026-04-09): Fig 3 redesigned as per-site 2D KDE contours with
   marginal distributions. Fig 5 SVF data source verified (passageway-
   aggregated, no centroid artifacts). All figures white backgrounds.

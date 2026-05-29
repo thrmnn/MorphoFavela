@@ -49,9 +49,9 @@ Use the same conda environment used by project scripts.
 
 ```bash
 python scripts/compute_svf_streets_gpu.py \
-  --stl /home/theo/IVF/data/riodaspedras/raw/full_scan.stl \
-  --roads /home/theo/IVF/data/riodaspedras/raw/roads_riodaspedras.shp \
-  --footprints /home/theo/IVF/data/riodaspedras/raw/riodaspedras_buildings.shp \
+  --stl data/riodaspedras/raw/full_scan.stl \
+  --roads data/riodaspedras/raw/roads_riodaspedras.shp \
+  --footprints data/riodaspedras/raw/riodaspedras_buildings.shp \
   --area riodaspedras \
   --spacing 3.0 \
   --height 1.5 \
@@ -60,16 +60,16 @@ python scripts/compute_svf_streets_gpu.py \
   --gpu-batch-size 200 \
   --gpu-ray-chunk-size 1024 \
   --gpu-tri-chunk-size 4096 \
-  --output-dir /home/theo/IVF/outputs/riodaspedras/svf_streets_gpu_exact
+  --output-dir outputs/riodaspedras/svf_streets_gpu_exact
 ```
 
 ### Vidigal_TLS (Exact GPU)
 
 ```bash
 python scripts/compute_svf_streets_gpu.py \
-  --stl /home/theo/IVF/data/vidigal_tls/raw/full_scan.stl \
-  --roads /home/theo/IVF/data/vidigal_tls/raw/roads_vidigal.shp \
-  --footprints /home/theo/IVF/data/vidigal_tls/raw/vidigal_buildings.shp \
+  --stl data/vidigal_tls/raw/full_scan.stl \
+  --roads data/vidigal_tls/raw/roads_vidigal.shp \
+  --footprints data/vidigal_tls/raw/vidigal_buildings.shp \
   --area vidigal_tls \
   --spacing 3.0 \
   --height 1.5 \
@@ -78,16 +78,16 @@ python scripts/compute_svf_streets_gpu.py \
   --gpu-batch-size 200 \
   --gpu-ray-chunk-size 1024 \
   --gpu-tri-chunk-size 4096 \
-  --output-dir /home/theo/IVF/outputs/vidigal_tls/svf_streets_gpu_exact
+  --output-dir outputs/vidigal_tls/svf_streets_gpu_exact
 ```
 
 ### Rocinha (Exact GPU)
 
 ```bash
 python scripts/compute_svf_streets_gpu.py \
-  --stl /home/theo/IVF/data/rocinha/rocinha.stl \
-  --roads /home/theo/IVF/data/rocinha/raw/roads_rocinha.shp \
-  --footprints /home/theo/IVF/data/rocinha/raw/rocinha_buildings.shp \
+  --stl data/rocinha/rocinha.stl \
+  --roads data/rocinha/raw/roads_rocinha.shp \
+  --footprints data/rocinha/raw/rocinha_buildings.shp \
   --spacing 3.0 \
   --height 1.5 \
   --sky-patches 145 \
@@ -95,6 +95,6 @@ python scripts/compute_svf_streets_gpu.py \
   --gpu-batch-size 200 \
   --gpu-ray-chunk-size 1024 \
   --gpu-tri-chunk-size 4096 \
-  --output-dir /home/theo/IVF/outputs/rocinha/svf_streets_gpu_exact
+  --output-dir outputs/rocinha/svf_streets_gpu_exact
 ```
 

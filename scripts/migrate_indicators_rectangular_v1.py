@@ -105,7 +105,14 @@ def _migrate_file(path: Path, audit: pd.DataFrame, site: str, apply: bool) -> tu
 
 
 def _migrate_one(audit: pd.DataFrame, site: str, apply: bool) -> tuple[int, int]:
-    canon = PROJECT_ROOT / "outputs" / site / "sampling_cfd" / "campaign_sampling" / "campaign_patches.csv"
+    canon = (
+        PROJECT_ROOT
+        / "outputs"
+        / site
+        / "sampling_cfd"
+        / "campaign_sampling"
+        / "campaign_patches.csv"
+    )
     derived = PROJECT_ROOT / "outputs" / site / "cfd_analysis" / "per_patch_indicators.csv"
 
     print(f"  {site}:")

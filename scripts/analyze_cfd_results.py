@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """End-to-end analysis pipeline for returned CFD results.
 
-Consumes one site's CFD outputs (auto-detects IVF-native CSV or
+Consumes one site's CFD outputs (auto-detects MorphoFavela-native CSV or
 Airflow-native parquet layout, see ``src/cfd_integration/io.py``) and
 emits paper-ready artefacts:
 

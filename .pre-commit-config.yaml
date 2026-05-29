@@ -1,4 +1,4 @@
-# pre-commit hooks for IVF.
+# pre-commit hooks for MorphoFavela.
 #
 # Install once after cloning the repo:
 #     pip install pre-commit

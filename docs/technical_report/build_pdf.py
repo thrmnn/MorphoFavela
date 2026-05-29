@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import weasyprint
@@ -127,6 +128,7 @@ nav#TOC li { margin: 0.2em 0; }
 
 
 def build():
+    t0 = time.monotonic()
     print(f"Reading  {MD}")
     if not MD.exists():
         sys.exit(f"Not found: {MD}")
@@ -166,7 +168,8 @@ def build():
     HTML.unlink(missing_ok=True)
 
     size_mb = PDF.stat().st_size / 1024 / 1024
-    print(f"Done: {PDF} ({size_mb:.1f} MB)")
+    elapsed_s = time.monotonic() - t0
+    print(f"Done: {PDF} ({size_mb:.1f} MB, {elapsed_s:.1f} s)")
 
 
 if __name__ == "__main__":

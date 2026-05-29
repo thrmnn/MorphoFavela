@@ -7,14 +7,12 @@
 | **Document version** | TR v1.0 (pre-CFD phase) |
 | **Pipeline version** | v5.5 (May 2026 milestone — ROADMAP.md) |
 | **Build date** | 2026-05-03 |
-| **Last numerical sweep** | [`904040e`](https://github.com/thrmnn/MorphoFavela/commit/904040e) (2026-05-03 — see `.claude/agents/numerical-claims-auditor.md`) |
+| **Last numerical sweep** | [`904040e`](https://github.com/thrmnn/MorphoFavela/commit/904040e) (2026-05-03) |
 | **Author** | Theo Hermann · MIT · `thermann.ai@gmail.com` |
 | **Repository** | https://github.com/thrmnn/MorphoFavela |
 | **License** | MIT (code) · CC-BY-4.0 (this report) |
 | **Audience** | Engineering reviewers; researchers reproducing or extending the pipeline; CFD team consuming the patch contract. *Not* a journal manuscript — that lives separately and cites this report. |
 
-For the **fastest engineering review path**, see
-[`docs/onboarding/engineering_review.md`](../onboarding/engineering_review.md).
 For terminology, see **§0 Glossary** below; for reproducibility, see
 **§12 Reproducibility**; for failure modes and observability, see
 **§13 Failure modes**.
@@ -57,7 +55,7 @@ At time of writing, the pipeline has produced:
   spacing and SVF-priority weighting to oversample health-relevant low-sky-
   view conditions.
 - **A complete CFD integration pipeline** (`src/cfd_integration/`,
-  63 passing tests) ready to ingest OpenFOAM results when the simulation
+  71 passing tests) ready to ingest OpenFOAM results when the simulation
   campaign completes in the parallel CFD repository. The result-side
   analysis pipeline (`scripts/analyze_cfd_results.py`) is shipped and
   synthetic-validated end-to-end on all 5 sites; awaiting the first real
@@ -95,9 +93,9 @@ in this section.
 
 | Term | Definition |
 |---|---|
-| **Tregenza-145** | Equal-area discretisation of the sky hemisphere into 145 patches (Tregenza, 1987). The IVF SVF engine ray-casts into the centroid of each patch from each sample point and reports the unobstructed fraction. |
+| **Tregenza-145** | Equal-area discretisation of the sky hemisphere into 145 patches (Tregenza, 1987). The MorphoFavela SVF engine ray-casts into the centroid of each patch from each sample point and reports the unobstructed fraction. |
 | **`svfForProcessing153`** | UMEP's shadow-cast SVF processor with 153-patch sky discretisation (Lindberg & Holmer, 2010, used in SOLWEIG). Used as the independent benchmark in §4.2 / §10.3 cross-validation. |
-| **Height-matched** | Both engines integrate at z = 1.5 m above ground, achieved in IVF via passageway sampling and in UMEP by lowering all building heights by 1.5 m before the shadow-cast. |
+| **Height-matched** | Both engines integrate at z = 1.5 m above ground, achieved in MorphoFavela via passageway sampling and in UMEP by lowering all building heights by 1.5 m before the shadow-cast. |
 | **Passageway aggregation** | SVF cell value comes from samples on traversable ground (streets, alleys, courtyards) — never centroids inside building footprints, which would bias to 0. |
 
 ### CFD sampling
@@ -143,24 +141,31 @@ in this section.
 Five favelas were selected to span the morphological typologies of Rio
 informal settlements:
 
-| Site | Area | Type | Buildings (extended) | 10 m cells | Mean building height † |
-|------|-----:|------|--------------------:|-----------:|----------------------:|
-| Vidigal | 0.30 km² | hillside | 4,600 | 3,169 | 6.3 m |
-| Rocinha | 0.80 km² | hillside | 14,443 | 8,972 | 8.1 m |
-| Rio das Pedras | 0.70 km² | flatland | 11,276 | 7,046 | 8.7 m |
-| Complexo do Alemão | 1.97 km² | mixed | 28,783 | 19,708 | 5.3 m |
-| Maré | 4.34 km² | flatland | 39,333 | 43,419 | 7.1 m |
-| **TOTAL** | **8.11 km²** | | **98,435** | **82,314** | — |
+| Site | Area | Type | Buildings (extended) | 10 m cells | Mean H † | Annual mean sun ‡ |
+|------|-----:|------|--------------------:|-----------:|--------:|----------------:|
+| Vidigal | 0.30 km² | hillside | 4,600 | 3,169 | 6.3 m | 4.53 h |
+| Rocinha | 0.80 km² | hillside | 14,443 | 8,972 | 8.1 m | 3.30 h |
+| Rio das Pedras | 0.70 km² | flatland | 11,276 | 7,046 | 8.7 m | 3.14 h |
+| Complexo do Alemão | 1.97 km² | mixed | 28,783 | 19,708 | 5.3 m | 5.03 h |
+| Maré | 4.34 km² | flatland | 39,333 | 43,419 | 7.1 m | 7.07 h |
+| **TOTAL** | **8.11 km²** | | **98,435** | **82,314** | — | — |
 
 *Extended buildings = site footprints plus context buildings within a 300 m
-buffer (see Section 3.2). Typology assignment drives wind-regime analysis:
-hillside sites span 0–45° slopes; flatland sites cluster near 0°.*
+buffer (see Section 3.2; the v1 CFD campaign uses the additional 700 m
+extension produced in May 2026). Typology assignment drives wind-regime
+analysis: hillside sites span 0–45° slopes; flatland sites cluster near 0°.*
 
 *† Mean building height = mean of `H_mean` across all eligible 10 m grid
 cells per site (`outputs/{site}/morphometrics/grid/grid_metrics.gpkg`).
 This is a cell-area-weighted aggregation, not a per-building mean — short
 ancillary structures contribute less than the multi-storey blocks that
 fill more of the eligible cell area.*
+
+*‡ Annual mean street-level direct sun = mean of `solar_hours_annual` across
+all street points in
+`outputs/{site}/morphometrics/svf/svf_streets_solar.gpkg`. The annual
+proxy is the unweighted mean of the four reference dates (winter/summer
+solstice + March/September equinox); see §5.4.*
 
 ![Figure 1. Study sites overview.](figures/fig01_study_sites.png)
 
@@ -174,8 +179,7 @@ near Sugarloaf; Maré and Complexo do Alemão are in the flat north-zone
 bayside plain; Rio das Pedras is in the west-zone plain.
 
 Cidade de Deus was initially considered but excluded from the CFD campaign
-due to a documented building-data defect (see
-`.claude/…/memory/project_cdd_data_bug.md`); its SVF values saturated at
+due to a building-data defect: its SVF values saturated at
 ≈ 0.90, indicating missing building footprints in the computational scene.
 
 ---
@@ -412,10 +416,10 @@ algorithmically distinct independent reference. To make the two engines
 height-comparable, we lower every building height by 1.5 m before
 running UMEP — equivalent to lifting the integration plane to
 pedestrian height — and mask rooftop pixels (UMEP otherwise includes
-them, IVF does not because passageway samples never fall on roofs).
+them, MorphoFavela does not because passageway samples never fall on roofs).
 Aggregating UMEP at the same 10 m grid across all five sites:
 
-| Site | n | r² | slope | RMSE | bias (UMEP − IVF) |
+| Site | n | r² | slope | RMSE | bias (UMEP − MorphoFavela) |
 |---|---:|---:|---:|---:|---:|
 | Vidigal | 2,510 | 0.68 | 0.96 | 0.12 | +0.01 |
 | Rocinha | 5,646 | 0.81 | 1.01 | 0.14 | +0.09 |
@@ -442,11 +446,11 @@ similar average obstruction. High-relief hillside settlements
 cell-to-cell variation between integrators because each cell sits in a
 distinct local viewshed.
 
-All five biases are positive (UMEP integrates over more sky than IVF),
+All five biases are positive (UMEP integrates over more sky than MorphoFavela),
 ranging from +0.01 (Vidigal) to +0.14 (Complexo do Alemão). The
 direction is consistent with the +1.5 m raised-observer transform
 applied to building heights before running UMEP: structures shorter
-than 1.5 m get partially or fully zeroed in IVF's input, opening
+than 1.5 m get partially or fully zeroed in MorphoFavela's input, opening
 additional sky in the UMEP comparison. Sites with substantial single-
 storey residential coverage (Complexo do Alemão, Maré, Rocinha,
 Rio das Pedras) sit in the +0.08 to +0.14 range; Vidigal's +0.01
@@ -650,30 +654,34 @@ SVF and slope are the dominant discriminators that CFD will quantify.
 
 ### 5.3 SVF and solar access decouple on sloped terrain
 
-![Figure 6. SVF↔solar dissociation on Vidigal.](figures/fig06_terrain_aspect.png)
+![Figure 6. Cross-site SVF↔solar dissociation on sloped terrain.](figures/fig06_terrain_aspect.png)
 
 **Figure 6.** Per-quadrant median **winter-solstice** solar hours as a
-function of SVF, on Vidigal's sloped cells (slope ≥ 5°, n = 6,812
-along-street points). The four traces — one per terrain-aspect
-quadrant (N / E / S / W) — do not collapse onto a single curve. At a
-fixed SVF ≈ 0.5 an N-facing cell receives ≈ 5 hours of direct sun on
-the winter solstice while an S-facing cell receives ≈ 0; the same is
-true at SVF ≈ 0.7 (8 hr vs 2 hr). Shaded bands show the inter-quartile
-range; trace segments where the SVF bin contains fewer than 30 cells
-are dashed (open markers) to flag the small-sample tails (W-quadrant
-beyond SVF ≈ 0.65). Underlay scatter is the full set of sample points
-coloured by aspect bearing, making the cloud's directional structure
-visible.
+function of SVF, on every site's sloped cells (slope ≥ 5°). Each panel
+holds a single site: four traces (N / E / S / W) plus the underlay
+scatter coloured by aspect bearing. Shaded bands show the
+inter-quartile range; trace segments where the SVF bin contains fewer
+than 30 cells are dashed (open markers) to flag the small-sample
+tails. The four available sites all show the same shape — the N
+trace sits well above the S trace at every SVF — and the per-site
+quadrant means in the summary panel give N − S ranging from +1.6 h
+(Vidigal) to +3.0 h (Rocinha). Maré is pending; its street-solar
+pipeline has not yet been run.
 
-The headline scientific claim: **SVF and solar hours are not
-interchangeable on sloped terrain in the southern hemisphere.** SVF
-measures total sky visibility; the winter sun in Rio (~22°S) crosses
-the sky to the north, so a south-facing cell can have abundant sky
-visibility while pointing away from the sun's actual path. The W
-quadrant earns the most direct sun by catching the late-afternoon
-descent into the north-west horizon; the S quadrant is structurally
-shaded for the entire winter solstice day. This dissociation is the
-reason the §7 CFD regression uses aspect (via `(sin α, cos α)`) and
+The headline scientific claim, now cross-site: **SVF and solar hours
+are not interchangeable on sloped terrain in the southern
+hemisphere.** SVF measures total sky visibility; the winter sun in
+Rio (~22°S) crosses the sky to the north, so a south-facing cell can
+have abundant sky visibility while pointing away from the sun's
+actual path. The W quadrant earns the most direct sun by catching the
+late-afternoon descent into the north-west horizon; the S quadrant is
+structurally shaded for the entire winter solstice day. This
+dissociation is *not* a hillside-only phenomenon: Rio das Pedras has
+only ≈ 1.3 k street points above the 5° threshold (vs ≈ 35–44 k on
+the hillside sites) but those few sloped cells reproduce the same
++2.9 h N − S contrast. The dissociation is southern-hemisphere
+physics; the typology controls only how many cells experience it. The
+§7 CFD regression therefore uses aspect (via `(sin α, cos α)`) and
 aspect–wind alignment alongside SVF as distinct predictors, rather
 than collapsing them.
 
@@ -685,15 +693,23 @@ SVF − solar (RdBu_r). Panel (d) of the supplementary figure is
 red-dominant across most of the favela: sky is open but the winter sun
 does not reach.
 
-Quadrant means on Vidigal sloped cells (winter solstice, 30-min
+Cross-site quadrant means on sloped cells (winter solstice, 30-min
 sampling, ray-cast against terrain + extruded LiDAR-height footprints):
-N = 3.32 h, E = 2.85 h, S = 1.70 h, W = 4.02 h, with N/E/S/W cell
-counts 1,363 / 2,595 / 2,488 / 366. Direct regression of solar hours
-on `(slope, λp, sin α, cos α)` reaches R² = 0.246 (n = 6,876,
-intercept 5.70 h, `aspect_cos` coefficient = +1.22 — i.e. moving from
-S- to N-facing under fixed slope and λp adds 2.4 h on average).
-Per-site SVF regressions on `(slope, λp, sin α, cos α)` are written
-to `outputs/{site}/morphometrics/aspect_regression.csv` (Vidigal SVF
+
+| Site | n | N | E | S | W | N − S |
+|---|--:|--:|--:|--:|--:|--:|
+| Vidigal | 6,812 | 3.32 | 2.85 | 1.70 | 4.02 | +1.62 |
+| Rocinha | 34,771 | 3.60 | 1.55 | 0.62 | 2.23 | +2.99 |
+| Complexo do Alemão | 43,741 | 4.94 | 3.62 | 2.06 | 3.29 | +2.88 |
+| Rio das Pedras | 1,346 | 3.41 | 1.49 | 0.54 | 1.77 | +2.87 |
+| Maré | 8,228 | 4.96 | 5.24 | 4.59 | 5.91 | +0.37 |
+
+Direct regression of solar hours on `(slope, λp, sin α, cos α)` on
+Vidigal reaches R² = 0.246 (n = 6,876, intercept 5.70 h,
+`aspect_cos` coefficient = +1.22 — i.e. moving from S- to N-facing
+under fixed slope and λp adds 2.4 h on average). Per-site SVF
+regressions on `(slope, λp, sin α, cos α)` are written to
+`outputs/{site}/morphometrics/aspect_regression.csv` (Vidigal SVF
 R² = 0.599) with per-quadrant summaries in
 `aspect_quadrant_summary.csv`. Cross-site signal: Vidigal sloped grid
 cells show SVF means N = 0.38 / E = 0.44 / S = 0.51 / W = 0.57 — the
@@ -726,6 +742,49 @@ of Vidigal's street cells fall short on the winter solstice but only
 19.3 % on the summer solstice; **the year-round figure to use for
 comfort, photovoltaic, and health-outcome studies is the annual proxy
 (28.6 % below 2 h)**, not the winter worst case.
+
+The same envelope was extended to all five sites in May 2026
+(`scripts/run_street_solar.py` + `outputs/paper_figures/figS_solar_envelope.py`,
+both site-agnostic — the canonical fig07 wrapper for Vidigal is a
+4-line invocation of the same renderer). Cross-site headline numbers:
+
+| Site | n streets | winter h | annual h | summer h | WHO < 2 h winter | WHO < 2 h annual | WHO < 2 h summer | range h |
+|------|--:|--:|--:|--:|--:|--:|--:|--:|
+| Vidigal | 6,876 | 2.59 | 4.53 | 6.21 | 54.1 % | 28.6 % | 19.3 % | 3.62 |
+| Rocinha | 38,690 | 2.08 | 3.30 | 4.56 | 67.1 % | 49.1 % | 34.1 % | 2.48 |
+| Complexo do Alemão | 47,508 | 3.22 | 5.03 | 6.66 | 44.2 % | 20.9 % | 12.9 % | 3.45 |
+| Rio das Pedras | 16,905 | 1.99 | 3.14 | 4.22 | 62.5 % | 44.0 % | 29.7 % | 2.23 |
+| Maré | 84,147 | 5.20 | 7.07 | 8.70 | 27.8 % | 9.9 % | 5.3 % | 3.50 |
+
+Two structural patterns:
+
+* **Hillside vs flatland seasonal range.** Vidigal (3.62 h) and CDA
+  (3.45 h) have the largest winter→summer recoveries — terrain shadowing
+  on hillside structures depresses the winter floor harder, which the
+  high summer sun then erases. The flatland sites recover less in
+  absolute terms (Rocinha 2.48 h, RdP 2.23 h, Maré 3.50 h)
+  because their winter floor was less depressed: the fabric is denser
+  and shadowing is canyon-driven rather than terrain-driven, so summer
+  doesn't lift the worst cells as far.
+
+* **WHO benchmark gap.** Even on the annual proxy, Rocinha and Rio das
+  Pedras leave 49 % and 44 % of street cells below the WHO 2 h/day
+  threshold. CDA and Vidigal sit at 21 % and 29 %. **Annual mean is the
+  number that should drive comfort and health-outcome modelling**; the
+  winter worst case (44–67 % below WHO) is the conservative bound for
+  PV-siting and seasonal-affective studies, not the everyday figure.
+
+Cross-site comparison by aspect quadrant:
+
+![Figure 8. Cross-site solar by aspect quadrant.](figures/fig08_solar_cross_site.png)
+
+**Figure 8.** Mean street-level direct sun by aspect quadrant
+(N / E / S / W) and reference date. Hillside sites (Vidigal, Rocinha)
+show large winter N–S contrasts (Rocinha N − S = +2.80 h; Vidigal
++1.56 h) — the §5.3 dissociation made cross-site. Flatland sites
+collapse: Rio das Pedras' winter N − S contrast is just +0.55 h
+(Maré +0.79 h). Complexo do Alemão's mixed terrain shows a
+hillside-like +2.74 h winter contrast.
 
 The standalone single-panel versions of Figure 7 (a/b/c) live at
 `docs/technical_report/figures/fig07a_solar_winter.png`,
@@ -944,7 +1003,7 @@ quantity. `λ_F = Σ(projected_facade × height) / disk_area` is the
 canopy-parameterisation form (Tominaga 2008 §3) — sum of all building
 facades, no shadowing — and routinely exceeds 1.0 in dense favela
 patches (campaign median λ_F max = 1.32, p90 = 2.10, max = 2.96 at
-ROC-P01). The CFD blockage gate uses the AIJ benchmark *silhouette
+RDP-P06). The CFD blockage gate uses the AIJ benchmark *silhouette
 envelope* `D · H_max` instead: the worst-case projected obstacle area
 in any wind direction, bounded by treating the analysis circle as a
 solid block. λ_F is reported alongside for the §4 morphometric tables
@@ -960,7 +1019,7 @@ The code to ingest CFD results, aggregate them onto the 10 m
 morphometric grid, and combine directional simulations into an
 annualised ensemble is implemented in `src/cfd_integration/`
 (~1,100 lines across five modules: `schema.py`, `io.py`, `aggregate.py`,
-`metrics.py`, `weighting.py`) and covered by **63 passing unit tests**.
+`metrics.py`, `weighting.py`) and covered by **71 passing unit tests**.
 
 **Input contract** (documented fully in
 `src/cfd_integration/README.md`, provided to the CFD agent as the
@@ -1066,6 +1125,148 @@ aspect coefficients are at noise level (the synthetic generator
 does not encode aspect into U_mag); they will become non-trivial
 once real CFD returns the directional flow field.
 
+### 7.5 Manuscript figure series (synthetic-CFD preview)
+
+A separate figure track at `docs/manuscript/figures/` produces the
+journal-manuscript artefacts. These consume real morphometrics +
+solar but currently inject **synthetic CFD** through the same
+`src.cfd_integration` API the real campaign will use, so each plot
+will refresh with a one-line config swap when real numbers land.
+Three figures are wired below; the rest of the manuscript series is
+upstream of CFD (Figs 0.1–0.2) and unaffected by the synthetic flag.
+
+**Fig 0.3 — Environmental performance.** Per-patch wind / sun maps
+for four representative morphologies (hillside-open, hillside-dense,
+flatland-open, flatland-dense) plus pooled ACH and sun-hours
+distributions across the campaign. Each patch is a 100 m analysis
+disk overlaid on the SVF raster, with U_mean colour-coded against
+Lawson 1.0 m/s pedestrian stagnation. After typology re-classification
+of Complexo do Alemão as **mixed** (rather than hillside), the
+hillside-open patch shifted from CDA-P22 to VDG-P17 (SVF=0.57,
+λp=0.20).
+
+![Figure 0.3 — Environmental performance.](figures/fig_0_3_performance.png)
+
+**Figure 0.3.** Cross-site environmental performance: representative
+patch maps + pooled distributions. Maré awaits its solar gpkg —
+4/5 sites shown.
+
+**Fig 0.4 ★ — Diagnostic taxonomy at favela scale (headline).** Four-
+state per-10 m-cell classification: **Adequate** (vent + sun both
+pass), **Ventilation failure** (U_mean < 1.0 m/s), **Sunlight
+deprivation** (winter direct sun < 2 h), **Compound failure**
+(both fail). Okabe-Ito colour-blind-safe palette locked at
+`#BDBDBD`/`#0072B2`/`#E69F00`/`#D55E00`. Layout: five site maps (equal-
+width panels with per-site scale bars at 100/200/500 m), a 2-D
+performance scatter with a twin top-axis carrying indoor-equivalent
+ACH via the canyon→room coupling α=1/150 (Etheridge-Sandberg), and
+horizontal stacked bars for hillside / mixed / flatland aggregates.
+
+![Figure 0.4 — Diagnostic taxonomy (★ headline).](figures/fig_0_4_diagnostic.png)
+
+**Figure 0.4. ★ HEADLINE.** Four-state diagnostic taxonomy at favela
+scale. Bottom axis on the scatter is operational outdoor U_mean
+(Lawson 1.0); top axis is indoor-equivalent ACH (α=1/150). WHO
+0.5 ACH lies off-scale at U≈0.21 m/s and is shown as an annotated
+callout.
+
+**Fig 0.5 — Predictors and typology contrast.** Four panels: (A)
+RF permutation importance, vent vs sun side-by-side; (B) partial-
+dependence curves for the three top predictors (SVF, λf, slope) on
+both targets with 95 % bootstrap CI; (C) logistic forest plot
+(main effects + three interactions), filled markers p<0.05, hollow
+n.s., cluster-robust SE on site; (D) SVF→U_mean changepoint
+regression with bootstrap CI and a twin right axis carrying indoor-
+equivalent ACH. On the synthetic dataset SVF dominates both
+targets (5-fold AUC vent=0.70, sun=0.86), with the changepoint
+landing at SVF=0.12 [CI 0.12, 0.50] — the wide CI is expected
+because the synthetic U_mean is roughly linear in SVF by construction.
+
+![Figure 0.5 — Predictors and typology contrast.](figures/fig_0_5_predictors.png)
+
+**Figure 0.5.** Statistical predictors and typology contrast. Pipeline
+artefacts at `outputs/comparative/diagnostic_models/` (rf_importance.csv,
+pdp_curves.csv, logit_coefs.csv, changepoint_svf_ach.csv) are
+regenerated by `scripts/run_diagnostic_models.py`. Once real CFD
+lands, the SVF→U_mean changepoint is expected to tighten and the
+forest-plot effect sizes for ventilation predictors will increase.
+
+**Fig 0.6 — Climate-stress robustness.** A wind-stilling stress test
+that scales the U field uniformly by {1.00, 0.85, 0.70} to mimic the
+IPCC AR6 mid-century projection for SE Brazil, then re-runs the 0.4
+four-state classifier on each scaled snapshot. Three panels: (A)
+stacked bars of state shares per site per scaling level (compound-
+failure rate climbs monotonically — Vidigal 19 → 23 → 30 %, Rocinha
+58 → 65 → 70 %, CDA 17 → 21 → 26 %, RdP 13 → 16 → 19 %); (B) per-cell
+transition maps at U×0.85 highlighting only the cells that *flip* into
+ventilation- or compound-failure — Rocinha is the largest absorber
+(10.2 % of cells flip to compound) while Vidigal and CDA each shed
+~3.6 %; (C) typology vulnerability ladder — hillside 7.6 %, flatland
+5.5 %, mixed 3.6 %. Thermal coupling is not modelled — only the
+ventilation half of the diagnosis moves.
+
+![Figure 0.6 — Climate-stress robustness.](figures/fig_0_6_climate_stress.png)
+
+**Figure 0.6.** Climate-stress robustness: wind-stilling shifts the
+4-state distribution non-uniformly across typologies. Maré awaits its
+solar gpkg and is shown without flip annotation in panel B.
+
+**Fig 0.7 — Spatial clustering of compound failure (proposition).**
+Empirical follow-up to 0.4: the compound-failure pixels are *not*
+randomly distributed — they form coherent corridors. Three panels:
+(A) Global Moran's I on the binary compound-failure indicator under
+Rook contiguity (4/5 sites: Vidigal I=0.61, Rocinha I=0.58, CDA
+I=0.81, RdP I=0.80; all p<0.001 vs 999-permutation random-label
+null); (B) LISA cluster maps showing the contiguous compound-failure
+components per site (compound-corridor cell share: Vidigal 8.3 %,
+Rocinha 4.5 %, CDA 9.2 %, RdP 6.9 %); (C) cluster-size CCDF pooled
+across sites — observed (orange) vs random null (grey dashed). The
+heavy upper tail in the observed CCDF (single components extending
+past ~30 cells) is the signature of spatial clustering: a planner
+intervening on a single cell affects a much larger neighbourhood
+than a random-pixel diagnostic would suggest.
+
+![Figure 0.7 — Spatial clustering of compound failure.](figures/fig_0_7_clustering.png)
+
+**Figure 0.7. PROPOSITION.** Compound-failure corridors are
+empirically clustered, not randomly distributed. Synthetic CFD;
+the spatial-statistics conclusion is conserved over the U-field
+modelling choice (Moran's I uses only the binary classification
+output). Pipeline: `scripts/run_diagnostic_models.py` produces
+the per-cell 4-state label; the figure script
+(`docs/manuscript/figures/fig_0_7_proposition_clustering.py`) runs
+the libpysal/esda statistics on it.
+
+![Figure 0.8 — Terrain confound: does typology survive slope control?](figures/fig_0_8_terrain_confound.png)
+
+**Figure 0.8.** Terrain confound test for the headline typology
+finding. Panel (a) stratifies the 4-state diagnostic by slope bin
+(0–5°, 5–15°, 15–25°, ≥ 25°) per site; compound-failure share rises
+monotonically with slope on Vidigal (0 % → 22 %) and Rocinha
+(3 % → 9 %). Panel (b) maps each site coloured by slope bin with
+compound-failure cells outlined in red — the outlines concentrate on
+the steeper (darker blue) cells in hillside sites. Panel (c) is the
+proposition: % compound-failure cells per typology, *stratified by
+slope bin*. **At slope < 5° the hillside − flatland gap is −2 pp; at
+the steepest slope bin it is +2 pp.** When slope is controlled the
+typology label nearly stops doing work, which means most of the
+"hillside is more compound-failure-prone" signal in Fig 0.4 and the
+typology ladder in Fig 0.6 is *slope acting through the typology
+label*, not a residual morphology effect. The honest reading: slope
+is a stronger predictor than typology categoricals once both are
+available. The n in each bin is shown — the flatland steep-bin
+(n = 26) and hillside flat-bin (n = 40) are small, so the proposition
+is the rough magnitude (gap close to zero at controlled slope), not
+the sign of an individual pp value. Maré is excluded until its
+street-solar pipeline lands; the flatland row in panel (c) is Rio das
+Pedras only. Synthetic CFD; the slope-stratification operates on the
+4-state label so the same panel re-renders unchanged once real CFD
+arrives. Pipeline:
+`docs/manuscript/figures/fig_0_8_terrain_confound.py` reads
+`outputs/{site}/cfd_analysis/grid_with_cfd.gpkg`, aggregates
+street-solar into 10 m cells, merges `slope_deg` from
+`grid_metrics.gpkg`, and produces the panel set.
+
 ---
 
 ## 8. Repository Structure
@@ -1163,7 +1364,7 @@ Key scripts:
 | Minimum inter-patch spacing (80 m) | PASS | realised minimum: 80–85 m across sites |
 | Resolution sensitivity (10 m justified) | PASS | Figure S3; 10 m captures features 20 m loses |
 | 12-strata coverage (≥ 1 site per stratum) | PASS | all 12 strata non-empty when pooled |
-| CFD integration unit tests | PASS | 63 / 63 tests |
+| CFD integration unit tests | PASS | 71 / 71 tests |
 
 ---
 
@@ -1189,7 +1390,7 @@ tested but has not yet processed real simulation data. Any
 assumptions about sample-point density, column naming quirks, or
 edge cases in OpenFOAM output will only surface at first ingestion.
 The first pilot patch (VDG-P07) is in flight; running the test
-suite plus `cfd-results-ingestor` agent against the returned
+suite plus the `cfd-results-ingestor` validation against the returned
 results will catch most issues.
 
 ### 10.3 SVF cross-validation against UMEP
@@ -1215,7 +1416,7 @@ Maré 2026-04-30; extended to all 5 sites 2026-05-01.) The
    0.3–0.5 SVF band where the 153-patch shadow-cast and 145-patch
    ray-cast integrations diverge most. Both engines are defensible
    operational definitions of SVF; the 5-site slope-≈-1 cluster
-   establishes that the IVF Tregenza-145 ray-cast engine is consistent
+   establishes that the MorphoFavela Tregenza-145 ray-cast engine is consistent
    with an independent benchmark across the full morphological range
    represented in the campaign. See §4 cross-validation table for
    per-site interpretation and
@@ -1240,32 +1441,20 @@ This is a final decision for the current campaign cycle: the
 all assume 5 sites. Re-onboarding CDD is out of scope until the
 building data is reprocessed upstream of this repository.
 
-### 10.6 Direct ground-solar measurements only on Vidigal
+### 10.6 Direct ground-solar measurements (closed 2026-05-08)
 
-`scripts/run_street_solar.py` produces a four-date seasonal
-envelope (winter and summer solstices, two equinoxes, 30-min
-sampling) for Vidigal at
-`outputs/vidigal/morphometrics/svf/svf_streets_solar.gpkg`. The
-gpkg carries `solar_hours_winter / summer / equinox_mar /
-equinox_sep / annual` plus matched irradiance columns; §5.3 and §5.4
-both consume it. The legacy `scripts/compute_solar_access.py`
-remains in the repo but is superseded — its single-date 60-min output
-was replaced by the seasonal runner on 2026-05-07.
-
-The remaining four sites (Rocinha, Complexo do Alemão, Rio das Pedras,
-Maré) lean on SVF as the per-cell sky-exposure proxy. The seasonal
-runner is site-agnostic: only Vidigal and Maré currently have a
-pre-built `scene.stl`, so re-using it on the other three sites first
-requires running `python scripts/run_svf_v2.py --area <site> --mode
-streets` to materialise their scene meshes (~15–30 min per site),
-after which `python scripts/run_street_solar.py --site <site>` adds
-the seasonal envelope (~2 min per site at 16 cores). Total cross-site
-catch-up: ~1.5 hours of compute, no methodology changes.
-
-Until that runs, the §5.4 Figure 7 narrative is Vidigal-only; §5.3
-already states the SVF↔solar dissociation in cross-site terms via
-the shared aspect predictor. Cross-site solar coverage is the next
-paper-figure follow-up, not a methodology gap.
+Originally a Vidigal-only limitation. Closed 2026-05-08:
+`scripts/run_street_solar.py` produces a four-date seasonal envelope
+(winter and summer solstices, two equinoxes, 30-min sampling) and was
+extended to all five campaign sites in commits `0a847f6` (refactor),
+`3a71349` (RdP), `0a5f3ca` (Rocinha), `f43355e` (CDA), and the matching
+Maré commit. Each site's
+`outputs/{site}/morphometrics/svf/svf_streets_solar.gpkg` carries
+`solar_hours_winter / summer / equinox_mar / equinox_sep / annual` plus
+matched irradiance columns; §5.4 (cross-site table + Figure 8)
+consumes them. The legacy `scripts/compute_solar_access.py` remains in
+the repo but is superseded — its single-date 60-min output was
+replaced by the seasonal runner on 2026-05-07.
 
 ---
 
@@ -1324,7 +1513,7 @@ each box flips when the same code path is re-run against real
 Airflow output.
 
 - [ ] Verify first patch ingests correctly via `cfd-results-ingestor`
-      (validator already accepts both IVF-native CSV and Airflow-
+      (validator already accepts both MorphoFavela-native CSV and Airflow-
       native parquet layouts; tested against synthetic 160/160 cleanly)
 - [ ] Annualise via wind-rose weighting (`src.cfd_integration.weighting`)
       — implemented; default weight is `freq_speed`
@@ -1349,7 +1538,7 @@ regenerated from the committed scripts. This section is the index.
 
 ```bash
 git clone https://github.com/thrmnn/MorphoFavela.git && cd MorphoFavela
-conda create -n IVF python=3.11 && conda activate IVF
+conda create -n morphofavela python=3.11 && conda activate morphofavela
 pip install -e ".[dev]"          # add ".[gpu]" for the optional GPU SVF stack
 ```
 
@@ -1359,8 +1548,9 @@ on Linux, `brew install gdal` on macOS) before `pip install`.
 ### 12.2 Smoke test (≤ 2 min on a fresh clone)
 
 ```bash
-pytest tests/ -m "not integration" -q --tb=short
-# → 508 tests pass; 69 integration tests deselected
+python -m pytest tests/ -m "not integration" -q --tb=short
+# → 552 tests pass; 69 integration tests deselected
+# (use `python -m pytest` to bypass any older user-site `pytest` on PATH)
 ```
 
 If this passes, the codebase is loaded correctly. If GDAL or pyvista
@@ -1414,7 +1604,8 @@ python scripts/validate_svf_against_umep.py --site <site> \
 | **3** SVF–λp coupling | `python outputs/paper_figures/fig03_svf_lambda_coupling.py` | `outputs/paper_figures/exports/fig03_svf_lambda_coupling.png` |
 | **4** Sampling design | `python outputs/paper_figures/fig04_sampling_design.py` | `outputs/paper_figures/exports/fig04_sampling_design.png` |
 | **5** Morphometric maps | `python outputs/paper_figures/fig05_morphometric_maps.py` | `outputs/paper_figures/exports/fig05_morphometric_maps.png` |
-| **6** SVF↔solar dissociation | `python outputs/paper_figures/fig06_terrain_aspect.py` | `outputs/paper_figures/exports/fig06_terrain_aspect.png` |
+| **6** SVF↔solar dissociation (cross-site) | `python outputs/paper_figures/fig06_terrain_aspect.py` | `outputs/paper_figures/exports/fig06_terrain_aspect.png` |
+| **0.8** Terrain confound (slope ladder) | `python docs/manuscript/figures/fig_0_8_terrain_confound.py` | `docs/manuscript/figures/exports/fig_0_8_terrain_confound.png` |
 | **7** Vidigal solar envelope (winter / annual / summer) | `python scripts/run_street_solar.py --site vidigal && python outputs/paper_figures/fig07_solar_envelope_vidigal.py` | `outputs/paper_figures/exports/fig07_solar_envelope_vidigal.png` (+ `fig07a/b/c_*.png` standalone panels) |
 | **S — terrain-aspect spatial** | `python outputs/paper_figures/figS_terrain_aspect_spatial.py` | `outputs/paper_figures/exports/figS_terrain_aspect_spatial.png` |
 | **S1** Correlation matrices | `python outputs/paper_figures/figS1_correlation_matrices.py` | `outputs/paper_figures/exports/figS1_correlation_matrices.png` |
@@ -1433,9 +1624,9 @@ cp outputs/paper_figures/exports/figXX_*.png docs/technical_report/figures/
 python docs/technical_report/build_pdf.py
 ```
 
-The pre-commit hook (`.claude/hooks/check_report_sync.py`) blocks
-commits that stage `technical_report.md` without `technical_report.pdf`,
-or vice versa.
+By convention the PDF is rebuilt in the same commit as any
+`technical_report.md` edit; a stale PDF is treated as a review failure,
+because external readers trust the rendered artefact.
 
 **Known orphans:** four pilot-summary figures
 (`fig_all_sites_patches`, `fig_candidate_pool`,
@@ -1460,7 +1651,9 @@ Regenerating them is in the next-steps backlog.
 
 ```bash
 python docs/technical_report/build_pdf.py
-# → 15.5 MB PDF, ~10 s on standard hardware (pandoc → WeasyPrint)
+# → 30.1 MB PDF, ~15 s on standard hardware (pandoc → WeasyPrint)
+# build_pdf.py prints the exact size and elapsed seconds at the end so future
+# audits can verify these numbers against the live run, not against the prose.
 ```
 
 The build is deterministic given a fixed `technical_report.md`.
@@ -1476,38 +1669,37 @@ the validators surface drift before it ships.
 
 | Stage | Producer | Success signal | Failure signal | Validator |
 |---|---|---|---|---|
-| Site onboarding | `data/<site>/` per `data/README.md` contract | All required files present; CRS = EPSG:31983; `wind_rose.json` quality_flag = "measured" | Missing files; mixed CRS; placeholder wind rose | `data-contract-checker` agent |
-| Building extension | `scripts/build_extended_context.py --buffer 700` | `data/<site>/buildings_extended_700m.gpkg` and matching DTM written; building count > site-only count | Empty geometry; CRS mismatch; sentinel pixels (−9999) survive into the merged DTM | `data-contract-checker` agent |
+| Site onboarding | `data/<site>/` per `data/README.md` contract | All required files present; CRS = EPSG:31983; `wind_rose.json` quality_flag = "measured" | Missing files; mixed CRS; placeholder wind rose | `data-contract-checker` |
+| Building extension | `scripts/build_extended_context.py --buffer 700` | `data/<site>/buildings_extended_700m.gpkg` and matching DTM written; building count > site-only count | Empty geometry; CRS mismatch; sentinel pixels (−9999) survive into the merged DTM | `data-contract-checker` |
 | Rectangular-domain audit | `scripts/audit_rectangular_domain.py` then `scripts/migrate_indicators_rectangular_v1.py --apply` | `outputs/comparative/cfd_methodology/audit_v1.csv` written with 119 rows, all `eligible = true`; both `campaign_patches.csv` and `per_patch_indicators.csv` carry the new `domain_*_m` columns | Any `eligible = false` row; mismatch between audit row count and campaign size; `blocken_radius_required` column survives migration | n/a — `audit_v1_pivot.csv` per-stratum table |
 | Morphometric grid | `scripts/run_morphometric_audit.py` | `grid_metrics.gpkg` written with all 20+ columns; `svf_count > 0` for every eligible cell; per-site PDF report rendered | NaN-heavy SVF column (passageway sampler failed); cells with `svf_count = 0` returning NaN; report_render fails on missing inputs | n/a — review the per-site PDF |
-| Pilot sampling | `scripts/run_pilot_sampling.py` | 12–15 patches per site; ≥ 1 patch per non-empty stratum; min spacing ≥ 80 m | Stratum coverage gap; min spacing < 80 m; eligibility filter rejects > 95 % of cells | `sampling-auditor` agent |
-| Campaign sampling | `scripts/run_campaign_sampling.py` | 22–25 patches per site; SVF-priority weighting reflected in stratum totals; `eligible = true` in every row of `audit_v1.csv` after the rectangular-domain audit | Spacing collision; stratum over- or under-allocation; `eligible = false` rows in audit output | `sampling-auditor` agent |
-| Wind rose ingestion | `scripts/build_wind_rose.py` | `wind_rose.json` with `quality_flag: "measured"`, `n_records ≥ 60,000`, full 8-direction frequency vector | quality_flag "placeholder-prior" (climatological prior never replaced); INMET date-format break post-2019 (silent zero rows) | `wind-ingestion` agent |
-| CFD ingestion | (CFD repo at `~/Airflow` writes; `src/cfd_integration/` reads) | All 8 wind directions present per patch; `sample_points.csv` rows ≥ 10 k; `summary.json` valid | Missing direction; off-axis directory name (e.g. `wind_017/`); column drift in CSV; `\|U_mag − √(U²+V²+W²)\| > 0.01` | `cfd-results-ingestor` agent (auto-detects IVF-native CSV vs Airflow-native parquet layouts) |
+| Pilot sampling | `scripts/run_pilot_sampling.py` | 12–15 patches per site; ≥ 1 patch per non-empty stratum; min spacing ≥ 80 m | Stratum coverage gap; min spacing < 80 m; eligibility filter rejects > 95 % of cells | `sampling-auditor` |
+| Campaign sampling | `scripts/run_campaign_sampling.py` | 22–25 patches per site; SVF-priority weighting reflected in stratum totals; `eligible = true` in every row of `audit_v1.csv` after the rectangular-domain audit | Spacing collision; stratum over- or under-allocation; `eligible = false` rows in audit output | `sampling-auditor` |
+| Wind rose ingestion | `scripts/build_wind_rose.py` | `wind_rose.json` with `quality_flag: "measured"`, `n_records ≥ 60,000`, full 8-direction frequency vector | quality_flag "placeholder-prior" (climatological prior never replaced); INMET date-format break post-2019 (silent zero rows) | `wind-ingestion` |
+| CFD ingestion | (CFD repo at `~/Airflow` writes; `src/cfd_integration/` reads) | All 8 wind directions present per patch; `sample_points.csv` rows ≥ 10 k; `summary.json` valid | Missing direction; off-axis directory name (e.g. `wind_017/`); column drift in CSV; `\|U_mag − √(U²+V²+W²)\| > 0.01` | `cfd-results-ingestor` (auto-detects MorphoFavela-native CSV vs Airflow-native parquet layouts) |
 | Annualised aggregation | `scripts/analyze_cfd_results.py` | Per-site `outputs/<site>/cfd_analysis/per_patch_indicators.csv`, `grid_with_cfd.gpkg`; covered cells in 350–410 range per site (synthetic baseline) | Coverage anomaly (cells well outside 350–410); regression sign flips; weighting falls back to uniform when wind rose missing | n/a — verify against synthetic baseline |
 | Report drift | `docs/technical_report/technical_report.md` | Numerical claims trace to source; cross-references resolve; PDF rebuilt | Prose drift from data (the §6.5-class bug); `.md` ↔ `.pdf` desync; figure copy missing | `report-sync-auditor` (commit-time) + `numerical-claims-auditor` (pre-review) |
 
 ### 13.2 The four validators
 
-Read-only project subagents under `.claude/agents/` — invoke before
-shipping. Each returns a structured punch list; all four can be run in
-parallel.
+Read-only validation checks the project runs before shipping. Each
+returns a structured punch list and is independent of the others.
 
 - **`data-contract-checker`** — site-level contract per `data/README.md`. Flags missing files, CRS drift, wind-rose placeholder.
 - **`sampling-auditor`** — 12-strata coverage, 80 m spacing, per-patch integrity, Blocken margin. Surfaces `docs/cfd_sampling_overrides.yaml` documented gaps as WARN, not FAIL.
 - **`report-sync-auditor`** — pipeline / figure / sampling change in a diff that didn't update the technical report. Runs against `working`, `staged`, or any git ref range.
 - **`numerical-claims-auditor`** — extracts every numerical claim from `technical_report.md` and verifies against source files. Targets the §6.5-class prose-drift bug. Run before sending the TR for external review.
 
-### 13.3 Pre-commit hook
+### 13.3 Commit-time report-sync discipline
 
-`.claude/hooks/check_report_sync.py`:
+Three rules keep the report, its rendered PDF, and the code in step:
 
-- **Blocks** a commit that stages `technical_report.md` without `technical_report.pdf` (or vice versa).
-- **Warns** when a figure under `docs/technical_report/figures/` is staged without a `technical_report.md` change.
-- **Warns** on `feat:` / `fix:` commits touching `src/` or `scripts/` without staging a corresponding `tests/` file.
+- A commit that changes `technical_report.md` **must** also rebuild and stage `technical_report.pdf` (and vice versa).
+- A figure staged under `docs/technical_report/figures/` should accompany a `technical_report.md` change.
+- A `feat:` / `fix:` commit touching `src/` or `scripts/` should stage a corresponding `tests/` file.
 
-The blocking rule is intentional: a stale PDF is strictly worse than no
-PDF, because external readers trust the rendered artefact.
+The first rule is the strict one: a stale PDF is worse than no PDF,
+because external readers trust the rendered artefact.
 
 ### 13.4 Common failure patterns and where they were caught
 
@@ -1546,8 +1738,18 @@ PDF, because external readers trust the rendered artefact.
 | — | Cross-site feature space | `fig_campaign_cross_site_featurespace.png` |
 | — | All sites patch overview | `fig_all_sites_patches.png` |
 | — | Patch metrics comparison | `fig_patch_metrics_comparison.png` |
+| 0.3 | Manuscript: environmental performance (per-patch maps + pooled distributions) | `fig_0_3_performance.png` |
+| 0.4 ★ | Manuscript: 4-state diagnostic taxonomy (headline) | `fig_0_4_diagnostic.png` |
+| 0.5 | Manuscript: predictors + typology contrast | `fig_0_5_predictors.png` |
+| 0.6 | Manuscript: climate-stress robustness (wind-stilling 4-state shift) | `fig_0_6_climate_stress.png` |
+| 0.7 | Manuscript: spatial clustering of compound failure (proposition) | `fig_0_7_clustering.png` |
+| 0.8 | Manuscript: terrain confound (slope-stratified 4-state shares) | `fig_0_8_terrain_confound.png` |
 
 All figures in `docs/technical_report/figures/`.
+
+Figures with a `0.x` prefix are draft journal-manuscript artefacts
+described in §7.5; the rest are produced and validated by this
+repository's pipeline.
 
 ---
 

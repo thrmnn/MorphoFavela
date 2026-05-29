@@ -17,14 +17,14 @@
 #   sbatch --array=0-1 scripts/hpc/run_streets_fast.sh   # both in parallel
 # ==========================================================================
 
-PROJECT_ROOT="${SLURM_SUBMIT_DIR:-$HOME/IVF}"
+PROJECT_ROOT="${SLURM_SUBMIT_DIR:-$HOME/MorphoFavela}"
 cd "${PROJECT_ROOT}"
 mkdir -p logs
 
 source /etc/profile.d/modules.sh 2>/dev/null || source /usr/share/modules/init/bash 2>/dev/null || true
 module load miniforge/25.11.0-0
 eval "$(conda shell.bash hook)"
-conda activate ivf
+conda activate morphofavela
 
 set -euo pipefail
 

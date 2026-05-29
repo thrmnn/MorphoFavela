@@ -338,7 +338,7 @@
 
 ### Recently Completed
 - [x] **5-site UMEP cross-validation** closed (2026-05-01) — slopes within ±8 % of unity
-      at 4/5 sites, r² 0.68–0.94, all biases ≥ 0 (height-shifted IVF input zeros sub-1.5 m
+      at 4/5 sites, r² 0.68–0.94, all biases ≥ 0 (height-shifted MorphoFavela input zeros sub-1.5 m
       structures). Vendored UMEP at `vendor/umep_processing/`. Closes §10.3 limitation.
 - [x] **§6.5 Blocken margin claim corrected** (2026-05-02) — min margin 114 m at RDP-P15
       (not "≥150 m" as previously stated); 11/119 patches under 150 m, all at RdP/Rocinha;
@@ -347,7 +347,7 @@
       `scripts/analyze_cfd_results.py` + `generate_synthetic_cfd_results.py`; end-to-end
       synthetic validation on all 5 sites (covered cells 359–405).
 - [x] **Six project subagents + CFD adapter** (2026-04-29) — `cfd-results-ingestor`
-      auto-detects IVF native (cardinal + CSV) and Airflow native (`wind_NNN/` +
+      auto-detects MorphoFavela native (cardinal + CSV) and Airflow native (`wind_NNN/` +
       parquet) layouts.
 - [x] **Wind input for all 5 sites** (2026-04-27) — measured roses 2015–2024,
       n = 64,088–89,439 hourly records, `quality_flag: "measured"`.
@@ -563,7 +563,7 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
 - Wind input for all 5 sites: INMET BDMEP + Iowa State ASOS pipelines, measured roses
   2015–2024, `quality_flag: "measured"`
 - Six project subagents under `.claude/agents/` (3 validators + 3 workflow accelerators)
-- `src/cfd_integration/io.py` auto-detects IVF native and Airflow native on-disk layouts
+- `src/cfd_integration/io.py` auto-detects MorphoFavela native and Airflow native on-disk layouts
 - Result-side pipeline: `analyze_cfd_results.py` + `generate_synthetic_cfd_results.py`,
   end-to-end synthetic-validated on all 5 sites
 - 5-site UMEP cross-validation closed (§10.3 limitation): vendored UMEP at

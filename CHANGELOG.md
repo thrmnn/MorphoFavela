@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the IVF (Informal settlements Vulnerability Framework)
+All notable changes to the MorphoFavela (Morphometric analysis of informal settlements)
 project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once
@@ -77,7 +77,7 @@ a stable v1.0 is cut.
 
 ### Added — SVF cross-validated against UMEP (closes §10.3 limitation)
 
-- `scripts/validate_svf_against_umep.py` benchmarks the IVF Tregenza-145
+- `scripts/validate_svf_against_umep.py` benchmarks the MorphoFavela Tregenza-145
   ray-cast SVF against UMEP's shadow-casting SVF
   (`svfForProcessing153`, Lindberg & Holmer 2010, used in SOLWEIG) on a
   rasterised DSM. The two engines are algorithmically distinct
@@ -110,11 +110,11 @@ a stable v1.0 is cut.
   agreement; high-relief hillside settlements (Vidigal 0.68,
   Complexo do Alemão 0.76, Rocinha 0.81) produce more cell-to-cell
   variation between integrators. All biases are positive (+0.01 to
-  +0.14), consistent with sub-1.5 m structures being zeroed in IVF's
+  +0.14), consistent with sub-1.5 m structures being zeroed in MorphoFavela's
   height-shifted input but retained in UMEP. UMEP is aggregated to the
   10 m grid only over non-building pixels — without that mask the
   comparison is contaminated by rooftop pixels that UMEP scores ~1.0
-  but IVF never samples. The mask brought Vidigal r² from 0.04 to 0.68.
+  but MorphoFavela never samples. The mask brought Vidigal r² from 0.04 to 0.68.
 - Outputs land in `outputs/{site}/morphometrics/svf/umep_validation/`
   (per-cell scatter PNG, per-cell CSV, summary stats CSV). Scatters
   are copied to `docs/technical_report/figures/figS{6,7,8,9,10}*.png`
@@ -180,7 +180,7 @@ a stable v1.0 is cut.
   per-patch indicator table joined with morphometric covariates →
   per-cell cell-level annualisation onto the 10 m grid → within-site
   OLS predictor regression (ACH/U_mean ~ SVF + λp + slope + σ_h) →
-  Figure 5 wind-panel PNG. Auto-detects IVF-native CSV and
+  Figure 5 wind-panel PNG. Auto-detects MorphoFavela-native CSV and
   Airflow-native parquet layouts via the existing
   `src.cfd_integration.io` adapter.
 - New `scripts/generate_synthetic_cfd_results.py` produces a complete
@@ -273,7 +273,7 @@ a stable v1.0 is cut.
   row-wise, used when OpenFOAM emits one parquet per processor
   decomposition).
 - `src/cfd_integration/io.py::_normalize_wind_direction` — accepts
-  both the IVF-native cardinal form (`N`, `NE`, …) and the Airflow-
+  both the MorphoFavela-native cardinal form (`N`, `NE`, …) and the Airflow-
   native `wind_NNN` form (`wind_000` → `N`, `wind_045` → `NE`, …,
   `wind_315` → `NW`); off-axis degrees return `None` so callers can
   warn-and-skip.
@@ -284,7 +284,7 @@ a stable v1.0 is cut.
 - 12 new tests in `tests/test_cfd_integration/test_schema_io.py`
   covering direction normalisation, single-file parquet round-trip,
   multi-parquet concat, U_mag auto-compute, and three campaign-loader
-  layout scenarios (IVF native, Airflow native, mixed). All 57 CFD
+  layout scenarios (MorphoFavela native, Airflow native, mixed). All 57 CFD
   tests pass; full fast-mark suite stays green at 81 tests.
 - `.claude/hooks/check_report_sync.py` + `.claude/settings.json` —
   PreToolUse hook on Bash that fires on `git commit` and surfaces

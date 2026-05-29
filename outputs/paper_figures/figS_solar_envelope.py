@@ -56,20 +56,12 @@ from fig_style import (  # noqa: E402
     save_fig,
 )
 
-
 VMAX_HOURS = 12.0  # shared colour ceiling so panels are directly comparable
 CMAP = "YlOrRd_r"  # legacy palette (reversed): deep red (0 h) → orange → pale yellow (12 h)
 
 
 def _load(site: str) -> gpd.GeoDataFrame:
-    path = (
-        PROJECT_ROOT
-        / "outputs"
-        / site
-        / "morphometrics"
-        / "svf"
-        / "svf_streets_solar.gpkg"
-    )
+    path = PROJECT_ROOT / "outputs" / site / "morphometrics" / "svf" / "svf_streets_solar.gpkg"
     if not path.exists():
         raise FileNotFoundError(
             f"Solar gpkg missing for {site!r}: {path}\n"
@@ -199,9 +191,21 @@ def render_envelope(
         }
 
     panels = [
-        ("solar_hours_winter", "(a) winter solstice — 21 Jun (worst case)", standalone_stems["winter"]),
-        ("solar_hours_annual", "(b) annual proxy — mean of 4 ref. dates",   standalone_stems["annual"]),
-        ("solar_hours_summer", "(c) summer solstice — 21 Dec (best case)",   standalone_stems["summer"]),
+        (
+            "solar_hours_winter",
+            "(a) winter solstice — 21 Jun (worst case)",
+            standalone_stems["winter"],
+        ),
+        (
+            "solar_hours_annual",
+            "(b) annual proxy — mean of 4 ref. dates",
+            standalone_stems["annual"],
+        ),
+        (
+            "solar_hours_summer",
+            "(c) summer solstice — 21 Dec (best case)",
+            standalone_stems["summer"],
+        ),
     ]
 
     if save_standalones:

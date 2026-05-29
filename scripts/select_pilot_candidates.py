@@ -33,7 +33,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -56,9 +55,7 @@ RUNG_FILTERS = {
     0: lambda r: (r["slope_deg"] < 5.0) and (r["sigma_h"] < 1.5),
     1: lambda r: (r["slope_deg"] >= 5.0) and (r["lambda_p"] < 0.20),
     2: lambda r: (
-        6.0 <= r["slope_deg"] < 12.0
-        and 0.20 <= r["lambda_p"] <= 0.35
-        and r["sigma_h"] < 1.5
+        6.0 <= r["slope_deg"] < 12.0 and 0.20 <= r["lambda_p"] <= 0.35 and r["sigma_h"] < 1.5
     ),
 }
 
@@ -66,7 +63,14 @@ RUNG_FILTERS = {
 def _load_campaign() -> pd.DataFrame:
     parts = []
     for site in SITES:
-        path = PROJECT_ROOT / "outputs" / site / "sampling_cfd" / "campaign_sampling" / "campaign_patches.csv"
+        path = (
+            PROJECT_ROOT
+            / "outputs"
+            / site
+            / "sampling_cfd"
+            / "campaign_sampling"
+            / "campaign_patches.csv"
+        )
         df = pd.read_csv(path)
         df.insert(0, "site", site)
         parts.append(df)
@@ -122,12 +126,24 @@ def main() -> int:
     out["original_pick"] = out["patch_id"].isin(ORIGINAL_PICKS)
 
     cols = [
-        "rung", "rank_within_rung", "recommended", "original_pick",
-        "site", "patch_id", "stratum_id",
-        "slope_deg", "lambda_p", "lambda_p_patch", "sigma_h",
-        "H_mean", "H_max_analysis",
-        "domain_lateral_m", "domain_blockage_ratio", "source_data_required_m",
-        "eligible", "distance",
+        "rung",
+        "rank_within_rung",
+        "recommended",
+        "original_pick",
+        "site",
+        "patch_id",
+        "stratum_id",
+        "slope_deg",
+        "lambda_p",
+        "lambda_p_patch",
+        "sigma_h",
+        "H_mean",
+        "H_max_analysis",
+        "domain_lateral_m",
+        "domain_blockage_ratio",
+        "source_data_required_m",
+        "eligible",
+        "distance",
     ]
     cols = [c for c in cols if c in out.columns]
     out = out[cols]
@@ -146,7 +162,7 @@ def main() -> int:
         else:
             for _, r in rows.iterrows():
                 print(
-                    f"    {pid}: rung {int(r['rung'])} rank {int(r['rank_within_rung'])}/{len(out[out['rung']==r['rung']])}"
+                    f"    {pid}: rung {int(r['rung'])} rank {int(r['rank_within_rung'])}/{len(out[out['rung'] == r['rung']])}"
                     f"  slope={r['slope_deg']:.2f}°  λp={r['lambda_p']:.3f}  σh={r['sigma_h']:.3f}"
                 )
     return 0
