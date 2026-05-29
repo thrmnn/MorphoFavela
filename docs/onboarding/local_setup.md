@@ -164,11 +164,10 @@ quirks bite:
 3. **Column names are accent-bearing** — `direção_horaria`, not
    `direcao_horaria`. Read with `encoding='latin-1'`.
 
-The `wind-ingestion` agent (under `.claude/agents/`) encodes all three
-quirks; for any new station, invoke it rather than re-implementing.
+`scripts/build_wind_rose.py` (via `extract_inmet_stations.py`) already
+handles all three quirks; reuse it rather than re-implementing.
 
 ## When in doubt
 
 - File a GitHub issue with: `python -V`, OS + version, conda vs venv, the full traceback, and what you tried.
 - Check `data/{site}/PROVENANCE.md` (when present) — many "bugs" are upstream raster gaps documented there.
-- The four project subagents under `.claude/agents/` (read-only validators) catch most contract violations before they show up as cryptic runtime errors. Run them when you're stuck.

@@ -12,8 +12,7 @@ only the figure scripts and tracked exports so they travel with the code.
 > `outputs/paper_figures/` is the *technical-report + presentations* track.
 > The two serve different audiences (peer review vs. internal stakeholders)
 > and different standards (journal style vs. project narrative). Do not
-> mix them — see `.claude/projects/-home-theo-MorphoFavela/memory/` for the
-> convention rule. Final paper writing/layout is out of scope for this
+> mix them. Final paper writing/layout is out of scope for this
 > repo; this directory only produces *figure candidates*.
 
 Each script is standalone and reads from `data/` and `outputs/` like every

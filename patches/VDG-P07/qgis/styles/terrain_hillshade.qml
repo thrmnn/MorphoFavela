@@ -1,1 +1,0 @@
-<!DOCTYPE qgis><qgis version="3.28.0"><pipe><rasterrenderer type="singlebandgray" band="1" opacity="0.55" gradient="BlackToWhite"/><brightnesscontrast/><huesaturation/><rasterresampler/></pipe></qgis>

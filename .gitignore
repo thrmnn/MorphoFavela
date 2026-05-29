@@ -44,12 +44,9 @@ slurm-*.out
 *.o[0-9]*
 *.e[0-9]*
 
-# Claude Code: ignore session data + per-user local settings.
-# Track project-shared assets: subagents, hooks, project settings.json.
-.claude/*
-!.claude/agents/
-!.claude/hooks/
-!.claude/settings.json
+# Claude Code: local AI-assistant config, not part of the public release.
+.claude/
+CLAUDE.md
 
 # IDE
 .vscode/
@@ -69,3 +66,14 @@ vendor/
 
 # gstack /retro session data — local-only retrospective snapshots
 .context/
+
+# CFD patch input dossiers — raw geodata + exact coordinates, not for
+# public release (restricted/on-request; see README "Data availability").
+patches/
+
+# Internal engineering-process docs — kept local, excluded from release.
+docs/PRODUCTION_READINESS_PLAN.md
+docs/onboarding/engineering_review.md
+
+# Tests for the local Claude hook (AI tooling, not shipped).
+tests/test_hooks/

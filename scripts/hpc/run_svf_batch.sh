@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=ivf-svf
+#SBATCH --job-name=mf-svf
 #SBATCH --output=logs/svf_%j.out
 #SBATCH --error=logs/svf_%j.err
 #SBATCH --time=12:00:00
@@ -30,7 +30,7 @@ mkdir -p logs
 source /etc/profile.d/modules.sh 2>/dev/null || source /usr/share/modules/init/bash 2>/dev/null || true
 module load miniforge/25.11.0-0
 eval "$(conda shell.bash hook)"
-conda activate ivf
+conda activate morphofavela
 
 set -euo pipefail
 

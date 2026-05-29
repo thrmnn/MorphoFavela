@@ -5,7 +5,7 @@
 set -e
 
 # Source conda environment
-source /home/theo/miniconda3/etc/profile.d/conda.sh
+source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate morphofavela
 
 # Data paths

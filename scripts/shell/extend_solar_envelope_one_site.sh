@@ -16,7 +16,7 @@ if [[ -z "${SITE}" ]]; then
     exit 2
 fi
 
-cd /home/theo/MorphoFavela
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 echo "============================================================"
 echo "  EXTEND SOLAR ENVELOPE — site=${SITE}"

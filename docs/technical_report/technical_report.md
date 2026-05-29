@@ -7,14 +7,12 @@
 | **Document version** | TR v1.0 (pre-CFD phase) |
 | **Pipeline version** | v5.5 (May 2026 milestone — ROADMAP.md) |
 | **Build date** | 2026-05-03 |
-| **Last numerical sweep** | [`904040e`](https://github.com/thrmnn/MorphoFavela/commit/904040e) (2026-05-03 — see `.claude/agents/numerical-claims-auditor.md`) |
+| **Last numerical sweep** | [`904040e`](https://github.com/thrmnn/MorphoFavela/commit/904040e) (2026-05-03) |
 | **Author** | Theo Hermann · MIT · `thermann.ai@gmail.com` |
 | **Repository** | https://github.com/thrmnn/MorphoFavela |
 | **License** | MIT (code) · CC-BY-4.0 (this report) |
 | **Audience** | Engineering reviewers; researchers reproducing or extending the pipeline; CFD team consuming the patch contract. *Not* a journal manuscript — that lives separately and cites this report. |
 
-For the **fastest engineering review path**, see
-[`docs/onboarding/engineering_review.md`](../onboarding/engineering_review.md).
 For terminology, see **§0 Glossary** below; for reproducibility, see
 **§12 Reproducibility**; for failure modes and observability, see
 **§13 Failure modes**.
@@ -181,8 +179,7 @@ near Sugarloaf; Maré and Complexo do Alemão are in the flat north-zone
 bayside plain; Rio das Pedras is in the west-zone plain.
 
 Cidade de Deus was initially considered but excluded from the CFD campaign
-due to a documented building-data defect (see
-`.claude/…/memory/project_cdd_data_bug.md`); its SVF values saturated at
+due to a building-data defect: its SVF values saturated at
 ≈ 0.90, indicating missing building footprints in the computational scene.
 
 ---
@@ -1393,7 +1390,7 @@ tested but has not yet processed real simulation data. Any
 assumptions about sample-point density, column naming quirks, or
 edge cases in OpenFOAM output will only surface at first ingestion.
 The first pilot patch (VDG-P07) is in flight; running the test
-suite plus `cfd-results-ingestor` agent against the returned
+suite plus the `cfd-results-ingestor` validation against the returned
 results will catch most issues.
 
 ### 10.3 SVF cross-validation against UMEP
@@ -1627,9 +1624,9 @@ cp outputs/paper_figures/exports/figXX_*.png docs/technical_report/figures/
 python docs/technical_report/build_pdf.py
 ```
 
-The pre-commit hook (`.claude/hooks/check_report_sync.py`) blocks
-commits that stage `technical_report.md` without `technical_report.pdf`,
-or vice versa.
+By convention the PDF is rebuilt in the same commit as any
+`technical_report.md` edit; a stale PDF is treated as a review failure,
+because external readers trust the rendered artefact.
 
 **Known orphans:** four pilot-summary figures
 (`fig_all_sites_patches`, `fig_candidate_pool`,
@@ -1672,38 +1669,37 @@ the validators surface drift before it ships.
 
 | Stage | Producer | Success signal | Failure signal | Validator |
 |---|---|---|---|---|
-| Site onboarding | `data/<site>/` per `data/README.md` contract | All required files present; CRS = EPSG:31983; `wind_rose.json` quality_flag = "measured" | Missing files; mixed CRS; placeholder wind rose | `data-contract-checker` agent |
-| Building extension | `scripts/build_extended_context.py --buffer 700` | `data/<site>/buildings_extended_700m.gpkg` and matching DTM written; building count > site-only count | Empty geometry; CRS mismatch; sentinel pixels (−9999) survive into the merged DTM | `data-contract-checker` agent |
+| Site onboarding | `data/<site>/` per `data/README.md` contract | All required files present; CRS = EPSG:31983; `wind_rose.json` quality_flag = "measured" | Missing files; mixed CRS; placeholder wind rose | `data-contract-checker` |
+| Building extension | `scripts/build_extended_context.py --buffer 700` | `data/<site>/buildings_extended_700m.gpkg` and matching DTM written; building count > site-only count | Empty geometry; CRS mismatch; sentinel pixels (−9999) survive into the merged DTM | `data-contract-checker` |
 | Rectangular-domain audit | `scripts/audit_rectangular_domain.py` then `scripts/migrate_indicators_rectangular_v1.py --apply` | `outputs/comparative/cfd_methodology/audit_v1.csv` written with 119 rows, all `eligible = true`; both `campaign_patches.csv` and `per_patch_indicators.csv` carry the new `domain_*_m` columns | Any `eligible = false` row; mismatch between audit row count and campaign size; `blocken_radius_required` column survives migration | n/a — `audit_v1_pivot.csv` per-stratum table |
 | Morphometric grid | `scripts/run_morphometric_audit.py` | `grid_metrics.gpkg` written with all 20+ columns; `svf_count > 0` for every eligible cell; per-site PDF report rendered | NaN-heavy SVF column (passageway sampler failed); cells with `svf_count = 0` returning NaN; report_render fails on missing inputs | n/a — review the per-site PDF |
-| Pilot sampling | `scripts/run_pilot_sampling.py` | 12–15 patches per site; ≥ 1 patch per non-empty stratum; min spacing ≥ 80 m | Stratum coverage gap; min spacing < 80 m; eligibility filter rejects > 95 % of cells | `sampling-auditor` agent |
-| Campaign sampling | `scripts/run_campaign_sampling.py` | 22–25 patches per site; SVF-priority weighting reflected in stratum totals; `eligible = true` in every row of `audit_v1.csv` after the rectangular-domain audit | Spacing collision; stratum over- or under-allocation; `eligible = false` rows in audit output | `sampling-auditor` agent |
-| Wind rose ingestion | `scripts/build_wind_rose.py` | `wind_rose.json` with `quality_flag: "measured"`, `n_records ≥ 60,000`, full 8-direction frequency vector | quality_flag "placeholder-prior" (climatological prior never replaced); INMET date-format break post-2019 (silent zero rows) | `wind-ingestion` agent |
-| CFD ingestion | (CFD repo at `~/Airflow` writes; `src/cfd_integration/` reads) | All 8 wind directions present per patch; `sample_points.csv` rows ≥ 10 k; `summary.json` valid | Missing direction; off-axis directory name (e.g. `wind_017/`); column drift in CSV; `\|U_mag − √(U²+V²+W²)\| > 0.01` | `cfd-results-ingestor` agent (auto-detects MorphoFavela-native CSV vs Airflow-native parquet layouts) |
+| Pilot sampling | `scripts/run_pilot_sampling.py` | 12–15 patches per site; ≥ 1 patch per non-empty stratum; min spacing ≥ 80 m | Stratum coverage gap; min spacing < 80 m; eligibility filter rejects > 95 % of cells | `sampling-auditor` |
+| Campaign sampling | `scripts/run_campaign_sampling.py` | 22–25 patches per site; SVF-priority weighting reflected in stratum totals; `eligible = true` in every row of `audit_v1.csv` after the rectangular-domain audit | Spacing collision; stratum over- or under-allocation; `eligible = false` rows in audit output | `sampling-auditor` |
+| Wind rose ingestion | `scripts/build_wind_rose.py` | `wind_rose.json` with `quality_flag: "measured"`, `n_records ≥ 60,000`, full 8-direction frequency vector | quality_flag "placeholder-prior" (climatological prior never replaced); INMET date-format break post-2019 (silent zero rows) | `wind-ingestion` |
+| CFD ingestion | (CFD repo at `~/Airflow` writes; `src/cfd_integration/` reads) | All 8 wind directions present per patch; `sample_points.csv` rows ≥ 10 k; `summary.json` valid | Missing direction; off-axis directory name (e.g. `wind_017/`); column drift in CSV; `\|U_mag − √(U²+V²+W²)\| > 0.01` | `cfd-results-ingestor` (auto-detects MorphoFavela-native CSV vs Airflow-native parquet layouts) |
 | Annualised aggregation | `scripts/analyze_cfd_results.py` | Per-site `outputs/<site>/cfd_analysis/per_patch_indicators.csv`, `grid_with_cfd.gpkg`; covered cells in 350–410 range per site (synthetic baseline) | Coverage anomaly (cells well outside 350–410); regression sign flips; weighting falls back to uniform when wind rose missing | n/a — verify against synthetic baseline |
 | Report drift | `docs/technical_report/technical_report.md` | Numerical claims trace to source; cross-references resolve; PDF rebuilt | Prose drift from data (the §6.5-class bug); `.md` ↔ `.pdf` desync; figure copy missing | `report-sync-auditor` (commit-time) + `numerical-claims-auditor` (pre-review) |
 
 ### 13.2 The four validators
 
-Read-only project subagents under `.claude/agents/` — invoke before
-shipping. Each returns a structured punch list; all four can be run in
-parallel.
+Read-only validation checks the project runs before shipping. Each
+returns a structured punch list and is independent of the others.
 
 - **`data-contract-checker`** — site-level contract per `data/README.md`. Flags missing files, CRS drift, wind-rose placeholder.
 - **`sampling-auditor`** — 12-strata coverage, 80 m spacing, per-patch integrity, Blocken margin. Surfaces `docs/cfd_sampling_overrides.yaml` documented gaps as WARN, not FAIL.
 - **`report-sync-auditor`** — pipeline / figure / sampling change in a diff that didn't update the technical report. Runs against `working`, `staged`, or any git ref range.
 - **`numerical-claims-auditor`** — extracts every numerical claim from `technical_report.md` and verifies against source files. Targets the §6.5-class prose-drift bug. Run before sending the TR for external review.
 
-### 13.3 Pre-commit hook
+### 13.3 Commit-time report-sync discipline
 
-`.claude/hooks/check_report_sync.py`:
+Three rules keep the report, its rendered PDF, and the code in step:
 
-- **Blocks** a commit that stages `technical_report.md` without `technical_report.pdf` (or vice versa).
-- **Warns** when a figure under `docs/technical_report/figures/` is staged without a `technical_report.md` change.
-- **Warns** on `feat:` / `fix:` commits touching `src/` or `scripts/` without staging a corresponding `tests/` file.
+- A commit that changes `technical_report.md` **must** also rebuild and stage `technical_report.pdf` (and vice versa).
+- A figure staged under `docs/technical_report/figures/` should accompany a `technical_report.md` change.
+- A `feat:` / `fix:` commit touching `src/` or `scripts/` should stage a corresponding `tests/` file.
 
-The blocking rule is intentional: a stale PDF is strictly worse than no
-PDF, because external readers trust the rendered artefact.
+The first rule is the strict one: a stale PDF is worse than no PDF,
+because external readers trust the rendered artefact.
 
 ### 13.4 Common failure patterns and where they were caught
 

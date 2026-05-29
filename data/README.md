@@ -118,10 +118,8 @@ python scripts/build_wind_rose.py --site maré --asos-csv data/asos/SBGL_2015_20
 ## Manual steps that are *not* in scripts
 
 A small number of inputs are clipped by hand in QGIS rather than via
-the pipeline. This is deliberate (see
-`.claude/projects/-home-theo-MorphoFavela/memory/feedback_dtm_workflow.md`) —
-the trade-off between automation cost and how rarely these are
-re-cut favoured manual.
+the pipeline. This is deliberate — the trade-off between automation
+cost and how rarely these are re-cut favoured a manual step.
 
 - **DTM clipping per site** — open the city-wide DTM in QGIS, clip
   to favela + 300 m buffer, export as `data/{site}/dtm_extended_300m.tif`.

@@ -20,6 +20,8 @@ import rasterio
 from rasterio.mask import mask
 from shapely.ops import unary_union
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 
 def normalize_text(value: str) -> str:
     """Normalize text for accent-insensitive matching."""
@@ -272,12 +274,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--data-rj-dir",
-        default="/home/theo/MorphoFavela/data/RJ",
+        default=str(PROJECT_ROOT / "data" / "RJ"),
         help="Directory containing city-wide RJ shapefiles",
     )
     parser.add_argument(
         "--output-base-dir",
-        default="/home/theo/MorphoFavela/data",
+        default=str(PROJECT_ROOT / "data"),
         help="Base directory for output area folders",
     )
     parser.add_argument(
