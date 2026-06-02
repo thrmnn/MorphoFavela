@@ -223,6 +223,47 @@ class TestComputeFrontalAreaRatio:
         r90 = compute_frontal_area_ratio(four_buildings, single_zone, wind_dir=90.0)
         assert math.isclose(r0.loc[0, "lambda_f"], r90.loc[0, "lambda_f"], rel_tol=1e-6)
 
+    def test_clipping_caps_lambda_f_below_unclipped(self) -> None:
+        """Regression: clipped λf must be ≤ unclipped λf, cell by cell.
+
+        Setup: a 30 m × 30 m building (height 9 m) straddling two 10 m square
+        cells. Unclipped, the building contributes its full 30 m projected
+        width to both cells, giving λf = 30·9 / 100 = 2.70 each. Clipped, only
+        the 10 m slice inside each cell counts, giving λf = 10·9 / 100 = 0.9.
+        """
+        from shapely.geometry import Polygon, box
+
+        cell_a = box(0, 0, 10, 10)
+        cell_b = box(10, 0, 20, 10)
+        zones = gpd.GeoDataFrame(
+            {"zone_id": [0, 1], "geometry": [cell_a, cell_b]}, crs="EPSG:31983"
+        )
+        zones["zone_area"] = zones.geometry.area
+
+        building = Polygon([(0, 0), (30, 0), (30, 10), (0, 10)])
+        buildings = gpd.GeoDataFrame(
+            {"height": [9.0], "geometry": [building]}, crs="EPSG:31983"
+        )
+
+        # wind_dir=0 (north): perpendicular = x-axis, so the 30 m-wide
+        # building projects its full 30 m unclipped, 10 m once clipped.
+        unclipped = compute_frontal_area_ratio(
+            buildings, zones, wind_dir=0.0, clip_to_zone=False
+        )
+        clipped = compute_frontal_area_ratio(
+            buildings, zones, wind_dir=0.0, clip_to_zone=True
+        )
+
+        for zid in [0, 1]:
+            u = unclipped.loc[unclipped.zone_id == zid, "lambda_f"].iloc[0]
+            c = clipped.loc[clipped.zone_id == zid, "lambda_f"].iloc[0]
+            assert c <= u + 1e-9, (
+                f"Clipped λf={c} exceeds unclipped λf={u} in cell {zid}"
+            )
+        # Numerical sanity: clipped λf at each cell should sit in canonical band.
+        assert all(clipped["lambda_f"] <= 1.5), clipped["lambda_f"].tolist()
+        assert all(unclipped["lambda_f"] > 1.5), unclipped["lambda_f"].tolist()
+
 
 @pytest.mark.fast
 class TestComputeZoneMetrics:

@@ -15,29 +15,34 @@ to be replaced by the CFD-derived ACH when the campaign completes.
 Output:
     outputs/vidigal/paper_figures/fig_vidigal_diagnostic_map.png
 """
-
 from __future__ import annotations
 
+import argparse
+import sys
 from pathlib import Path
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import patches as mpatches
-from matplotlib.colors import BoundaryNorm, ListedColormap
+from matplotlib.colors import ListedColormap, BoundaryNorm
 from scipy.spatial import cKDTree
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+from src.viz import presentation_style as ps  # noqa: E402
+
 SITE = "vidigal"
 
 GRID_PATH = PROJECT_ROOT / "outputs" / SITE / "morphometrics" / "grid" / "grid_metrics.gpkg"
 SOLAR_PATH = PROJECT_ROOT / "outputs" / SITE / "morphometrics" / "svf" / "svf_streets_solar.gpkg"
 BLDG_PATH = PROJECT_ROOT / "data" / SITE / "buildings_extended_300m.gpkg"
-OUT_DIR = PROJECT_ROOT / "outputs" / SITE / "paper_figures"
-OUT_PNG = OUT_DIR / "fig_vidigal_diagnostic_map.png"
+PAPER_OUT_DIR = PROJECT_ROOT / "outputs" / SITE / "paper_figures"
+PRESENTATION_OUT_DIR = PROJECT_ROOT / "outputs" / SITE / "presentation_figures"
+OUT_FILENAME = "fig_vidigal_diagnostic_map.png"
 
-THRESHOLD_SUN_HRS = 2.0  # WHO winter direct-sun floor.
-THRESHOLD_LAMBDA_F = 0.35  # Skimming-flow regime (Grimmond & Oke 1999).
+THRESHOLD_SUN_HRS = 2.0      # WHO winter direct-sun floor.
+THRESHOLD_LAMBDA_F = 0.35    # Skimming-flow regime (Grimmond & Oke 1999).
 
 STATE_ADEQUATE = 0
 STATE_SUN_ONLY = 1
@@ -104,7 +109,7 @@ def classify(grid: gpd.GeoDataFrame) -> np.ndarray:
     return state
 
 
-def render(grid: gpd.GeoDataFrame, state: np.ndarray) -> None:
+def render(grid: gpd.GeoDataFrame, state: np.ndarray, preset: str = "paper") -> None:
     fig, ax = plt.subplots(figsize=(12, 6.0), facecolor="white")
     ax.set_facecolor("white")
 
@@ -115,12 +120,8 @@ def render(grid: gpd.GeoDataFrame, state: np.ndarray) -> None:
     grid_to_plot["state"] = state
     classified = grid_to_plot[grid_to_plot["state"] != STATE_NODATA]
     classified.plot(
-        ax=ax,
-        column="state",
-        cmap=cmap,
-        norm=norm,
-        edgecolor="#FFFFFF",
-        linewidth=0.12,
+        ax=ax, column="state", cmap=cmap, norm=norm,
+        edgecolor="#FFFFFF", linewidth=0.12,
     )
 
     if BLDG_PATH.exists():
@@ -134,106 +135,87 @@ def render(grid: gpd.GeoDataFrame, state: np.ndarray) -> None:
     ax.set_xlim(bbox[0] - pad, bbox[2] + pad)
     ax.set_ylim(bbox[1] - pad, bbox[3] + pad)
     ax.set_aspect("equal")
-    ax.set_xticks([])
-    ax.set_yticks([])
-    for spine in ax.spines.values():
-        spine.set_visible(False)
+    if preset == "presentation":
+        ps.apply_to_map_axes(ax)
+    else:
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
 
     counts = {s: int((state == s).sum()) for s in range(5)}
-    total_known = sum(
-        counts[s] for s in (STATE_ADEQUATE, STATE_SUN_ONLY, STATE_VENT_ONLY, STATE_COMPOUND)
-    )
+    total_known = sum(counts[s] for s in (STATE_ADEQUATE, STATE_SUN_ONLY,
+                                          STATE_VENT_ONLY, STATE_COMPOUND))
     legend_handles = []
     for s in (STATE_ADEQUATE, STATE_SUN_ONLY, STATE_VENT_ONLY, STATE_COMPOUND):
         share = counts[s] / total_known if total_known else 0.0
-        label = f"{STATE_LABELS[s]}  —  {share * 100:.0f}%"
-        legend_handles.append(
-            mpatches.Patch(
-                facecolor=STATE_COLORS[s],
-                edgecolor="#555555",
-                linewidth=0.6,
-                label=label,
-            )
-        )
+        label = f"{STATE_LABELS[s]}  —  {share*100:.0f}%"
+        legend_handles.append(mpatches.Patch(
+            facecolor=STATE_COLORS[s], edgecolor="#555555", linewidth=0.6,
+            label=label,
+        ))
+    legend_fs = 13 if preset == "presentation" else 10
     leg = ax.legend(
-        handles=legend_handles,
-        loc="lower left",
-        frameon=False,
-        bbox_to_anchor=(0.0, -0.12),
-        fontsize=10,
-        handlelength=1.6,
-        handleheight=1.0,
-        borderpad=0.4,
-        labelspacing=0.6,
-        ncol=2,
+        handles=legend_handles, loc="lower left", frameon=False,
+        bbox_to_anchor=(0.0, -0.12), fontsize=legend_fs, handlelength=1.6,
+        handleheight=1.0, borderpad=0.4, labelspacing=0.6, ncol=2,
         columnspacing=2.0,
     )
     for txt in leg.get_texts():
         txt.set_color("#222222")
 
-    ax.text(
-        0.01,
-        1.02,
-        "VIDIGAL  ·  diagnostic map (pre-CFD; geometric λf proxy for ventilation)",
-        transform=ax.transAxes,
-        fontsize=9.5,
-        color="#666666",
-        ha="left",
-        va="bottom",
-    )
-
-    bar_y = 0.02
-    bar_x0 = 0.78
-    scale_m = 100
-    bbox = grid.total_bounds
-    span = bbox[2] - bbox[0]
-    bar_w = scale_m / span * (1 - 0.02)
-    ax.add_patch(
-        mpatches.Rectangle(
-            (bar_x0, bar_y),
-            bar_w,
-            0.008,
-            transform=ax.transAxes,
-            color="#222222",
+    if preset != "presentation":
+        ax.text(
+            0.01, 1.02,
+            "VIDIGAL  ·  diagnostic map (pre-CFD; geometric λf proxy for ventilation)",
+            transform=ax.transAxes, fontsize=9.5, color="#666666",
+            ha="left", va="bottom",
         )
-    )
-    ax.text(
-        bar_x0 + bar_w / 2,
-        bar_y + 0.018,
-        f"{scale_m} m",
-        transform=ax.transAxes,
-        fontsize=8.5,
-        color="#444444",
-        ha="center",
-        va="bottom",
-    )
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    plt.savefig(OUT_PNG, dpi=300, bbox_inches="tight", facecolor="white")
+    if preset == "presentation":
+        ps.add_scale_bar(ax, 100.0, loc="lower right")
+    else:
+        bar_y = 0.02
+        bar_x0 = 0.78
+        scale_m = 100
+        bbox_data = grid.total_bounds
+        span = bbox_data[2] - bbox_data[0]
+        bar_w = scale_m / span * (1 - 0.02)
+        ax.add_patch(mpatches.Rectangle(
+            (bar_x0, bar_y), bar_w, 0.008,
+            transform=ax.transAxes, color="#222222",
+        ))
+        ax.text(
+            bar_x0 + bar_w / 2, bar_y + 0.018,
+            f"{scale_m} m", transform=ax.transAxes,
+            fontsize=8.5, color="#444444", ha="center", va="bottom",
+        )
+
+    out_dir = PRESENTATION_OUT_DIR if preset == "presentation" else PAPER_OUT_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_png = out_dir / OUT_FILENAME
+    plt.savefig(out_png, dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
 
-    print(f"\nwrote {OUT_PNG}")
+    print(f"\nwrote {out_png}")
     print(f"n cells: {len(grid)}")
-    print(
-        f"  adequate:        {counts[STATE_ADEQUATE]:5d}  ({counts[STATE_ADEQUATE] / total_known * 100:5.1f}%)"
-    )
-    print(
-        f"  sun-fail only:   {counts[STATE_SUN_ONLY]:5d}  ({counts[STATE_SUN_ONLY] / total_known * 100:5.1f}%)"
-    )
-    print(
-        f"  vent-fail only:  {counts[STATE_VENT_ONLY]:5d}  ({counts[STATE_VENT_ONLY] / total_known * 100:5.1f}%)"
-    )
-    print(
-        f"  compound-fail:   {counts[STATE_COMPOUND]:5d}  ({counts[STATE_COMPOUND] / total_known * 100:5.1f}%)"
-    )
+    print(f"  adequate:        {counts[STATE_ADEQUATE]:5d}  ({counts[STATE_ADEQUATE]/total_known*100:5.1f}%)")
+    print(f"  sun-fail only:   {counts[STATE_SUN_ONLY]:5d}  ({counts[STATE_SUN_ONLY]/total_known*100:5.1f}%)")
+    print(f"  vent-fail only:  {counts[STATE_VENT_ONLY]:5d}  ({counts[STATE_VENT_ONLY]/total_known*100:5.1f}%)")
+    print(f"  compound-fail:   {counts[STATE_COMPOUND]:5d}  ({counts[STATE_COMPOUND]/total_known*100:5.1f}%)")
     print(f"  no data:         {counts[STATE_NODATA]:5d}")
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--preset", choices=("paper", "presentation"), default="paper")
+    args = parser.parse_args()
+
+    ps.apply(args.preset)
     grid = gpd.read_file(GRID_PATH)
     grid = aggregate_solar_to_cells(grid)
     state = classify(grid)
-    render(grid, state)
+    render(grid, state, preset=args.preset)
 
 
 if __name__ == "__main__":

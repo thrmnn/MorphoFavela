@@ -46,7 +46,7 @@ THRESHOLD_LAMBDA_F = 0.35
 FEATURES = [
     "svf",
     "slope_deg",
-    "northness",
+    "southness",
     "eastness",
     "lambda_p",
     "lambda_f_mean",
@@ -56,7 +56,7 @@ FEATURES = [
 FEATURE_LABELS = {
     "svf": "SVF",
     "slope_deg": "slope",
-    "northness": "northness",
+    "southness": "southness",
     "eastness": "eastness",
     "lambda_p": r"$\lambda_p$",
     "lambda_f_mean": r"$\lambda_f$",
@@ -103,7 +103,11 @@ def load_site(site: str) -> pd.DataFrame:
     keep = built & sun_known & vent_known
     g = grid[keep].copy()
     aspect = np.deg2rad(g["aspect_deg"])
-    g["northness"] = np.cos(aspect)
+    # Southern-hemisphere convention: south-facing slopes get less winter sun,
+    # north-facing get more. We expose "southness" = -cos(aspect) so the sign
+    # of the coefficient is intuitive for a northern-hemisphere audience
+    # (higher southness -> higher P(sunlight failure)).
+    g["southness"] = -np.cos(aspect)
     g["eastness"] = np.sin(aspect)
     g["site"] = site
     g["sun_fail"] = (g["solar_hours_winter"] < THRESHOLD_SUN_HRS).astype(int)
@@ -223,7 +227,7 @@ def pooled_logit_with_interactions(df: pd.DataFrame, target: str = "sun_fail") -
 
     feats_std = df[FEATURES].copy()
     feats_std = (feats_std - feats_std.mean()) / feats_std.std()
-    feats_std["slope_x_northness"] = feats_std["slope_deg"] * feats_std["northness"]
+    feats_std["slope_x_southness"] = feats_std["slope_deg"] * feats_std["southness"]
     feats_std["slope_x_svf"] = feats_std["slope_deg"] * feats_std["svf"]
     X = sm.add_constant(feats_std)
     y = df[target].values
@@ -250,7 +254,7 @@ def pooled_logit_with_interactions(df: pd.DataFrame, target: str = "sun_fail") -
             sub = df[df["site"] != held_out]
             fs = sub[FEATURES].copy()
             fs = (fs - fs.mean()) / fs.std()
-            fs["slope_x_northness"] = fs["slope_deg"] * fs["northness"]
+            fs["slope_x_southness"] = fs["slope_deg"] * fs["southness"]
             fs["slope_x_svf"] = fs["slope_deg"] * fs["svf"]
             Xs = sm.add_constant(fs)
             ys = sub[target].values
@@ -325,7 +329,7 @@ def main() -> None:
     logit = pooled_logit_with_interactions(df)
     if "error" not in logit:
         print(f"  pseudo R^2 = {logit['pseudo_r2']:.3f}")
-        for name in ("slope_x_northness", "slope_x_svf", "slope_deg", "northness", "svf"):
+        for name in ("slope_x_southness", "slope_x_svf", "slope_deg", "southness", "svf"):
             if name in logit["coefficients"]:
                 c = logit["coefficients"][name]
                 print(
