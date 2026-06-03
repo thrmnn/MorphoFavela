@@ -127,8 +127,8 @@ pipeline scripts work unchanged.
 | Site (slug) | Buildings (site / extended) | Grid cells | Street SVF | Street solar | Notes |
 |---|---|---|---|---|---|
 | `borel` (Tijuca) | 2 880 / 5 805 | 3 679 | ✅ | ✅ | Steep hillside, z-range 234 m. **N − S winter sun = 6.21 h** (strongest gap of any site) |
-| `jacarezinho` | 7 423 / 11 312 | 4 038 | running | pending | Lowland (z-range 54 m) |
-| `morro_do_juramento` | 3 481 / 5 700 | 2 480 | running | pending | Steepest, z-range 222 m |
+| `jacarezinho` | 7 423 / 11 312 | 4 038 | ✅ | ✅ | Lowland (z-range 54 m). **N − S winter sun = 3.87 h** (N = 4.95, S = 1.07; site-mean winter sun only 1.80 h — heavily sun-deprived overall, 38.8% zero-sun cells) |
+| `morro_do_juramento` | 3 481 / 5 700 | 2 480 | ✅ | ✅ | Steepest, z-range 222 m. **N − S winter sun = 3.56 h** (N = 6.06, S = 2.50; only 71 S-cells — NE-facing morro) |
 
 **Borel aspect-quadrant winter sun (h):** N = 7.95 · E = 3.37 · S = 1.74 · W = 4.70.
 The steepest hillside in the feasible set produces the strongest decoupling
