@@ -126,9 +126,14 @@ pipeline scripts work unchanged.
 
 | Site (slug) | Buildings (site / extended) | Grid cells | Street SVF | Street solar | Notes |
 |---|---|---|---|---|---|
-| `borel` (Tijuca) | 2 880 / 5 805 | 3 679 | ✅ | running | Steep hillside, z-range 234 m |
+| `borel` (Tijuca) | 2 880 / 5 805 | 3 679 | ✅ | ✅ | Steep hillside, z-range 234 m. **N − S winter sun = 6.21 h** (strongest gap of any site) |
 | `jacarezinho` | 7 423 / 11 312 | 4 038 | running | pending | Lowland (z-range 54 m) |
 | `morro_do_juramento` | 3 481 / 5 700 | 2 480 | running | pending | Steepest, z-range 222 m |
+
+**Borel aspect-quadrant winter sun (h):** N = 7.95 · E = 3.37 · S = 1.74 · W = 4.70.
+The steepest hillside in the feasible set produces the strongest decoupling
+yet — N over 4× S — which is a strong cross-validation of the Task 2 finding
+on a fresh site beyond the campaign-5.
 
 All three have full corrected `grid_metrics.{csv,gpkg}` (clipped λf
 from Task 1's fix, identical code path).
