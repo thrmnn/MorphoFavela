@@ -9,7 +9,7 @@ Two panels at ~16:9 (3600×2025 px @ 300 DPI ≈ 12.0 × 6.75 in):
 
   (B) RIGHT — Two stacked sub-panels:
         (B-top) SVF partial-dependence curve with the 0.26 inflection marked.
-        (B-bot) Empirical P(sunlight failure) per aspect quadrant (N/E/S/W),
+        (B-bot) Empirical P(sunlight constraint) per aspect quadrant (N/E/S/W),
                 horizontal bar chart, bars sorted descending. South in
                 terracotta accent, others slate. 0.5 reference line.
 
@@ -197,7 +197,7 @@ def panel_svf_pd(ax, stats: dict, pd_curves: dict) -> None:
 
 
 def compute_quadrant_pfail(df: pd.DataFrame) -> list[tuple[str, float, int]]:
-    """Compute empirical P(sunlight failure) per aspect quadrant.
+    """Compute empirical P(sunlight constraint) per aspect quadrant.
 
     Returns list of (label, p_fail, n) tuples sorted descending by p_fail.
     """
@@ -254,7 +254,7 @@ def panel_aspect_quadrants(ax, df: pd.DataFrame) -> None:
     ax.set_xticks([0.0, 0.25, 0.5, 0.75, 1.0])
     ax.set_xticklabels(["0", "0.25", "0.50", "0.75", "1.0"])
     ax.set_xlabel(
-        "P(sunlight failure)  — empirical share per aspect quadrant",
+        "P(sunlight constraint)  — empirical share per aspect quadrant",
         fontsize=FS_AXLABEL, color=INK, labelpad=6,
     )
     ax.tick_params(axis="x", labelsize=FS_TICK, color=INK, length=3, width=0.6)
@@ -304,7 +304,7 @@ def main() -> None:
 
     # Report quadrant numbers to stdout for sanity-checking.
     quads = compute_quadrant_pfail(df)
-    print("Aspect quadrant P(sunlight failure):")
+    print("Aspect quadrant P(sunlight constraint):")
     for label, p, n in quads:
         print(f"  {label}: {p*100:5.1f}%   (n={n:,})")
 

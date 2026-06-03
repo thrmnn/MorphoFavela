@@ -2,7 +2,7 @@
 """Fig 04 — Cross-site diagnostic taxonomy (Nature Cities sizing).
 
 Six-panel composite for the BRISA paper:
-  A–E  Per-site 4-state diagnostic maps (adequate / sun-only / vent-only / compound)
+  A–E  Per-site 4-state diagnostic maps (adequate / sunlight constraint / ventilation constraint / compound constraint)
   F    Typology stacked bar (hillside vs flatland aggregate)
 
 Inputs are the per-site grid + solar layers (same engine as
@@ -36,14 +36,20 @@ HILLSIDE = {"vidigal", "rocinha", "complexo_do_alemao"}
 THRESHOLD_SUN_HRS = 2.0
 THRESHOLD_LAMBDA_F = 0.35
 
-STATE_NAMES = ("adequate", "sun_only", "vent_only", "compound")
-STATE_INT = {"adequate": 0, "sun_only": 1, "vent_only": 2, "compound": 3, "nodata": 4}
+STATE_NAMES = ("adequate", "sunlight_constraint", "ventilation_constraint", "compound_constraint")
+STATE_INT = {
+    "adequate": 0,
+    "sunlight_constraint": 1,
+    "ventilation_constraint": 2,
+    "compound_constraint": 3,
+    "nodata": 4,
+}
 STATE_COLORS = ["#FFFFFF", "#D9D9D9", "#7F7F7F", "#111111", "#F4F0E8"]
 STATE_LEGEND = [
     ("adequate", "adequate (both pass)"),
-    ("sun_only", f"sunlight fail only (<{THRESHOLD_SUN_HRS:.0f} h winter sun)"),
-    ("vent_only", f"ventilation fail only (λ$_f$ > {THRESHOLD_LAMBDA_F:.2f})"),
-    ("compound", "compound failure (both fail)"),
+    ("sunlight_constraint", f"sunlight constraint (<{THRESHOLD_SUN_HRS:.0f} h winter sun)"),
+    ("ventilation_constraint", f"ventilation constraint (λ$_f$ > {THRESHOLD_LAMBDA_F:.2f})"),
+    ("compound_constraint", "compound constraint (both)"),
 ]
 
 
@@ -83,9 +89,9 @@ def classify_int(grid: gpd.GeoDataFrame) -> np.ndarray:
     sun_fail = both & (sun < THRESHOLD_SUN_HRS)
     vent_fail = both & (vent > THRESHOLD_LAMBDA_F)
     state[both & ~sun_fail & ~vent_fail] = STATE_INT["adequate"]
-    state[both & sun_fail & ~vent_fail] = STATE_INT["sun_only"]
-    state[both & ~sun_fail & vent_fail] = STATE_INT["vent_only"]
-    state[both & sun_fail & vent_fail] = STATE_INT["compound"]
+    state[both & sun_fail & ~vent_fail] = STATE_INT["sunlight_constraint"]
+    state[both & ~sun_fail & vent_fail] = STATE_INT["ventilation_constraint"]
+    state[both & sun_fail & vent_fail] = STATE_INT["compound_constraint"]
     return state
 
 
@@ -134,8 +140,8 @@ def draw_site_panel(ax, site: str, grid: gpd.GeoDataFrame, state: np.ndarray, pa
     ax.text(
         0.02,
         0.04,
-        f"compound {shares['compound'] * 100:.0f}% · vent-only {shares['vent_only'] * 100:.0f}% · "
-        f"sun-only {shares['sun_only'] * 100:.1f}% · adeq. {shares['adequate'] * 100:.1f}%",
+        f"compound {shares['compound_constraint'] * 100:.0f}% · vent. {shares['ventilation_constraint'] * 100:.0f}% · "
+        f"sun. {shares['sunlight_constraint'] * 100:.1f}% · adeq. {shares['adequate'] * 100:.1f}%",
         transform=ax.transAxes,
         fontsize=5.0,
         color="#444444",
@@ -163,9 +169,9 @@ def draw_typology_panel(ax, per_site: dict[str, dict]) -> None:
     bottoms = np.zeros(len(rows))
     colors_for_states = {
         "adequate": "#FFFFFF",
-        "sun_only": "#D9D9D9",
-        "vent_only": "#7F7F7F",
-        "compound": "#111111",
+        "sunlight_constraint": "#D9D9D9",
+        "ventilation_constraint": "#7F7F7F",
+        "compound_constraint": "#111111",
     }
     edge = "#444444"
     for k, _ in STATE_LEGEND:
@@ -181,7 +187,7 @@ def draw_typology_panel(ax, per_site: dict[str, dict]) -> None:
         )
         for i, v in enumerate(vals):
             if v >= 4:
-                text_color = "#FFFFFF" if k == "compound" else "#222222"
+                text_color = "#FFFFFF" if k == "compound_constraint" else "#222222"
                 ax.text(
                     bottoms[i] + v / 2,
                     i,
@@ -209,9 +215,9 @@ def draw_shared_legend(fig) -> None:
     for key, label in STATE_LEGEND:
         color = {
             "adequate": "#FFFFFF",
-            "sun_only": "#D9D9D9",
-            "vent_only": "#7F7F7F",
-            "compound": "#111111",
+            "sunlight_constraint": "#D9D9D9",
+            "ventilation_constraint": "#7F7F7F",
+            "compound_constraint": "#111111",
         }[key]
         handles.append(
             mpatches.Patch(facecolor=color, edgecolor="#444444", linewidth=0.6, label=label)
@@ -255,7 +261,7 @@ def main() -> None:
         n = int(
             sum(
                 (state == STATE_INT[k]).sum()
-                for k in ("adequate", "sun_only", "vent_only", "compound")
+                for k in ("adequate", "sunlight_constraint", "ventilation_constraint", "compound_constraint")
             )
         )
         per_site[site] = {"shares": shares, "n": n}

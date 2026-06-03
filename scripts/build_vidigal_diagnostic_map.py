@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Build the Vidigal partial-failure diagnostic map for the BRISA paper.
+"""Build the Vidigal partial-constraint diagnostic map for the BRISA paper.
 
 Four-state map at 10 m grid resolution:
-    - adequate         (both thresholds pass)
-    - sun-fail only    (winter direct sun < 2 h)
-    - vent-fail only   (lambda_f > 0.35, skimming-flow proxy)
-    - compound-fail    (both fail)
+    - adequate                (both thresholds pass)
+    - sunlight constraint     (winter direct sun < 2 h)
+    - ventilation constraint  (lambda_f > 0.35, skimming-flow proxy)
+    - compound constraint     (both)
 
 Sunlight signal is real (ray-cast winter solstice solar hours per street
 observation point, median-aggregated to grid cells). Ventilation signal is
@@ -53,9 +53,9 @@ STATE_NODATA = 4
 STATE_COLORS = ["#FFFFFF", "#D9D9D9", "#7F7F7F", "#E76F51", "#F4F0E8"]
 STATE_LABELS = [
     "adequate (both thresholds pass)",
-    f"sunlight fail only (winter sun < {THRESHOLD_SUN_HRS:.0f} h)",
-    f"ventilation fail only (λf > {THRESHOLD_LAMBDA_F:.2f})",
-    "compound failure (both fail)",
+    f"sunlight constraint (winter sun < {THRESHOLD_SUN_HRS:.0f} h)",
+    f"ventilation constraint (λf > {THRESHOLD_LAMBDA_F:.2f})",
+    "compound constraint (both)",
     "no data",
 ]
 
@@ -200,9 +200,9 @@ def render(grid: gpd.GeoDataFrame, state: np.ndarray, preset: str = "paper") -> 
     print(f"\nwrote {out_png}")
     print(f"n cells: {len(grid)}")
     print(f"  adequate:        {counts[STATE_ADEQUATE]:5d}  ({counts[STATE_ADEQUATE]/total_known*100:5.1f}%)")
-    print(f"  sun-fail only:   {counts[STATE_SUN_ONLY]:5d}  ({counts[STATE_SUN_ONLY]/total_known*100:5.1f}%)")
-    print(f"  vent-fail only:  {counts[STATE_VENT_ONLY]:5d}  ({counts[STATE_VENT_ONLY]/total_known*100:5.1f}%)")
-    print(f"  compound-fail:   {counts[STATE_COMPOUND]:5d}  ({counts[STATE_COMPOUND]/total_known*100:5.1f}%)")
+    print(f"  sunlight constraint:     {counts[STATE_SUN_ONLY]:5d}  ({counts[STATE_SUN_ONLY]/total_known*100:5.1f}%)")
+    print(f"  ventilation constraint:  {counts[STATE_VENT_ONLY]:5d}  ({counts[STATE_VENT_ONLY]/total_known*100:5.1f}%)")
+    print(f"  compound constraint:     {counts[STATE_COMPOUND]:5d}  ({counts[STATE_COMPOUND]/total_known*100:5.1f}%)")
     print(f"  no data:         {counts[STATE_NODATA]:5d}")
 
 

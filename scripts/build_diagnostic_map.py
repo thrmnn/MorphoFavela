@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Build the partial-failure diagnostic map for any BRISA site.
+"""Build the partial-constraint diagnostic map for any BRISA site.
 
 Four-state map at 10 m grid resolution:
-    - adequate         (both thresholds pass)
-    - sun-fail only    (winter direct sun < 2 h)
-    - vent-fail only   (lambda_f > 0.35, skimming-flow proxy)
-    - compound-fail    (both fail)
+    - adequate                (both thresholds pass)
+    - sunlight constraint     (winter direct sun < 2 h)
+    - ventilation constraint  (lambda_f > 0.35, skimming-flow proxy)
+    - compound constraint     (both)
 
 Sunlight signal: ray-cast winter-solstice solar hours per street observation
 point, median-aggregated to grid cells with nearest-k fallback. Ventilation
@@ -63,11 +63,19 @@ STATE_NODATA = 4
 STATE_COLORS = ["#FFFFFF", "#D9D9D9", "#7F7F7F", "#111111", "#F4F0E8"]
 STATE_LABELS = [
     "adequate (both thresholds pass)",
-    f"sunlight fail only (winter sun < {THRESHOLD_SUN_HRS:.0f} h)",
-    f"ventilation fail only (λf > {THRESHOLD_LAMBDA_F:.2f})",
-    "compound failure (both fail)",
+    f"sunlight constraint (winter sun < {THRESHOLD_SUN_HRS:.0f} h)",
+    f"ventilation constraint (λf > {THRESHOLD_LAMBDA_F:.2f})",
+    "compound constraint (both)",
     "no data",
 ]
+
+# JSON / CSV / GPKG attribute keys for the four diagnostic states.
+STATE_KEYS = {
+    STATE_ADEQUATE: "adequate",
+    STATE_SUN_ONLY: "sunlight_constraint",
+    STATE_VENT_ONLY: "ventilation_constraint",
+    STATE_COMPOUND: "compound_constraint",
+}
 
 
 def site_paths(site: str) -> dict:
@@ -256,16 +264,16 @@ def render(site: str, grid: gpd.GeoDataFrame, state: np.ndarray, paths: dict) ->
         "n_cells_classified": int(total_known),
         "counts": {
             "adequate": counts[STATE_ADEQUATE],
-            "sun_only": counts[STATE_SUN_ONLY],
-            "vent_only": counts[STATE_VENT_ONLY],
-            "compound": counts[STATE_COMPOUND],
+            "sunlight_constraint": counts[STATE_SUN_ONLY],
+            "ventilation_constraint": counts[STATE_VENT_ONLY],
+            "compound_constraint": counts[STATE_COMPOUND],
             "nodata": counts[STATE_NODATA],
         },
         "shares": {
             "adequate": counts[STATE_ADEQUATE] / total_known if total_known else 0.0,
-            "sun_only": counts[STATE_SUN_ONLY] / total_known if total_known else 0.0,
-            "vent_only": counts[STATE_VENT_ONLY] / total_known if total_known else 0.0,
-            "compound": counts[STATE_COMPOUND] / total_known if total_known else 0.0,
+            "sunlight_constraint": counts[STATE_SUN_ONLY] / total_known if total_known else 0.0,
+            "ventilation_constraint": counts[STATE_VENT_ONLY] / total_known if total_known else 0.0,
+            "compound_constraint": counts[STATE_COMPOUND] / total_known if total_known else 0.0,
         },
         "thresholds": {
             "sun_hours_winter_min": THRESHOLD_SUN_HRS,
@@ -274,21 +282,14 @@ def render(site: str, grid: gpd.GeoDataFrame, state: np.ndarray, paths: dict) ->
     }
     paths["out_stats"].write_text(json.dumps(stats, indent=2, ensure_ascii=False))
 
+    sh = stats["shares"]
     print(f"\n[{site}] wrote {paths['out_png']}")
     print(f"  n cells: {len(grid)} (classified {total_known})")
-    print(
-        f"    adequate:        {counts[STATE_ADEQUATE]:5d}  ({stats['shares']['adequate'] * 100:5.1f}%)"
-    )
-    print(
-        f"    sun-fail only:   {counts[STATE_SUN_ONLY]:5d}  ({stats['shares']['sun_only'] * 100:5.1f}%)"
-    )
-    print(
-        f"    vent-fail only:  {counts[STATE_VENT_ONLY]:5d}  ({stats['shares']['vent_only'] * 100:5.1f}%)"
-    )
-    print(
-        f"    compound-fail:   {counts[STATE_COMPOUND]:5d}  ({stats['shares']['compound'] * 100:5.1f}%)"
-    )
-    print(f"    no data:         {counts[STATE_NODATA]:5d}")
+    print(f"    adequate:                {counts[STATE_ADEQUATE]:5d}  ({sh['adequate'] * 100:5.1f}%)")
+    print(f"    sunlight constraint:     {counts[STATE_SUN_ONLY]:5d}  ({sh['sunlight_constraint'] * 100:5.1f}%)")
+    print(f"    ventilation constraint:  {counts[STATE_VENT_ONLY]:5d}  ({sh['ventilation_constraint'] * 100:5.1f}%)")
+    print(f"    compound constraint:     {counts[STATE_COMPOUND]:5d}  ({sh['compound_constraint'] * 100:5.1f}%)")
+    print(f"    no data:                 {counts[STATE_NODATA]:5d}")
     return stats
 
 

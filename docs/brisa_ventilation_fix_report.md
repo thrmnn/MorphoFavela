@@ -164,7 +164,7 @@ lands.
 cells in each state under **four** corrected ventilation-axis choices.
 The broken legacy axis is no longer reproducible (in-place overwrite);
 its distribution is preserved in `lambda_f_repair_stats.json` where
-~99 % of built cells fell into vent-fail + compound.
+~99 % of built cells fell into ventilation constraint + compound constraint.
 
 ### Vidigal
 | Axis | adequate | sun-only | vent-only | compound |
@@ -212,7 +212,7 @@ its distribution is preserved in `lambda_f_repair_stats.json` where
    for the favela density regime — the manuscript must not claim
    Macdonald 0.40 as a within-favela discriminator.
 2. The **H/W and street-SVF axes give coherent, discriminating
-   results**: across sites the **compound-failure share** under H/W
+   results**: across sites the **compound constrainture share** under H/W
    correlates very well with under street SVF (Vidigal 45 / 33,
    Rocinha 68 / 60, Alemão 34 / 27, Rio das Pedras 55 / 55,
    Maré 27 / 22). Two independent geometric channels triangulate the

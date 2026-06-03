@@ -84,9 +84,9 @@ def taxonomy_shares(built: np.ndarray, sun_fail: np.ndarray, vent_fail: np.ndarr
     return {
         "n_classified": n,
         "adequate": float((~sf & ~vf).mean()),
-        "sun_only": float((sf & ~vf).mean()),
-        "vent_only": float((~sf & vf).mean()),
-        "compound": float((sf & vf).mean()),
+        "sunlight_constraint": float((sf & ~vf).mean()),
+        "ventilation_constraint": float((~sf & vf).mean()),
+        "compound_constraint": float((sf & vf).mean()),
     }
 
 
@@ -151,8 +151,9 @@ def main() -> None:
                     continue
                 print(
                     f"    {axis:50s}  ade={100*sh['adequate']:.1f}  "
-                    f"sun={100*sh['sun_only']:.1f}  vent={100*sh['vent_only']:.1f}  "
-                    f"comp={100*sh['compound']:.1f}"
+                    f"sun={100*sh['sunlight_constraint']:.1f}  "
+                    f"vent={100*sh['ventilation_constraint']:.1f}  "
+                    f"comp={100*sh['compound_constraint']:.1f}"
                 )
         except Exception as e:
             print(f"    FAILED: {e}")

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Random-forest + pooled-logistic predictor analysis for sunlight failure.
+"""Random-forest + pooled-logistic predictor analysis for sunlight constraint.
 
 Pipeline:
   1. Load per-site grid + solar layers (same engine as build_diagnostic_map.py).
   2. Pool built cells across all 5 sites.
-  3. Target: sunlight failure (winter_sun < 2 h, binary).
+  3. Target: sunlight constraint (winter_sun < 2 h, binary).
   4. Features: SVF, slope_deg, northness, eastness, lambda_p, lambda_f_mean,
               sigma_h, street_orientation_entropy.
   5. Random forest classifier, leave-one-site-out 5-fold CV. Per-fold ROC-AUC
@@ -106,7 +106,7 @@ def load_site(site: str) -> pd.DataFrame:
     # Southern-hemisphere convention: south-facing slopes get less winter sun,
     # north-facing get more. We expose "southness" = -cos(aspect) so the sign
     # of the coefficient is intuitive for a northern-hemisphere audience
-    # (higher southness -> higher P(sunlight failure)).
+    # (higher southness -> higher P(sunlight constraint)).
     g["southness"] = -np.cos(aspect)
     g["eastness"] = np.sin(aspect)
     g["site"] = site
