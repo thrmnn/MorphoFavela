@@ -2,12 +2,16 @@
 """Fig 03 — Frontal-area density and winter direct-sun across five favelas.
 
 Four panels in a 4-row layout (rows 1+2 are choropleths, rows 3+4 are ridges):
-  Row 1 — (A) Per-site λf choropleths, 5 panels + shared colorbar on the right.
+  Row 1 — (A) Per-site λf choropleths (corrected cell-clipped λf),
+          5 panels + shared colorbar; relative threshold λf = 2.75 marked.
   Row 2 — (B) Per-site winter-sun choropleths, 5 panels + shared colorbar.
-  Row 3 — (C) λf distribution as a ridge plot, 0.35 threshold marked.
-  Row 4 — (D) Winter-sun-hour distribution as a ridge plot, 2 h threshold marked.
+  Row 3 — (C) λf distribution as a ridge plot; relative threshold (pooled p75,
+          λf = 2.75) marked.
+  Row 4 — (D) Winter-sun-hour distribution as a ridge plot, WHO 2 h marker.
 
-Replaces the v3.5 \figplaceholder for fig:cfd-solar.
+λf threshold is the INTERIM RELATIVE pre-screen — p75 of the pooled
+corrected-λf distribution (see outputs/brisa_ventilation_fix/
+taxonomy_interim_lambda_f.json) — pending CFD-ACH + LMA calibration.
 """
 
 from __future__ import annotations
@@ -35,12 +39,12 @@ from fig_style import (
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "maré"]
 
 THRESHOLD_SUN_HRS = 2.0
-THRESHOLD_LAMBDA_F = 0.35
+THRESHOLD_LAMBDA_F = 2.75  # interim relative threshold (pooled p75 of corrected λf)
 
-LAMBDA_F_CMAP = "Greys"
+LAMBDA_F_CMAP = "Greys"  # sequential, deliberately not a red=alarm map
 SUN_CMAP = "cividis"
 
-LAMBDA_VMIN, LAMBDA_VMAX = 0.0, 0.8
+LAMBDA_VMIN, LAMBDA_VMAX = 0.0, 4.0  # corrected λf: p95 ≈ 4.39, threshold 2.75 sits at ~69% of range
 SUN_VMIN, SUN_VMAX = 0.0, 10.5
 
 
@@ -251,8 +255,8 @@ def main() -> None:
         LAMBDA_VMIN,
         LAMBDA_VMAX,
         THRESHOLD_LAMBDA_F,
-        r"$\lambda_f$ (8-direction mean)",
-        "0.35",
+        r"$\lambda_f$ (cell-clipped, rel. thr. 2.75)",
+        "2.75",
     )
     add_vertical_colorbar(
         row_b_axes[-1],
@@ -271,11 +275,11 @@ def main() -> None:
         ax_c,
         lambda_data,
         THRESHOLD_LAMBDA_F,
-        r"$\lambda_f$ (frontal-area density)",
-        xlim=(0.0, 1.5),
-        threshold_label="0.35",
+        r"$\lambda_f$ (cell-clipped frontal-area density)",
+        xlim=(0.0, 5.0),
+        threshold_label=r"$\lambda_f = 2.75$",
         title=r"(C) $\lambda_f$ distribution per favela "
-        r"(skimming-flow regime threshold marked)",
+        r"(relative threshold, pooled p75 = 2.75, marked)",
     )
 
     # Row D — winter-sun ridge
