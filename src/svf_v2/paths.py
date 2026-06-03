@@ -52,6 +52,27 @@ AREA_FILES = {
         "roads": "street_mare.shp",
         "boundary": "mare_boundary.shp",
     },
+    "borel": {
+        "dtm": "borel_dtm.tif",
+        "footprints": "borel_buildings.shp",
+        "roads": "roads_borel.shp",
+        "boundary": "borel_boundary.shp",
+    },
+
+    "jacarezinho": {
+        "dtm": "jacarezinho_dtm.tif",
+        "footprints": "jacarezinho_buildings.shp",
+        "roads": "roads_jacarezinho.shp",
+        "boundary": "jacarezinho_boundary.shp",
+    },
+
+    "morro_do_juramento": {
+        "dtm": "morro_do_juramento_dtm.tif",
+        "footprints": "morro_do_juramento_buildings.shp",
+        "roads": "roads_morro_do_juramento.shp",
+        "boundary": "morro_do_juramento_boundary.shp",
+    },
+
 }
 
 

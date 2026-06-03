@@ -22,6 +22,9 @@ SUPPORTED_AREAS = [
     "maré",
     "cidade_de_deus",
     "complexo_do_alemao",
+    "borel",
+    "jacarezinho",
+    "morro_do_juramento",
 ]
 
 # CFD campaign areas (subset of SUPPORTED_AREAS selected for wind simulation)
@@ -54,6 +57,9 @@ INFORMAL_AREAS = [
     "maré",
     "cidade_de_deus",
     "complexo_do_alemao",
+    "borel",
+    "jacarezinho",
+    "morro_do_juramento",
 ]  # Informal settlements (with filtering)
 
 
