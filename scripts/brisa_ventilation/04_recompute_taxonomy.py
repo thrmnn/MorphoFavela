@@ -7,7 +7,7 @@
 
 Solar axis stays as in build_diagnostic_map.py (winter solar hours < 2 h).
 
-Writes outputs/brisa_ventilation_fix/taxonomy_v2_stats.json with per-site
+Writes outputs/brisa_ventilation_fix/taxonomy_shares.json with per-site
 shares under each ventilation axis.
 """
 
@@ -91,12 +91,12 @@ def taxonomy_shares(built: np.ndarray, sun_fail: np.ndarray, vent_fail: np.ndarr
 
 
 def process_site(site: str, label: str) -> dict:
-    grid_v2_path = _ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics_v2.gpkg"
+    grid_path = _ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg"
     sol_path = _ROOT / "outputs" / site / "morphometrics" / "svf" / "svf_streets_solar.gpkg"
     svf_path = sol_path  # same file has svf + solar_hours_winter
     hw_path = _ROOT / "outputs" / site / "morphometrics" / "canyon" / "hw_streets.gpkg"
 
-    grid = gpd.read_file(grid_v2_path)
+    grid = gpd.read_file(grid_path)
     if "zone_id" not in grid.columns:
         grid["zone_id"] = np.arange(len(grid))
     if "centroid_x" not in grid.columns:
@@ -110,36 +110,29 @@ def process_site(site: str, label: str) -> dict:
     sun = aggregate_to_cells(grid, sol_path, "solar_hours_winter")
     sun_fail = sun < SUN_THR
 
-    # Ventilation axis A: v2 clipped λf with Macdonald 0.40
-    lf_v2 = grid["lambda_f_mean_v2"].values.astype(float)
-    vent_fail_lf_mac = lf_v2 > LF_MACDONALD
+    # Axis A: clipped λf (canonical grid product) with Macdonald 0.40.
+    lf = grid["lambda_f_mean"].values.astype(float)
+    vent_fail_lf_mac = lf > LF_MACDONALD
 
-    # Ventilation axis B: v2 clipped λf with within-site p75 (relative discriminator)
-    lf_built = lf_v2[built & np.isfinite(lf_v2)]
+    # Axis B: clipped λf with within-site p75 (relative discriminator).
+    lf_built = lf[built & np.isfinite(lf)]
     p75 = float(np.quantile(lf_built, 0.75)) if lf_built.size else np.nan
-    vent_fail_lf_p75 = lf_v2 > p75
+    vent_fail_lf_p75 = lf > p75
 
-    # Ventilation axis C: street SVF aggregated to cells, sheltered if SVF<0.30
+    # Axis C: street SVF aggregated to cells, sheltered if SVF<0.30.
     svf_cell = aggregate_to_cells(grid, svf_path, "svf")
     vent_fail_svf = svf_cell < SVF_SHELTER
 
-    # Ventilation axis D: street H/W aggregated, skimming if H/W>0.65
+    # Axis D: street H/W aggregated, skimming if H/W>0.65.
     hw_cell = aggregate_to_cells(grid, hw_path, "HW")
     vent_fail_hw = hw_cell > HW_SKIM
 
     shares = {
-        "lambda_f_v2_macdonald_0p40": taxonomy_shares(built, sun_fail, vent_fail_lf_mac),
-        f"lambda_f_v2_p75_within_site (={p75:.3f})": taxonomy_shares(built, sun_fail, vent_fail_lf_p75),
+        "lambda_f_clipped_macdonald_0p40": taxonomy_shares(built, sun_fail, vent_fail_lf_mac),
+        f"lambda_f_clipped_p75_within_site (={p75:.3f})": taxonomy_shares(built, sun_fail, vent_fail_lf_p75),
         "svf_streets_sheltered_lt_0p30": taxonomy_shares(built, sun_fail, vent_fail_svf),
         "hw_streets_skim_gt_0p65": taxonomy_shares(built, sun_fail, vent_fail_hw),
-        "legacy_lambda_f_v1_gt_0p35": None,  # left None — v1 column may be missing in some sites
     }
-
-    # Legacy v1 if column present.
-    if "lambda_f_mean_v1" in grid.columns:
-        lf_v1 = grid["lambda_f_mean_v1"].values.astype(float)
-        vent_fail_legacy = lf_v1 > 0.35
-        shares["legacy_lambda_f_v1_gt_0p35"] = taxonomy_shares(built, sun_fail, vent_fail_legacy)
 
     return {"site": site, "label": label, "n_built_cells": int(built.sum()), "shares": shares}
 
@@ -180,10 +173,10 @@ def main() -> None:
         ),
         "sites": results,
     }
-    (out_root / "taxonomy_v2_stats.json").write_text(
+    (out_root / "taxonomy_shares.json").write_text(
         json.dumps(payload, indent=2, ensure_ascii=False)
     )
-    print(f"\nWrote {out_root / 'taxonomy_v2_stats.json'}")
+    print(f"\nWrote {out_root / 'taxonomy_shares.json'}")
 
 
 if __name__ == "__main__":
