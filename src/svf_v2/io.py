@@ -191,6 +191,10 @@ def save_street_results(
         seg_gdf = roads_copy.merge(seg_stats, on="street_id", how="inner")
         seg_gdf = gpd.GeoDataFrame(seg_gdf, crs=roads_gdf.crs)
 
+        # length_m: projected geometry length, needed for length-weighted
+        # site-level aggregates downstream (audit 2026-06-05 C1).
+        seg_gdf["length_m"] = seg_gdf.geometry.length
+
         seg_path = out / "svf_streets_segments.gpkg"
         seg_gdf.to_file(seg_path, driver="GPKG")
         logger.info(f"  Saved {seg_path} ({len(seg_gdf)} segments)")

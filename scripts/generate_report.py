@@ -242,9 +242,26 @@ def collect_area_data(area: str) -> Dict[str, Any]:
             seg = gpd.read_file(seg_path)
             out["svf_segments"] = seg
             if "svf_mean" in seg.columns:
-                vals = seg["svf_mean"].dropna()
-                out["svf_mean"] = float(vals.mean())
-                out["svf_std"] = float(vals.std())
+                # Length-weighted site aggregate: count-weighted means
+                # over-represent short fragments and biased Rocinha by
+                # +0.088 SVF (audit 2026-06-05 C1). Fall back to
+                # geometry length if the length_m column predates the fix.
+                lengths = (
+                    seg["length_m"]
+                    if "length_m" in seg.columns
+                    else seg.geometry.length
+                )
+                valid = seg["svf_mean"].notna() & (lengths > 0)
+                vals = seg.loc[valid, "svf_mean"]
+                w = lengths[valid]
+                if w.sum() > 0:
+                    out["svf_mean"] = float((vals * w).sum() / w.sum())
+                    # Length-weighted std (population form)
+                    mu = out["svf_mean"]
+                    out["svf_std"] = float(((((vals - mu) ** 2) * w).sum() / w.sum()) ** 0.5)
+                else:
+                    out["svf_mean"] = float(vals.mean())
+                    out["svf_std"] = float(vals.std())
                 out["svf_median"] = float(vals.median())
                 out["svf_min"] = float(vals.min())
                 out["svf_max"] = float(vals.max())
