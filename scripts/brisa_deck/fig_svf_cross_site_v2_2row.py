@@ -1,0 +1,223 @@
+#!/usr/bin/env python3
+"""BRISA slide deck — fig_svf_cross_site_v2_2row.png (slide 7, REPLACES large).
+
+Same five favelas, but laid out in 2 rows so each panel renders ~2x larger
+when projected:
+  * Top row: Vidigal · Rocinha · Complexo do Alemão (3 hillside)
+  * Bottom row: Rio das Pedras · Maré (2 flatland), centred
+  * Shared SVF colorbar on the right, spanning both rows
+  * 200 m scale bar on each row's leftmost panel
+  * Per-favela ridge plot below the maps, ≥ 1.5× the height of the v1.
+
+Aspect ≈ 1.4 (slightly wider than tall). 200 DPI.
+
+Output: /home/theo/brisa_paper/artifacts/slides/assets/fig_svf_cross_site_v2_2row.png
+"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize
+from scipy.stats import gaussian_kde
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PAPER_FIG_DIR = PROJECT_ROOT / "outputs" / "paper_figures"
+sys.path.insert(0, str(PAPER_FIG_DIR))
+from fig_style import SITE_LABELS, apply_style  # noqa: E402
+
+OUT_DIR = Path("/home/theo/brisa_paper/artifacts/slides/assets")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+SITES = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "maré"]
+ROW_TOP = ["vidigal", "rocinha", "complexo_do_alemao"]
+ROW_BOT = ["riodaspedras", "maré"]
+
+SVF_CMAP = "Greys_r"
+SVF_VMIN, SVF_VMAX = 0.0, 1.0
+
+
+def load_grid(site: str) -> gpd.GeoDataFrame:
+    p = PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg"
+    grid = gpd.read_file(p)
+    built = (grid["lambda_p"].fillna(0) > 0.01) | (grid["building_count"] > 0)
+    return grid[built].copy()
+
+
+def choropleth(ax, gdf: gpd.GeoDataFrame, title: str, *, with_scalebar: bool = False) -> None:
+    valid = gdf[gdf["svf"].notna()].copy()
+    valid["svf"] = valid["svf"].clip(SVF_VMIN, SVF_VMAX)
+    valid.plot(
+        ax=ax, column="svf", cmap=SVF_CMAP,
+        vmin=SVF_VMIN, vmax=SVF_VMAX,
+        edgecolor="none", linewidth=0.0,
+    )
+    bbox = valid.total_bounds
+    pad = (bbox[2] - bbox[0]) * 0.03
+    ax.set_xlim(bbox[0] - pad, bbox[2] + pad)
+    ax.set_ylim(bbox[1] - pad, bbox[3] + pad)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_title(title, fontsize=13, color="#111111", pad=4)
+
+    if with_scalebar:
+        x0 = bbox[0] + pad
+        y0 = bbox[1] + pad
+        ax.add_patch(
+            plt.Rectangle(
+                (x0, y0), 200.0, (bbox[3] - bbox[1]) * 0.010,
+                facecolor="black", edgecolor="black", linewidth=0.0,
+                zorder=20, clip_on=False,
+            )
+        )
+        ax.text(
+            x0 + 100, y0 + (bbox[3] - bbox[1]) * 0.030,
+            "200 m", ha="center", va="bottom",
+            fontsize=9, color="#111111",
+        )
+
+
+def add_colorbar(fig, top_anchor_ax, bot_anchor_ax) -> None:
+    top_pos = top_anchor_ax.get_position()
+    bot_pos = bot_anchor_ax.get_position()
+    cb_x = top_pos.x1 + 0.012
+    cb_w = 0.014
+    cb_y = bot_pos.y0
+    cb_h = top_pos.y1 - bot_pos.y0
+    cax = fig.add_axes([cb_x, cb_y, cb_w, cb_h])
+    sm = ScalarMappable(norm=Normalize(vmin=SVF_VMIN, vmax=SVF_VMAX), cmap=SVF_CMAP)
+    sm.set_array([])
+    cb = fig.colorbar(sm, cax=cax, orientation="vertical")
+    cb.outline.set_linewidth(0.5)
+    cb.set_label("Sky View Factor (10 m grid)", fontsize=11, color="#111111", labelpad=6)
+    cb.ax.tick_params(labelsize=10, color="#333333", length=2.5)
+
+
+def ridge(ax, data: dict) -> None:
+    n = len(SITES)
+    offsets = np.arange(n)
+    xlim = (0.0, 1.0)
+    height = 0.9
+    for i, site in enumerate(SITES):
+        vals = data[site]
+        vals = vals[(vals >= xlim[0]) & (vals <= xlim[1])]
+        if len(vals) < 30:
+            continue
+        kde = gaussian_kde(vals, bw_method=0.22)
+        xs = np.linspace(xlim[0], xlim[1], 400)
+        density = kde(xs)
+        density = density / density.max() * height
+        ax.fill_between(xs, offsets[i], offsets[i] + density,
+                        color="#bbbbbb", alpha=0.85, linewidth=0)
+        ax.plot(xs, offsets[i] + density, color="#222222", lw=0.7)
+        median = float(np.median(vals))
+        ax.plot([median, median], [offsets[i], offsets[i] + height * 0.65],
+                color="#000000", lw=1.3, solid_capstyle="butt")
+        ax.text(median, offsets[i] + height * 0.72, f"{median:.2f}",
+                ha="center", va="bottom", fontsize=9.5, color="#111111")
+
+    ax.set_yticks(offsets)
+    ax.set_yticklabels([SITE_LABELS[s] for s in SITES], fontsize=11)
+    ax.invert_yaxis()
+    ax.set_xlim(*xlim)
+    ax.set_xlabel("Sky View Factor", fontsize=11)
+    ax.tick_params(axis="x", labelsize=10)
+    ax.set_title("Per-favela SVF distribution (median marked)",
+                 loc="left", fontsize=12, pad=4)
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+    ax.spines["bottom"].set_linewidth(0.5)
+    ax.spines["left"].set_linewidth(0.5)
+
+
+def main() -> None:
+    apply_style()
+    grids = {s: load_grid(s) for s in SITES}
+
+    fig_w = 14.0
+    fig_h = fig_w / 1.4  # ~10 in tall
+    fig = plt.figure(figsize=(fig_w, fig_h))
+
+    bboxes = {}
+    for s in SITES:
+        valid = grids[s][grids[s]["svf"].notna()]
+        bboxes[s] = valid.total_bounds
+    aspects = {s: (bboxes[s][2] - bboxes[s][0]) / (bboxes[s][3] - bboxes[s][1]) for s in SITES}
+
+    # Map-row layout. Both rows use the same vertical band per row.
+    left, right = 0.03, 0.88   # leave 0.12 on right for colorbar
+    cb_pad = 0.005
+    band_w = right - left
+    map_top = 0.97
+    map_bottom = 0.40
+    row_gap = 0.025  # vertical gap between top and bottom map rows
+    row_h = (map_top - map_bottom - row_gap) / 2.0
+    top_row_y = map_bottom + row_h + row_gap
+    bot_row_y = map_bottom
+
+    inter_pad = 0.015
+    # Width allocation per row: proportional to sqrt(aspect) so panels share
+    # roughly the same display area. Then translate panel widths to fig-fraction
+    # by normalising within the row.
+    def allocate_widths(sites, band_width):
+        raw = np.array([np.sqrt(aspects[s]) for s in sites])
+        total_gap = inter_pad * (len(sites) - 1)
+        raw_n = raw / raw.sum()
+        return raw_n * (band_width - total_gap)
+
+    # Top row: 3 panels filling the full band.
+    top_widths = allocate_widths(ROW_TOP, band_w)
+    # Bottom row: 2 panels, centred — use about 75% of band_w so the two flatland
+    # panels are sized similarly to a top-row panel.
+    bot_band_w = band_w * 0.72
+    bot_widths = allocate_widths(ROW_BOT, bot_band_w)
+    bot_left = left + (band_w - bot_band_w) / 2.0 + cb_pad / 2
+
+    # Place panels.
+    top_axes = []
+    x = left
+    for i, s in enumerate(ROW_TOP):
+        ax = fig.add_axes([x, top_row_y, top_widths[i], row_h])
+        choropleth(ax, grids[s], SITE_LABELS[s], with_scalebar=(i == 0))
+        top_axes.append(ax)
+        x += top_widths[i] + inter_pad
+
+    bot_axes = []
+    x = bot_left
+    for i, s in enumerate(ROW_BOT):
+        ax = fig.add_axes([x, bot_row_y, bot_widths[i], row_h])
+        choropleth(ax, grids[s], SITE_LABELS[s], with_scalebar=(i == 0))
+        bot_axes.append(ax)
+        x += bot_widths[i] + inter_pad
+
+    fig.canvas.draw()
+    add_colorbar(fig, top_axes[-1], bot_axes[-1])
+
+    # Ridge plot — taller than v1. Bump its left edge so y-tick labels fit.
+    ridge_h = 0.32
+    ridge_bot = 0.04
+    ridge_top = ridge_bot + ridge_h
+    if ridge_top > map_bottom - 0.005:
+        ridge_h = (map_bottom - 0.005) - ridge_bot
+    ridge_left = 0.085   # widen LHS so site names render in full
+    ridge_right = right
+    ax_r = fig.add_axes([ridge_left, ridge_bot, ridge_right - ridge_left, ridge_h])
+    data = {s: grids[s]["svf"].dropna().values for s in SITES}
+    ridge(ax_r, data)
+
+    out = OUT_DIR / "fig_svf_cross_site_v2_2row.png"
+    fig.savefig(out, dpi=200, facecolor="white", bbox_inches=None)
+    plt.close(fig)
+    size_kb = out.stat().st_size // 1024
+    print(f"  Saved {out} ({size_kb} KB)")
+
+
+if __name__ == "__main__":
+    main()
