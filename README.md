@@ -177,6 +177,32 @@ Outputs land in `outputs/paper_figures/exports/` (PNG + SVG); the
 PNGs already published in the technical report live in
 `docs/technical_report/figures/`.
 
+### 10. Site dashboards + distribution bundles
+
+The pipeline outputs flow into shareable artefacts under
+`outputs/_distribution/` (all gitignored):
+
+```bash
+# Canonical street-observer network — single source of truth for sampling
+python scripts/build_street_observers.py --bundle      # writes observers + tarball
+
+# Static A3 "Folha de Rua" per site (PNG + PDF + 8 atomic panels)
+python scripts/build_site_dashboard.py --site vidigal
+
+# Interactive HTML site sheet (Leaflet + Plotly + methodology drawer)
+python scripts/build_html_dashboard.py --site vidigal
+
+# 3D data bundle for an external solar-access collaborator
+python scripts/build_mingze_bundle.py                  # 4 sites, ~37 MB tarball
+```
+
+The HTML dashboards surface the most recent audit (`docs/audit_2026-06-03*.md`)
+findings inline — C1 length-weighting fix, H1-H4 sampling biases, M1-M6
+schema and CLI fixes — so reviewers see them as toggles and callouts
+rather than buried in an appendix. See
+[`docs/workflow_patterns.md`](docs/workflow_patterns.md) for the
+multi-agent audit-and-deliverable-per-entity pattern that produces them.
+
 ## Installation
 
 The recommended path is Conda via the pinned [`environment.yml`](environment.yml),
@@ -289,6 +315,13 @@ See [`docs/README.md`](docs/README.md) for a one-line summary of each.
   with `python docs/technical_report/build_pdf.py`.
 - **Methodology** (per-feature deep dives): [`docs/methodology/`](docs/methodology/)
   — sky-exposure plane, street-level SVF, the 25 morphometric indicators.
+- **Workflow patterns**: [`docs/workflow_patterns.md`](docs/workflow_patterns.md)
+  — the council-of-experts + judge-panel + per-entity build pattern
+  used to produce the audit, site dashboards, and HTML deliverables.
+- **Repo audits**: [`docs/audit_2026-06-03.md`](docs/audit_2026-06-03.md)
+  + [`_round2.md`](docs/audit_2026-06-03_round2.md) — the two-pass
+  audit that produced the recent length-weighted-SVF fix (commit
+  d8175ca) and the dashboard caveat surfaces.
 - **Doc map**: [`docs/README.md`](docs/README.md).
 - **Roadmap + project status**: [`ROADMAP.md`](ROADMAP.md).
 - **Changelog**: [`CHANGELOG.md`](CHANGELOG.md).
