@@ -113,6 +113,22 @@ def scatter_and_bland_altman(df: pd.DataFrame, s: dict):
     plt.close(fig)
 
 
+def add_scalebar_north(ax):
+    """Scale bar + north arrow. CRS is EPSG:31983 (metres, grid north up)."""
+    x0, x1 = ax.get_xlim()
+    y0, y1 = ax.get_ylim()
+    dx, dy = x1 - x0, y1 - y0
+    bar = max((L for L in (50, 100, 200, 250, 500) if L <= 0.25 * dx), default=100)
+    bx, by = x0 + 0.04 * dx, y0 + 0.05 * dy
+    ax.plot([bx, bx + bar], [by, by], color="k", lw=2.5, solid_capstyle="butt", zorder=10)
+    ax.text(bx + bar / 2, by + 0.012 * dy, f"{bar} m", ha="center", va="bottom",
+            fontsize=8, zorder=10)
+    ax.annotate("", xy=(0.96, 0.94), xytext=(0.96, 0.86), xycoords="axes fraction",
+                arrowprops=dict(arrowstyle="-|>", color="k", lw=1.5))
+    ax.text(0.96, 0.945, "N", transform=ax.transAxes, ha="center", va="bottom",
+            fontsize=10, fontweight="bold")
+
+
 def residual_map(df: gpd.GeoDataFrame):
     fig, axes = plt.subplots(1, 2, figsize=(14, 7))
     vmax = float(np.percentile(np.abs(df["residual"]), 98))
@@ -126,6 +142,7 @@ def residual_map(df: gpd.GeoDataFrame):
     ax.set_aspect("equal")
     ax.set_title("Residual (winter solstice solar hours)")
     ax.set_xticks([]); ax.set_yticks([])
+    add_scalebar_north(ax)
 
     ax = axes[1]
     df.plot(
@@ -136,6 +153,7 @@ def residual_map(df: gpd.GeoDataFrame):
     ax.set_aspect("equal")
     ax.set_title("Ours")
     ax.set_xticks([]); ax.set_yticks([])
+    add_scalebar_north(ax)
 
     fig.tight_layout()
     fig.savefig(OUT / "residual_map.png", dpi=160)
@@ -303,11 +321,16 @@ def diagnostic_figures(df: gpd.GeoDataFrame, d: dict):
     ax.legend(loc="lower right", fontsize=9, markerscale=2)
     ax.set_title("Structural disagreements: who sees sun where the other sees none")
     ax.set_xticks([]); ax.set_yticks([])
+    add_scalebar_north(ax)
     fig.tight_layout()
     fig.savefig(OUT / "zero_asymmetry_map.png", dpi=160)
     plt.close(fig)
 
     # MAE + bias by SVF band
+    def svf_band_label(key: str) -> str:
+        lo, hi = (float(v) for v in key.strip("([])").split(", "))
+        return f"{max(lo, 0.0):g}–{hi:.1f}"
+
     bands = list(d["mae_by_svf_band"].keys())
     mae = [d["mae_by_svf_band"][b]["mae"] for b in bands]
     bias = [d["mae_by_svf_band"][b]["bias"] for b in bands]
@@ -317,12 +340,15 @@ def diagnostic_figures(df: gpd.GeoDataFrame, d: dict):
     ax.bar(xpos - 0.2, mae, width=0.4, color="#4477aa", label="MAE")
     ax.bar(xpos + 0.2, bias, width=0.4, color="#ee6677", label="bias (ours − mingze)")
     ax.axhline(0, color="k", lw=0.8)
-    ax.set_xticks(xpos, [b.replace(", ", "–").strip("([])") for b in bands], rotation=30)
+    ax.set_xticks(xpos, [svf_band_label(b) for b in bands], rotation=30)
     for i, n in enumerate(ns):
         ax.annotate(f"n={n:,}", (xpos[i], max(mae[i], 0) + 0.07), ha="center", fontsize=7.5)
     ax.set_xlabel("SVF band (ours)")
     ax.set_ylabel("Hours")
-    ax.set_title("Agreement by sky openness: MAE grows with SVF, bias stays near zero")
+    ax.set_title(
+        f"Agreement by sky openness: MAE roughly flat ({min(mae):.1f}–{max(mae):.1f} h);\n"
+        f"bias swings {bias[0]:+.1f} h (deep canyons) to {bias[-1]:+.1f} h (most open)"
+    )
     ax.legend()
     fig.tight_layout()
     fig.savefig(OUT / "mae_by_svf_band.png", dpi=150)
@@ -339,7 +365,10 @@ def diagnostic_figures(df: gpd.GeoDataFrame, d: dict):
     ax.set_xticks(xpos, [b.strip("([])").replace(", ", "–") + "°" for b in bk], rotation=30)
     ax.set_xlabel("Street bearing (0° = N–S, 90° = E–W)")
     ax.set_ylabel("Mean sun hours")
-    ax.set_title("Both methods see the same orientation signal")
+    ax.set_title(
+        "Both peak in the NE family, but brightness swaps at 90°:\n"
+        "ours higher on every 0–90° bin, Mingze on every 90–180° bin (see H2)"
+    )
     ax.legend()
     fig.tight_layout()
     fig.savefig(OUT / "bearing_panel.png", dpi=150)
