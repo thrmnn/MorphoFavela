@@ -117,6 +117,7 @@ produce; they never re-cast rays or re-run the solver.
 | `build_mingze_bundle.py` | — | 3D-data bundle for the Ladybug solar-access collaborator (DTM + 3D footprints with `altura` + boundary + canonical observers, per site). Writes tarball + sha256 under `outputs/_distribution/mingze_3d_bundle_v1/`. | (shutil / hashlib only) |
 | `build_diagnostic_map.py` | — | Per-site SVF / solar / observer-density diagnostic map | `src.svf_v2`, matplotlib |
 | `build_vidigal_diagnostic_map.py` | — | Specialised Vidigal diagnostic map for the BRISA paper | `src.viz`, matplotlib |
+| `compare_mingze_vidigal.py` | — | Accuracy comparison of our Vidigal winter-solstice solar hours against Mingze's Ladybug run (paired 1-to-1 by row order, n = 6876). MAE / RMSE / bias / Pearson, Bland-Altman, residual map + per-observer GPKG. Output: `outputs/comparative/vidigal_vs_mingze/`. | (pandas / geopandas / scipy) |
 
 ---
 
