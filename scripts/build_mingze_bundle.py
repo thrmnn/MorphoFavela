@@ -102,8 +102,20 @@ CRS for every spatial layer: **EPSG:31983** (SIRGAS 2000 / UTM 23S), units = met
 
 ## dtm.tif
 - Digital terrain model raster. One band, float32 metres above SIRGAS 2000 ellipsoid.
-- Pixel size ≈ 1 m (varies slightly per site).
+- Pixel size 5 m.
 - Use for ground elevation at observer points (already encoded as `z_terrain_m` in the observer table; this raster is provided for any custom resampling).
+
+## terrain.stl
+- Triangulated terrain mesh built from `dtm.tif` at full resolution, binary STL,
+  **world coordinates** (EPSG:31983 metres — no local-origin translation).
+
+## buildings_3d.stl
+- All buildings extruded on top of the terrain: base elevation from the registry
+  `base` field (DTM-sampled where missing), extrusion height = `altura`. Binary STL,
+  world coordinates.
+- `terrain.stl + buildings_3d.stl` together are **exactly the scene MorphoFavela's
+  ray-caster used** for the SVF/solar numbers we compare against — simulating on this
+  geometry removes the model-construction difference between our pipelines.
 
 ## buildings.shp (+ .dbf .shx .prj .cpg)
 - 3D Polygon geometry. Per-feature attributes from the Rio municipal `edificações` registry:
@@ -133,6 +145,30 @@ Per-site sampling parameters (spacing, pedestrian height, building safety margin
 """
 
 
+def build_site_stls(site: str, files: dict[str, Path], site_dir: Path) -> None:
+    """terrain.stl + buildings_3d.stl in world coordinates (EPSG:31983).
+
+    Their union is byte-for-byte the scene MorphoFavela's SVF/solar
+    ray-caster sees — sending it removes the model-construction confound
+    from cross-method comparisons.
+    """
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from src.svf_v2 import build_building_meshes, build_terrain_mesh
+
+    terrain = build_terrain_mesh(files["dtm"])
+    terrain_path = site_dir / "terrain.stl"
+    terrain.save(str(terrain_path), binary=True)
+    print(f"    terrain.stl: {terrain.n_cells:,} cells, {terrain_path.stat().st_size / 1e6:.1f} MB")
+
+    buildings, _ = build_building_meshes(files["buildings_shp"], files["dtm"], area=site)
+    if buildings is None:
+        raise RuntimeError(f"{site}: no valid buildings for STL extrusion")
+    bld_path = site_dir / "buildings_3d.stl"
+    buildings.save(str(bld_path), binary=True)
+    print(f"    buildings_3d.stl: {buildings.n_cells:,} cells, {bld_path.stat().st_size / 1e6:.1f} MB")
+
+
 def write_per_site_schema(dest: Path, site: str) -> Path:
     full_name = {
         "rocinha": "Rocinha",
@@ -159,7 +195,9 @@ README = """# MorphoFavela — 3D data bundle for Mingze (Ladybug solar-access)
 
 ```
 {site_slug}/
-  dtm.tif              # terrain raster, 1-band float32 metres
+  dtm.tif              # terrain raster, 1-band float32 metres, 5 m pixels
+  terrain.stl          # ready-made terrain mesh (binary STL, EPSG:31983 world coords)
+  buildings_3d.stl     # buildings extruded on the terrain (binary STL, world coords)
   buildings.shp+.dbf+.shx+.prj+.cpg   # 3D polygons, has 'altura' (height, m)
   boundary.shp+...     # site outline
   observers.gpkg       # canonical sampling points, EPSG:31983
@@ -170,6 +208,15 @@ README = """# MorphoFavela — 3D data bundle for Mingze (Ladybug solar-access)
 ```
 
 ## To build a Ladybug 3D model
+
+**Shortcut (recommended):** import `terrain.stl` + `buildings_3d.stl` directly —
+they are the exact occlusion scene our ray-caster used, so any remaining
+difference between your results and ours is down to the solver, not the model.
+Coordinates are world EPSG:31983 metres (large values — translate to a local
+origin inside Rhino if your tolerance settings complain, but apply the same
+translation to the observer points).
+
+Building the model yourself instead:
 
 1. Read `buildings.shp` (it's a 3D Polygon registry). For Ladybug:
    - Extrude each footprint by the `altura` attribute (metres).
@@ -237,6 +284,10 @@ def main() -> int:
         # Boundary + sidecars
         if files["boundary_shp"].exists():
             copy_shp_with_sidecars(files["boundary_shp"], site_dir, rename="boundary")
+
+        # STL scene (terrain + extruded buildings, world coordinates)
+        if files["dtm"].exists() and files["buildings_shp"].exists():
+            build_site_stls(site, files, site_dir)
 
         # Observers (3 formats + manifest)
         for src_key, dst_name in [
