@@ -81,7 +81,7 @@ in this section.
 |---|---|---|---|
 | Sky View Factor | SVF | — (0–1) | Fraction of the upper hemisphere visible from a sample point at 1.5 m above ground. Cell value = mean over passageway samples whose centroid falls in the cell. Method: §4.2. |
 | Plan area density (Building Coverage Ratio) | λp, BCR | — (0–1) | Sum of building footprint area in the cell ÷ cell area. Capped at 1.0 to prevent over-counting from overlapping footprints. |
-| Frontal area density | λf | — | Projected vertical surface area per unit horizontal cell area, computed for 8 wind directions; stored as `lambda_f_{N,NE,…,NW}`, plus `lambda_f_mean` (mean across directions) and `lambda_f_max` (worst-case direction). Primary input to wind-canopy drag models. |
+| Frontal area density | λf | — | Projected vertical surface area per unit horizontal cell area, computed for 8 wind directions; stored as `lambda_f_{N,NE,…,NW}`, plus `lambda_f_mean` (mean across directions) and `lambda_f_max` (worst-case direction). Facade segments clipped to the cell since 2026-06 (§4.2). Primary input to wind-canopy drag models. |
 | Volumetric porosity | — | — (0–1) | `1 − (Σ building_volume_in_cell) / (cell_area × H_mean)`. Strongly anti-correlated with λp (r ≈ −0.95). |
 | Height variability | σH | m | Standard deviation of building heights in the cell. NaN if < 2 buildings. |
 | Mean building height | H_mean | m | Arithmetic mean of contributing building heights. Cell-level average — see §1 footnote on aggregation. |
@@ -470,7 +470,12 @@ dense informal fabric.
 horizontal cell area, computed for eight wind directions (N, NE, E, SE,
 S, SW, W, NW); stored as `lambda_f_{direction}` plus `lambda_f_mean` and
 `lambda_f_max`. Directional λf is the primary morphological input to
-wind-canopy drag models.
+wind-canopy drag models. Facade segments are **clipped to the cell
+boundary** before accumulation (repair of 2026-06-02, commit `e2252f4`):
+earlier grids attributed the full length of facades crossing a cell
+border to that cell, inflating per-cell λf 2–3×. All published grids
+were regenerated in place; λf values in earlier revisions of this
+report are superseded.
 
 **Volumetric porosity.** `1 − (Σ building_volume_in_cell) / (cell_area ×
 H_mean)`. Characterises the void fraction in the urban canopy; strongly
@@ -592,6 +597,12 @@ This analysis justifies the 10 m resolution as the production grid:
   only resolved at 10 m.
 - Computational cost at 10 m is manageable (< 85 s per site).
 
+Figure S3 predates the 2026-06-02 λf cell-clipping re-baseline. Both
+resolutions were computed with the same pre-repair estimator, so the
+*sensitivity* conclusion (shape preservation, multimodality only at
+10 m) stands, but the absolute λf values shown are superseded by
+§4.2/§5.2. The 20 m grids are queued for re-baselining.
+
 Supplementary variants (Vidigal-only upscaled-vs-native scatter, and
 side-by-side difference maps) are archived in
 `outputs/paper_figures/exports/_variants/` and regenerable with
@@ -632,12 +643,14 @@ impossibilities).
 | Slope, median | 25.7° | 19.3° | 1.5° |
 | SVF, median | 0.34 | 0.37 | 0.43 |
 | λp, median | 0.71 | 0.62 | 0.54 |
-| λf_mean, median | 3.43 | 2.20 | 3.12 |
+| λf_mean, median (built cells, λp > 0) | 1.90 | 1.15 | 1.79 |
 | σH, median | 2.0 m | 1.6 m | 2.0 m |
 
 Source: medians computed from the concatenation of
-`outputs/{site}/morphometrics/grid/grid_metrics.gpkg` across the 12-strata
-eligible cells per site. Note the *Mixed* row reflects only Complexo do
+`outputs/{site}/morphometrics/grid/grid_metrics.gpkg` across all grid
+cells per site; the λf row restricts to built cells (λp > 0) so that
+unbuilt cells — roughly a third of Maré's grid — do not drag the
+frontal-area signal of the standing fabric. Note the *Mixed* row reflects only Complexo do
 Alemão (which spans both flat and steep terrain — its slope median sits
 between the typology extremes); aggregating it with either Hillside or
 Flatland would compress that signal.
@@ -646,9 +659,12 @@ Two observations matter for the CFD design. First, **λp is uniformly
 high (0.54–0.71)** across all three typologies — informal urban form is
 denser than formal Rio fabric (typical λp in Copacabana ≈ 0.40), so the
 sampling allocation correctly prioritises high-λp strata. Second,
-**hillside and flatland sites carry comparable λf_mean (3.43 vs 3.12)**;
-the Mixed typology dips because Complexo do Alemão has the lowest
-building heights of the campaign (mean H_mean = 5.3 m). Wind-canopy drag
+**on the built fabric, hillside and flatland typologies carry comparable
+median λf (1.90 vs 1.79)**; the Mixed typology dips (1.15) because
+Complexo do Alemão has the lowest building heights of the campaign
+(mean H_mean = 5.3 m). (All λf values reflect the 2026-06 cell-clipping
+re-baseline — see §4.2; on an all-cells basis the flatland median drops
+to 1.01 because of Maré's unbuilt share.) Wind-canopy drag
 will therefore not separate cleanly along the hillside↔flatland axis;
 SVF and slope are the dominant discriminators that CFD will quantify.
 
@@ -1003,7 +1019,8 @@ quantity. `λ_F = Σ(projected_facade × height) / disk_area` is the
 canopy-parameterisation form (Tominaga 2008 §3) — sum of all building
 facades, no shadowing — and routinely exceeds 1.0 in dense favela
 patches (campaign median λ_F max = 1.32, p90 = 2.10, max = 2.96 at
-RDP-P06). The CFD blockage gate uses the AIJ benchmark *silhouette
+RDP-P06 — unclipped-facade form as frozen in `audit_v1.csv` at campaign
+lock 2026-05-08; not comparable to the cell-clipped grid λf of §4.2). The CFD blockage gate uses the AIJ benchmark *silhouette
 envelope* `D · H_max` instead: the worst-case projected obstacle area
 in any wind direction, bounded by treating the analysis circle as a
 solid block. λ_F is reported alongside for the §4 morphometric tables
@@ -1153,9 +1170,9 @@ patch maps + pooled distributions. Maré awaits its solar gpkg —
 
 **Fig 0.4 ★ — Diagnostic taxonomy at favela scale (headline).** Four-
 state per-10 m-cell classification: **Adequate** (vent + sun both
-pass), **Ventilation failure** (U_mean < 1.0 m/s), **Sunlight
-deprivation** (winter direct sun < 2 h), **Compound failure**
-(both fail). Okabe-Ito colour-blind-safe palette locked at
+pass), **Ventilation constraint** (U_mean < 1.0 m/s), **Sunlight
+constraint** (winter direct sun < 2 h), **Compound constraint**
+(both). Okabe-Ito colour-blind-safe palette locked at
 `#BDBDBD`/`#0072B2`/`#E69F00`/`#D55E00`. Layout: five site maps (equal-
 width panels with per-site scale bars at 100/200/500 m), a 2-D
 performance scatter with a twin top-axis carrying indoor-equivalent
@@ -1196,11 +1213,11 @@ that scales the U field uniformly by {1.00, 0.85, 0.70} to mimic the
 IPCC AR6 mid-century projection for SE Brazil, then re-runs the 0.4
 four-state classifier on each scaled snapshot. Three panels: (A)
 stacked bars of state shares per site per scaling level (compound-
-failure rate climbs monotonically — Vidigal 19 → 23 → 30 %, Rocinha
+constraint rate climbs monotonically — Vidigal 19 → 23 → 30 %, Rocinha
 58 → 65 → 70 %, CDA 17 → 21 → 26 %, RdP 13 → 16 → 19 %); (B) per-cell
 transition maps at U×0.85 highlighting only the cells that *flip* into
-ventilation- or compound-failure — Rocinha is the largest absorber
-(10.2 % of cells flip to compound) while Vidigal and CDA each shed
+ventilation- or compound-constraint — Rocinha is the largest absorber
+(10.2 % of cells flip to compound constraint) while Vidigal and CDA each shed
 ~3.6 %; (C) typology vulnerability ladder — hillside 7.6 %, flatland
 5.5 %, mixed 3.6 %. Thermal coupling is not modelled — only the
 ventilation half of the diagnosis moves.
@@ -1211,13 +1228,13 @@ ventilation half of the diagnosis moves.
 4-state distribution non-uniformly across typologies. Maré awaits its
 solar gpkg and is shown without flip annotation in panel B.
 
-**Fig 0.7 — Spatial clustering of compound failure (proposition).**
-Empirical follow-up to 0.4: the compound-failure pixels are *not*
+**Fig 0.7 — Spatial clustering of compound constraint (proposition).**
+Empirical follow-up to 0.4: the compound-constraint pixels are *not*
 randomly distributed — they form coherent corridors. Three panels:
-(A) Global Moran's I on the binary compound-failure indicator under
+(A) Global Moran's I on the binary compound-constraint indicator under
 Rook contiguity (4/5 sites: Vidigal I=0.61, Rocinha I=0.58, CDA
 I=0.81, RdP I=0.80; all p<0.001 vs 999-permutation random-label
-null); (B) LISA cluster maps showing the contiguous compound-failure
+null); (B) LISA cluster maps showing the contiguous compound-constraint
 components per site (compound-corridor cell share: Vidigal 8.3 %,
 Rocinha 4.5 %, CDA 9.2 %, RdP 6.9 %); (C) cluster-size CCDF pooled
 across sites — observed (orange) vs random null (grey dashed). The
@@ -1226,9 +1243,9 @@ past ~30 cells) is the signature of spatial clustering: a planner
 intervening on a single cell affects a much larger neighbourhood
 than a random-pixel diagnostic would suggest.
 
-![Figure 0.7 — Spatial clustering of compound failure.](figures/fig_0_7_clustering.png)
+![Figure 0.7 — Spatial clustering of compound constraint.](figures/fig_0_7_clustering.png)
 
-**Figure 0.7. PROPOSITION.** Compound-failure corridors are
+**Figure 0.7. PROPOSITION.** Compound-constraint corridors are
 empirically clustered, not randomly distributed. Synthetic CFD;
 the spatial-statistics conclusion is conserved over the U-field
 modelling choice (Moran's I uses only the binary classification
@@ -1241,16 +1258,16 @@ the libpysal/esda statistics on it.
 
 **Figure 0.8.** Terrain confound test for the headline typology
 finding. Panel (a) stratifies the 4-state diagnostic by slope bin
-(0–5°, 5–15°, 15–25°, ≥ 25°) per site; compound-failure share rises
+(0–5°, 5–15°, 15–25°, ≥ 25°) per site; compound-constraint share rises
 monotonically with slope on Vidigal (0 % → 22 %) and Rocinha
 (3 % → 9 %). Panel (b) maps each site coloured by slope bin with
-compound-failure cells outlined in red — the outlines concentrate on
+compound-constraint cells outlined in red — the outlines concentrate on
 the steeper (darker blue) cells in hillside sites. Panel (c) is the
-proposition: % compound-failure cells per typology, *stratified by
+proposition: % compound-constraint cells per typology, *stratified by
 slope bin*. **At slope < 5° the hillside − flatland gap is −2 pp; at
 the steepest slope bin it is +2 pp.** When slope is controlled the
 typology label nearly stops doing work, which means most of the
-"hillside is more compound-failure-prone" signal in Fig 0.4 and the
+"hillside is more compound-constraint-prone" signal in Fig 0.4 and the
 typology ladder in Fig 0.6 is *slope acting through the typology
 label*, not a residual morphology effect. The honest reading: slope
 is a stronger predictor than typology categoricals once both are
@@ -1742,7 +1759,7 @@ because external readers trust the rendered artefact.
 | 0.4 ★ | Manuscript: 4-state diagnostic taxonomy (headline) | `fig_0_4_diagnostic.png` |
 | 0.5 | Manuscript: predictors + typology contrast | `fig_0_5_predictors.png` |
 | 0.6 | Manuscript: climate-stress robustness (wind-stilling 4-state shift) | `fig_0_6_climate_stress.png` |
-| 0.7 | Manuscript: spatial clustering of compound failure (proposition) | `fig_0_7_clustering.png` |
+| 0.7 | Manuscript: spatial clustering of compound constraint (proposition) | `fig_0_7_clustering.png` |
 | 0.8 | Manuscript: terrain confound (slope-stratified 4-state shares) | `fig_0_8_terrain_confound.png` |
 
 All figures in `docs/technical_report/figures/`.
