@@ -5,7 +5,7 @@ distribution non-uniformly across typologies.
 Under a documented tropical wind-stilling trend (−10 to −15 % mean U
 projected for SE Brazil mid-century; IPCC AR6 WGI Atlas regional
 summary), the 4-state diagnosis from Fig 0.4 tilts away from adequate
-toward compound failure, but not uniformly across typologies.
+toward compound constraint, but not uniformly across typologies.
 
 This is a stylized scenario — wind speeds are uniformly scaled by a
 factor; no CMIP6 ensemble or thermal coupling. Sunlight is unaffected
@@ -18,7 +18,7 @@ Panels
 A   Stacked bars per site under {U×1.00, U×0.85, U×0.70}.
 B   Cell-level state-flip map per site under U×0.85.
 C   Typology vulnerability ladder: % of cells flipping to compound
-    failure under U×0.85, ordered.
+    constraint under U×0.85, ordered.
 
 Run:
     python docs/manuscript/figures/fig_0_6_climate_stress.py
@@ -83,9 +83,9 @@ FLIP_COLORS = {
 }
 FLIP_LABELS = {
     "stable_adequate": "Stays adequate",
-    "stable_fail": "Stays in failure",
-    "flip_to_vent": "Flips → ventilation failure",
-    "flip_to_compound": "Flips → compound failure",
+    "stable_fail": "Stays constrained",
+    "flip_to_vent": "Flips → ventilation constraint",
+    "flip_to_compound": "Flips → compound constraint",
 }
 
 
@@ -265,7 +265,7 @@ def draw_panel_c(ax, vulnerability: dict[str, float]) -> None:
                 fontsize=6.5, color="#333", fontweight="bold")
     ax.set_yticks(y)
     ax.set_yticklabels(typs, fontsize=7, fontweight="bold")
-    ax.set_xlabel("% cells flipping → compound failure under −15 % U", fontsize=6.5,
+    ax.set_xlabel("% cells flipping → compound constraint under −15 % U", fontsize=6.5,
                   labelpad=2)
     ax.tick_params(axis="x", labelsize=6, length=2, width=0.4, pad=2)
     ax.tick_params(axis="y", length=0)
@@ -389,7 +389,7 @@ def main() -> None:
         "consistent with IPCC AR6 mid-century projections for SE Brazil;\n"
         "−30 % is a stress-test upper bound. Thermal coupling is not\n"
         "modelled — only the ventilation half of the diagnosis moves.\n"
-        "Cells already in failure stay there; the figure surfaces the\n"
+        "Cells already constrained stay there; the figure surfaces the\n"
         "marginal recruits the climate signal pulls below threshold."
     )
     ax_cap.text(0.0, 0.95, caption, transform=ax_cap.transAxes,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Figure 0.7 (proposition B) — Spatial clustering of compound failure.
+"""Figure 0.7 (proposition B) — Spatial clustering of compound constraint.
 
-Tests whether compound-failure cells (4-state grid from Fig 0.4) are
+Tests whether compound-constraint cells (4-state grid from Fig 0.4) are
 spatially structured or random. If structured, then targeting
 interventions geographically (rather than by census boundary) is
 mechanistically sound.
@@ -14,7 +14,7 @@ A   Global Moran's I per site with permutation null distribution
 B   Local Moran's I (LISA) cluster map per site (5 panels). Cells
     classified as high-high (compound surrounded by compound) are
     highlighted; the rest fade. This identifies the "compound
-    corridors" — where the failure concentrates.
+    corridors" — where the constraint concentrates.
 C   Compound-cluster size distribution. CCDF of connected-component
     sizes (Rook adjacency) observed vs. random-spatial-permutation
     expectation. A heavy upper tail = real clustering.
@@ -185,7 +185,7 @@ def draw_panel_a(ax, moran_per_site: dict) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels([SITE_LABELS[s] for s in sites], fontsize=6.5,
                        rotation=10)
-    ax.set_ylabel("Moran's I (compound failure)", fontsize=7, labelpad=2)
+    ax.set_ylabel("Moran's I (compound constraint)", fontsize=7, labelpad=2)
     ax.tick_params(axis="y", labelsize=6, length=2, width=0.4, pad=2)
     ax.tick_params(axis="x", length=0)
     for s in ("top", "right"):
@@ -360,7 +360,7 @@ def main() -> None:
     for sp in ax_cap_a.spines.values():
         sp.set_visible(False)
     cap_a = (
-        "Global Moran's I on the binary compound-failure indicator,\n"
+        "Global Moran's I on the binary compound-constraint indicator,\n"
         "Rook contiguity (10 m cells sharing an edge), row-standardized.\n"
         "Null obtained by random label permutation (999 reshuffles).\n"
         "I > 0 → compound cells co-locate more than chance; I ≈ 0 →\n"
@@ -389,7 +389,7 @@ def main() -> None:
         sp.set_visible(False)
     cap_c = (
         "Cluster sizes pooled across sites. Components found by Rook\n"
-        "adjacency on the subset of cells classified as compound failure.\n"
+        "adjacency on the subset of cells classified as compound constraint.\n"
         "Random null: same number of compound labels permuted uniformly\n"
         "over classified cells (20 reshuffles × site). A heavy upper tail\n"
         "in the observed CCDF, relative to the null, is the signature of\n"
@@ -412,7 +412,7 @@ def main() -> None:
              fontsize=9, fontweight="bold", va="bottom", ha="left")
 
     fig.text(0.5, 0.985,
-             "Spatial clustering: compound failure forms coherent corridors, not random pixels",
+             "Spatial clustering: compound constraint forms coherent corridors, not random pixels",
              ha="center", va="top", fontsize=8.5, fontweight="bold",
              color="#1a1a1a")
     fig.text(0.5, 0.968,

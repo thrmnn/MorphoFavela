@@ -92,6 +92,12 @@ def main():
             for t in thresholds[col]:
                 ax.axhline(t, color="#888888", linewidth=0.4, linestyle="--", zorder=1)
 
+        # Post-repair λf sits well under 5; an extreme tail otherwise stretches
+        # the axis until the violin bodies are unreadable
+        if col == "lambda_f_mean":
+            hi = np.percentile(np.concatenate(data), 99)
+            ax.set_ylim(0, max(hi, 5.0))
+
         ax.set_xticks(range(len(SITE_ORDER)))
         ax.set_xticklabels(
             [SITE_LABELS.get(s, s) for s in SITE_ORDER],
