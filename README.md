@@ -19,7 +19,7 @@ A Python pipeline for the morphometric and CFD-coupled analysis of pedestrian-le
 
 ## Status
 
-See [ROADMAP.md](ROADMAP.md) for the full roadmap and version history. **As of May 2026**: 5 sites onboarded; 119-patch CFD campaign sampled and exported; wind input complete; result-side analysis pipeline shipped + synthetic-validated end-to-end on all 5 sites; SVF cross-validated against UMEP `svfForProcessing153` on all 5 sites (closes the §10.3 limitation). Pilot patch VDG-P07 in flight at MIT ORCD; ingestion layer plumbed and waiting on first real CFD return.
+See [ROADMAP.md](ROADMAP.md) for the full roadmap and version history. **As of June 2026**: 5 campaign sites + 3 calibration sites (Borel, Jacarezinho, Morro do Juramento) onboarded; 119-patch CFD campaign sampled and exported; wind input complete; result-side analysis pipeline shipped + synthetic-validated end-to-end on all 5 sites; SVF cross-validated against UMEP `svfForProcessing153` (closes the §10.3 limitation). Grid λf was re-baselined on 2026-06-02 by the cell-clipping repair — pre-June λf values are superseded. Street-level pipeline now runs on canonical observer networks with length-weighted segment SVF, cross-validated against an independent Ladybug model (Vidigal, MAE 1.77 h, deprivation-flag agreement 72 %). CFD pilot ladder staged in `~/Airflow`; ingestion layer plumbed and waiting on first real return.
 
 ## Repository Map
 
@@ -250,9 +250,10 @@ MorphoFavela/
 │   ├── solar/                            # Façade + ground solar access
 │   ├── cfd_integration/                  # CFD I/O contract, wind weighting (see its README)
 │   ├── visualization/                    # Map + chart helpers
-│   ├── urban_morphology.py               # BCR, FAR, λp, λf
+│   ├── viz/                              # Dashboard panel + map composition helpers
+│   ├── urban_morphology.py               # BCR, FAR, λp, λf (cell-clipped since 2026-06)
 │   ├── typology.py                       # Settlement typology
-│   ├── exposure.py                       # Sky-exposure-plane exceedance
+│   ├── exposure/                         # Sky-exposure-plane exceedance + deprivation
 │   ├── spatial_analysis.py               # Moran's I, LISA, Gi*
 │   └── config.py                         # Filtering thresholds + plot settings
 │
@@ -270,6 +271,13 @@ MorphoFavela/
 │   ├── run_campaign_sampling.py          # Full CFD campaign top-up (22-25 patches)
 │   ├── build_wind_rose.py                # INMET / Iowa ASOS → wind_rose.json
 │   ├── extract_inmet_stations.py         # Pull station CSVs from yearly INMET ZIPs
+│   ├── build_street_observers.py         # Canonical per-site observer networks
+│   ├── build_site_dashboard.py           # A3 Folha de Rua site sheets
+│   ├── build_html_dashboard.py           # Interactive HTML site dashboards
+│   ├── build_mingze_bundle.py            # 3D-data bundle for collaborators
+│   ├── compare_mingze_vidigal.py         # Cross-method solar validation (Ladybug)
+│   ├── brisa_ventilation/                # Numbered BRISA pipeline (λf repair → taxonomy)
+│   ├── brisa_deck/                       # BRISA presentation figure scripts
 │   ├── hpc/                              # SLURM helpers (most CFD HPC code is in ~/Airflow)
 │   └── data_utils/, debug/               # Small helpers
 │

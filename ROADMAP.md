@@ -270,6 +270,8 @@
 ### Completed Features
 - [x] Plan area density (lambda_p) - footprint area / total area per analysis unit
 - [x] Frontal area density (lambda_f) - building frontal area perpendicular to wind
+      — **repaired 2026-06-02** (cell clipping, commit e2252f4): pre-June grids inflated
+      λf 2-3×; all grids overwritten in place, pre-June λf values are superseded
 - [x] Height variability (sigma_h) - standard deviation of building heights per unit
 - [x] Street orientation entropy (H) - Shannon entropy of street directions
 - [x] Zone flagging (SVF < 0.3, lambda_f > 0.4)
@@ -337,6 +339,21 @@
 ## Next Steps & Priorities
 
 ### Recently Completed
+- [x] **Grid λf repair** (2026-06-02) — facade segments now clipped to the cell; per-site
+      medians dropped 2-3× (canonical band λp>0: p50 = 1.15–2.69). Grids overwritten in
+      place; anything quoting pre-June λf is superseded. See `docs/brisa_ventilation_handoff.md`.
+- [x] **Interim λf diagnostic taxonomy** (2026-06-03) — four-state at pooled p75 = 2.75;
+      values renamed failure → constraint; Figs 03/04 regenerated from corrected λf.
+- [x] **3 calibration sites onboarded** (2026-06-03) — Borel, Jacarezinho, Morro do
+      Juramento (calibration-only, lighter outputs layout; not CFD campaign sites).
+- [x] **Canonical street-observer networks** for all 5 sites + length-weighted segment
+      SVF (audit C1 fix, d8175ca) (2026-06-05).
+- [x] **Site dashboards** (2026-06-05) — interactive HTML (Leaflet + Plotly) and A3
+      *Folha de Rua* sheets for all 5 sites under `outputs/_distribution/`.
+- [x] **Mingze cross-validation** (2026-06-11) — 4-site 3D bundle shipped; Vidigal
+      Ladybug-vs-raycast comparison: MAE 1.77 h, bias −0.10 h, WHO <2 h deprivation-flag
+      agreement 72 %.
+- [x] **Two-pass repo audit** landed (2026-06-03) — `docs/audit_2026-06-03/`.
 - [x] **5-site UMEP cross-validation** closed (2026-05-01) — slopes within ±8 % of unity
       at 4/5 sites, r² 0.68–0.94, all biases ≥ 0 (height-shifted MorphoFavela input zeros sub-1.5 m
       structures). Vendored UMEP at `vendor/umep_processing/`. Closes §10.3 limitation.
@@ -445,7 +462,7 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
 
 ### Next steps (in this repo)
 - [x] **Result-side pipeline implemented + synthetic-validated on all 5 sites**
-      (2026-04-29). Entry points: `ivf-analyze-cfd`, `ivf-synthetic-cfd`. Outputs in
+      (2026-04-29). Entry points: `mf-analyze-cfd`, `mf-synthetic-cfd`. Outputs in
       `outputs/{site}/cfd_analysis/`.
 - [ ] Ingest first real CFD return (VDG-P07) via `cfd-results-ingestor` agent →
       `src/cfd_integration/` aggregation
@@ -559,6 +576,18 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
 - Nature Cities paper figures: 9 scripts + shared style module (`outputs/paper_figures/`)
 - **Status**: Phase 5 complete, ready for OpenFOAM simulations in CFD repo
 
+### v6.0.0 (June 2026)
+- Grid λf repair: cell clipping in `src/urban_morphology.py` / `src/morphometry/indicators.py`;
+  all per-site grids overwritten in place (medians 2-3× lower)
+- BRISA ventilation workstream: interim λf taxonomy (pooled p75 = 2.75), failure → constraint
+  rename, Figs 03/04/05 regenerated; 3 calibration sites onboarded
+- Street level: canonical observer networks (`build_street_observers.py`), length-weighted
+  segment SVF (audit C1)
+- Distribution: HTML + A3 site dashboards, Mingze 3D bundle + Vidigal Ladybug
+  cross-validation (`scripts/compare_mingze_vidigal.py`)
+- **Status**: BRISA paper workstream active on `feat/brisa-paper`; technical-report §4
+  refresh in flight
+
 ### v5.5.0 (late April – early May 2026)
 - Wind input for all 5 sites: INMET BDMEP + Iowa State ASOS pipelines, measured roses
   2015–2024, `quality_flag: "measured"`
@@ -593,8 +622,10 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
 - Tregenza 145-patch SVF is merged and production-ready
 - SVF validated against UMEP `svfForProcessing153` on all 5 campaign sites (2026-05-01)
 - All Phase 2, 3, 3.5, 4, 4.5, and 5 analyses are complete and production-ready
+  (λf re-baselined 2026-06-02 by the cell-clipping repair — see Recently Completed)
 - CFD campaign: 5 areas — vidigal, rocinha, riodaspedras, complexo_do_alemao, maré
-  (CDD excluded due to broken building data; see `project_cdd_data_bug` memory)
+  (CDD excluded from the campaign at allocation time; its building data was later
+  confirmed valid — see `project_cdd_data_bug` memory — but the 5-site lock stood)
 - CFD simulation execution is handled in a separate repo (`~/Airflow`); this repo
   produces the patches (`sampling_cfd/campaign_sampling/patches/`) and ingests
   results via `cfd-results-ingestor` + `src/cfd_integration/` for Phase 7 analysis
