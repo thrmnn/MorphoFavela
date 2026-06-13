@@ -12,7 +12,7 @@
 - [x] Robust error handling and validation
 
 ### Current Status
-- **Version**: 1.0.0
+- **Version**: 6.0.0
 - **Status**: Production ready
 - **Outputs**: Enhanced datasets, statistics, and visualizations
 

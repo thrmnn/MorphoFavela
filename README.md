@@ -4,7 +4,7 @@ A Python pipeline for the morphometric and CFD-coupled analysis of pedestrian-le
 
 **What this repo does**
 
-- Builds a **10 m morphometric grid** (20+ indicators per cell — SVF, λp, λf, σh, slope, aspect, porosity, …) from building footprints + DTM
+- Builds a **10 m morphometric grid** (12 indicators per cell — SVF, λp, λf, σh, slope, aspect, porosity, … — materialised as 25 columns since λf is stored per-direction) from building footprints + DTM
 - Generates a **stratified CFD sampling campaign** (119 patches across 5 sites, 12-strata SVF × slope × λp grid, 80 m maximin spacing, 250 m circular domain)
 - Ingests measured **wind input** (INMET BDMEP + Iowa ASOS METAR) into per-site `wind_rose.json` for annual weighting
 - Specifies a **CFD I/O contract** and ingests OpenFOAM-derived wind fields when they return from the simulation cluster
@@ -322,7 +322,7 @@ See [`docs/README.md`](docs/README.md) for a one-line summary of each.
   + [`.pdf`](docs/technical_report/technical_report.pdf). Rebuild
   with `python docs/technical_report/build_pdf.py`.
 - **Methodology** (per-feature deep dives): [`docs/methodology/`](docs/methodology/)
-  — sky-exposure plane, street-level SVF, the 25 morphometric indicators.
+  — sky-exposure plane, street-level SVF, the 12 morphometric indicators.
 - **Workflow patterns**: [`docs/workflow_patterns.md`](docs/workflow_patterns.md)
   — the council-of-experts + judge-panel + per-entity build pattern
   used to produce the audit, site dashboards, and HTML deliverables.
