@@ -1511,8 +1511,6 @@ def generate_pdf(
         "svf_v2/svf_streets_map": "Spatial map of SVF values along street centerlines.",
         "svf_v2/svf_streets_segments_map": "Segment-level SVF map with colour-coded classification.",
         "morphology_metrics/morphology_distributions": "Kernel density estimates for key building-level morphometric indicators.",
-        "urban_morphology/maps/zone_metrics_panel": "Zone-level panel showing BCR, FAR, height variability, and frontal area index.",
-        "urban_morphology/maps/lisa_clusters_bcr": "LISA cluster map for BCR identifying statistically significant spatial clusters.",
     }
 
     with PdfPages(output_path) as pdf:
@@ -1717,8 +1715,6 @@ def generate_pdf(
                     "svf_v2/svf_streets_map",
                     "svf_v2/svf_streets_segments_map",
                     "morphology_metrics/morphology_distributions",
-                    "urban_morphology/maps/zone_metrics_panel",
-                    "urban_morphology/maps/lisa_clusters_bcr",
                 ]
                 for key in sorted(figs.keys()):
                     if "street_svf" in key and key not in priority:
