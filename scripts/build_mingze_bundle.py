@@ -119,9 +119,9 @@ CRS for every spatial layer: **EPSG:31983** (SIRGAS 2000 / UTM 23S), units = met
 
 ## buildings.shp (+ .dbf .shx .prj .cpg)
 - 3D Polygon geometry. **Height-sanitised**: rows with a corrupt registry height
-  (`altura` > 60 m, where the source `topo` was 0 and `altura` had been
-  mis-derived as the base elevation) are dropped so the footprint set matches
-  `buildings_3d.stl`. This affects Rocinha only (4 rows).
+  (source `topo` == 0, where `altura` had been mis-derived as the base
+  elevation) are dropped so the footprint set matches `buildings_3d.stl`.
+  Affected: Rocinha 33 rows, Rio das Pedras 8, Maré 22.
 - Per-feature attributes from the Rio municipal `edificações` registry:
   - `altura` — building height above its base, metres. Use this as extrusion height for 3D modelling.
   - `base` — base elevation of the building footprint, m a.s.l.
@@ -149,29 +149,24 @@ Per-site sampling parameters (spacing, pedestrian height, building safety margin
 """
 
 
-# Favela building heights top out around 50 m (Rio das Pedras max ≈ 57 m;
-# every site's p99.9 ≤ 24 m). A handful of Rocinha rows carry a registry
-# corruption where `topo` (absolute top elevation) is 0 and `altura` was
-# mis-derived as the *base elevation* (129–232 m), which the extruder would
-# turn into phantom 130–465 m towers. Drop anything above this cap.
-HEIGHT_SANITY_CAP_M = 60.0
-
-
 def write_cleaned_buildings(shp: Path, site_dir: Path) -> tuple[Path, int]:
     """Write a height-sanitised buildings.shp into the bundle and return its path.
 
-    Drops registry-corrupt rows (altura above HEIGHT_SANITY_CAP_M) so that both
-    the shipped vector layer and the extruded STL are free of phantom towers.
+    Drops rows with the Rio edificações registry corruption where `topo`
+    (absolute top elevation) is 0 and `altura` was mis-derived as the base
+    elevation — the extruder would otherwise turn these into phantom towers up
+    to 232 m (Rocinha 33, Rio das Pedras 8, Maré 22). This is the same gate
+    `src.svf_v2.build_building_meshes` applies, so the shipped vector layer and
+    the STL stay consistent.
     """
     import geopandas as gpd
 
     gdf = gpd.read_file(shp)
     n0 = len(gdf)
-    if "altura" in gdf.columns:
-        bad = gdf["altura"] > HEIGHT_SANITY_CAP_M
+    if "topo" in gdf.columns:
+        bad = gdf["topo"] == 0
         if bad.any():
-            heights = sorted(gdf.loc[bad, "altura"].round(1), reverse=True)
-            print(f"    dropping {int(bad.sum())} registry-corrupt building(s), altura={heights} m")
+            print(f"    dropping {int(bad.sum())} registry-corrupt building(s) (topo == 0)")
         gdf = gdf[~bad].copy()
     out = site_dir / "buildings.shp"
     gdf.to_file(out)
@@ -267,7 +262,7 @@ If you can write back to CSV with `point_id + solar_hours_*` we can join 1:1 aga
 ## Caveats
 
 - These shapefiles are the Rio municipal `edificações` v2024 registry. The `altura` attribute is height above the building base, not above sea level (use `topo` for absolute top elevation).
-- The footprint set and `buildings_3d.stl` have been height-sanitised: 4 Rocinha rows with a corrupt registry height (altura 124–232 m, a known `topo == 0` artefact) were dropped. No other site is affected.
+- The footprint set and `buildings_3d.stl` have been height-sanitised: rows with a corrupt registry height (a known `topo == 0` artefact where altura was mis-derived as the base elevation) were dropped — Rocinha 33, Rio das Pedras 8, Maré 22.
 - The observer set is the canonical street-level sampling (1.5 m spacing along road centerlines, pedestrian height = DTM + 1.5 m, building safety margin 0.5 m). See `observers_manifest.json` per site for the exact parameters.
 - For Maré, the in-folder name is `mare/` (ASCII) but the site is referred to in our reports as `Maré`.
 - For Rocinha and Complexo do Alemão the road shapefile omits stairway features (Escadaria / Ladeira); pedestrian circulation through stairs is therefore under-sampled.
