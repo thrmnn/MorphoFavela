@@ -31,6 +31,37 @@ logging.basicConfig(
 logger = logging.getLogger("morphometric_audit")
 
 
+def _sync_outputs(src_dir: Path, dst_dir: Path, label: str = "outputs") -> tuple[int, int]:
+    """Copy every file in src_dir into dst_dir, OVERWRITING existing files.
+
+    A non-overwriting copy here once froze the canonical morphometrics/svf/
+    tree: re-running run_svf_v2 wrote fresh svf_v2/ files that were never
+    propagated, so the street-SVF drift stayed invisible to every consumer.
+    Overwrites unconditionally and warns when the destination is newer than
+    its source (a sign the run order was wrong). Returns (n_new, n_replaced).
+    """
+    import shutil
+
+    n_new = n_replaced = 0
+    for src in src_dir.glob("*"):
+        if not src.is_file():
+            continue
+        dest = dst_dir / src.name
+        existed = dest.exists()
+        if existed and dest.stat().st_mtime > src.stat().st_mtime:
+            logger.warning(
+                "%s: %s is newer than its svf_v2/ source — overwriting; "
+                "check run order if unexpected",
+                label,
+                src.name,
+            )
+        shutil.copy2(src, dest)
+        n_replaced += existed
+        n_new += not existed
+    logger.info("%s synced (%d new, %d overwritten)", label, n_new, n_replaced)
+    return n_new, n_replaced
+
+
 def load_data(area: str, buildings_override: str = None, dtm_override: str = None):
     """Load all input data for the area.
 
@@ -177,25 +208,12 @@ def run_audit(
     # ── 4b. Copy SVF data into morphometrics/svf/ ─────────────────
     svf_src_dir = get_area_output_dir(area) / "svf_v2"
     if svf_src_dir.exists():
-        import shutil
-
-        for svf_file in svf_src_dir.glob("*"):
-            dest = svf_dir_out / svf_file.name
-            if not dest.exists():
-                if svf_file.is_file():
-                    shutil.copy2(svf_file, dest)
-        logger.info("SVF data linked to morphometrics/svf/")
+        _sync_outputs(svf_src_dir, svf_dir_out, "morphometrics/svf/")
 
     # ── 4c. Copy building metrics into morphometrics/buildings/ ────
     bld_src = get_area_output_dir(area) / "morphology_metrics"
     if bld_src.exists():
-        import shutil
-
-        for bld_file in bld_src.glob("*"):
-            dest = buildings_dir / bld_file.name
-            if not dest.exists() and bld_file.is_file():
-                shutil.copy2(bld_file, dest)
-        logger.info("Building metrics linked to morphometrics/buildings/")
+        _sync_outputs(bld_src, buildings_dir, "morphometrics/buildings/")
 
     # ── 5. Save grid data ─────────────────────────────────────────
     logger.info("Saving grid data...")
