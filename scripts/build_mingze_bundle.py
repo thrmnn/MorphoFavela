@@ -118,7 +118,11 @@ CRS for every spatial layer: **EPSG:31983** (SIRGAS 2000 / UTM 23S), units = met
   geometry removes the model-construction difference between our pipelines.
 
 ## buildings.shp (+ .dbf .shx .prj .cpg)
-- 3D Polygon geometry. Per-feature attributes from the Rio municipal `edificações` registry:
+- 3D Polygon geometry. **Height-sanitised**: rows with a corrupt registry height
+  (`altura` > 60 m, where the source `topo` was 0 and `altura` had been
+  mis-derived as the base elevation) are dropped so the footprint set matches
+  `buildings_3d.stl`. This affects Rocinha only (4 rows).
+- Per-feature attributes from the Rio municipal `edificações` registry:
   - `altura` — building height above its base, metres. Use this as extrusion height for 3D modelling.
   - `base` — base elevation of the building footprint, m a.s.l.
   - `topo` — top elevation = base + altura, m a.s.l.
@@ -145,23 +149,52 @@ Per-site sampling parameters (spacing, pedestrian height, building safety margin
 """
 
 
-def build_site_stls(site: str, files: dict[str, Path], site_dir: Path) -> None:
+# Favela building heights top out around 50 m (Rio das Pedras max ≈ 57 m;
+# every site's p99.9 ≤ 24 m). A handful of Rocinha rows carry a registry
+# corruption where `topo` (absolute top elevation) is 0 and `altura` was
+# mis-derived as the *base elevation* (129–232 m), which the extruder would
+# turn into phantom 130–465 m towers. Drop anything above this cap.
+HEIGHT_SANITY_CAP_M = 60.0
+
+
+def write_cleaned_buildings(shp: Path, site_dir: Path) -> tuple[Path, int]:
+    """Write a height-sanitised buildings.shp into the bundle and return its path.
+
+    Drops registry-corrupt rows (altura above HEIGHT_SANITY_CAP_M) so that both
+    the shipped vector layer and the extruded STL are free of phantom towers.
+    """
+    import geopandas as gpd
+
+    gdf = gpd.read_file(shp)
+    n0 = len(gdf)
+    if "altura" in gdf.columns:
+        bad = gdf["altura"] > HEIGHT_SANITY_CAP_M
+        if bad.any():
+            heights = sorted(gdf.loc[bad, "altura"].round(1), reverse=True)
+            print(f"    dropping {int(bad.sum())} registry-corrupt building(s), altura={heights} m")
+        gdf = gdf[~bad].copy()
+    out = site_dir / "buildings.shp"
+    gdf.to_file(out)
+    return out, n0 - len(gdf)
+
+
+def build_site_stls(site: str, dtm: Path, buildings_shp: Path, site_dir: Path) -> None:
     """terrain.stl + buildings_3d.stl in world coordinates (EPSG:31983).
 
-    Their union is byte-for-byte the scene MorphoFavela's SVF/solar
-    ray-caster sees — sending it removes the model-construction confound
-    from cross-method comparisons.
+    Their union is the scene MorphoFavela's SVF/solar ray-caster sees (modulo
+    the height-sanity cleaning applied to the shipped footprints) — sending it
+    removes the model-construction confound from cross-method comparisons.
     """
     if str(REPO) not in sys.path:
         sys.path.insert(0, str(REPO))
     from src.svf_v2 import build_building_meshes, build_terrain_mesh
 
-    terrain = build_terrain_mesh(files["dtm"])
+    terrain = build_terrain_mesh(dtm)
     terrain_path = site_dir / "terrain.stl"
     terrain.save(str(terrain_path), binary=True)
     print(f"    terrain.stl: {terrain.n_cells:,} cells, {terrain_path.stat().st_size / 1e6:.1f} MB")
 
-    buildings, _ = build_building_meshes(files["buildings_shp"], files["dtm"], area=site)
+    buildings, _ = build_building_meshes(buildings_shp, dtm, area=site)
     if buildings is None:
         raise RuntimeError(f"{site}: no valid buildings for STL extrusion")
     bld_path = site_dir / "buildings_3d.stl"
@@ -234,6 +267,7 @@ If you can write back to CSV with `point_id + solar_hours_*` we can join 1:1 aga
 ## Caveats
 
 - These shapefiles are the Rio municipal `edificações` v2024 registry. The `altura` attribute is height above the building base, not above sea level (use `topo` for absolute top elevation).
+- The footprint set and `buildings_3d.stl` have been height-sanitised: 4 Rocinha rows with a corrupt registry height (altura 124–232 m, a known `topo == 0` artefact) were dropped. No other site is affected.
 - The observer set is the canonical street-level sampling (1.5 m spacing along road centerlines, pedestrian height = DTM + 1.5 m, building safety margin 0.5 m). See `observers_manifest.json` per site for the exact parameters.
 - For Maré, the in-folder name is `mare/` (ASCII) but the site is referred to in our reports as `Maré`.
 - For Rocinha and Complexo do Alemão the road shapefile omits stairway features (Escadaria / Ladeira); pedestrian circulation through stairs is therefore under-sampled.
@@ -277,17 +311,19 @@ def main() -> int:
             dst = site_dir / "dtm.tif"
             shutil.copy2(files["dtm"], dst)
 
-        # Buildings + sidecars (rename to canonical name)
+        # Buildings: write a height-sanitised buildings.shp (drops registry-corrupt
+        # phantom-tower rows), then extrude the *same* cleaned set into the STL.
+        cleaned_shp = None
         if files["buildings_shp"].exists():
-            copy_shp_with_sidecars(files["buildings_shp"], site_dir, rename="buildings")
+            cleaned_shp, _ = write_cleaned_buildings(files["buildings_shp"], site_dir)
 
         # Boundary + sidecars
         if files["boundary_shp"].exists():
             copy_shp_with_sidecars(files["boundary_shp"], site_dir, rename="boundary")
 
         # STL scene (terrain + extruded buildings, world coordinates)
-        if files["dtm"].exists() and files["buildings_shp"].exists():
-            build_site_stls(site, files, site_dir)
+        if files["dtm"].exists() and cleaned_shp is not None:
+            build_site_stls(site, files["dtm"], cleaned_shp, site_dir)
 
         # Observers (3 formats + manifest)
         for src_key, dst_name in [
