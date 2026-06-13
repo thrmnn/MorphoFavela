@@ -69,6 +69,22 @@ These are **independent** — run in any order or parallel.
 | `plot_street_svf_with_isolines.py` | — | Street SVF overlaid on DTM hillshade + contours | `src.svf_v2` |
 | `validate_svf_against_umep.py` | — | Per-site cross-validation of MorphoFavela's ray-cast SVF against UMEP's shadow-cast `svfForProcessing153`. Writes `outputs/{site}/morphometrics/svf/umep_validation/`. | `src.svf_v2`, UMEP |
 
+> **⚠ SVF output path — producer/consumer split (mandatory ordering).**
+> `run_svf_v2.py` writes its raw outputs to **`outputs/{site}/svf_v2/`**
+> (`svf_streets.gpkg`, `svf_grid.*`, `scene.stl`, figures). But every
+> downstream consumer — `run_street_solar.py`, `compute_cross_site_stats.py`,
+> `run_aspect_analysis.py`, `run_diagnostic_models.py`,
+> `run_predictor_analysis.py`, `build_street_observers.py`,
+> `compare_mingze_vidigal.py` — reads the **canonical
+> `outputs/{site}/morphometrics/svf/`** tree. The bridge is
+> `run_morphometric_audit.py`, which copies `svf_v2/*` → `morphometrics/svf/`
+> (overwriting, since the 2026-06 copy-guard fix). **So after re-running SVF
+> you must run `run_morphometric_audit.py` (or copy the files yourself)
+> before any consumer, or they will silently read stale geometry.** This
+> split is the mechanism behind the 2026 street-SVF drift; until a future
+> change makes `run_svf_v2` write `morphometrics/svf/` directly, treat
+> `run_svf_v2 → run_morphometric_audit → consumers` as a hard ordering.
+
 ---
 
 ## Stage 3 — Per-feature combined indices + reports
