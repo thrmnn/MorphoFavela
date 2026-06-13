@@ -14,16 +14,23 @@ docs/
 │   ├── build_pdf.py                     # Pandoc + WeasyPrint pipeline
 │   └── figures/                         # Figures referenced from the report (PNG)
 │
+├── manuscript/                          # Ventilation-paper (BRISA) figure track
+│   └── figures/                         # fig_0_x scripts + PNG exports (SVGs gitignored)
+│
 ├── methodology/                         # Per-feature methodology deep dives
 │   ├── sky_exposure.md                  # Sky-exposure plane envelope (Rio + São Paulo rulesets)
 │   ├── street_svf.md                    # Street-level SVF along centrelines
-│   └── morphometric_indicators.md       # Formal definitions of the 25 indicators
+│   └── morphometric_indicators.md       # Formal definitions of the 12 indicators (25 grid columns)
 │
 ├── onboarding/                          # Reader paths for first-time visitors
 │   └── local_setup.md                   # Concentrated troubleshooting (GDAL, conda, GPU)
 │
 ├── FAVELA_EXTRACTION_WORKFLOW.md        # GIS workflow for new-site building extraction
 ├── GPU_SVF_EXACT_VALIDATION.md          # GPU-vs-CPU SVF parity report (Phase 3.5)
+├── PRODUCTION_READINESS_PLAN.md         # Repo hardening checklist (packaging, CI, cleanup phases)
+├── workflow_patterns.md                # Multi-agent workflow / orchestration patterns
+├── brisa_*.md                           # BRISA ventilation workstream: λf-fix plan, taxonomy note, fix report, handoff
+├── audit_2026-06-03*.md                 # Two-pass repo audit (round 1 + round 2)
 └── cfd_sampling_overrides.yaml          # Documented coverage-gap downgrades for sampling-auditor
 ```
 
