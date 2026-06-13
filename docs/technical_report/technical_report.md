@@ -571,7 +571,7 @@ so patterns are directly comparable.
   arrangement breaks the λp↔SVF link at fine scales. This is the
   structural-coupling finding developed in Section 5.
 - **σH correlates weakly with H_mean** (per-site r ≈ 0.15–0.43, pooled
-  ≈ 0.25). Earlier prose claimed r ≈ 0.5; the current cross-site number
+  ≈ 0.34). Earlier prose claimed r ≈ 0.5; the current cross-site number
   is lower because the bimodal "regular block + tall outliers" pattern
   saturates in dense favela fabric.
 - **Slope is nearly uncorrelated with morphology**, confirming that
@@ -678,11 +678,11 @@ holds a single site: four traces (N / E / S / W) plus the underlay
 scatter coloured by aspect bearing. Shaded bands show the
 inter-quartile range; trace segments where the SVF bin contains fewer
 than 30 cells are dashed (open markers) to flag the small-sample
-tails. The four available sites all show the same shape — the N
-trace sits well above the S trace at every SVF — and the per-site
-quadrant means in the summary panel give N − S ranging from +1.6 h
-(Vidigal) to +3.0 h (Rocinha). Maré is pending; its street-solar
-pipeline has not yet been run.
+tails. All five sites show the same ordering — the N trace sits above
+the S trace at every SVF — but the magnitude tracks typology: the
+per-site quadrant means (full table below) give an N − S contrast from
++2.99 h on hillside Rocinha down to +0.37 h on flatland Maré, whose
+near-level fabric mutes the dissociation without reversing its sign.
 
 The headline scientific claim, now cross-site: **SVF and solar hours
 are not interchangeable on sloped terrain in the southern
@@ -1566,7 +1566,7 @@ on Linux, `brew install gdal` on macOS) before `pip install`.
 
 ```bash
 python -m pytest tests/ -m "not integration" -q --tb=short
-# → 552 tests pass; 69 integration tests deselected
+# → 557 tests pass; 69 integration tests deselected
 # (use `python -m pytest` to bypass any older user-site `pytest` on PATH)
 ```
 
