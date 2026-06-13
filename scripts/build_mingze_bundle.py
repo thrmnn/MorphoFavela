@@ -374,7 +374,7 @@ def main() -> int:
         tar.add(BUNDLE_DIR, arcname=BUNDLE_DIR.name)
 
     sha = sha256_of(TARBALL)
-    (TARBALL.with_suffix(".tar.gz.sha256")).write_text(f"{sha}  {TARBALL.name}\n")
+    (TARBALL.parent / f"{TARBALL.name}.sha256").write_text(f"{sha}  {TARBALL.name}\n")
     tar_mb = TARBALL.stat().st_size / (1024 * 1024)
     print(f"Tarball: {TARBALL} ({tar_mb:.1f} MB)")
     print(f"sha256:  {sha}")
