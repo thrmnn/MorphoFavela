@@ -31,6 +31,47 @@ def _ensure_dir(path: Path) -> Path:
     return path
 
 
+def _git_sha() -> str:
+    import subprocess
+
+    try:
+        return (
+            subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=Path(__file__).resolve().parents[2],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
+    except Exception:
+        return "unknown"
+
+
+def write_run_meta(output_dir: Path, output_type: str, n_points: int, **params) -> Path:
+    """Write run_meta.json next to SVF outputs so drift is detectable.
+
+    Records the producer git sha, a UTC timestamp, the output type, point
+    count, and any sampler params. A consumer (or the queue-refresh probe)
+    can compare ``run_meta["git_sha"]`` against HEAD to know whether an
+    output was produced by the current code — the 2026 street-SVF drift was
+    invisible precisely because no such provenance was written.
+    """
+    import json
+    from datetime import datetime, timezone
+
+    meta = {
+        "output_type": output_type,
+        "git_sha": _git_sha(),
+        "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "n_points": int(n_points),
+        **params,
+    }
+    path = _ensure_dir(output_dir) / "run_meta.json"
+    path.write_text(json.dumps(meta, indent=2))
+    return path
+
+
 # ---------------------------------------------------------------------------
 # Grid results
 # ---------------------------------------------------------------------------
@@ -78,6 +119,9 @@ def save_grid_results(
 
     # Heatmap plot
     plot_svf_heatmap(points, svf, out / "svf_heatmap.png", footprints_gdf=footprints_gdf)
+
+    # Provenance (drift detection)
+    write_run_meta(out, "svf_grid", len(gdf), grid_spacing=grid_spacing, crs=str(crs))
 
 
 def _rasterise_svf(
@@ -167,6 +211,16 @@ def save_street_results(
     gpkg_path = out / "svf_streets.gpkg"
     street_gdf.to_file(gpkg_path, driver="GPKG")
     logger.info(f"  Saved {gpkg_path} ({len(street_gdf)} points)")
+
+    # Provenance (drift detection): boundary_clipped distinguishes the
+    # pre/post-a554dbb sampling that caused the 2026 street-SVF drift.
+    write_run_meta(
+        out,
+        "svf_streets",
+        len(street_gdf),
+        crs=str(street_gdf.crs),
+        boundary_clipped=boundary_gdf is not None,
+    )
 
     # Per-segment aggregation
     seg_gdf = None
