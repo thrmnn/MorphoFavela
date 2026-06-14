@@ -680,9 +680,10 @@ inter-quartile range; trace segments where the SVF bin contains fewer
 than 30 cells are dashed (open markers) to flag the small-sample
 tails. All five sites show the same ordering — the N trace sits above
 the S trace at every SVF — but the magnitude tracks typology: the
-per-site quadrant means (full table below) give an N − S contrast from
-+2.99 h on hillside Rocinha down to +0.37 h on flatland Maré, whose
-near-level fabric mutes the dissociation without reversing its sign.
+per-site quadrant means (full table below) give an N − S contrast of
++2.6 to +2.9 h across the hillside sites (Complexo do Alemão highest at
++2.92 h) down to +0.37 h on flatland Maré, whose near-level fabric mutes
+the dissociation without reversing its sign.
 
 The headline scientific claim, now cross-site: **SVF and solar hours
 are not interchangeable on sloped terrain in the southern
@@ -714,16 +715,16 @@ sampling, ray-cast against terrain + extruded LiDAR-height footprints):
 
 | Site | n | N | E | S | W | N − S |
 |---|--:|--:|--:|--:|--:|--:|
-| Vidigal | 6,812 | 3.32 | 2.85 | 1.70 | 4.02 | +1.62 |
-| Rocinha | 34,771 | 3.60 | 1.55 | 0.62 | 2.23 | +2.99 |
-| Complexo do Alemão | 43,741 | 4.94 | 3.62 | 2.06 | 3.29 | +2.88 |
-| Rio das Pedras | 1,346 | 3.41 | 1.49 | 0.54 | 1.77 | +2.87 |
+| Vidigal | 6,812 | 3.00 | 2.81 | 1.63 | 3.89 | +1.37 |
+| Rocinha | 33,463 | 3.22 | 1.45 | 0.61 | 1.98 | +2.61 |
+| Complexo do Alemão | 43,741 | 4.97 | 3.63 | 2.05 | 3.27 | +2.92 |
+| Rio das Pedras | 1,346 | 3.41 | 1.47 | 0.53 | 1.76 | +2.87 |
 | Maré | 8,228 | 4.96 | 5.24 | 4.59 | 5.91 | +0.37 |
 
 Direct regression of solar hours on `(slope, λp, sin α, cos α)` on
-Vidigal reaches R² = 0.246 (n = 6,876, intercept 5.70 h,
-`aspect_cos` coefficient = +1.22 — i.e. moving from S- to N-facing
-under fixed slope and λp adds 2.4 h on average). Per-site SVF
+Vidigal reaches R² = 0.270 (n = 6,876, intercept 5.52 h,
+`aspect_cos` coefficient = +1.13 — i.e. moving from S- to N-facing
+under fixed slope and λp adds 2.3 h on average). Per-site SVF
 regressions on `(slope, λp, sin α, cos α)` are written to
 `outputs/{site}/morphometrics/aspect_regression.csv` (Vidigal SVF
 R² = 0.599) with per-quadrant summaries in
@@ -796,11 +797,11 @@ Cross-site comparison by aspect quadrant:
 
 **Figure 8.** Mean street-level direct sun by aspect quadrant
 (N / E / S / W) and reference date. Hillside sites (Vidigal, Rocinha)
-show large winter N–S contrasts (Rocinha N − S = +2.80 h; Vidigal
-+1.56 h) — the §5.3 dissociation made cross-site. Flatland sites
-collapse: Rio das Pedras' winter N − S contrast is just +0.55 h
+show large winter N–S contrasts (Rocinha N − S = +2.44 h; Vidigal
++1.31 h) — the §5.3 dissociation made cross-site. Flatland sites
+collapse: Rio das Pedras' winter N − S contrast is just +0.56 h
 (Maré +0.79 h). Complexo do Alemão's mixed terrain shows a
-hillside-like +2.74 h winter contrast.
+hillside-like +2.78 h winter contrast.
 
 The standalone single-panel versions of Figure 7 (a/b/c) live at
 `docs/technical_report/figures/fig07a_solar_winter.png`,
@@ -1165,8 +1166,8 @@ hillside-open patch shifted from CDA-P22 to VDG-P17 (SVF=0.57,
 ![Figure 0.3 — Environmental performance.](figures/fig_0_3_performance.png)
 
 **Figure 0.3.** Cross-site environmental performance: representative
-patch maps + pooled distributions. Maré awaits its solar gpkg —
-4/5 sites shown.
+patch maps + pooled distributions across all five sites (Maré's
+street-solar gpkg landed in the 2026-06 re-baseline).
 
 **Fig 0.4 ★ — Diagnostic taxonomy at favela scale (headline).** Four-
 state per-10 m-cell classification: **Adequate** (vent + sun both
@@ -1225,18 +1226,18 @@ ventilation half of the diagnosis moves.
 ![Figure 0.6 — Climate-stress robustness.](figures/fig_0_6_climate_stress.png)
 
 **Figure 0.6.** Climate-stress robustness: wind-stilling shifts the
-4-state distribution non-uniformly across typologies. Maré awaits its
-solar gpkg and is shown without flip annotation in panel B.
+4-state distribution non-uniformly across typologies, now including
+flatland Maré in panel B.
 
 **Fig 0.7 — Spatial clustering of compound constraint (proposition).**
 Empirical follow-up to 0.4: the compound-constraint pixels are *not*
 randomly distributed — they form coherent corridors. Three panels:
 (A) Global Moran's I on the binary compound-constraint indicator under
-Rook contiguity (4/5 sites: Vidigal I=0.61, Rocinha I=0.58, CDA
-I=0.81, RdP I=0.80; all p<0.001 vs 999-permutation random-label
-null); (B) LISA cluster maps showing the contiguous compound-constraint
-components per site (compound-corridor cell share: Vidigal 8.3 %,
-Rocinha 4.5 %, CDA 9.2 %, RdP 6.9 %); (C) cluster-size CCDF pooled
+Rook contiguity (all five sites: Vidigal I=0.64, Rocinha I=0.59, CDA
+I=0.80, RdP I=0.80, Maré I=0.77; all p<0.001 vs 999-permutation
+random-label null); (B) LISA cluster maps showing the contiguous
+compound-constraint components per site (per-site compound-corridor
+shares shown in the panel); (C) cluster-size CCDF pooled
 across sites — observed (orange) vs random null (grey dashed). The
 heavy upper tail in the observed CCDF (single components extending
 past ~30 cells) is the signature of spatial clustering: a planner
