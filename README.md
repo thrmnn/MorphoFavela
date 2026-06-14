@@ -71,7 +71,7 @@ pip install -e ".[dev]"
 
 GDAL / GEOS native libraries must be present (`apt install libgdal-dev`
 on Linux, `brew install gdal` on macOS) before `pip install`.
-For GPU SVF: `pip install -e ".[gpu]"`.
+A GPU SVF backend is **not currently available** (the v2 ray-caster is CPU-parallelised; a GPU port is future work). The `[gpu]` extra installs PyTorch3D but the backend raises `NotImplementedError`.
 
 ### 2. Inputs
 
@@ -219,7 +219,7 @@ Or a lighter unpinned setup (you supply GDAL / GEOS via `apt`/`brew`):
 
 ```bash
 conda create -n morphofavela python=3.11 && conda activate morphofavela
-pip install -e ".[dev]"          # add ".[gpu]" for PyTorch3D-backed SVF
+pip install -e ".[dev]"          # ([gpu] extra exists but the GPU SVF backend is not yet ported — CPU is supported)
 ```
 
 GDAL / GEOS native libraries are required for the pip path (`apt install
@@ -246,7 +246,7 @@ MorphoFavela/
 │
 ├── src/                                  # Library code (importable)
 │   ├── morphometry/                      # Core morphometric metrics
-│   ├── svf_v2/                           # GPU sky-view-factor computation
+│   ├── svf_v2/                           # Sky-view-factor computation (CPU ray-casting)
 │   ├── solar/                            # Façade + ground solar access
 │   ├── cfd_integration/                  # CFD I/O contract, wind weighting (see its README)
 │   ├── visualization/                    # Map + chart helpers
@@ -259,7 +259,7 @@ MorphoFavela/
 │
 ├── scripts/                              # Executable entry points
 │   ├── build_extended_context.py         # 300 m buffer per site (run first)
-│   ├── run_svf_v2.py                     # SVF (GPU)
+│   ├── run_svf_v2.py                     # SVF (CPU ray-casting)
 │   ├── compute_solar_access.py           # Ground solar
 │   ├── run_facade_solar.py               # Façade solar
 │   ├── compute_sectional_porosity.py     # Porosity

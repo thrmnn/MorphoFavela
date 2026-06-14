@@ -235,7 +235,7 @@ def main():
     parser.add_argument("--pedestrian-height", type=float, default=1.5)
     parser.add_argument("--sky-patches", type=int, default=145)
     parser.add_argument(
-        "--backend", default="raycasting", choices=["raycasting", "gpu", "pyviewfactor"]
+        "--backend", default="raycasting", choices=["raycasting", "pyviewfactor"]
     )
     parser.add_argument("--max-ray-length", type=float, default=500.0)
     parser.add_argument(

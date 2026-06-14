@@ -1557,7 +1557,7 @@ regenerated from the committed scripts. This section is the index.
 ```bash
 git clone https://github.com/thrmnn/MorphoFavela.git && cd MorphoFavela
 conda create -n morphofavela python=3.11 && conda activate morphofavela
-pip install -e ".[dev]"          # add ".[gpu]" for the optional GPU SVF stack
+pip install -e ".[dev]"          # ([gpu] extra exists but the GPU SVF backend is not yet ported to v2 — CPU ray-casting is the supported backend)
 ```
 
 GDAL / GEOS native libraries must be present (`apt install libgdal-dev`
