@@ -1567,7 +1567,7 @@ on Linux, `brew install gdal` on macOS) before `pip install`.
 
 ```bash
 python -m pytest tests/ -m "not integration" -q --tb=short
-# → 557 tests pass; 69 integration tests deselected
+# → 539 tests pass; 69 integration tests deselected
 # (use `python -m pytest` to bypass any older user-site `pytest` on PATH)
 ```
 
