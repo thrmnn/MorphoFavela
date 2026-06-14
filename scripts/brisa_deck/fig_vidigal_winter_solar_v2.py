@@ -16,12 +16,12 @@ from pathlib import Path
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
-from matplotlib import patches as mpatches
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
 sys.path.insert(0, str(PROJECT_ROOT))
 from fig_style import load_buildings  # noqa: E402
+
 from src.viz import presentation_style as ps  # noqa: E402
 
 PAPER_OUT_DIR = Path("/home/theo/brisa_paper/artifacts/slides/assets")

@@ -25,13 +25,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 logging.getLogger("pilot_sampling").setLevel(logging.ERROR)
 from scripts.run_pilot_sampling import (  # noqa: E402
+    CONFIG,
     PATCH_RADIUS_M,
     SITE_PRESETS,
-    CONFIG,
     _hillshade,
     _resolve,
     assign_strata,
 )
+
 PAPER_FIG_DIR = PROJECT_ROOT / "outputs" / "paper_figures"
 sys.path.insert(0, str(PAPER_FIG_DIR))
 from fig_style import SITE_LABELS, apply_style  # noqa: E402

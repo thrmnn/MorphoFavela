@@ -37,6 +37,7 @@ PAPER_FIG_DIR = PROJECT_ROOT / "outputs" / "paper_figures"
 sys.path.insert(0, str(PAPER_FIG_DIR))
 sys.path.insert(0, str(PROJECT_ROOT))
 from fig_style import apply_style  # noqa: E402
+
 from scripts.run_pilot_sampling import _hillshade, _resolve  # noqa: E402
 from src.viz import presentation_style as ps  # noqa: E402
 

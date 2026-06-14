@@ -31,9 +31,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # silence the noisy module-level logger from run_pilot_sampling import
 logging.getLogger("pilot_sampling").setLevel(logging.ERROR)
 from scripts.run_pilot_sampling import (  # noqa: E402
+    CONFIG,
     PATCH_RADIUS_M,
     SITE_PRESETS,
-    CONFIG,
     _hillshade,
     _resolve,
     _stratum_cmap,

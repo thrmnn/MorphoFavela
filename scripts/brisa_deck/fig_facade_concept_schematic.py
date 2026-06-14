@@ -19,10 +19,8 @@ import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib.patches import FancyArrowPatch, Polygon
-from matplotlib.lines import Line2D
 import numpy as np
+from matplotlib.patches import Polygon
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PAPER_FIG_DIR = PROJECT_ROOT / "outputs" / "paper_figures"

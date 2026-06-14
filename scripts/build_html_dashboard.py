@@ -576,7 +576,7 @@ def render_site_html(site: str, stats: dict) -> str:
         kpi("Observers / km²" + density_chip,
             f'{stats["density_per_km2"]:.0f}' if not math.isnan(stats["density_per_km2"]) else "—",
             "kpi-density", "density_per_km2"),
-        kpi(f'Edge observers (≤15 m) <small class="kpi-hint">toggle the "Exclude edge" mask on the map to see them removed</small>',
+        kpi('Edge observers (≤15 m) <small class="kpi-hint">toggle the "Exclude edge" mask on the map to see them removed</small>',
             f'{edge_pct:.1f}%' if edge_pct else "—",
             "kpi-edge", "edge_share"),
         kpi("Mean SVF <small>length-weighted</small>",
@@ -607,7 +607,7 @@ def render_site_html(site: str, stats: dict) -> str:
                 f'<p>{f["summary"]}</p>'
                 + (f'<p class="human-stakes">{f["human_stakes"]}</p>' if f.get("human_stakes") else "")
                 + f'<a class="chevron" href="#m-{fid.lower()}">read methodology →</a>'
-                + f'</article>'
+                + '</article>'
             )
         return "\n".join(out)
 

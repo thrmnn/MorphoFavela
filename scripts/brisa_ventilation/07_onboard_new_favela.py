@@ -26,12 +26,10 @@ from __future__ import annotations
 
 import argparse
 import re
-import sys
 import unicodedata
 from pathlib import Path
 
 import geopandas as gpd
-import numpy as np
 import rasterio
 from rasterio.mask import mask as rio_mask
 from rasterio.windows import from_bounds

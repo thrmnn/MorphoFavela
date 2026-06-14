@@ -28,11 +28,11 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LinearSegmentedColormap, Normalize
 from matplotlib.cm import ScalarMappable
+from matplotlib.colors import LinearSegmentedColormap, Normalize
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PAPER_FIG_DIR = PROJECT_ROOT / "outputs" / "paper_figures"

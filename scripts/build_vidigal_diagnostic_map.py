@@ -25,7 +25,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import patches as mpatches
-from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib.colors import BoundaryNorm, ListedColormap
 from scipy.spatial import cKDTree
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

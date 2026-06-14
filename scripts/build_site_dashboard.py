@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
-import os
 import subprocess
 import sys
 import warnings
@@ -24,12 +23,10 @@ import geopandas as gpd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from matplotlib import patches as mpatches
 from matplotlib.lines import Line2D
-from matplotlib.patches import Circle, Rectangle
+from matplotlib.patches import Rectangle
 from scipy.stats import gaussian_kde, pearsonr
-from shapely.geometry import box
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)

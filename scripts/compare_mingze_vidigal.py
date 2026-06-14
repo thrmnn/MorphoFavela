@@ -141,7 +141,8 @@ def residual_map(df: gpd.GeoDataFrame):
     )
     ax.set_aspect("equal")
     ax.set_title("Residual (winter solstice solar hours)")
-    ax.set_xticks([]); ax.set_yticks([])
+    ax.set_xticks([])
+    ax.set_yticks([])
     add_scalebar_north(ax)
 
     ax = axes[1]
@@ -152,7 +153,8 @@ def residual_map(df: gpd.GeoDataFrame):
     )
     ax.set_aspect("equal")
     ax.set_title("Ours")
-    ax.set_xticks([]); ax.set_yticks([])
+    ax.set_xticks([])
+    ax.set_yticks([])
     add_scalebar_north(ax)
 
     fig.tight_layout()
@@ -320,7 +322,8 @@ def diagnostic_figures(df: gpd.GeoDataFrame, d: dict):
     ax.set_aspect("equal")
     ax.legend(loc="lower right", fontsize=9, markerscale=2)
     ax.set_title("Structural disagreements: who sees sun where the other sees none")
-    ax.set_xticks([]); ax.set_yticks([])
+    ax.set_xticks([])
+    ax.set_yticks([])
     add_scalebar_north(ax)
     fig.tight_layout()
     fig.savefig(OUT / "zero_asymmetry_map.png", dpi=160)
