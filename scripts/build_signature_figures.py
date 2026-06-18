@@ -198,24 +198,115 @@ def fig_stability(meta):
     _save(fig, "stability.png")
 
 
-def fig_maps():
+def _scalebar(ax, length_m=200):
+    x0, x1 = ax.get_xlim()
+    y0, y1 = ax.get_ylim()
+    x = x0 + 0.06 * (x1 - x0)
+    y = y0 + 0.06 * (y1 - y0)
+    ax.plot([x, x + length_m], [y, y], color="black", lw=2, solid_capstyle="butt")
+    ax.text(x + length_m / 2, y + 0.015 * (y1 - y0), f"{length_m} m",
+            ha="center", va="bottom", fontsize=6)
+
+
+def fig_maps(mmu_cells=10):
+    """Mode-filtered morphotypes, dissolved to regions: islands below the MMU
+    dropped, thin white casing between regions, site outline, constant ground
+    scale (panel width ∝ site bbox width), scale bar. NULL = grey."""
     paths = sorted(glob.glob(str(ROOT / "outputs/*/features/features_grid.parquet")))
     paths = [p for p in paths if Path(p).parents[1].name in CAMPAIGN_SITES]
-    fig, axes = plt.subplots(1, len(paths), figsize=(3 * len(paths), 3.2))
-    for ax, p in zip(np.atleast_1d(axes), paths):
-        site = Path(p).parents[1].name
-        g = gpd.read_parquet(p)
+    grids = {Path(p).parents[1].name: gpd.read_parquet(p) for p in paths}
+    widths = [g.total_bounds[2] - g.total_bounds[0] for g in grids.values()]
+    fig, axes = plt.subplots(
+        1, len(grids), figsize=(2.6 * len(grids), 3.4),
+        gridspec_kw={"width_ratios": widths},
+    )
+    cmap = matplotlib.colors.ListedColormap(type_color_list())
+    for ax, (site, g) in zip(np.atleast_1d(axes), grids.items()):
         col = "morphotype_smooth" if "morphotype_smooth" in g else "morphotype"
+        cell_area = float(g.geometry.area.median())
         g.plot(ax=ax, color=NULL_COLOR, linewidth=0)
         gg = g.dropna(subset=[col])
-        gg.plot(ax=ax, column=col, categorical=True,
-                cmap=matplotlib.colors.ListedColormap(type_color_list()),
-                vmin=0, vmax=5, linewidth=0)
+        diss = gg.dissolve(by=col).reset_index().explode(index_parts=False)
+        diss = diss[diss.geometry.area >= mmu_cells * cell_area]
+        diss.plot(ax=ax, column=col, categorical=True, cmap=cmap,
+                  vmin=0, vmax=5, edgecolor="white", linewidth=0.3)
+        gpd.GeoSeries([g.geometry.union_all()], crs=g.crs).boundary.plot(
+            ax=ax, color="0.25", linewidth=0.6)
+        ax.set_xlim(g.total_bounds[0], g.total_bounds[2])
+        ax.set_ylim(g.total_bounds[1], g.total_bounds[3])
+        ax.set_aspect("equal")
+        _scalebar(ax)
         ax.set_axis_off()
         ax.set_title(site.replace("_", " "), fontsize=9)
-    fig.suptitle("Morphotypes (spatially mode-filtered; grey = no street support)",
-                 fontsize=10)
+    fig.suptitle("Morphotypes — mode-filtered, dissolved (MMU "
+                 f"{mmu_cells} cells); grey = no street support", fontsize=10)
     _save(fig, "maps_morphotypes.png")
+
+
+def fig_naive_vs_support(site="vidigal"):
+    """Why the change-of-support matters: naive nearest-k mean SVF (fills every
+    cell) vs support-aware p10 with NULL grey (honest about the ~65% unsupported)."""
+    g = gpd.read_parquet(ROOT / "outputs" / site / "features" / "features_grid.parquet")
+    obs = gpd.read_parquet(ROOT / "outputs" / site / "features" / "features_street.parquet")
+    cent = g.copy()
+    cent["geometry"] = g.geometry.centroid
+    near = gpd.sjoin_nearest(cent[["geometry"]], obs[["svf", "geometry"]], how="left")
+    naive = near.groupby(near.index)["svf"].mean().reindex(range(len(g)))
+
+    fig, axes = plt.subplots(1, 2, figsize=(8, 3.6))
+    g.assign(naive=naive.to_numpy()).plot(
+        ax=axes[0], column="naive", cmap="YlOrBr_r", linewidth=0, legend=True,
+        legend_kwds={"shrink": 0.6, "label": "SVF"})
+    axes[0].set_title("Naive nearest-k mean\n(every cell filled)", fontsize=9)
+    g.plot(ax=axes[1], color=NULL_COLOR, linewidth=0)
+    g.dropna(subset=["svf_p10"]).plot(
+        ax=axes[1], column="svf_p10", cmap="YlOrBr_r", linewidth=0, legend=True,
+        legend_kwds={"shrink": 0.6, "label": "SVF p10"})
+    axes[1].set_title("Support-aware p10\n(grey = no observer, not imputed)", fontsize=9)
+    for ax in axes:
+        ax.set_aspect("equal")
+        ax.set_axis_off()
+    fig.suptitle(f"{site} — naive aggregation invents values the support-aware "
+                 "table withholds", fontsize=10)
+    _save(fig, "naive_vs_support.png")
+
+
+def fig_terrain_sensitivity(leaf):
+    """Does the flat-datum error track the prioritized types? Per morphotype:
+    slope (error driver) and the gap between measured SVF and an analytic
+    flat-canyon SVF from H/W (proxy for the terrain/3D correction)."""
+    rows = []
+    for p in sorted(glob.glob(str(ROOT / "outputs/*/features/features_grid.parquet"))):
+        site = Path(p).parents[1].name
+        if site not in CAMPAIGN_SITES:
+            continue
+        g = gpd.read_parquet(p)[["zone_id", "morphotype_smooth"]]
+        obs = gpd.read_parquet(Path(p).parents[1] / "features" / "features_street.parquet")
+        o = obs[obs["has_hw"]].merge(g, on="zone_id", how="left")
+        o = o.dropna(subset=["morphotype_smooth", "HW", "svf", "slope_deg"])
+        o["svf_flat"] = np.cos(np.arctan(2 * o["HW"]))
+        o["svf_gap"] = o["svf"] - o["svf_flat"]
+        rows.append(o[["morphotype_smooth", "slope_deg", "svf_gap"]])
+    d = pd.concat(rows, ignore_index=True)
+    order = [c for c in leaf if c in d["morphotype_smooth"].unique()]
+
+    fig, axes = plt.subplots(1, 2, figsize=(9, 3.4))
+    for ax, (col, lab) in zip(axes, [("slope_deg", "slope (°)"),
+                                     ("svf_gap", "SVF gap (measured − flat-canyon)")]):
+        data = [d[d["morphotype_smooth"] == c][col].to_numpy() for c in order]
+        bp = ax.boxplot(data, vert=False, showfliers=False, patch_artist=True)
+        for patch, c in zip(bp["boxes"], order):
+            patch.set_facecolor(TYPE_COLORS[c])
+            patch.set_alpha(0.8)
+        ax.set_yticks(range(1, len(order) + 1))
+        ax.set_yticklabels([f"T{c}" for c in order])
+        ax.set_xlabel(lab, fontsize=9)
+        ax.grid(axis="x", color="0.92")
+    axes[0].axvline(20, ls=":", color="crimson")
+    axes[0].text(20, 0.5, " flat-datum risk →", color="crimson", fontsize=7)
+    fig.suptitle("Terrain sensitivity by morphotype — prioritized types T4/T5 "
+                 "(steep/dense) vs the known flat-datum error", fontsize=10)
+    _save(fig, "terrain_sensitivity.png")
 
 
 GALLERY = [
@@ -234,8 +325,14 @@ GALLERY = [
      "Held-out experienced conditions per type (dot size ∝ street support). The "
      "monotone worsening with density is out-of-sample validation."),
     ("maps_morphotypes.png", "Morphotype maps",
-     "Spatially mode-filtered (purity 0.43→0.80), Okabe–Ito, NULL=grey. "
-     "Dissolve→MMU→white-casing + scale bars are the next polish."),
+     "Mode-filtered + dissolved to regions (MMU 10 cells, white casing, site "
+     "outline, constant ground-scale, scale bars); Okabe–Ito, NULL=grey."),
+    ("naive_vs_support.png", "Naive vs support-aware",
+     "Why the change-of-support matters: nearest-k mean invents a value for every "
+     "cell; the support-aware p10 leaves the ~65% unsupported cells grey."),
+    ("terrain_sensitivity.png", "Terrain sensitivity",
+     "Does the flat-datum λf/SVF error track the prioritized types? Slope + the "
+     "measured-vs-flat-canyon SVF gap per morphotype (Risk-1 honesty)."),
     ("stability.png", "k=6 stability",
      "Bootstrap ARI 0.90 over 20 refits — k=6 is robust."),
     ("k_selection.png", "Model selection",
@@ -251,7 +348,7 @@ def write_gallery():
         cards.append(f"""
   <section class="card">
     <h2>{title}</h2>
-    <img src="{name}" loading="lazy">
+    <img src="{name}" loading="lazy" onclick="zoom('{name}','{title}')">
     <p class="decision">{decision}</p>
     <p class="prompt">Review: <b>✅ keep</b> &nbsp;|&nbsp; <b>✏️ refine</b> — note what to change.</p>
   </section>""")
@@ -264,16 +361,24 @@ def write_gallery():
  main{{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:20px;padding:24px}}
  .card{{background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:16px}}
  .card h2{{margin:0 0 10px;font-size:16px}}
- .card img{{width:100%;height:auto;border:1px solid #eee;border-radius:6px}}
+ .card img{{width:100%;height:auto;border:1px solid #eee;border-radius:6px;cursor:zoom-in}}
  .decision{{color:#444;font-size:13px}} .prompt{{color:#777;font-size:13px;border-top:1px dashed #ddd;padding-top:8px}}
+ #lb{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;cursor:zoom-out;flex-direction:column;align-items:center;justify-content:center}}
+ #lb img{{max-width:96vw;max-height:90vh}} #lb p{{color:#eee;margin:10px;font-size:15px}}
 </style>
 <header>
  <h1>Favela morpho-signature — figure review (v2)</h1>
- <p>Generated per the expert-reviewed spec. Page through; mark each keep / refine.
-    Full rationale: docs/visualization_plan.md · docs/morpho_signature_decisions.md</p>
+ <p>Generated per the expert-reviewed spec. Click any figure to enlarge. Page
+    through; mark each keep / refine.
+    Rationale: docs/visualization_plan.md · docs/morpho_signature_decisions.md</p>
 </header>
 <main>{''.join(cards)}
-</main>"""
+</main>
+<div id="lb" onclick="this.style.display='none'"><img id="lbimg"><p id="lbcap"></p></div>
+<script>
+ function zoom(src,cap){{lbimg.src=src;lbcap.textContent=cap;lb.style.display='flex'}}
+ addEventListener('keydown',e=>{{if(e.key==='Escape')lb.style.display='none'}});
+</script>"""
     (OUT / "index.html").write_text(html)
 
 
@@ -310,6 +415,8 @@ def main():
     fig_recurrence_evidence(mat, labels, leaf)
     fig_experience(profile, leaf)
     fig_maps()
+    fig_naive_vs_support()
+    fig_terrain_sensitivity(leaf)
     fig_stability(stab)
     fig_kselection(sel, k)
     write_gallery()
