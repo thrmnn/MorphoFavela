@@ -133,6 +133,18 @@ captions. Prioritization map = **quantile classes** (not continuous physical uni
 **overlay the real CFD anchor locations**, lead with the pure-geometry index and
 label any synthetic-CFD calibration explicitly.
 
+## Status (2026-06-18)
+
+Generated (`scripts/build_signature_figures.py` → `figures_v2/` + lightbox gallery):
+fingerprint heatmap, dendrogram, recurrence + recurrence-evidence, experience
+dot-plots, mode-filtered **dissolved** maps (MMU/casing/outline/scale-bar/
+constant-ground-scale), naive-vs-support, terrain-sensitivity, stability,
+k-selection. Project hub (`scripts/build_project_hub.py` → `outputs/_hub/`) links
+all parts. **Remaining polish:** per-figure caption finalization (type names),
+Rio locator inset, UMAP embedding (needs `umap-learn`), and md→html rendering in
+the hub. The terrain-sensitivity figure uses an analytic flat-canyon SVF proxy
+(from H/W), not a full flat-datum re-run — that remains the rigorous Risk-1 task.
+
 ## Review protocol
 
 1. Three expert lenses critique this plan + the current draft figures
