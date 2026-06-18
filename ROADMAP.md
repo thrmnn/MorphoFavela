@@ -339,6 +339,14 @@
 ## Next Steps & Priorities
 
 ### Recently Completed
+- [x] **5-site street-SVF re-baseline + branch consolidation** (2026-06-18) — all five
+      sites re-baselined on the corrected ray-caster (boundary-clip street sampling +
+      facade-normal fix for CW polygons); removes external-highway edge bias. Validated
+      against Mingze's independent Ladybug ground truth (Vidigal MAE 1.77 → 1.70 h,
+      Pearson 0.565 → 0.589). Outputs now emit `run_meta.json` provenance (git sha) so
+      silent drift is detectable. The 41-commit BRISA chain (`feat/brisa-paper` →
+      `fix/brisa-figures-fig5-fig6`) fast-forwarded onto `main`; 13 merged remote
+      branches pruned. Suite green (539 tests), ruff clean.
 - [x] **Grid λf repair** (2026-06-02) — facade segments now clipped to the cell; per-site
       medians dropped 2-3× (canonical band λp>0: p50 = 1.15–2.69). Grids overwritten in
       place; anything quoting pre-June λf is superseded. See `docs/brisa_ventilation_handoff.md`.
@@ -585,8 +593,10 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
   segment SVF (audit C1)
 - Distribution: HTML + A3 site dashboards, Mingze 3D bundle + Vidigal Ladybug
   cross-validation (`scripts/compare_mingze_vidigal.py`)
-- **Status**: BRISA paper workstream active on `feat/brisa-paper`; technical-report §4
-  refresh in flight
+- 5-site street-SVF re-baseline on the corrected ray-caster (boundary-clip + facade-normal),
+  validated vs Mingze Ladybug (Vidigal MAE 1.77 → 1.70 h); `run_meta.json` provenance manifests
+- **Status**: BRISA chain consolidated onto `main` (2026-06-18, 41 commits fast-forwarded,
+  merged branches pruned); ready for a fresh next track
 
 ### v5.5.0 (late April – early May 2026)
 - Wind input for all 5 sites: INMET BDMEP + Iowa State ASOS pipelines, measured roses
