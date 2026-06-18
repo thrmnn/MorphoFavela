@@ -114,6 +114,27 @@ site artefact. *Outcome:*
 
 ---
 
+## WS-A.2 — Spatial refinement & stability
+
+**D14 · Salt-and-pepper fixed by a contiguity mode filter, not regionalization.**
+Per-site libpysal Queen weights → iterated majority filter (2 passes; ties keep the
+current label, so it is conservative and deterministic). *Outcome:* same-type
+adjacency (spatial purity) rises **0.43 → 0.80** mean across the 8 sites, ~35% of
+cells relabeled. A `morphotype_smooth` column is written back alongside the raw
+`morphotype`. *Tradeoff (flagged by the cartography reviewer):* mode-filtering is a
+*display generalization* that **preserves the global k=6 GMM types** — so the
+cross-site recurrence claim (D13) still holds. Full `spopt` regionalization
+(SKATER/MaxP) would give cleaner regions but a *different, site-specific*
+segmentation that breaks recurrence; reserve it for a single-site illustrative inset
+only. Raw per-cell labels remain the honest datum (kept in `morphotype`); the smooth
+column is for legible maps. `spopt` not installed.
+
+**D15 · k=6 is stable under resampling.**
+Bootstrap (20 GMM refits on 80% subsamples, ARI vs the reference labels):
+**mean ARI 0.901, sd 0.109, min 0.729.** Promote this from a footnote to a main
+figure (the domain reviewer notes a Fleischmann-lineage reviewer will demand cluster
+stability regardless).
+
 ## Open questions / revisit list
 
 - **Terrain-aware λf & SVF (plan Risk 1).** Both assume a flat datum; on 20–30°

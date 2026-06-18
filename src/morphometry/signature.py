@@ -180,6 +180,80 @@ def recurrence_flags(shares: pd.DataFrame, min_share=0.05, min_sites=3) -> pd.Da
     })
 
 
+def queen_neighbors(gdf) -> dict:
+    """Positional Queen-contiguity neighbour map for a site's grid cells."""
+    from libpysal.weights import Queen
+
+    w = Queen.from_dataframe(gdf, use_index=False, silence_warnings=True)
+    return w.neighbors
+
+
+def spatial_mode_smooth(
+    labels: np.ndarray, neighbors: dict, passes: int = 2
+) -> np.ndarray:
+    """Contiguity mode filter: relabel each cell to the majority type among
+    itself + its neighbours, iterated.
+
+    Dissolves salt-and-pepper while keeping the 6 *global* type semantics (this
+    is denoising, not regionalization — full ``spopt`` regionalization is the
+    rigorous follow-up, see the decision log). NaN labels (unbuilt cells) are
+    left untouched and excluded from voting. Ties keep the current label, so the
+    filter is conservative and deterministic.
+    """
+    import math
+    from collections import Counter
+
+    lab = np.array(labels, dtype=float)
+    for _ in range(passes):
+        new = lab.copy()
+        for i in range(len(lab)):
+            if math.isnan(lab[i]):
+                continue
+            votes = [lab[j] for j in neighbors.get(i, []) if not math.isnan(lab[j])]
+            votes.append(lab[i])
+            counts = Counter(votes)
+            top = max(counts.values())
+            winners = sorted(v for v, c in counts.items() if c == top)
+            new[i] = lab[i] if lab[i] in winners else winners[0]
+        lab = new
+    return lab
+
+
+def spatial_purity(labels: np.ndarray, neighbors: dict) -> float:
+    """Fraction of same-type adjacencies — the salt-and-pepper metric (0..1)."""
+    import math
+
+    same = total = 0
+    for i, neigh in neighbors.items():
+        if math.isnan(labels[i]):
+            continue
+        for j in neigh:
+            if math.isnan(labels[j]):
+                continue
+            total += 1
+            same += labels[i] == labels[j]
+    return same / total if total else float("nan")
+
+
+def bootstrap_stability(
+    Xz: np.ndarray, reference: np.ndarray, k: int,
+    n_boot: int = 20, frac: float = 0.8, random_state: int = 0,
+) -> np.ndarray:
+    """ARI of bootstrap GMM refits vs the reference labels — is k=6 fragile?"""
+    from sklearn.metrics import adjusted_rand_score
+    from sklearn.mixture import GaussianMixture
+
+    rng = np.random.default_rng(random_state)
+    aris = []
+    for b in range(n_boot):
+        idx = rng.choice(len(Xz), size=int(frac * len(Xz)), replace=False)
+        gm = GaussianMixture(
+            n_components=k, covariance_type="full", random_state=b, n_init=1
+        ).fit(Xz[idx])
+        aris.append(adjusted_rand_score(reference, gm.predict(Xz)))
+    return np.array(aris)
+
+
 def experience_profile(
     df: pd.DataFrame, mat: pd.DataFrame, labels: np.ndarray
 ) -> pd.DataFrame:
