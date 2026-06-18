@@ -74,9 +74,9 @@ def classify(grid: gpd.GeoDataFrame) -> pd.Series:
     both = built & sun_known & vent_known
     state = pd.Series("nodata", index=grid.index, dtype=object)
     state[both & (sun >= THRESHOLD_SUN_HRS) & (vent <= THRESHOLD_LAMBDA_F)] = "adequate"
-    state[both & (sun < THRESHOLD_SUN_HRS) & (vent <= THRESHOLD_LAMBDA_F)] = "sun_only"
-    state[both & (sun >= THRESHOLD_SUN_HRS) & (vent > THRESHOLD_LAMBDA_F)] = "vent_only"
-    state[both & (sun < THRESHOLD_SUN_HRS) & (vent > THRESHOLD_LAMBDA_F)] = "compound"
+    state[both & (sun < THRESHOLD_SUN_HRS) & (vent <= THRESHOLD_LAMBDA_F)] = "sunlight_constraint"
+    state[both & (sun >= THRESHOLD_SUN_HRS) & (vent > THRESHOLD_LAMBDA_F)] = "ventilation_constraint"
+    state[both & (sun < THRESHOLD_SUN_HRS) & (vent > THRESHOLD_LAMBDA_F)] = "compound_constraint"
     return state
 
 
@@ -117,7 +117,7 @@ def stats_for_site(site: str) -> dict[str, Any]:
     total = int(built_mask.sum())
     shares = {
         k: counts.get(k, 0) / total if total else 0.0
-        for k in ("adequate", "sun_only", "vent_only", "compound")
+        for k in ("adequate", "sunlight_constraint", "ventilation_constraint", "compound_constraint")
     }
 
     descriptors = {}
@@ -180,7 +180,7 @@ def stats_for_site(site: str) -> dict[str, Any]:
         "site": site,
         "typology": "hillside" if site in HILLSIDE else "flatland",
         "n_built_cells": total,
-        "counts": {k: counts.get(k, 0) for k in ("adequate", "sun_only", "vent_only", "compound")},
+        "counts": {k: counts.get(k, 0) for k in ("adequate", "sunlight_constraint", "ventilation_constraint", "compound_constraint")},
         "shares": shares,
         "pct_sun_below_2h": pct_below_2h,
         "pct_lambda_f_above_0_35": pct_lambda_f_above,
@@ -198,7 +198,7 @@ def aggregate(per_site: list[dict[str, Any]]) -> dict[str, Any]:
         total = sum(s["n_built_cells"] for s in per_site if s["site"] in group_sites)
         counts = {
             k: sum(s["counts"][k] for s in per_site if s["site"] in group_sites)
-            for k in ("adequate", "sun_only", "vent_only", "compound")
+            for k in ("adequate", "sunlight_constraint", "ventilation_constraint", "compound_constraint")
         }
         shares = {k: (v / total if total else 0.0) for k, v in counts.items()}
         return {"n_built_cells": total, "counts": counts, "shares": shares}
@@ -263,14 +263,16 @@ def write_summary_md(stats: dict[str, Any], path: Path) -> None:
     lines.append("")
     lines.append("## State shares per site")
     lines.append("")
-    lines.append("| Site | Typology | Built cells | Adequate | Sun-only | Vent-only | Compound |")
+    lines.append(
+        "| Site | Typology | Built cells | Adequate | Sunlight | Ventilation | Compound |"
+    )
     lines.append("|---|---|---:|---:|---:|---:|---:|")
     for s in stats["per_site"]:
         sh = s["shares"]
         lines.append(
             f"| {s['site']} | {s['typology']} | {s['n_built_cells']:,} | "
-            f"{sh['adequate'] * 100:.1f}% | {sh['sun_only'] * 100:.1f}% | "
-            f"{sh['vent_only'] * 100:.1f}% | {sh['compound'] * 100:.1f}% |"
+            f"{sh['adequate'] * 100:.1f}% | {sh['sunlight_constraint'] * 100:.1f}% | "
+            f"{sh['ventilation_constraint'] * 100:.1f}% | {sh['compound_constraint'] * 100:.1f}% |"
         )
     lines.append("")
     lines.append("## Aggregates")
@@ -280,8 +282,10 @@ def write_summary_md(stats: dict[str, Any], path: Path) -> None:
         sh = a["shares"]
         lines.append(
             f"- **{k}**: {a['n_built_cells']:,} cells — "
-            f"adequate {sh['adequate'] * 100:.1f}%, sun-only {sh['sun_only'] * 100:.1f}%, "
-            f"vent-only {sh['vent_only'] * 100:.1f}%, compound {sh['compound'] * 100:.1f}%"
+            f"adequate {sh['adequate'] * 100:.1f}%, "
+            f"sunlight constraint {sh['sunlight_constraint'] * 100:.1f}%, "
+            f"ventilation constraint {sh['ventilation_constraint'] * 100:.1f}%, "
+            f"compound constraint {sh['compound_constraint'] * 100:.1f}%"
         )
     lines.append("")
     lines.append("## Cross-site ranges")

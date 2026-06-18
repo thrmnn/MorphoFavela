@@ -77,3 +77,6 @@ docs/onboarding/engineering_review.md
 
 # Tests for the local Claude hook (AI tooling, not shipped).
 tests/test_hooks/
+
+# Vector figure source — regenerable by the docs/manuscript/figures/*.py scripts; keep PNGs tracked, not the heavy SVGs
+docs/manuscript/figures/exports/*.svg

@@ -249,6 +249,11 @@ def _projected_width(
     if mbr is None or mbr.is_empty:
         return 0.0
 
+    # A clipped intersection can degenerate to a Point or LineString
+    # (touching only a cell edge/corner); those carry no frontal area.
+    if not hasattr(mbr, "exterior") or mbr.exterior is None:
+        return 0.0
+
     coords = np.array(mbr.exterior.coords)[:-1]  # drop closing vertex
 
     # Perpendicular to wind direction (projected axis)
@@ -263,6 +268,7 @@ def compute_frontal_area_ratio(
     buildings: gpd.GeoDataFrame,
     zones: gpd.GeoDataFrame,
     wind_dir: float = 0.0,
+    clip_to_zone: bool = True,
 ) -> gpd.GeoDataFrame:
     """Projected frontal area density per zone.
 
@@ -270,8 +276,16 @@ def compute_frontal_area_ratio(
     ----------
     wind_dir : float
         Wind bearing in degrees from north (0 = N, 90 = E).
+    clip_to_zone : bool, default True
+        If True (recommended for small grid cells), clip each building footprint
+        to the zone polygon before projecting onto the cross-wind axis. This
+        mirrors ``compute_bcr`` and prevents partially-overlapping buildings
+        from contributing their full projected width to every cell they touch
+        — the bug that drove grid lambda_f to 0–54 instead of 0–1.5 and made
+        it a building-count proxy.
 
-    lambda_f = sum(projected_width * height) / zone_area.
+    lambda_f = sum(projected_width * height) / zone_area, with projected_width
+    measured on the cell-clipped footprint when ``clip_to_zone=True``.
     Requires a ``height`` column in *buildings*.
     """
     zones = zones.copy()
@@ -286,11 +300,17 @@ def compute_frontal_area_ratio(
 
     lf_values: dict[int, float] = {}
     for zone_id, group in joined.groupby("zone_id"):
+        zone_geom = zones.loc[zones["zone_id"] == zone_id, "geometry"].iloc[0]
+        zone_area = zones.loc[zones["zone_id"] == zone_id, "zone_area"].iloc[0]
         total_frontal = 0.0
         for _, row in group.iterrows():
-            w = _projected_width(row.geometry, wind_dir_rad)
+            geom = row.geometry
+            if clip_to_zone:
+                geom = geom.intersection(zone_geom)
+                if geom.is_empty:
+                    continue
+            w = _projected_width(geom, wind_dir_rad)
             total_frontal += w * row["height"]
-        zone_area = zones.loc[zones["zone_id"] == zone_id, "zone_area"].iloc[0]
         lf_values[zone_id] = total_frontal / zone_area if zone_area > 0 else 0.0
 
     zones["lambda_f"] = zones["zone_id"].map(lf_values).fillna(0.0)

@@ -2,7 +2,7 @@
 """Figure 0.8 — Terrain confound: does typology survive when slope is controlled?
 
 The 4-state diagnostic in 0.4 and the climate-stress vulnerability ladder
-in 0.6 both implicate "hillside" as the most compound-failure-prone
+in 0.6 both implicate "hillside" as the most compound-constraint-prone
 typology. But the hillside label is partially proxying terrain slope.
 This figure tests whether the typology effect survives slope control.
 
@@ -13,9 +13,9 @@ A   Per-site horizontal stacked bars of the 4-state shares, stratified
     composition shifts; rising compound share at steeper bins quantifies
     the raw terrain confound.
 B   5-site grid maps colored by slope bin, with cells in compound
-    failure outlined. Spatial expression: where do compound-failure
+    failure outlined. Spatial expression: where do compound-constraint
     cells co-locate with steep ground?
-C   Typology comparison stratified by slope bin: % compound-failure
+C   Typology comparison stratified by slope bin: % compound-constraint
     cells per typology, for each slope bin. If the hillside–flatland
     gap persists across slope bins, typology beats slope. If the gap
     collapses at low slope, typology was slope.
@@ -201,7 +201,7 @@ def draw_panel_a(ax, fractions: dict[str, list[dict[str, float] | None]],
 
 
 # ---------------------------------------------------------------------------
-# Panel B: slope-binned site maps with compound-failure cells outlined
+# Panel B: slope-binned site maps with compound-constraint cells outlined
 # ---------------------------------------------------------------------------
 def draw_slope_map(ax, site: str, grid: gpd.GeoDataFrame,
                    buildings: gpd.GeoDataFrame, boundary: gpd.GeoDataFrame,
@@ -227,7 +227,7 @@ def draw_slope_map(ax, site: str, grid: gpd.GeoDataFrame,
             sub.plot(ax=ax, facecolor=color, edgecolor="none", alpha=0.88,
                      zorder=3)
 
-    # Compound-failure cells outlined in red
+    # Compound-constraint cells outlined in red
     if site_has_solar:
         comp = grid[grid["state"] == "compound"]
         if len(comp):
@@ -262,7 +262,7 @@ def draw_slope_map(ax, site: str, grid: gpd.GeoDataFrame,
 
 
 # ---------------------------------------------------------------------------
-# Panel C: typology × slope-bin compound failure share
+# Panel C: typology × slope-bin compound constraint share
 # ---------------------------------------------------------------------------
 def draw_panel_c(ax,
                  typology_by_bin: dict[str, list[dict[str, float] | None]],
@@ -301,7 +301,7 @@ def draw_panel_c(ax,
     ax.set_xticks(x)
     ax.set_xticklabels(bins, fontsize=6.5)
     ax.set_xlabel("slope bin", fontsize=7, labelpad=2)
-    ax.set_ylabel("% compound-failure cells", fontsize=7, labelpad=2)
+    ax.set_ylabel("% compound-constraint cells", fontsize=7, labelpad=2)
     ax.tick_params(axis="x", length=2, width=0.4, pad=2)
     ax.tick_params(axis="y", labelsize=6, length=2, width=0.4, pad=2)
     ax.set_ylim(0, 100)
@@ -429,7 +429,7 @@ def main() -> None:
     ]
     handles_b.append(
         Patch(facecolor="none", edgecolor=STATE_COLORS["compound"],
-              linewidth=0.8, label="compound-failure outline")
+              linewidth=0.8, label="compound-constraint outline")
     )
     leg2 = ax_legend.legend(handles=handles_b, loc="lower left",
                             bbox_to_anchor=(0.02, 0.02),
@@ -501,7 +501,7 @@ def main() -> None:
              color="#1a1a1a")
     fig.text(0.5, 0.968,
              "4-state shares stratified by terrain slope. If the hillside–flatland gap "
-             "in compound failure persists at the lowest slope bin, typology encodes "
+             "in compound constraint persists at the lowest slope bin, typology encodes "
              "morphology beyond slope.",
              ha="center", va="top", fontsize=5.5, style="italic", color="#666")
 

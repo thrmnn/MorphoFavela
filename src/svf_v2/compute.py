@@ -583,7 +583,7 @@ def compute_svf_gpu(
        code-path raises a clear error instead of an import failure.
     """
     raise NotImplementedError(
-        "GPU backend not yet ported to v2. Use backend='raycast' (CPU, parallelised) instead."
+        "GPU backend not yet ported to v2. Use backend='raycasting' (CPU, parallelised) instead."
     )
 
 

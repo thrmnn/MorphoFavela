@@ -242,9 +242,26 @@ def collect_area_data(area: str) -> Dict[str, Any]:
             seg = gpd.read_file(seg_path)
             out["svf_segments"] = seg
             if "svf_mean" in seg.columns:
-                vals = seg["svf_mean"].dropna()
-                out["svf_mean"] = float(vals.mean())
-                out["svf_std"] = float(vals.std())
+                # Length-weighted site aggregate: count-weighted means
+                # over-represent short fragments and biased Rocinha by
+                # +0.088 SVF (audit 2026-06-05 C1). Fall back to
+                # geometry length if the length_m column predates the fix.
+                lengths = (
+                    seg["length_m"]
+                    if "length_m" in seg.columns
+                    else seg.geometry.length
+                )
+                valid = seg["svf_mean"].notna() & (lengths > 0)
+                vals = seg.loc[valid, "svf_mean"]
+                w = lengths[valid]
+                if w.sum() > 0:
+                    out["svf_mean"] = float((vals * w).sum() / w.sum())
+                    # Length-weighted std (population form)
+                    mu = out["svf_mean"]
+                    out["svf_std"] = float(((((vals - mu) ** 2) * w).sum() / w.sum()) ** 0.5)
+                else:
+                    out["svf_mean"] = float(vals.mean())
+                    out["svf_std"] = float(vals.std())
                 out["svf_median"] = float(vals.median())
                 out["svf_min"] = float(vals.min())
                 out["svf_max"] = float(vals.max())
@@ -1494,8 +1511,6 @@ def generate_pdf(
         "svf_v2/svf_streets_map": "Spatial map of SVF values along street centerlines.",
         "svf_v2/svf_streets_segments_map": "Segment-level SVF map with colour-coded classification.",
         "morphology_metrics/morphology_distributions": "Kernel density estimates for key building-level morphometric indicators.",
-        "urban_morphology/maps/zone_metrics_panel": "Zone-level panel showing BCR, FAR, height variability, and frontal area index.",
-        "urban_morphology/maps/lisa_clusters_bcr": "LISA cluster map for BCR identifying statistically significant spatial clusters.",
     }
 
     with PdfPages(output_path) as pdf:
@@ -1700,8 +1715,6 @@ def generate_pdf(
                     "svf_v2/svf_streets_map",
                     "svf_v2/svf_streets_segments_map",
                     "morphology_metrics/morphology_distributions",
-                    "urban_morphology/maps/zone_metrics_panel",
-                    "urban_morphology/maps/lisa_clusters_bcr",
                 ]
                 for key in sorted(figs.keys()):
                     if "street_svf" in key and key not in priority:

@@ -149,6 +149,28 @@ def build_extended_buildings(
         logger.warning("Repairing %d invalid geometries.", invalid.sum())
         extended.loc[invalid, "geometry"] = extended.loc[invalid, "geometry"].buffer(0)
 
+    # Drop degenerate geometries — buffer(0) above can collapse a degenerate
+    # polygon to empty, and null/empty footprints violate the data contract
+    # (Polygon/MultiPolygon required) and silently corrupt λp / coverage stats.
+    degenerate = extended.geometry.is_empty | extended.geometry.isna()
+    if degenerate.any():
+        logger.warning("Dropping %d empty/null geometries before write.", degenerate.sum())
+        extended = extended[~degenerate].copy()
+
+    # Drop registry-corrupt heights — rows with topo (absolute top elevation)
+    # == 0 carry an altura mis-derived as the base elevation, which extrudes
+    # into phantom towers up to 232 m. The SVF scene builder already filters
+    # these (src/svf_v2/scene.py), but other consumers read this gpkg directly,
+    # so clean them at the source too.
+    if {"topo", "altura"}.issubset(extended.columns):
+        phantom = (extended["topo"] == 0) & (extended["altura"] > 0)
+        if phantom.any():
+            logger.warning(
+                "Dropping %d topo==0 phantom-height building(s) before write.",
+                int(phantom.sum()),
+            )
+            extended = extended[~phantom].copy()
+
     # Save
     data_dir = get_area_data_dir(area).parent  # data/{area}/
     output_path = data_dir / f"buildings_extended_{int(buffer_m)}m.gpkg"

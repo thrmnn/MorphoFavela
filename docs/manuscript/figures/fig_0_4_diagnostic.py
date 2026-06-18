@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Figure 0.4 — Diagnostic taxonomy at favela scale  ★ HEADLINE.
 
-Compound-failure as the headline finding: ventilation deprivation and
-sunlight deprivation co-locate in coherent spatial patches across the
+Compound-constraint as the headline finding: ventilation constraint and
+sunlight constraint co-locate in coherent spatial patches across the
 five favelas, with strong typology contrast (hillside / mixed /
 flatland).
 
@@ -89,9 +89,9 @@ STATE_COLORS = {
 }
 STATE_LABELS = {
     "adequate": "Adequate",
-    "vent": "Ventilation failure",
-    "sun": "Sunlight deprivation",
-    "compound": "Compound failure",
+    "vent": "Ventilation constraint",
+    "sun": "Sunlight constraint",
+    "compound": "Compound constraint",
 }
 NOT_ASSESSED_COLOR = "#f4f4f4"
 BUILDING_COLOR = "#dcdcdc"
@@ -234,10 +234,10 @@ def draw_panel_a(ax, all_cells: pd.DataFrame) -> None:
             ha="left", va="bottom", fontsize=6.5,
             color=STATE_COLORS["compound"],
             fontweight="bold", alpha=0.95)
-    ax.text(0.04, 0.78, "ventilation\nfailure", transform=ax.transAxes,
+    ax.text(0.04, 0.78, "ventilation\nconstraint", transform=ax.transAxes,
             ha="left", va="top", fontsize=6.5, color=STATE_COLORS["vent"],
             fontweight="bold", alpha=0.95)
-    ax.text(0.97, 0.06, "sunlight\ndeprivation", transform=ax.transAxes,
+    ax.text(0.97, 0.06, "sunlight\nconstraint", transform=ax.transAxes,
             ha="right", va="bottom", fontsize=6.5, color=STATE_COLORS["sun"],
             fontweight="bold", alpha=0.95)
     ax.text(0.97, 0.78, "adequate", transform=ax.transAxes,
@@ -448,8 +448,8 @@ def main() -> None:
 
     caption = (
         "4-state classification per 10 m cell.\n"
-        "Ventilation failure: U_mean < 1.0 m/s (Lawson stagnation).\n"
-        "Sunlight deprivation: < 2 h direct sun on winter solstice.\n"
+        "Ventilation constraint: U_mean < 1.0 m/s (Lawson stagnation).\n"
+        "Sunlight constraint: < 2 h direct sun on winter solstice.\n"
         "Compound: both fail simultaneously.\n\n"
         "Synthetic CFD; threshold maps to WHO 0.5 ACH\n"
         "via canyon→indoor coupling (α = 1/150,\n"
@@ -491,7 +491,7 @@ def main() -> None:
 
     # Headline title (figure-level), nudged down to avoid bbox_inches clipping.
     fig.text(0.5, 0.965,
-             "Diagnostic taxonomy: compound failure forms coherent spatial patches",
+             "Diagnostic taxonomy: compound constraint forms coherent spatial patches",
              ha="center", va="top", fontsize=8.5, fontweight="bold",
              color="#1a1a1a")
 

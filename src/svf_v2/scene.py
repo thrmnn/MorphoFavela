@@ -220,6 +220,19 @@ def build_building_meshes(
         logger.warning(f"Base field '{base_field}' missing -- will sample from DTM")
         use_dtm_for_base = True
 
+    # Drop registry rows whose absolute top elevation `topo` is 0 — an
+    # impossible value on elevated/coastal terrain. In the Rio edificações
+    # registry these rows carry a corrupt `altura` mis-derived as the base
+    # elevation (Rocinha 33, Rio das Pedras 8, Maré 22), which would extrude
+    # into phantom towers up to 232 m. True height is unrecoverable, so drop.
+    if "topo" in gdf.columns:
+        corrupt = gdf["topo"] == 0
+        if corrupt.any():
+            logger.warning(
+                f"  Dropping {int(corrupt.sum())} building(s) with corrupt height (topo == 0)"
+            )
+            gdf = gdf[~corrupt].copy()
+
     # Optional filtering for informal areas
     # skip_area_filter=True: large buildings (schools, commercial) still
     # physically obstruct the sky and must be present in the SVF scene.

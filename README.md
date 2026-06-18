@@ -4,7 +4,7 @@ A Python pipeline for the morphometric and CFD-coupled analysis of pedestrian-le
 
 **What this repo does**
 
-- Builds a **10 m morphometric grid** (20+ indicators per cell — SVF, λp, λf, σh, slope, aspect, porosity, …) from building footprints + DTM
+- Builds a **10 m morphometric grid** (12 indicators per cell — SVF, λp, λf, σh, slope, aspect, porosity, … — materialised as 25 columns since λf is stored per-direction) from building footprints + DTM
 - Generates a **stratified CFD sampling campaign** (119 patches across 5 sites, 12-strata SVF × slope × λp grid, 80 m maximin spacing, 250 m circular domain)
 - Ingests measured **wind input** (INMET BDMEP + Iowa ASOS METAR) into per-site `wind_rose.json` for annual weighting
 - Specifies a **CFD I/O contract** and ingests OpenFOAM-derived wind fields when they return from the simulation cluster
@@ -19,7 +19,7 @@ A Python pipeline for the morphometric and CFD-coupled analysis of pedestrian-le
 
 ## Status
 
-See [ROADMAP.md](ROADMAP.md) for the full roadmap and version history. **As of May 2026**: 5 sites onboarded; 119-patch CFD campaign sampled and exported; wind input complete; result-side analysis pipeline shipped + synthetic-validated end-to-end on all 5 sites; SVF cross-validated against UMEP `svfForProcessing153` on all 5 sites (closes the §10.3 limitation). Pilot patch VDG-P07 in flight at MIT ORCD; ingestion layer plumbed and waiting on first real CFD return.
+See [ROADMAP.md](ROADMAP.md) for the full roadmap and version history. **As of June 2026**: 5 campaign sites + 3 calibration sites (Borel, Jacarezinho, Morro do Juramento) onboarded; 119-patch CFD campaign sampled and exported; wind input complete; result-side analysis pipeline shipped + synthetic-validated end-to-end on all 5 sites; SVF cross-validated against UMEP `svfForProcessing153` (closes the §10.3 limitation). Grid λf was re-baselined on 2026-06-02 by the cell-clipping repair — pre-June λf values are superseded. Street-level pipeline now runs on canonical observer networks with length-weighted segment SVF, cross-validated against an independent Ladybug model (Vidigal, MAE 1.77 h, deprivation-flag agreement 72 %). CFD pilot ladder staged in `~/Airflow`; ingestion layer plumbed and waiting on first real return.
 
 ## Repository Map
 
@@ -71,7 +71,7 @@ pip install -e ".[dev]"
 
 GDAL / GEOS native libraries must be present (`apt install libgdal-dev`
 on Linux, `brew install gdal` on macOS) before `pip install`.
-For GPU SVF: `pip install -e ".[gpu]"`.
+A GPU SVF backend is **not currently available** (the v2 ray-caster is CPU-parallelised; a GPU port is future work). The `[gpu]` extra installs PyTorch3D but the backend raises `NotImplementedError`.
 
 ### 2. Inputs
 
@@ -177,6 +177,32 @@ Outputs land in `outputs/paper_figures/exports/` (PNG + SVG); the
 PNGs already published in the technical report live in
 `docs/technical_report/figures/`.
 
+### 10. Site dashboards + distribution bundles
+
+The pipeline outputs flow into shareable artefacts under
+`outputs/_distribution/` (all gitignored):
+
+```bash
+# Canonical street-observer network — single source of truth for sampling
+python scripts/build_street_observers.py --bundle      # writes observers + tarball
+
+# Static A3 "Folha de Rua" per site (PNG + PDF + 8 atomic panels)
+python scripts/build_site_dashboard.py --site vidigal
+
+# Interactive HTML site sheet (Leaflet + Plotly + methodology drawer)
+python scripts/build_html_dashboard.py --site vidigal
+
+# 3D data bundle for an external solar-access collaborator
+python scripts/build_mingze_bundle.py                  # 4 sites, ~37 MB tarball
+```
+
+The HTML dashboards surface the most recent audit (`docs/audit_2026-06-03*.md`)
+findings inline — C1 length-weighting fix, H1-H4 sampling biases, M1-M6
+schema and CLI fixes — so reviewers see them as toggles and callouts
+rather than buried in an appendix. See
+[`docs/workflow_patterns.md`](docs/workflow_patterns.md) for the
+multi-agent audit-and-deliverable-per-entity pattern that produces them.
+
 ## Installation
 
 The recommended path is Conda via the pinned [`environment.yml`](environment.yml),
@@ -193,7 +219,7 @@ Or a lighter unpinned setup (you supply GDAL / GEOS via `apt`/`brew`):
 
 ```bash
 conda create -n morphofavela python=3.11 && conda activate morphofavela
-pip install -e ".[dev]"          # add ".[gpu]" for PyTorch3D-backed SVF
+pip install -e ".[dev]"          # ([gpu] extra exists but the GPU SVF backend is not yet ported — CPU is supported)
 ```
 
 GDAL / GEOS native libraries are required for the pip path (`apt install
@@ -220,19 +246,20 @@ MorphoFavela/
 │
 ├── src/                                  # Library code (importable)
 │   ├── morphometry/                      # Core morphometric metrics
-│   ├── svf_v2/                           # GPU sky-view-factor computation
+│   ├── svf_v2/                           # Sky-view-factor computation (CPU ray-casting)
 │   ├── solar/                            # Façade + ground solar access
 │   ├── cfd_integration/                  # CFD I/O contract, wind weighting (see its README)
 │   ├── visualization/                    # Map + chart helpers
-│   ├── urban_morphology.py               # BCR, FAR, λp, λf
+│   ├── viz/                              # Dashboard panel + map composition helpers
+│   ├── urban_morphology.py               # BCR, FAR, λp, λf (cell-clipped since 2026-06)
 │   ├── typology.py                       # Settlement typology
-│   ├── exposure.py                       # Sky-exposure-plane exceedance
+│   ├── exposure/                         # Sky-exposure-plane exceedance + deprivation
 │   ├── spatial_analysis.py               # Moran's I, LISA, Gi*
 │   └── config.py                         # Filtering thresholds + plot settings
 │
 ├── scripts/                              # Executable entry points
 │   ├── build_extended_context.py         # 300 m buffer per site (run first)
-│   ├── run_svf_v2.py                     # SVF (GPU)
+│   ├── run_svf_v2.py                     # SVF (CPU ray-casting)
 │   ├── compute_solar_access.py           # Ground solar
 │   ├── run_facade_solar.py               # Façade solar
 │   ├── compute_sectional_porosity.py     # Porosity
@@ -244,6 +271,13 @@ MorphoFavela/
 │   ├── run_campaign_sampling.py          # Full CFD campaign top-up (22-25 patches)
 │   ├── build_wind_rose.py                # INMET / Iowa ASOS → wind_rose.json
 │   ├── extract_inmet_stations.py         # Pull station CSVs from yearly INMET ZIPs
+│   ├── build_street_observers.py         # Canonical per-site observer networks
+│   ├── build_site_dashboard.py           # A3 Folha de Rua site sheets
+│   ├── build_html_dashboard.py           # Interactive HTML site dashboards
+│   ├── build_mingze_bundle.py            # 3D-data bundle for collaborators
+│   ├── compare_mingze_vidigal.py         # Cross-method solar validation (Ladybug)
+│   ├── brisa_ventilation/                # Numbered BRISA pipeline (λf repair → taxonomy)
+│   ├── brisa_deck/                       # BRISA presentation figure scripts
 │   ├── hpc/                              # SLURM helpers (most CFD HPC code is in ~/Airflow)
 │   └── data_utils/, debug/               # Small helpers
 │
@@ -288,7 +322,14 @@ See [`docs/README.md`](docs/README.md) for a one-line summary of each.
   + [`.pdf`](docs/technical_report/technical_report.pdf). Rebuild
   with `python docs/technical_report/build_pdf.py`.
 - **Methodology** (per-feature deep dives): [`docs/methodology/`](docs/methodology/)
-  — sky-exposure plane, street-level SVF, the 25 morphometric indicators.
+  — sky-exposure plane, street-level SVF, the 12 morphometric indicators.
+- **Workflow patterns**: [`docs/workflow_patterns.md`](docs/workflow_patterns.md)
+  — the council-of-experts + judge-panel + per-entity build pattern
+  used to produce the audit, site dashboards, and HTML deliverables.
+- **Repo audits**: [`docs/audit_2026-06-03.md`](docs/audit_2026-06-03.md)
+  + [`_round2.md`](docs/audit_2026-06-03_round2.md) — the two-pass
+  audit that produced the recent length-weighted-SVF fix (commit
+  d8175ca) and the dashboard caveat surfaces.
 - **Doc map**: [`docs/README.md`](docs/README.md).
 - **Roadmap + project status**: [`ROADMAP.md`](ROADMAP.md).
 - **Changelog**: [`CHANGELOG.md`](CHANGELOG.md).

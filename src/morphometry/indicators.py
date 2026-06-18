@@ -36,11 +36,15 @@ WIND_DIRECTIONS = {
 def compute_lambda_f_directional(
     buildings: gpd.GeoDataFrame,
     zones: gpd.GeoDataFrame,
+    clip_to_zone: bool = True,
 ) -> gpd.GeoDataFrame:
     """Compute frontal area density for 8 wind directions.
 
     Adds columns: lambda_f_N, lambda_f_NE, ..., lambda_f_NW,
     lambda_f_mean, lambda_f_max.
+
+    ``clip_to_zone=True`` (default) clips footprints to the cell before
+    projecting — required for small grid cells, see compute_frontal_area_ratio.
     """
     zones = zones.copy()
 
@@ -54,7 +58,9 @@ def compute_lambda_f_directional(
     direction_cols = []
     for label, bearing in WIND_DIRECTIONS.items():
         col = f"lambda_f_{label}"
-        result = compute_frontal_area_ratio(buildings, zones, wind_dir=bearing)
+        result = compute_frontal_area_ratio(
+            buildings, zones, wind_dir=bearing, clip_to_zone=clip_to_zone
+        )
         zones[col] = result["lambda_f"]
         direction_cols.append(col)
 

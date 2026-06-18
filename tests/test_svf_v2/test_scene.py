@@ -56,3 +56,64 @@ class TestCombinedScene:
         assert mesh.points[:, 2].max() == pytest.approx(5.0)
         # Should have vertices from both terrain and building
         assert mesh.n_points > 8  # more than just building
+
+
+class TestTopoCorruptionFilter:
+    """Rows with topo == 0 are a Rio edificações registry corruption where
+    altura was mis-derived as the base elevation; they must be dropped before
+    extrusion so they don't become phantom towers."""
+
+    def _write_inputs(self, tmp_path):
+        import geopandas as gpd
+        import rasterio
+        from rasterio.transform import from_origin
+
+        # Flat DTM at z=10, EPSG:31983, 1 m pixels, 40x40 m around the buildings
+        arr = np.full((40, 40), 10.0, dtype="float32")
+        dtm = tmp_path / "dtm.tif"
+        with rasterio.open(
+            dtm, "w", driver="GTiff", height=40, width=40, count=1,
+            dtype="float32", crs="EPSG:31983",
+            transform=from_origin(0, 40, 1, 1),
+        ) as dst:
+            dst.write(arr, 1)
+
+        valid = Polygon([(5, 5), (9, 5), (9, 9), (5, 9)])
+        corrupt = Polygon([(20, 20), (24, 20), (24, 24), (20, 24)])
+        gdf = gpd.GeoDataFrame(
+            {
+                "base": [10.0, 232.0],
+                "altura": [8.0, 232.0],   # corrupt: altura == base, topo == 0
+                "topo": [18.0, 0.0],
+                "geometry": [valid, corrupt],
+            },
+            crs="EPSG:31983",
+        )
+        fp = tmp_path / "buildings.gpkg"
+        gdf.to_file(fp, driver="GPKG")
+        return dtm, fp
+
+    def test_corrupt_row_dropped(self, tmp_path):
+        from src.svf_v2.scene import build_building_meshes
+
+        dtm, fp = self._write_inputs(tmp_path)
+        mesh, gdf = build_building_meshes(fp, dtm, area=None)
+        # Only the valid building survives
+        assert len(gdf) == 1
+        assert (gdf["topo"] != 0).all()
+        # No phantom tower: z stays near the valid 10 m base + 8 m height
+        assert mesh is not None
+        assert mesh.points[:, 2].max() < 50, "phantom tower not filtered"
+
+    def test_no_topo_column_is_noop(self, tmp_path):
+        import geopandas as gpd
+
+        from src.svf_v2.scene import build_building_meshes
+
+        dtm, fp = self._write_inputs(tmp_path)
+        gdf = gpd.read_file(fp).drop(columns=["topo"])
+        fp2 = tmp_path / "buildings_no_topo.gpkg"
+        gdf.to_file(fp2, driver="GPKG")
+        # Without a topo column the corruption gate cannot fire; both rows kept.
+        _, out = build_building_meshes(fp2, dtm, area=None)
+        assert len(out) == 2

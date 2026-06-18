@@ -2,15 +2,21 @@
 """Fig 04 — Cross-site diagnostic taxonomy (Nature Cities sizing).
 
 Six-panel composite for the BRISA paper:
-  A–E  Per-site 4-state diagnostic maps (adequate / sun-only / vent-only / compound)
-  F    Typology stacked bar (hillside vs flatland aggregate)
+  A–E  Per-site 4-state diagnostic maps (adequate / sunlight constraint /
+       ventilation constraint / compound constraint).
+  F    Typology stacked bar (hillside vs flatland aggregate).
 
-Inputs are the per-site grid + solar layers (same engine as
-scripts/build_diagnostic_map.py); outputs to exports/.
+Maps are rendered by classifying each site's grid on the fly. Per-panel
+share annotations and the typology aggregates are loaded from the canonical
+interim taxonomy JSON (outputs/brisa_ventilation_fix/
+taxonomy_interim_lambda_f.json) so the printed numbers match the manuscript
+exactly. Threshold is interim/relative: λf > 2.75 (pooled p75 of corrected
+λf) ∧ winter direct sun < 2 h.
 """
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -34,16 +40,34 @@ SITES = ["vidigal", "rocinha", "complexo_do_alemao", "maré", "riodaspedras"]
 HILLSIDE = {"vidigal", "rocinha", "complexo_do_alemao"}
 
 THRESHOLD_SUN_HRS = 2.0
-THRESHOLD_LAMBDA_F = 0.35
+THRESHOLD_LAMBDA_F = 2.75  # interim relative pre-screen (pooled p75 of corrected λf)
 
-STATE_NAMES = ("adequate", "sun_only", "vent_only", "compound")
-STATE_INT = {"adequate": 0, "sun_only": 1, "vent_only": 2, "compound": 3, "nodata": 4}
+TAXONOMY_JSON = (
+    PROJECT_ROOT
+    / "outputs"
+    / "brisa_ventilation_fix"
+    / "taxonomy_interim_lambda_f.json"
+)
+
+
+def load_taxonomy() -> dict:
+    with open(TAXONOMY_JSON) as f:
+        return json.load(f)
+
+STATE_NAMES = ("adequate", "sunlight_constraint", "ventilation_constraint", "compound_constraint")
+STATE_INT = {
+    "adequate": 0,
+    "sunlight_constraint": 1,
+    "ventilation_constraint": 2,
+    "compound_constraint": 3,
+    "nodata": 4,
+}
 STATE_COLORS = ["#FFFFFF", "#D9D9D9", "#7F7F7F", "#111111", "#F4F0E8"]
 STATE_LEGEND = [
     ("adequate", "adequate (both pass)"),
-    ("sun_only", f"sunlight fail only (<{THRESHOLD_SUN_HRS:.0f} h winter sun)"),
-    ("vent_only", f"ventilation fail only (λ$_f$ > {THRESHOLD_LAMBDA_F:.2f})"),
-    ("compound", "compound failure (both fail)"),
+    ("sunlight_constraint", f"sunlight constraint (<{THRESHOLD_SUN_HRS:.0f} h winter sun)"),
+    ("ventilation_constraint", f"ventilation constraint (λ$_f$ > {THRESHOLD_LAMBDA_F:.2f})"),
+    ("compound_constraint", "compound constraint (both)"),
 ]
 
 
@@ -83,9 +107,9 @@ def classify_int(grid: gpd.GeoDataFrame) -> np.ndarray:
     sun_fail = both & (sun < THRESHOLD_SUN_HRS)
     vent_fail = both & (vent > THRESHOLD_LAMBDA_F)
     state[both & ~sun_fail & ~vent_fail] = STATE_INT["adequate"]
-    state[both & sun_fail & ~vent_fail] = STATE_INT["sun_only"]
-    state[both & ~sun_fail & vent_fail] = STATE_INT["vent_only"]
-    state[both & sun_fail & vent_fail] = STATE_INT["compound"]
+    state[both & sun_fail & ~vent_fail] = STATE_INT["sunlight_constraint"]
+    state[both & ~sun_fail & vent_fail] = STATE_INT["ventilation_constraint"]
+    state[both & sun_fail & vent_fail] = STATE_INT["compound_constraint"]
     return state
 
 
@@ -98,7 +122,18 @@ def load_and_classify(site: str) -> tuple[gpd.GeoDataFrame, np.ndarray]:
     return grid, classify_int(grid)
 
 
-def draw_site_panel(ax, site: str, grid: gpd.GeoDataFrame, state: np.ndarray, panel: str) -> dict:
+def draw_site_panel(
+    ax,
+    site: str,
+    grid: gpd.GeoDataFrame,
+    state: np.ndarray,
+    panel: str,
+    canonical_shares: dict,
+    canonical_n: int,
+) -> dict:
+    """Render per-site map; annotation text uses canonical shares from the
+    taxonomy JSON, NOT the on-the-fly classification, so printed numbers
+    match the manuscript exactly."""
     ax.set_facecolor("white")
     cmap = ListedColormap(STATE_COLORS)
     norm = BoundaryNorm(boundaries=[-0.5, 0.5, 1.5, 2.5, 3.5, 4.5], ncolors=5)
@@ -123,49 +158,49 @@ def draw_site_panel(ax, site: str, grid: gpd.GeoDataFrame, state: np.ndarray, pa
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
-    counts = {STATE_NAMES[i]: int((state == i).sum()) for i in range(4)}
-    total = sum(counts.values())
-    shares = {k: (v / total if total else 0.0) for k, v in counts.items()}
     label = SITE_LABELS[site]
     typology = "hillside" if site in HILLSIDE else "flatland"
     ax.set_title(
-        f"({panel}) {label}  ·  {typology}", loc="left", fontsize=7.5, color="#222222", pad=2.5
+        f"({panel}) {label}  ·  {typology}  ·  n={canonical_n:,}",
+        loc="left",
+        fontsize=7.5,
+        color="#222222",
+        pad=2.5,
     )
+    s = canonical_shares
     ax.text(
         0.02,
         0.04,
-        f"compound {shares['compound'] * 100:.0f}% · vent-only {shares['vent_only'] * 100:.0f}% · "
-        f"sun-only {shares['sun_only'] * 100:.1f}% · adeq. {shares['adequate'] * 100:.1f}%",
+        f"compound {s['compound_constraint'] * 100:.1f}% · "
+        f"vent. {s['ventilation_constraint'] * 100:.1f}% · "
+        f"sun. {s['sunlight_constraint'] * 100:.1f}% · "
+        f"adeq. {s['adequate'] * 100:.1f}%",
         transform=ax.transAxes,
         fontsize=5.0,
         color="#444444",
         va="bottom",
     )
-    return shares
+    return s
 
 
-def draw_typology_panel(ax, per_site: dict[str, dict]) -> None:
-    # Pool by typology using built-cell counts.
-    groups = {"hillside": HILLSIDE, "flatland": set(SITES) - HILLSIDE, "all": set(SITES)}
+def draw_typology_panel(ax, taxonomy: dict) -> None:
+    """Pull hillside / flatland / all aggregates directly from the canonical
+    taxonomy JSON so the bar shares match the manuscript verbatim."""
+    aggregates = taxonomy["aggregates"]
     rows = []
-    for label, members in groups.items():
-        counts = {k: 0 for k in STATE_NAMES}
-        total = 0
-        for site in members:
-            n_site = per_site[site]["n"]
-            for k in STATE_NAMES:
-                counts[k] += int(round(per_site[site]["shares"][k] * n_site))
-            total += n_site
-        shares = {k: (counts[k] / total if total else 0.0) for k in STATE_NAMES}
+    for label in ("hillside", "flatland", "all"):
+        agg = aggregates[label]
+        shares = {k: agg["shares"][k] for k in STATE_NAMES}
+        total = agg["n_classified_cells"]
         rows.append((label, shares, total))
 
     labels = [f"{lab}\n(n={t:,})" for lab, _, t in rows]
     bottoms = np.zeros(len(rows))
     colors_for_states = {
         "adequate": "#FFFFFF",
-        "sun_only": "#D9D9D9",
-        "vent_only": "#7F7F7F",
-        "compound": "#111111",
+        "sunlight_constraint": "#D9D9D9",
+        "ventilation_constraint": "#7F7F7F",
+        "compound_constraint": "#111111",
     }
     edge = "#444444"
     for k, _ in STATE_LEGEND:
@@ -181,7 +216,7 @@ def draw_typology_panel(ax, per_site: dict[str, dict]) -> None:
         )
         for i, v in enumerate(vals):
             if v >= 4:
-                text_color = "#FFFFFF" if k == "compound" else "#222222"
+                text_color = "#FFFFFF" if k == "compound_constraint" else "#222222"
                 ax.text(
                     bottoms[i] + v / 2,
                     i,
@@ -209,9 +244,9 @@ def draw_shared_legend(fig) -> None:
     for key, label in STATE_LEGEND:
         color = {
             "adequate": "#FFFFFF",
-            "sun_only": "#D9D9D9",
-            "vent_only": "#7F7F7F",
-            "compound": "#111111",
+            "sunlight_constraint": "#D9D9D9",
+            "ventilation_constraint": "#7F7F7F",
+            "compound_constraint": "#111111",
         }[key]
         handles.append(
             mpatches.Patch(facecolor=color, edgecolor="#444444", linewidth=0.6, label=label)
@@ -231,6 +266,7 @@ def draw_shared_legend(fig) -> None:
 
 def main() -> None:
     apply_style()
+    taxonomy = load_taxonomy()
     fig = plt.figure(figsize=SIZE_DOUBLE_TALL)
     gs = fig.add_gridspec(
         nrows=4,
@@ -247,21 +283,22 @@ def main() -> None:
         "D": (gs[1, 2:4], "riodaspedras"),
         "E": (gs[2, :], "maré"),  # widest because maré is geographically largest
     }
-    per_site = {}
     for panel, (gsspec, site) in axes_layout.items():
         ax = fig.add_subplot(gsspec)
         grid, state = load_and_classify(site)
-        shares = draw_site_panel(ax, site, grid, state, panel)
-        n = int(
-            sum(
-                (state == STATE_INT[k]).sum()
-                for k in ("adequate", "sun_only", "vent_only", "compound")
-            )
+        canonical = taxonomy["per_site"][site]
+        draw_site_panel(
+            ax,
+            site,
+            grid,
+            state,
+            panel,
+            canonical_shares=canonical["shares"],
+            canonical_n=canonical["n_classified"],
         )
-        per_site[site] = {"shares": shares, "n": n}
 
     ax_f = fig.add_subplot(gs[3, :])
-    draw_typology_panel(ax_f, per_site)
+    draw_typology_panel(ax_f, taxonomy)
     draw_shared_legend(fig)
     save_fig(fig, "fig04_diagnostic_taxonomy")
 

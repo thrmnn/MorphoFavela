@@ -60,8 +60,8 @@ PRETTY = {
     "slope_deg": "slope (°)",
     "northness": "northness", "eastness": "eastness",
 }
-TARGET_LABEL = {"vent_fail": "Ventilation failure",
-                "sun_fail": "Sunlight deprivation"}
+TARGET_LABEL = {"vent_fail": "Ventilation constraint",
+                "sun_fail": "Sunlight constraint"}
 TARGET_COLOR = {"vent_fail": COLOR_VENT, "sun_fail": COLOR_SUN}
 
 
@@ -155,7 +155,7 @@ def draw_panel_b(fig, gs, pdp: pd.DataFrame) -> None:
             if r == 1:
                 ax.set_xlabel(PRETTY[pred], fontsize=6.5, labelpad=2)
             if c == 0:
-                ylab = ("P(vent failure)" if tgt == "vent_fail"
+                ylab = ("P(vent constraint)" if tgt == "vent_fail"
                         else "P(sun deprivation)")
                 ax.set_ylabel(ylab, fontsize=6.5, labelpad=2,
                               color=color)
@@ -368,7 +368,7 @@ def main() -> None:
 
     # Headline title.
     fig.text(0.5, 0.97,
-             "Predictors and typology contrast: which morphometrics drive failure?",
+             "Predictors and typology contrast: which morphometrics drive constraint?",
              ha="center", va="top", fontsize=8.5, fontweight="bold",
              color="#1a1a1a")
 
