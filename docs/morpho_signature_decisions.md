@@ -126,3 +126,11 @@ site artefact. *Outcome:*
 - **k robustness.** Re-run with bootstrap cluster stability (ClustGeo / A-DBSCAN)
   to confirm k = 6 is not fragile.
 - **Separate experience clustering** for the full cross-level contingency (WS-A.2).
+- **Spatial contiguity.** The per-site morphotype maps show genuine regional
+  structure (e.g. Vidigal: T4 dominates the east, T1 the upper-west) but are
+  salt-and-pepper at 10 m resolution — GMM has no contiguity term, so adjacent
+  cells flip type. Next refinement is spatially-constrained clustering (plan
+  Recipe C: `spopt.region` Ward/Skater/MaxP, or sklearn `AgglomerativeClustering`
+  with a libpysal `W`) to dissolve types into coherent morphotope regions. The
+  current non-spatial labels are correct per-cell; the noise is spatial, not
+  categorical.
