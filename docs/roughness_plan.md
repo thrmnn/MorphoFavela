@@ -54,11 +54,16 @@ H_max — we have all]:
 - The **super-linear b1=20.21** term in Y is exactly where Kanda departs *upward*
   from Macdonald for large σH/H_mean — the favela regime. Fit on building-resolving
   LES over real Tokyo/Nagoya squares + idealized arrays.
+- **Expect zd > H_mean** in heterogeneous favela fabric: tall outliers carry
+  disproportionate drag, and Kanda's `H_max` scaling permits the displacement
+  height to exceed the *mean* height. Counterintuitive but correct (Kent et al.) —
+  a feature of the method, not a bug to clip.
 
-**Millward-Hopkins et al. (2011)** — σH-aware **cross-check** [λp, λf, H_mean, σH;
-no H_max]: a uniform-height drag-partition core plus an explicit additive
-`(σH/H_mean)` term for both zd and z0 (different functional form from Kanda —
-agreement is a strong signal, divergence flags out-of-envelope fabric).
+**Millward-Hopkins et al. (2011)** — σH-aware **cross-check** [λp, λf, H_mean, σH
+(± H_max)]: an **iterative** drag-profile / roughness-sublayer model (not a single
+closed form — coefficients in 2011 §3), physically distinct from Kanda's
+regression-on-Macdonald. Agreement of the two is a strong signal; divergence flags
+out-of-envelope fabric.
 
 **Grimmond & Oke (1999)** — sanity bounds: zd≈0.7H, z0≈0.1H; benchmark sensitivity
 study; documents wind-direction dependence.
@@ -74,6 +79,15 @@ study; documents wind-direction dependence.
 
 Compute **per cell** and as a **directional roughness rose** z0(θ) from the
 8-direction λf — favela packing is anisotropic; don't collapse to mean too early.
+
+**Implementation — use UMEP, don't hand-roll the formulas.** The vendored UMEP
+(`vendor/umep_processing/util/RoughnessCalcFunctionV2.py` +
+`imageMorphometricParms_v2.py`, Kent & Grimmond — the same package already used for
+our SVF validation) computes z0/zd by **Macdonald, Kanda, Raupach and
+Millward-Hopkins** from a DSM or footprint+height grid, with directional support.
+R-A drives UMEP per cell/sector; we hand-code only the directional wrapping, the
+extrapolation flags, and the CFD drag-centroid extractor — auditing UMEP's Kanda
+against the published coefficients above as a unit test.
 
 ## Where cube-array calibration breaks (flag explicitly in outputs)
 
@@ -94,6 +108,17 @@ Compute **per cell** and as a **directional roughness rose** z0(θ) from the
 5. **Steep terrain — entirely unmodeled** by any roughness method. Open axis.
 
 ## CFD integration
+
+**Two roles of z0 — decouple them (this resolves the z0 confusion).** The
+morphometric z0(θ)/zd(θ) computed above is the roughness of the *upstream
+settlement*: it sets the **CFD inlet ABL profile and the k_eq target** (the
+approach-flow turbulence the patch sees). It is **not** the ground roughness
+*inside* the resolved patch — there the buildings are explicitly meshed and already
+supply the form drag, so the **ground z0 stays small and mesh-valid**, sidestepping
+the Blocken ks-vs-near-wall-cell trap. So: derived morphometric z0 → inlet /
+boundary turbulence; resolved geometry → internal drag. Never double-count by also
+inflating the wall roughness under meshed buildings. (The "decouple the two roles"
+recommendation, made concrete with a number we *derived*, not guessed.)
 
 - **Extraction (anchor/validate):** Jackson drag-centroid `zd = Σ zᵢDᵢ / Σ Dᵢ`;
   `u*² = τ_total/ρ`; fit the **double-averaged** ⟨Ū⟩(z) above canopy to
@@ -155,8 +180,11 @@ Giometto 2016 "uniform city errs ~200%") frames the achievable accuracy.
 - Stewart & Oke 2012, *BAMS* 93 — LCZ roughness classes (the only, and poor,
   "favela" proxy).
 
-*Verification caveats from the sweep:* Kanda's LES solver is almost certainly PALM
-(Gryschka/Raasch) but unconfirmed from open text; Raupach ψh and the Kent
-equation constants were cross-checked against the open-access Kent 2017a reprints,
-not the paywalled originals — pull a library copy before quoting exact values in
-the paper.
+*Constants verified (2026-06-19) against the open-access Kent 2017a/2017b reprints,
+Blocken 2007, and the OpenFOAM atmBoundaryLayer source.* Outstanding flags before
+quoting exact values in the paper: Kanda **c0 = −0.17, c1 = −0.77** signs confirmed
+by equation structure + secondary sources but not the paywalled original's printed
+text; Millward-Hopkins is an iterative model (coefficients in 2011 §3, not a closed
+form); Grimmond & Oke **z0 ≈ 0.1·H** is the standard companion to the verbatim
+**zd ≈ 0.7·H**. **UMEP's `RoughnessCalcFunctionV2` is the implementation of record**
+(Mac/Kan/Rau/MHN) — audit its Kanda path against the coefficients above.
