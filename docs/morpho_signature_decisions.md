@@ -135,6 +135,24 @@ Bootstrap (20 GMM refits on 80% subsamples, ARI vs the reference labels):
 figure (the domain reviewer notes a Fleischmann-lineage reviewer will demand cluster
 stability regardless).
 
+## WS-B — Morphometrics-only prioritization (geometry-first)
+
+**D16 · Pure-geometry deprivation index, ranked, worst-decile to cell.**
+Per-observer score = equal-weight mean of three [0,1] components, all ray-cast or
+geometric, no CFD: `sun_deficit` (winter sun shortfall below WHO 2 h),
+`sky_enclosure` (1−SVF), `wind_stagnation` (λf / 0.35 skimming threshold,
+Grimmond & Oke 1999). *Choices, each per the domain-review:* (i) scored at the
+**observer/void** level (the unit of exposure), aggregated to cells by **worst-
+decile p90**, not a mean (preserves the WS-0 support stance; NULL where no
+support); (ii) shown as **tertile rank classes** (lower/elevated/highest) on
+**shared pooled breaks**, never absolute units — we have no validated absolute
+scale without CFD; (iii) **equal weights are provisional** and are the explicit
+hook where sparse CFD anchors will recalibrate (the methodological contribution).
+*Outcome:* Rocinha skews "highest" (3357 vs 487 lower — steep dense hillside),
+flat Maré skews "lower" (7303) — face-valid. `priority_p90`/`priority_class`
+written back to `features_grid.parquet`; map in the gallery. **Not yet done:**
+CFD-anchor overlay on the map, boundary-gradient transects, weight calibration.
+
 ## Open questions / revisit list
 
 - **Terrain-aware λf & SVF (plan Risk 1).** Both assume a flat datum; on 20–30°

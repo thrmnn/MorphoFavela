@@ -333,6 +333,10 @@ GALLERY = [
     ("terrain_sensitivity.png", "Terrain sensitivity",
      "Does the flat-datum λf/SVF error track the prioritized types? Slope + the "
      "measured-vs-flat-canyon SVF gap per morphotype (Risk-1 honesty)."),
+    ("priority_map.png", "Morphometrics-only priority (WS-B)",
+     "Geometry-only deprivation index (sun deficit + sky enclosure + wind "
+     "stagnation), worst-decile per cell, rank classes. No CFD; weights "
+     "provisional pending calibration."),
     ("stability.png", "k=6 stability",
      "Bootstrap ARI 0.90 over 20 refits — k=6 is robust."),
     ("k_selection.png", "Model selection",
