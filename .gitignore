@@ -80,3 +80,6 @@ tests/test_hooks/
 
 # Vector figure source — regenerable by the docs/manuscript/figures/*.py scripts; keep PNGs tracked, not the heavy SVGs
 docs/manuscript/figures/exports/*.svg
+
+# local review landing page (served, not tracked)
+/index.html

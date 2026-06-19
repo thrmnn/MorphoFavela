@@ -370,11 +370,16 @@ def write_gallery():
  #lb{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;cursor:zoom-out;flex-direction:column;align-items:center;justify-content:center}}
  #lb img{{max-width:96vw;max-height:90vh}} #lb p{{color:#eee;margin:10px;font-size:15px}}
 </style>
+<nav style="position:sticky;top:0;background:#fffd;backdrop-filter:blur(6px);padding:10px 24px;border-bottom:1px solid #e5e5e5;font-weight:600;font-size:14px">
+ <a href="/outputs/_hub/index.html" style="color:#1a6fb5;text-decoration:none">← Project hub</a>
+ <span style="color:#999;margin:0 8px">›</span><span style="color:#666">Signature figures</span>
+</nav>
 <header>
  <h1>Favela morpho-signature — figure review (v2)</h1>
  <p>Generated per the expert-reviewed spec. Click any figure to enlarge. Page
-    through; mark each keep / refine.
-    Rationale: docs/visualization_plan.md · docs/morpho_signature_decisions.md</p>
+    through; mark each keep / refine. Rationale:
+    <a href="/outputs/_hub/docs/visualization_plan.html">visualization plan</a> ·
+    <a href="/outputs/_hub/docs/morpho_signature_decisions.html">decision log</a></p>
 </header>
 <main>{''.join(cards)}
 </main>
