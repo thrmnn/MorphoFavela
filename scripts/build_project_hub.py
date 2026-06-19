@@ -1,7 +1,9 @@
-"""Build a project hub — one navigable page linking every reviewable part of the
-project (plans, decision logs, deliverables, figure galleries, reports,
-dashboards). Discovers artifacts by existence so it degrades gracefully.
+"""Build the MorphoFavela project hub — one navigable page linking every
+reviewable part of the project (plans, decision logs, deliverables, figure
+galleries, reports, dashboards). Markdown docs are rendered to styled in-browser
+pages; artifacts are discovered by existence so the hub degrades gracefully.
 
+Uses the project-agnostic `hubkit` engine (vendored from the project-hub skill).
 Serve the repo root and open /outputs/_hub/index.html:
     python -m http.server 8773 --directory <repo-root>
 
@@ -11,26 +13,26 @@ Serve the repo root and open /outputs/_hub/index.html:
 from __future__ import annotations
 
 import glob
-import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from hubkit import (  # noqa: E402
+    badge,
+    breadcrumb,
+    card,
+    git_provenance,
+    page,
+    render_doc_page,
+    section,
+)
+
 OUT = ROOT / "outputs" / "_hub"
+DOCS = OUT / "docs"
 
-
-def _git(*args, default="?"):
-    try:
-        return subprocess.check_output(["git", *args], cwd=ROOT,
-                                       stderr=subprocess.DEVNULL).decode().strip()
-    except Exception:
-        return default
-
-
-def _exists(rel: str) -> bool:
-    return (ROOT / rel).exists()
-
-
-# (root-relative url, title, description, kind) — kind drives the badge
+# (root-relative url, title, description, kind). kind: doc (md→rendered) | pdf | live
 SECTIONS = {
     "Plans & decisions": [
         ("/docs/morpho_signature_plan.md", "Morpho-signature plan",
@@ -54,67 +56,51 @@ SECTIONS = {
          "Mingze solar comparison", "Vidigal Ladybug-vs-raycast report.", "live"),
     ],
 }
+KIND_BADGE = {"doc": "doc", "pdf": "info", "live": "ok"}
 
 
 def _discover_dashboards():
-    items = []
-    for p in sorted(glob.glob(str(ROOT / "outputs/_distribution/**/*.html"),
-                              recursive=True)):
-        rel = "/" + str(Path(p).relative_to(ROOT))
-        items.append((rel, Path(p).stem.replace("_", " "), "Site dashboard.", "live"))
-    return items
+    out = []
+    for p in sorted(glob.glob(str(ROOT / "outputs/_distribution/**/*.html"), recursive=True)):
+        out.append(("/" + str(Path(p).relative_to(ROOT)),
+                    Path(p).stem.replace("_", " "), "Site dashboard.", "live"))
+    return out
 
 
 def main():
-    OUT.mkdir(parents=True, exist_ok=True)
-    sections = {k: [i for i in v if _exists(i[0].lstrip("/"))]
-                for k, v in SECTIONS.items()}
+    DOCS.mkdir(parents=True, exist_ok=True)
+    prov = git_provenance(ROOT, "scripts/build_project_hub.py")
+
+    sections = dict(SECTIONS)
     dash = _discover_dashboards()
     if dash:
         sections["Dashboards"] = dash
 
+    blocks, n_links = [], 0
+    for title, items in sections.items():
+        cards = []
+        for url, name, desc, kind in items:
+            src = ROOT / url.lstrip("/")
+            if not src.exists():
+                continue
+            if kind == "doc" and src.suffix == ".md":
+                back = breadcrumb([("← Project hub", "../index.html"), (src.stem, None)])
+                render_doc_page(src, DOCS / f"{src.stem}.html", crumb=back, provenance=prov)
+                href = f"docs/{src.stem}.html"
+            else:
+                href = url
+            cards.append(card(name, desc, href, meta=url, kind=KIND_BADGE.get(kind, "doc")))
+            n_links += 1
+        blocks.append(section(title, cards, anchor=title.split()[0].lower()))
+
     n_sites = len(glob.glob(str(ROOT / "outputs/*/features/features_grid.parquet")))
     n_figs = len(glob.glob(str(ROOT / "outputs/cross_site/signature/figures_v2/*.png")))
-    badge = {"doc": "#6c757d", "pdf": "#b5341f", "live": "#1a7f4b"}
-
-    blocks = []
-    for title, items in sections.items():
-        cards = "".join(
-            f"""<a class="card" href="{url}" target="_blank">
-      <span class="badge" style="background:{badge.get(kind, '#888')}">{kind}</span>
-      <h3>{name}</h3><p>{desc}</p></a>"""
-            for url, name, desc, kind in items)
-        blocks.append(f"<section><h2 id='{title.split()[0].lower()}'>{title}</h2>"
-                      f"<div class='grid'>{cards}</div></section>")
-
-    nav = "".join(f"<a href='#{t.split()[0].lower()}'>{t}</a>" for t in sections)
-    html = f"""<!doctype html><meta charset=utf-8>
-<title>MorphoFavela — project hub</title>
-<style>
- :root{{--fg:#1d1d1f;--mut:#666}}
- *{{box-sizing:border-box}} body{{margin:0;font:15px/1.55 system-ui,sans-serif;color:var(--fg);background:#f5f5f7}}
- header{{padding:28px 40px;background:#fff;border-bottom:1px solid #e3e3e6}}
- h1{{margin:0;font-size:22px}} .sub{{color:var(--mut);margin-top:6px;font-size:13px}}
- nav{{position:sticky;top:0;background:#fffd;backdrop-filter:blur(6px);padding:10px 40px;border-bottom:1px solid #e3e3e6;display:flex;gap:18px;flex-wrap:wrap;z-index:5}}
- nav a{{color:#0a5;text-decoration:none;font-size:13px;font-weight:600}}
- main{{padding:8px 40px 60px}} section{{margin-top:28px}} h2{{font-size:16px;margin:0 0 12px}}
- .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}}
- .card{{display:block;background:#fff;border:1px solid #e3e3e6;border-radius:10px;padding:16px;text-decoration:none;color:inherit;transition:.12s}}
- .card:hover{{border-color:#0a5;transform:translateY(-2px);box-shadow:0 4px 14px #0001}}
- .card h3{{margin:8px 0 4px;font-size:15px}} .card p{{margin:0;color:var(--mut);font-size:13px}}
- .badge{{display:inline-block;color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:20px}}
-</style>
-<header>
- <h1>MorphoFavela — project hub</h1>
- <div class="sub">branch <b>{_git('rev-parse', '--abbrev-ref', 'HEAD')}</b> ·
-   {_git('rev-parse', '--short', 'HEAD')} · {n_sites} sites with feature tables ·
-   {n_figs} signature figures · regenerate: <code>python scripts/build_project_hub.py</code></div>
-</header>
-<nav>{nav}</nav>
-<main>{''.join(blocks)}</main>"""
-    (OUT / "index.html").write_text(html)
-    print(f"hub written to {OUT/'index.html'} "
-          f"({sum(len(v) for v in sections.values())} links)")
+    nav = " ".join(f'<a href="#{t.split()[0].lower()}">{t}</a>' for t in sections)
+    sub = (f'{badge("ok", f"{n_sites} sites")} {badge("info", f"{n_figs} figures")} '
+           f'&nbsp; {nav}')
+    (OUT / "index.html").write_text(
+        page("MorphoFavela — project hub", sub, "".join(blocks), provenance=prov))
+    print(f"hub written to {OUT/'index.html'} ({n_links} links, {len(sections)} sections)")
 
 
 if __name__ == "__main__":
