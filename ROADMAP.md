@@ -339,6 +339,20 @@
 ## Next Steps & Priorities
 
 ### Recently Completed
+- [x] **Morpho-signature track (WS-0 → WS-B) + review hub** (2026-06-19, branch
+      `track/morpho-signature`) — two-table feature substrate respecting the street/grid
+      change-of-support (`src/morphometry/features.py`); favela morphotype clustering
+      (GMM k=6, cross-site recurrence validated, fabric×experience contingency,
+      `signature.py`); spatial mode-filter + bootstrap stability (ARI 0.90); a
+      geometry-only prioritization index (`prioritization.py`). Expert-reviewed figure set
+      (`figures_v2/`) + a Tailscale-served **project hub** (`hubkit.py` +
+      `build_project_hub.py`) with rendered docs, named per-favela Sites, and the TR HTML
+      view. Plans + append-only decision log under `docs/morpho_signature_*`. Reusable
+      **`project-hub` skill** distilled. Awaiting user figure review before merge to main.
+- [ ] **Roughness-estimation track** (planned, 2026-06-19) — estimate aerodynamic
+      roughness z0 / displacement zd per cell from λp, λf, H_mean, σH for CFD inlet /
+      canopy parameterization; height-heterogeneity-aware (Kanda 2013) and skeptical of
+      cube-array calibration on dense favela fabric. SOTA literature review in flight.
 - [x] **5-site street-SVF re-baseline + branch consolidation** (2026-06-18) — all five
       sites re-baselined on the corrected ray-caster (boundary-clip street sampling +
       facade-normal fix for CW polygons); removes external-highway edge bias. Validated
