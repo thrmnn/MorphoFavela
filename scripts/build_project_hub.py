@@ -52,6 +52,8 @@ DOC_SECTIONS = {
          "Mingze solar comparison", "Vidigal Ladybug-vs-raycast report.", "live"),
     ],
     "Plans & decisions": [
+        ("/docs/roughness_plan.md", "Roughness-estimation plan",
+         "z0/zd from morphometry for CFD; SOTA brief + equations (Kanda 2013).", "doc"),
         ("/docs/morpho_signature_plan.md", "Morpho-signature plan",
          "The 3-workstream track plan + literature brief.", "doc"),
         ("/docs/morpho_signature_decisions.md", "Decision log",
