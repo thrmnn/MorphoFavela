@@ -55,6 +55,7 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
 .doc pre{background:#1d2127;color:#e6e9ee;padding:14px;border-radius:8px;overflow:auto;font-size:13px}
 .doc pre code{background:none;color:inherit;padding:0}.doc blockquote{border-left:3px solid var(--line);
 margin:0;padding:2px 14px;color:var(--mut)}
+.doc img{max-width:100%;height:auto;display:block;margin:10px 0;border:1px solid var(--line);border-radius:6px}
 #lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;cursor:zoom-out;
 align-items:center;justify-content:center}#lb img{max-width:96vw;max-height:94vh}
 """
@@ -118,12 +119,21 @@ def git_provenance(repo: Path, generator: str) -> str:
 
 # --- minimal, dependency-free Markdown → HTML (headings, lists, tables, code,
 #     inline emphasis/links). Good enough for project docs; not a spec parser. ---
-def _inline(t: str) -> str:
+def _rel(url: str, base: str) -> str:
+    if base and not re.match(r"^(/|https?:|#|mailto:)", url):
+        return base.rstrip("/") + "/" + url
+    return url
+
+
+def _inline(t: str, base: str = "") -> str:
     t = _html.escape(t)
     t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
     t = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", t)
     t = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<em>\1</em>", t)
-    t = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', t)
+    t = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)",
+               lambda m: f'<img src="{_rel(m.group(2), base)}" alt="{m.group(1)}">', t)
+    t = re.sub(r"\[([^\]]+)\]\(([^)]+)\)",
+               lambda m: f'<a href="{_rel(m.group(2), base)}">{m.group(1)}</a>', t)
     return t
 
 
@@ -131,7 +141,10 @@ _UL = re.compile(r"^\s*[-*]\s+")
 _OL = re.compile(r"^\s*\d+\.\s+")
 
 
-def md_to_html(md: str) -> str:
+def md_to_html(md: str, base: str = "") -> str:
+    def inl(s):
+        return _inline(s, base)
+
     lines = md.splitlines()
     out, i = [], 0
     while i < len(lines):
@@ -145,20 +158,18 @@ def md_to_html(md: str) -> str:
             out.append("<pre><code>" + "\n".join(buf) + "</code></pre>")
         elif re.match(r"^#{1,6}\s", ln):
             n = len(ln) - len(ln.lstrip("#"))
-            out.append(f"<h{n}>{_inline(ln[n:].strip())}</h{n}>")
+            out.append(f"<h{n}>{inl(ln[n:].strip())}</h{n}>")
         elif _UL.match(ln):
             buf = []
             while i < len(lines) and _UL.match(lines[i]):
-                item = _inline(_UL.sub("", lines[i]))
-                buf.append(f"<li>{item}</li>")
+                buf.append(f"<li>{inl(_UL.sub('', lines[i]))}</li>")
                 i += 1
             out.append("<ul>" + "".join(buf) + "</ul>")
             continue
         elif _OL.match(ln):
             buf = []
             while i < len(lines) and _OL.match(lines[i]):
-                item = _inline(_OL.sub("", lines[i]))
-                buf.append(f"<li>{item}</li>")
+                buf.append(f"<li>{inl(_OL.sub('', lines[i]))}</li>")
                 i += 1
             out.append("<ol>" + "".join(buf) + "</ol>")
             continue
@@ -171,8 +182,8 @@ def md_to_html(md: str) -> str:
             while i < len(lines) and "|" in lines[i]:
                 body.append(cells(lines[i]))
                 i += 1
-            th = "".join(f"<th>{_inline(c)}</th>" for c in head)
-            trs = "".join("<tr>" + "".join(f"<td>{_inline(c)}</td>" for c in r) + "</tr>" for r in body)
+            th = "".join(f"<th>{inl(c)}</th>" for c in head)
+            trs = "".join("<tr>" + "".join(f"<td>{inl(c)}</td>" for c in r) + "</tr>" for r in body)
             out.append(f"<table><thead><tr>{th}</tr></thead><tbody>{trs}</tbody></table>")
             continue
         elif re.match(r"^\s*---+\s*$", ln):
@@ -185,15 +196,15 @@ def md_to_html(md: str) -> str:
                     r"^(#{1,6}\s|```|\s*[-*]\s|\s*\d+\.\s|>|\s*---+\s*$)", lines[i + 1]):
                 i += 1
                 buf.append(lines[i])
-            out.append("<p>" + _inline(" ".join(buf)) + "</p>")
+            out.append("<p>" + inl(" ".join(buf)) + "</p>")
         i += 1
     return "\n".join(out)
 
 
-def render_doc_page(md_path: Path, out_path: Path, *, crumb="", provenance="") -> None:
+def render_doc_page(md_path: Path, out_path: Path, *, crumb="", provenance="", base="") -> None:
     text = Path(md_path).read_text()
     title = next((ln.lstrip("# ").strip() for ln in text.splitlines()
                   if ln.startswith("# ")), Path(md_path).stem)
-    body = md_to_html(text)
+    body = md_to_html(text, base=base)
     out_path.write_text(page(title, f"source: {md_path.name}", body,
                              crumb=crumb, provenance=provenance, doc=True))
