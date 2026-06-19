@@ -341,6 +341,9 @@ GALLERY = [
      "Aerodynamic roughness per wind sector (UMEP/Kanda 2013) from λp, λf, "
      "H_mean, σH, H_max. Anisotropic; dense-flat sites collapse (skimming, "
      "out-of-envelope — flagged)."),
+    ("roughness_map.png", "Roughness z0 map (R-B)",
+     "Per-cell Kanda z0; dense cores collapse to low z0 (skimming), looser/edge "
+     "cells rougher. Most cells λp>0.5 — out of envelope, flagged."),
     ("stability.png", "k=6 stability",
      "Bootstrap ARI 0.90 over 20 refits — k=6 is robust."),
     ("k_selection.png", "Model selection",

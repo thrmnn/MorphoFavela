@@ -58,9 +58,19 @@ def derive_hmax(grid: gpd.GeoDataFrame, site_dir: Path) -> np.ndarray:
     return grid["zone_id"].map(zmax).fillna(pd.Series(fallback, index=grid.index)).to_numpy()
 
 
+def _scalebar(ax, length_m=200):
+    x0, x1 = ax.get_xlim()
+    y0, y1 = ax.get_ylim()
+    x, y = x0 + 0.06 * (x1 - x0), y0 + 0.06 * (y1 - y0)
+    ax.plot([x, x + length_m], [y, y], color="black", lw=2)
+    ax.text(x + length_m / 2, y + 0.015 * (y1 - y0), f"{length_m} m",
+            ha="center", va="bottom", fontsize=6)
+
+
 def main():
     summary = []
     rose = {}
+    geoms = {}
     for p in sorted(glob.glob(str(ROOT / "outputs/*/features/features_grid.parquet"))):
         site = Path(p).parents[1].name
         g = gpd.read_parquet(p)
@@ -98,6 +108,7 @@ def main():
         })
         if site in CAMPAIGN_SITES:
             rose[site] = [np.nanmedian(out[f"z0_kan_{d}"]) for d in DIRS]
+            geoms[site] = out
 
     # directional roughness rose (campaign sites), shared radial scale
     sites = [s for s in CAMPAIGN_SITES if s in rose]
@@ -121,6 +132,33 @@ def main():
                  fontsize=10)
     fig.tight_layout()
     fig.savefig(FIGS / "roughness_rose.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+    # spatial z0 map (campaign sites), shared robust scale; cividis (no palette clash)
+    camp = [(s, geoms[s]) for s in CAMPAIGN_SITES if s in geoms]
+    pooled = np.concatenate([g["z0_kan"].dropna().to_numpy() for _, g in camp])
+    vmax = float(np.nanpercentile(pooled, 95))
+    widths = [g.total_bounds[2] - g.total_bounds[0] for _, g in camp]
+    fig, axes = plt.subplots(1, len(camp), figsize=(2.6 * len(camp), 3.4),
+                             gridspec_kw={"width_ratios": widths})
+    for ax, (s, g) in zip(np.atleast_1d(axes), camp):
+        g.plot(ax=ax, color="#E0E0E0", linewidth=0)
+        gg = g.dropna(subset=["z0_kan"])
+        gg.plot(ax=ax, column="z0_kan", cmap="cividis", vmin=0, vmax=vmax, linewidth=0)
+        gpd.GeoSeries([g.geometry.union_all()], crs=g.crs).boundary.plot(
+            ax=ax, color="0.25", linewidth=0.6)
+        ax.set_xlim(g.total_bounds[0], g.total_bounds[2])
+        ax.set_ylim(g.total_bounds[1], g.total_bounds[3])
+        ax.set_aspect("equal")
+        _scalebar(ax)
+        ax.set_axis_off()
+        ax.set_title(s.replace("_", " "), fontsize=9)
+    sm = plt.cm.ScalarMappable(cmap="cividis",
+                               norm=plt.Normalize(vmin=0, vmax=vmax))
+    fig.colorbar(sm, ax=list(np.atleast_1d(axes)), shrink=0.6, label="z0 (m), Kanda")
+    fig.suptitle("Aerodynamic roughness z0 (Kanda 2013); most cells λp>0.5 = "
+                 "out of calibration envelope (see flags)", fontsize=9)
+    fig.savefig(FIGS / "roughness_map.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
     (ROOT / "outputs" / "cross_site" / "signature" / "roughness_meta.json").write_text(

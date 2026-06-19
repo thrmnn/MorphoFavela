@@ -37,7 +37,27 @@ gallery (`roughness_rose.png`).
 - **Cross-method z0 spread ≈ 0.30–0.40 m** (median) — large; the morphometric
   uncertainty is real and reported, not hidden behind a single method.
 
-**Pending:** R-B map the rose spatially; R-C CFD drag-centroid anchor on patches to
+## R-B — Spatial roughness map
+
+**RB-1 · Per-cell z0 choropleth** (`roughness_map.png`, cividis — no clash with the
+morphotype Okabe–Ito or the priority YlOrBr), shared robust scale (pooled p95),
+NULL grey, dissolved boundary + scale bar, constant ground-scale small-multiple.
+Confirms the R-A finding spatially: **dense cores collapse to low z0** (skimming),
+**looser/edge cells are rougher** — the gradient runs opposite to intuition because
+λp>0.5 skimming dominates the interiors. Title carries the out-of-envelope caveat.
+Cell-level for now (dissolve is the polish step).
+
+## R-C / R-D — gated on real CFD
+
+**RC-gate · The CFD drag-centroid anchor needs real OpenFOAM force/velocity fields**
+and will NOT be run on the synthetic placeholders (`data/{site}/cfd_results/` holds
+unmarked synthetic data). R-C (extract patch-effective z0/zd via Jackson + log-fit)
+and R-D (emit per-patch z0 to the CFD contract) wait for the campaign. *Computable
+now without CFD and worth doing next:* per-CFD-patch **morphometric** z0(θ) (aggregate
+the cell roughness over each sampling patch) — the inlet/k_eq input the CFD setup
+needs, the "decouple two roles" hand-off — distinct from the CFD-*extracted* z0 of R-C.
+
+**Pending:** R-C CFD drag-centroid anchor on patches to
 resolve the dense-site collapse + recalibrate Kanda for favela fabric; R-D emit
 per-patch z0 to CFD (decouple the two z0 roles — morphometric z0 → inlet/k_eq,
 ground z0 small inside the resolved patch).
