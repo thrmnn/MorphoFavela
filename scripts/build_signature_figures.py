@@ -337,6 +337,10 @@ GALLERY = [
      "Geometry-only deprivation index (sun deficit + sky enclosure + wind "
      "stagnation), worst-decile per cell, rank classes. No CFD; weights "
      "provisional pending calibration."),
+    ("roughness_rose.png", "Directional roughness z0(θ) (R-A)",
+     "Aerodynamic roughness per wind sector (UMEP/Kanda 2013) from λp, λf, "
+     "H_mean, σH, H_max. Anisotropic; dense-flat sites collapse (skimming, "
+     "out-of-envelope — flagged)."),
     ("stability.png", "k=6 stability",
      "Bootstrap ARI 0.90 over 20 refits — k=6 is robust."),
     ("k_selection.png", "Model selection",
