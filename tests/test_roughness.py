@@ -1,9 +1,12 @@
 """R-A roughness wrapper — UMEP binding, NaN guard, flags, vectorization."""
 
 import numpy as np
+import pandas as pd
 
 from src.morphometry.roughness import (
+    DIRS,
     extrapolation_flags,
+    patch_mean_lambda_f,
     roughness,
     roughness_vec,
 )
@@ -42,6 +45,15 @@ def test_vectorized_matches_scalar():
     for i in range(2):
         zd_i, z0_i = roughness("Kan", zH[i], fai[i], pai[i], zMax[i], sdev[i])
         assert np.isclose(zd[i], zd_i) and np.isclose(z0[i], z0_i)
+
+
+def test_patch_mean_lambda_f_selects_radius():
+    cells = pd.DataFrame({"centroid_x": [0.0, 10.0, 100.0],
+                          "centroid_y": [0.0, 0.0, 0.0],
+                          **{f"lambda_f_{d}": [0.2, 0.4, 9.0] for d in DIRS}})
+    out = patch_mean_lambda_f(cells, cx=0, cy=0, radius=50)  # excludes the x=100 cell
+    assert out["n_cells"] == 2
+    assert abs(out["N"] - 0.3) < 1e-9  # mean of 0.2, 0.4
 
 
 def test_extrapolation_flags():

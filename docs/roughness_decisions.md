@@ -49,13 +49,22 @@ Cell-level for now (dissolve is the polish step).
 
 ## R-C / R-D — gated on real CFD
 
+**RD-prep · Per-patch morphometric z0(θ) computed (the CFD-inlet hand-off).**
+`scripts/build_patch_roughness.py` runs UMEP/Kanda per campaign patch from the
+patch-scale morphometry in `patch_meta.json` (λp, H_mean, σH, H_max) + the
+patch-aggregated λf(θ) over the cells inside the 100 m analysis disk. Output:
+`outputs/{site}/sampling_cfd/campaign_sampling/patch_roughness.csv` (+ pooled
+`outputs/cross_site/roughness/patch_roughness.csv`) — per-patch z0(θ)/zd(θ) to set
+each patch's CFD **inlet ABL + k_eq**. *Outcome:* 119 patches, 118 with z0, **77
+flagged λp>0.5**; per-site median z0 0.10–0.61 m. **Scale note:** patch-effective z0
+(100 m disk) ≠ the cell-level value — the per-cell skimming collapse (R-A) averages
+out at patch scale, and the patch scale is the CFD-inlet-relevant one. This is the
+*morphometric* z0; the CFD-*extracted* z0 of R-C is the validator.
+
 **RC-gate · The CFD drag-centroid anchor needs real OpenFOAM force/velocity fields**
 and will NOT be run on the synthetic placeholders (`data/{site}/cfd_results/` holds
 unmarked synthetic data). R-C (extract patch-effective z0/zd via Jackson + log-fit)
-and R-D (emit per-patch z0 to the CFD contract) wait for the campaign. *Computable
-now without CFD and worth doing next:* per-CFD-patch **morphometric** z0(θ) (aggregate
-the cell roughness over each sampling patch) — the inlet/k_eq input the CFD setup
-needs, the "decouple two roles" hand-off — distinct from the CFD-*extracted* z0 of R-C.
+and R-D (wire per-patch z0 into the CFD contract) wait for the campaign.
 
 **Pending:** R-C CFD drag-centroid anchor on patches to
 resolve the dense-site collapse + recalibrate Kanda for favela fabric; R-D emit

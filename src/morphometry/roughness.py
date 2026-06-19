@@ -55,6 +55,22 @@ def roughness_vec(method, zH, fai, pai, zMax, zSdev):
     return zd, z0
 
 
+def patch_mean_lambda_f(cells, cx, cy, radius):
+    """Per-direction mean λf over grid cells whose centroid lies within ``radius``
+    of (cx, cy) — the patch-scale frontal area for a CFD analysis disk.
+
+    Returns a dict dir → mean λf, plus n_cells; NaNs if no cell falls inside.
+    """
+    dx = cells["centroid_x"].to_numpy() - cx
+    dy = cells["centroid_y"].to_numpy() - cy
+    inside = (dx * dx + dy * dy) <= radius * radius
+    sub = cells[inside]
+    out = {d: float(np.nanmean(sub[f"lambda_f_{d}"])) if len(sub) else np.nan
+           for d in DIRS}
+    out["n_cells"] = int(len(sub))
+    return out
+
+
 def extrapolation_flags(zH, pai, zMax, zSdev) -> dict:
     """Per-cell flags marking estimates outside the methods' calibration envelope."""
     zH, pai, zMax, zSdev = (np.asarray(a, float) for a in (zH, pai, zMax, zSdev))
