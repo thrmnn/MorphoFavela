@@ -55,7 +55,19 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#
 .doc pre{background:#1d2127;color:#e6e9ee;padding:14px;border-radius:8px;overflow:auto;font-size:13px}
 .doc pre code{background:none;color:inherit;padding:0}.doc blockquote{border-left:3px solid var(--line);
 margin:0;padding:2px 14px;color:var(--mut)}
-.doc img{max-width:100%;height:auto;display:block;margin:10px 0;border:1px solid var(--line);border-radius:6px}
+.doc{font-size:15.5px;color:#2a2d31}
+.doc h1{font-size:25px;line-height:1.2;margin:0 0 4px}
+.doc h2{margin:34px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--ink)}
+.doc h3{margin:22px 0 8px;color:var(--accent)}
+.doc>p:first-of-type{font-size:17px;color:#444;line-height:1.6}
+.doc img{max-width:100%;height:auto;display:block;margin:18px auto 4px;border:1px solid var(--line);
+border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+/* an italics-only paragraph right after a figure reads as its caption */
+.doc img+p em:only-child,.doc p>em:only-child{display:block;text-align:center;font-size:13px;
+color:var(--mut);margin:0 auto 18px;max-width:80%;font-style:italic}
+.doc table{box-shadow:0 1px 4px rgba(0,0,0,.05)}.doc th{background:#eef1f4}
+.doc tr:nth-child(even) td{background:#fafbfc}
+.doc strong{color:var(--ink)}
 #lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;cursor:zoom-out;
 align-items:center;justify-content:center}#lb img{max-width:96vw;max-height:94vh}
 .layout{display:flex;align-items:flex-start;max-width:1320px;margin:0 auto}

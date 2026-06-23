@@ -28,16 +28,19 @@ SEQUENTIAL = "YlOrBr"         # prioritization intensity (a hue no type owns)
 DIVERGING = "RdBu_r"          # z-scores / flat-vs-terrain delta, centred at 0
 
 # Provisional short descriptors (data-checked at gallery build; refine after review)
-# Council-proposed names (2026-06-19), pending user sign-off. Spine:
-# Footing → Plateau → Core (densification→enclosure) × a {flat, steep} slope switch.
+# Names (refined 2026-06-19, pending user sign-off). Two-axis scheme:
+# density ladder  Fringe → Consolidated → Core  ×  condition modifier
+# (Open / Hillside / Shaded / Saturated). Density rises T0→T5; T1,T4 are the steep pair.
 TYPE_NAMES = {
-    0: "T0 · Open Footing",            # sparse flat single-storey fringe (λp 0.22, SVF 0.65)
-    1: "T1 · Stepped Footing",         # low-rise on ~19° slope (H/W from terrain)
-    2: "T2 · Massing Plateau",         # flat consolidated mid-rise, sky intact (conditional)
-    3: "T3 · Shaded Plateau",          # flat dense, daylight lost by frontal density (conditional)
-    4: "T4 · Cliff Stack",             # steep dense hillside, H/W 2.6, fully sun-starved
-    5: "T5 · Saturated Core",          # λp=1 maxed flat interior, deep-canyon 0.89, H/W 3.5
+    0: "T0 · Open Fringe",          # sparse flat single-storey edge (λp 0.22, SVF 0.65, sun 7h)
+    1: "T1 · Hillside Fringe",      # low-rise on ~19° slope; canyon from terrain, not mass
+    2: "T2 · Open Consolidated",    # flat, dense, sky still intact (SVF 0.46; conditional)
+    3: "T3 · Shaded Consolidated",  # flat, dense, daylight lost to frontal density (conditional)
+    4: "T4 · Hillside Core",        # steep dense hillside, H/W 2.6, fully sun-starved
+    5: "T5 · Saturated Core",       # λp=1 maxed flat interior, deep-canyon 0.89, H/W 3.5
 }
+# Short labels (no "T# ·" prefix) for compact figures.
+TYPE_LABEL = {c: n.split(" · ")[1] for c, n in TYPE_NAMES.items()}
 
 
 def type_cmap(k: int = 6) -> ListedColormap:

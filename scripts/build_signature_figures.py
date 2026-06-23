@@ -312,6 +312,12 @@ def fig_terrain_sensitivity(leaf):
 # Themed groups → each becomes an anchored gallery section with sidebar nav.
 GALLERY_GROUPS = [
     ("Signature", "signature", [
+        ("morphotype_schematics.png", "What the 6 types look like",
+         "Idealized 40 m street section per morphotype (driven by the centroids): "
+         "density, height spread, slope and canyon depth at a glance."),
+        ("composition_by_site.png", "Composition per favela",
+         "% of each morphotype per site — hillside favelas are T1/T4-dominated, "
+         "flat ones T3/T5; topography drives the mix."),
         ("fingerprint_heatmap.png", "Morphotype fingerprints",
          "Type×character diverging heatmap (annotated z, dendrogram order, columns "
          "grouped density|wind|terrain)."),
