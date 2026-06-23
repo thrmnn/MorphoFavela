@@ -1029,6 +1029,57 @@ and downstream urban-canopy analyses.
 
 ---
 
+## 6.5 Aerodynamic Roughness (z0, zd)
+
+*Track `track/roughness`. Figures (directional rose, per-cell z0 map,
+cross-method comparison) are in the review hub's grouped gallery, "Roughness"
+section.*
+
+The aerodynamic roughness length **z0** and zero-plane displacement **zd** are
+the boundary condition the CFD inlet sees. They are estimated **morphometrically**
+— per 10 m cell and per wind sector — from the §4 grid (λp, λf in 8 directions,
+H_mean, σH) plus per-cell H_max derived from the building heights, using the
+vendored UMEP roughness calculator (Kent & Grimmond: Macdonald 1998, Raupach 1994,
+Millward-Hopkins 2011, Kanda 2013). Kanda is primary because it is height-
+variability-aware; Macdonald is carried as the σH-blind baseline. The directional
+λf gives a roughness rose z0(θ) — favela packing is anisotropic, so a single mean
+would discard real directional structure.
+
+**The two roles of z0 are decoupled.** The morphometric z0(θ)/zd(θ) of the
+*upstream settlement* sets the CFD **inlet ABL profile and the k_eq target**; the
+**ground z0 inside the resolved patch stays small and mesh-valid**, because the
+explicitly-meshed buildings already supply the form drag. This removes the
+Blocken et al. (2007) sand-grain wall-function inconsistency and replaces a
+guessed inlet roughness with a derived one. Per-patch morphometric z0(θ) is
+written to `outputs/{site}/sampling_cfd/campaign_sampling/patch_roughness.csv`
+(119 patches) as the CFD-inlet hand-off.
+
+**Findings, with honest caveats.** Three features of favela fabric place it
+outside the calibration envelope of every published method (all fit on cube/
+obstacle arrays at λp ≈ 0.05–0.5):
+
+- **zd > H_mean in 70–93 % of built cells** — tall outliers carry disproportionate
+  drag, pushing the displacement height above the *mean* building height (expected
+  for heterogeneous canopies; Kanda/Kent).
+- **λp > 0.5 in 56–88 % of cells** (77 of 119 CFD patches) — most fabric is an
+  extrapolation, not an in-envelope estimate; flagged per cell/patch
+  (`flag_pai_over_envelope`), never silently.
+- **The four methods diverge by up to ~20× in the dense regime** — and the naive
+  expectation that the σH-aware methods simply lift z0 above Macdonald does *not*
+  hold: in the skimming limit Kanda can fall *below* Macdonald (Maré, Rio das
+  Pedras). The disagreement is the morphometric uncertainty, and resolving it
+  requires anchoring against CFD.
+
+No published z0/zd estimate exists for any favela or informal settlement; the
+height-randomness (which raises roughness) versus extreme-λp skimming (which lowers
+it) tension is unresolved in the literature. The campaign CFD, processed via the
+Jackson (1981) drag-centroid + log-law fit above the canopy, is the instrument to
+settle it — pending the OpenFOAM run (the CFD-extracted z0 of step R-C, vs the
+morphometric z0 here). Method equations, coefficients, and the full reference list
+are in `docs/roughness_plan.md`; per-step decisions in `docs/roughness_decisions.md`.
+
+---
+
 ## 7. CFD Integration Pipeline
 
 ### 7.1 Overview
