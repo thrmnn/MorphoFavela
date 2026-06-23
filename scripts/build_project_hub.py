@@ -28,6 +28,7 @@ from hubkit import (  # noqa: E402
     page,
     render_doc_page,
     section,
+    toc_sections,
 )
 
 OUT = ROOT / "outputs" / "_hub"
@@ -139,11 +140,12 @@ def main():
 
     n_sites = sum((DASH / s / "index.html").exists() for s in SITE_NAMES)
     n_figs = len(glob.glob(str(ROOT / "outputs/cross_site/signature/figures_v2/*.png")))
-    nav = " ".join(f'<a href="#{t.split()[0].lower()}">{t}</a>' for t in titles)
     sub = (f'{badge("ok", f"{n_sites} site dashboards")} '
-           f'{badge("info", f"{n_figs} figures")} &nbsp; {nav}')
+           f'{badge("info", f"{n_figs} figures")}')
+    sidebar = toc_sections([(t.split()[0].lower(), t) for t in titles])
     (OUT / "index.html").write_text(
-        page("MorphoFavela — project hub", sub, "".join(blocks), provenance=prov))
+        page("MorphoFavela — project hub", sub, "".join(blocks),
+             provenance=prov, sidebar=sidebar))
     print(f"hub written: {len(titles)} sections, {n_sites} site dashboards")
 
 

@@ -58,6 +58,20 @@ margin:0;padding:2px 14px;color:var(--mut)}
 .doc img{max-width:100%;height:auto;display:block;margin:10px 0;border:1px solid var(--line);border-radius:6px}
 #lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;cursor:zoom-out;
 align-items:center;justify-content:center}#lb img{max-width:96vw;max-height:94vh}
+.layout{display:flex;align-items:flex-start;max-width:1320px;margin:0 auto}
+.layout aside{position:sticky;top:0;flex:0 0 240px;max-height:100vh;overflow:auto;
+padding:22px 10px 22px 22px}
+.layout main{flex:1 1 auto;min-width:0}
+.toc{font-size:13px;border-left:2px solid var(--line);padding-left:12px}
+.toc-h{font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;
+font-size:11px;margin-bottom:8px}
+.toc a{display:block;color:var(--mut);text-decoration:none;padding:3px 0;line-height:1.35}
+.toc a:hover{color:var(--accent)}
+.toc a.t3{padding-left:12px;font-size:12px}
+html{scroll-behavior:smooth}:target{scroll-margin-top:14px}
+@media(max-width:820px){.layout{display:block}.layout aside{position:static;max-height:none;
+flex-basis:auto;padding:14px 22px 0}.toc{border-left:none;border-bottom:1px solid var(--line);
+padding:0 0 10px}.toc a{display:inline-block;margin-right:14px}}
 """
 
 _LB = ("<div id=lb onclick=\"this.style.display='none'\"><img id=lbi></div>"
@@ -94,15 +108,46 @@ def breadcrumb(trail: list[tuple[str, str | None]]) -> str:
     return '<nav class="crumb">' + '<span class="sep">›</span>'.join(parts) + "</nav>"
 
 
-def page(title, subtitle, body, *, crumb="", provenance="", doc=False) -> str:
+def _slug(text: str) -> str:
+    s = re.sub(r"<[^>]+>", "", text).lower()
+    s = re.sub(r"[^a-z0-9\s-]", "", s)
+    return re.sub(r"\s+", "-", s.strip())[:60] or "section"
+
+
+def toc_from_html(body: str, levels=("h2", "h3")) -> str:
+    """Sidebar table of contents from `<hN id=...>` headings in rendered HTML."""
+    items = re.findall(r'<(h[23]) id="([^"]+)">(.*?)</h[23]>', body, re.DOTALL)
+    if not items:
+        return ""
+    rows = []
+    for tag, hid, txt in items:
+        txt = re.sub(r"<[^>]+>", "", txt).strip()
+        cls = "t3" if tag == "h3" else "t2"
+        rows.append(f'<a class="{cls}" href="#{hid}">{_html.escape(txt)}</a>')
+    return '<nav class="toc"><div class="toc-h">On this page</div>' + "".join(rows) + "</nav>"
+
+
+def toc_sections(sections: list[tuple[str, str]]) -> str:
+    """Sidebar TOC from explicit (anchor, label) pairs — for hub/gallery pages."""
+    rows = [f'<a class="t2" href="#{a}">{_html.escape(lbl)}</a>' for a, lbl in sections]
+    return '<nav class="toc"><div class="toc-h">Sections</div>' + "".join(rows) + "</nav>"
+
+
+def page(title, subtitle, body, *, crumb="", provenance="", doc=False, sidebar="") -> str:
     cls = "wrap doc" if doc else "wrap"
     foot = f"<footer>{_html.escape(provenance)}</footer>" if provenance else ""
+    main = (f'<div class="layout"><aside>{sidebar}</aside>'
+            f'<main class="{cls}">{crumb}'
+            f'<header class=hd><h1>{_html.escape(title)}</h1>'
+            f'<div class=sub>{subtitle}</div></header>{body}{foot}</main></div>'
+            if sidebar else
+            f'<div class="{cls}">{crumb}'
+            f'<header class=hd><h1>{_html.escape(title)}</h1>'
+            f'<div class=sub>{subtitle}</div></header>{body}{foot}</div>')
     return f"""<!doctype html><html lang=en><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>{_html.escape(title)}</title><style>{CSS}</style></head><body>
-<div class="{cls}">{crumb}
-<header class=hd><h1>{_html.escape(title)}</h1><div class=sub>{subtitle}</div></header>
-{body}{foot}</div>{_LB}</body></html>"""
+{main}{_LB}</body></html>"""
 
 
 def git_provenance(repo: Path, generator: str) -> str:
@@ -158,7 +203,9 @@ def md_to_html(md: str, base: str = "") -> str:
             out.append("<pre><code>" + "\n".join(buf) + "</code></pre>")
         elif re.match(r"^#{1,6}\s", ln):
             n = len(ln) - len(ln.lstrip("#"))
-            out.append(f"<h{n}>{inl(ln[n:].strip())}</h{n}>")
+            txt = ln[n:].strip()
+            hid = _slug(txt)
+            out.append(f'<h{n} id="{hid}">{inl(txt)}</h{n}>')
         elif _UL.match(ln):
             buf = []
             while i < len(lines) and _UL.match(lines[i]):
@@ -207,4 +254,5 @@ def render_doc_page(md_path: Path, out_path: Path, *, crumb="", provenance="", b
                   if ln.startswith("# ")), Path(md_path).stem)
     body = md_to_html(text, base=base)
     out_path.write_text(page(title, f"source: {md_path.name}", body,
-                             crumb=crumb, provenance=provenance, doc=True))
+                             crumb=crumb, provenance=provenance, doc=True,
+                             sidebar=toc_from_html(body)))
