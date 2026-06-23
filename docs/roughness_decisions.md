@@ -58,6 +58,14 @@ quadratic-in-Y correction can drop z0 *below* Macdonald in the skimming limit
 CFD*. This is the validation gap quantified, and it directly motivates R-C. (Caught
 on review: the first cut mis-titled this "the σH premium" before the data was read.)
 
+**RB-2 · Two findings-driven maps (track `track/viz`).** (i) `roughness_zd_ratio.png`
+— diverging map centred at zd/H_mean = 1 (RdBu, TwoSlopeNorm): red where displacement
+exceeds mean height, the spatial face of the 70–93% finding. (ii) `roughness_slope.png`
+— median z0 binned by terrain slope (≥30 cells/bin, capped at 35° where data thins).
+z0 *rises* on steep slopes, but this is reframed honestly as a **confound, not a
+clean finding**: the flat-datum λf/σH absorbs the hillside, and no morphometric
+method separates terrain from fabric. Matches the plan's Risk-1 / open-axis note.
+
 ## R-C / R-D — gated on real CFD
 
 **RD-prep · Per-patch morphometric z0(θ) computed (the CFD-inlet hand-off).**

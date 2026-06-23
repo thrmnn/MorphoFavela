@@ -87,6 +87,9 @@ def main():
         out["z0_kan"] = z0_kan
         out["zd_kan"] = zd_kan
         out["zd_exceeds_Hmean"] = zd_kan > zH
+        out["zd_over_Hmean"] = np.where(zH > 0, zd_kan / zH, np.nan)
+        out["H_mean"] = zH
+        out["slope_deg"] = g["slope_deg"].to_numpy()
         for d in DIRS:
             out[f"z0_kan_{d}"] = roughness_vec("Kan", zH, g[f"lambda_f_{d}"].to_numpy(),
                                                pai, zMax, sdev)[1]
@@ -187,6 +190,55 @@ def main():
     plt.close(fig)
     pd.DataFrame(method_med).T.to_csv(
         ROOT / "outputs" / "cross_site" / "roughness" / "method_medians.csv")
+
+    # zd/H_mean ratio map — the headline finding spatially (where zd exceeds H_mean)
+    from matplotlib.colors import TwoSlopeNorm
+    norm = TwoSlopeNorm(vcenter=1.0, vmin=0.0, vmax=2.0)
+    fig, axes = plt.subplots(1, len(camp), figsize=(2.6 * len(camp), 3.4),
+                             gridspec_kw={"width_ratios": widths})
+    for ax, (s, g) in zip(np.atleast_1d(axes), camp):
+        g.plot(ax=ax, color="#E0E0E0", linewidth=0)
+        gg = g.dropna(subset=["zd_over_Hmean"])
+        gg.plot(ax=ax, column="zd_over_Hmean", cmap="RdBu_r", norm=norm, linewidth=0)
+        gpd.GeoSeries([g.geometry.union_all()], crs=g.crs).boundary.plot(
+            ax=ax, color="0.25", linewidth=0.6)
+        ax.set_xlim(g.total_bounds[0], g.total_bounds[2])
+        ax.set_ylim(g.total_bounds[1], g.total_bounds[3])
+        ax.set_aspect("equal")
+        _scalebar(ax)
+        ax.set_axis_off()
+        ax.set_title(s.replace("_", " "), fontsize=9)
+    sm = plt.cm.ScalarMappable(cmap="RdBu_r", norm=norm)
+    fig.colorbar(sm, ax=list(np.atleast_1d(axes)), shrink=0.6,
+                 label="zd / H_mean  (red = displacement exceeds mean height)")
+    fig.suptitle("Displacement height relative to mean building height — "
+                 "zd>H_mean in 70–93% of cells (heterogeneity signature)", fontsize=8.5)
+    fig.savefig(FIGS / "roughness_zd_ratio.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+    # z0 vs slope — the terrain confound no morphometric method separates.
+    # Bins need >=MIN_N cells or the steep tail is a few noisy edge cells.
+    MIN_N = 30
+    fig, ax = plt.subplots(figsize=(6.5, 3.6))
+    bins = np.array([0, 5, 10, 15, 20, 25, 30, 35])  # cap at 35°: above is sparse
+    centers = 0.5 * (bins[:-1] + bins[1:])
+    for s, g in camp:
+        d = g.dropna(subset=["z0_kan", "slope_deg"])
+        idx = np.digitize(d["slope_deg"].to_numpy(), bins) - 1
+        med = [np.nanmedian(d["z0_kan"].to_numpy()[idx == b])
+               if (idx == b).sum() >= MIN_N else np.nan
+               for b in range(len(bins) - 1)]
+        ax.plot(centers, med, "o-", ms=3, label=s.replace("_", " "))
+    ax.set_xlabel("terrain slope (°)")
+    ax.set_ylabel("median z0 (m), Kanda")
+    ax.set_title("Morphometric z0 rises on steep slopes — but flat-datum λf/σH "
+                 "absorbs the hillside; no method separates terrain from fabric",
+                 fontsize=8)
+    ax.legend(fontsize=7)
+    ax.grid(color="0.92")
+    fig.tight_layout()
+    fig.savefig(FIGS / "roughness_slope.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
 
     (ROOT / "outputs" / "cross_site" / "signature" / "roughness_meta.json").write_text(
         json.dumps({"git_sha": _git_sha(),

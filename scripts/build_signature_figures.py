@@ -340,6 +340,12 @@ GALLERY_GROUPS = [
         ("roughness_methods.png", "Cross-method z0 disagreement",
          "Macdonald/Raupach/Millward-Hopkins/Kanda median z0 per site — diverge "
          "up to ~20× in the λp>0.5 regime. Motivates CFD anchoring (R-C)."),
+        ("roughness_zd_ratio.png", "Displacement zd / H_mean",
+         "Diverging map centred at 1: red = displacement exceeds mean building "
+         "height (70–93% of cells) — the heterogeneity signature spatially."),
+        ("roughness_slope.png", "Roughness vs terrain slope",
+         "Morphometric z0 rises on steep slopes — but flat-datum λf/σH absorbs the "
+         "hillside; no method separates terrain from fabric (the open caveat)."),
     ]),
     ("Prioritization & honesty", "prioritization", [
         ("priority_map.png", "Morphometrics-only priority (WS-B)",
