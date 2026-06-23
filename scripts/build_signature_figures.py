@@ -309,91 +309,111 @@ def fig_terrain_sensitivity(leaf):
     _save(fig, "terrain_sensitivity.png")
 
 
-GALLERY = [
-    ("fingerprint_heatmap.png", "Morphotype fingerprints",
-     "Radar replaced by a type×character diverging heatmap (annotated z, rows in "
-     "dendrogram order, columns grouped density|wind|terrain)."),
-    ("dendrogram.png", "Taxonomy dendrogram",
-     "Grey links (structure), leaf labels in the type palette (identity), k=6 cut."),
-    ("recurrence.png", "Cross-site recurrence",
-     "Single-hue Blues; cols in dendrogram order, rows flat-then-steep; the "
-     "site-specific type (T3, flatland) boxed in red — the validation as a figure."),
-    ("recurrence_evidence.png", "Recurrence evidence",
-     "Per-site type centroids overlaid: if a type's profile is the same shape across "
-     "sites, recurrence is shown, not asserted (domain-reviewer's #1 ask)."),
-    ("experience_dotplots.png", "Fabric × experience",
-     "Held-out experienced conditions per type (dot size ∝ street support). The "
-     "monotone worsening with density is out-of-sample validation."),
-    ("maps_morphotypes.png", "Morphotype maps",
-     "Mode-filtered + dissolved to regions (MMU 10 cells, white casing, site "
-     "outline, constant ground-scale, scale bars); Okabe–Ito, NULL=grey."),
-    ("naive_vs_support.png", "Naive vs support-aware",
-     "Why the change-of-support matters: nearest-k mean invents a value for every "
-     "cell; the support-aware p10 leaves the ~65% unsupported cells grey."),
-    ("terrain_sensitivity.png", "Terrain sensitivity",
-     "Does the flat-datum λf/SVF error track the prioritized types? Slope + the "
-     "measured-vs-flat-canyon SVF gap per morphotype (Risk-1 honesty)."),
-    ("priority_map.png", "Morphometrics-only priority (WS-B)",
-     "Geometry-only deprivation index (sun deficit + sky enclosure + wind "
-     "stagnation), worst-decile per cell, rank classes. No CFD; weights "
-     "provisional pending calibration."),
-    ("roughness_rose.png", "Directional roughness z0(θ) (R-A)",
-     "Aerodynamic roughness per wind sector (UMEP/Kanda 2013) from λp, λf, "
-     "H_mean, σH, H_max. Anisotropic; dense-flat sites collapse (skimming, "
-     "out-of-envelope — flagged)."),
-    ("roughness_map.png", "Roughness z0 map (R-B)",
-     "Per-cell Kanda z0; dense cores collapse to low z0 (skimming), looser/edge "
-     "cells rougher. Most cells λp>0.5 — out of envelope, flagged."),
-    ("roughness_methods.png", "Cross-method z0 disagreement",
-     "Macdonald / Raupach / Millward-Hopkins / Kanda median z0 per site. They "
-     "diverge up to ~20× in the λp>0.5 favela regime — the morphometric "
-     "uncertainty, and why CFD anchoring (R-C) is needed to say which is right."),
-    ("stability.png", "k=6 stability",
-     "Bootstrap ARI 0.90 over 20 refits — k=6 is robust."),
-    ("k_selection.png", "Model selection",
-     "BIC elbow (primary) + silhouette cross-check."),
+# Themed groups → each becomes an anchored gallery section with sidebar nav.
+GALLERY_GROUPS = [
+    ("Signature", "signature", [
+        ("fingerprint_heatmap.png", "Morphotype fingerprints",
+         "Type×character diverging heatmap (annotated z, dendrogram order, columns "
+         "grouped density|wind|terrain)."),
+        ("dendrogram.png", "Taxonomy dendrogram",
+         "Grey links (structure), leaf labels in the type palette, k=6 cut."),
+        ("recurrence.png", "Cross-site recurrence",
+         "Single-hue Blues; the site-specific type (T3, flatland) boxed red — the "
+         "validation as a figure."),
+        ("recurrence_evidence.png", "Recurrence evidence",
+         "Per-site type centroids overlaid: same profile shape across sites = "
+         "recurrence shown, not asserted."),
+        ("maps_morphotypes.png", "Morphotype maps",
+         "Mode-filtered + dissolved to regions; Okabe–Ito, NULL=grey, scale bars."),
+        ("stability.png", "k=6 stability",
+         "Bootstrap ARI 0.90 over 20 refits — k=6 is robust."),
+        ("k_selection.png", "Model selection",
+         "BIC elbow (primary) + silhouette cross-check."),
+    ]),
+    ("Roughness (track/roughness)", "roughness", [
+        ("roughness_rose.png", "Directional roughness z0(θ) (R-A)",
+         "z0 per wind sector (UMEP/Kanda 2013) from λp, λf, H_mean, σH, H_max. "
+         "Anisotropic; dense-flat sites collapse (skimming)."),
+        ("roughness_map.png", "Roughness z0 map (R-B)",
+         "Per-cell Kanda z0; dense cores collapse (skimming), looser/edge cells "
+         "rougher. Most cells λp>0.5 — out of envelope, flagged."),
+        ("roughness_methods.png", "Cross-method z0 disagreement",
+         "Macdonald/Raupach/Millward-Hopkins/Kanda median z0 per site — diverge "
+         "up to ~20× in the λp>0.5 regime. Motivates CFD anchoring (R-C)."),
+    ]),
+    ("Prioritization & honesty", "prioritization", [
+        ("priority_map.png", "Morphometrics-only priority (WS-B)",
+         "Geometry-only deprivation index, worst-decile per cell, rank classes. "
+         "No CFD; weights provisional."),
+        ("experience_dotplots.png", "Fabric × experience",
+         "Held-out experienced conditions per type (dot size ∝ support). Monotone "
+         "worsening with density = out-of-sample validation."),
+        ("naive_vs_support.png", "Naive vs support-aware",
+         "Nearest-k mean invents a value for every cell; support-aware p10 leaves "
+         "the ~65% unsupported cells grey."),
+        ("terrain_sensitivity.png", "Terrain sensitivity",
+         "Does the flat-datum error track the prioritized types? Slope + the "
+         "measured-vs-flat-canyon SVF gap per morphotype."),
+    ]),
 ]
 
 
 def write_gallery():
-    cards = []
-    for name, title, decision in GALLERY:
-        if not (OUT / name).exists():
-            continue
-        cards.append(f"""
-  <section class="card">
-    <h2>{title}</h2>
-    <img src="{name}" loading="lazy" onclick="zoom('{name}','{title}')">
-    <p class="decision">{decision}</p>
-    <p class="prompt">Review: <b>✅ keep</b> &nbsp;|&nbsp; <b>✏️ refine</b> — note what to change.</p>
-  </section>""")
+    blocks = []
+    toc = []
+    for group, anchor, items in GALLERY_GROUPS:
+        cards = []
+        for name, title, decision in items:
+            if not (OUT / name).exists():
+                continue
+            cards.append(f"""
+    <section class="card">
+      <h3>{title}</h3>
+      <img src="{name}" loading="lazy" onclick="zoom('{name}','{title}')">
+      <p class="decision">{decision}</p>
+      <p class="prompt">Review: <b>✅ keep</b> &nbsp;|&nbsp; <b>✏️ refine</b></p>
+    </section>""")
+        if cards:
+            toc.append(f'<a href="#{anchor}">{group}</a>')
+            blocks.append(f'<h2 id="{anchor}">{group}</h2>'
+                          f'<div class="grid">{"".join(cards)}</div>')
+    sidebar = ('<nav class="toc"><div class="toc-h">Sections</div>'
+               + "".join(toc) + "</nav>")
     html = f"""<!doctype html><meta charset=utf-8>
 <title>Morpho-signature figures — review</title>
 <style>
  body{{font:15px/1.5 system-ui,sans-serif;margin:0;background:#fafafa;color:#222}}
- header{{padding:24px 32px;background:#fff;border-bottom:1px solid #e5e5e5}}
- h1{{margin:0;font-size:20px}} header p{{margin:6px 0 0;color:#666}}
- main{{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:20px;padding:24px}}
+ .top{{position:sticky;top:0;background:#fffd;backdrop-filter:blur(6px);padding:10px 24px;border-bottom:1px solid #e5e5e5;font-weight:600;font-size:14px;z-index:30}}
+ .top a{{color:#1a6fb5;text-decoration:none}}
+ .layout{{display:flex;align-items:flex-start;max-width:1400px;margin:0 auto}}
+ .layout aside{{position:sticky;top:42px;flex:0 0 220px;max-height:calc(100vh - 42px);overflow:auto;padding:20px 8px 20px 24px}}
+ .toc{{font-size:13px;border-left:2px solid #e5e5e5;padding-left:12px}}
+ .toc-h{{font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;font-size:11px;margin-bottom:8px}}
+ .toc a{{display:block;color:#666;text-decoration:none;padding:4px 0}} .toc a:hover{{color:#1a6fb5}}
+ main{{flex:1 1 auto;min-width:0;padding:18px 24px 60px}}
+ h1{{font-size:20px;margin:8px 0}} main>h2{{font-size:16px;border-bottom:1px solid #e5e5e5;padding-bottom:5px;margin:26px 0 12px}}
+ .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:18px}}
  .card{{background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:16px}}
- .card h2{{margin:0 0 10px;font-size:16px}}
+ .card h3{{margin:0 0 10px;font-size:15px}}
  .card img{{width:100%;height:auto;border:1px solid #eee;border-radius:6px;cursor:zoom-in}}
  .decision{{color:#444;font-size:13px}} .prompt{{color:#777;font-size:13px;border-top:1px dashed #ddd;padding-top:8px}}
+ html{{scroll-behavior:smooth}} :target{{scroll-margin-top:52px}}
  #lb{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;cursor:zoom-out;flex-direction:column;align-items:center;justify-content:center}}
  #lb img{{max-width:96vw;max-height:90vh}} #lb p{{color:#eee;margin:10px;font-size:15px}}
+ @media(max-width:820px){{.layout{{display:block}}.layout aside{{position:static;max-height:none;flex-basis:auto;padding:12px 24px 0}}.toc{{border-left:none}}.toc a{{display:inline-block;margin-right:14px}}}}
 </style>
-<nav style="position:sticky;top:0;background:#fffd;backdrop-filter:blur(6px);padding:10px 24px;border-bottom:1px solid #e5e5e5;font-weight:600;font-size:14px">
- <a href="/outputs/_hub/index.html" style="color:#1a6fb5;text-decoration:none">← Project hub</a>
- <span style="color:#999;margin:0 8px">›</span><span style="color:#666">Signature figures</span>
-</nav>
-<header>
- <h1>Favela morpho-signature — figure review (v2)</h1>
- <p>Generated per the expert-reviewed spec. Click any figure to enlarge. Page
-    through; mark each keep / refine. Rationale:
+<div class="top"><a href="/outputs/_hub/index.html">← Project hub</a>
+ <span style="color:#999;margin:0 8px">›</span><span style="color:#666">Signature &amp; roughness figures</span></div>
+<div class="layout">
+<aside>{sidebar}</aside>
+<main>
+ <h1>Favela morpho-signature &amp; roughness — figure review</h1>
+ <p style="color:#666;margin:0 0 6px">Click any figure to enlarge. Rationale:
     <a href="/outputs/_hub/docs/visualization_plan.html">visualization plan</a> ·
-    <a href="/outputs/_hub/docs/morpho_signature_decisions.html">decision log</a></p>
-</header>
-<main>{''.join(cards)}
-</main>
+    <a href="/outputs/_hub/docs/morpho_signature_decisions.html">signature decisions</a> ·
+    <a href="/outputs/_hub/docs/roughness_decisions.html">roughness decisions</a></p>
+ {''.join(blocks)}
+</main></div>
 <div id="lb" onclick="this.style.display='none'"><img id="lbimg"><p id="lbcap"></p></div>
 <script>
  function zoom(src,cap){{lbimg.src=src;lbcap.textContent=cap;lb.style.display='flex'}}
