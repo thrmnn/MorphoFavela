@@ -47,6 +47,17 @@ Confirms the R-A finding spatially: **dense cores collapse to low z0** (skimming
 λp>0.5 skimming dominates the interiors. Title carries the out-of-envelope caveat.
 Cell-level for now (dissolve is the polish step).
 
+**RA-5 · Cross-method disagreement is the headline uncertainty (figure
+`roughness_methods.png`).** Plotting median z0 by Macdonald/Raupach/Millward-
+Hopkins/Kanda per site: in the favela λp>0.5 regime the four **span up to ~20×**.
+The naive expectation — σH-aware Kanda/MHN lift z0 above the height-blind Macdonald
+("heterogeneity premium") — **does not hold in the dense regime**: Kanda's
+quadratic-in-Y correction can drop z0 *below* Macdonald in the skimming limit
+(Maré, Rio das Pedras), while Raupach/MHN run high. So the honest figure is
+*disagreement*, not a clean premium — and *which method is right is unknown without
+CFD*. This is the validation gap quantified, and it directly motivates R-C. (Caught
+on review: the first cut mis-titled this "the σH premium" before the data was read.)
+
 ## R-C / R-D — gated on real CFD
 
 **RD-prep · Per-patch morphometric z0(θ) computed (the CFD-inlet hand-off).**

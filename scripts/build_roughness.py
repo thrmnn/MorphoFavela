@@ -71,6 +71,7 @@ def main():
     summary = []
     rose = {}
     geoms = {}
+    method_med = {}  # site -> {method: median z0}
     for p in sorted(glob.glob(str(ROOT / "outputs/*/features/features_grid.parquet"))):
         site = Path(p).parents[1].name
         g = gpd.read_parquet(p)
@@ -106,6 +107,8 @@ def main():
             "frac_pai_over_0.5": float(np.nanmean(out["flag_pai_over_envelope"][m])),
             "z0_spread_med": float(np.nanmedian(spread)),
         })
+        method_med[site] = {mm: float(np.nanmedian(out[f"z0_{mm.lower()}"]))
+                            for mm in ("Kan", "Mho", "Mac", "Rau")}
         if site in CAMPAIGN_SITES:
             rose[site] = [np.nanmedian(out[f"z0_kan_{d}"]) for d in DIRS]
             geoms[site] = out
@@ -160,6 +163,30 @@ def main():
                  "out of calibration envelope (see flags)", fontsize=9)
     fig.savefig(FIGS / "roughness_map.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
+
+    # cross-method comparison — the "σH premium" (Kanda/MHN vs Macdonald baseline)
+    msites = list(method_med)
+    methods = ["Mac", "Rau", "Mho", "Kan"]
+    mcolor = {"Mac": "#999999", "Rau": "#56B4E9", "Mho": "#E69F00", "Kan": "#0072B2"}
+    x = np.arange(len(msites))
+    w = 0.2
+    fig, ax = plt.subplots(figsize=(8.5, 3.4))
+    for i, mm in enumerate(methods):
+        ax.bar(x + (i - 1.5) * w, [method_med[s][mm] for s in msites], w,
+               label=mm, color=mcolor[mm])
+    ax.set_xticks(x)
+    ax.set_xticklabels([s.replace("_", " ") for s in msites], rotation=25, ha="right",
+                       fontsize=8)
+    ax.set_ylabel("median z0 (m)")
+    ax.set_title("Cross-method z0 disagreement — the four methods span up to ~20× "
+                 "in the λp>0.5 favela regime (which is right is unknown w/o CFD)",
+                 fontsize=8.5)
+    ax.legend(fontsize=8, ncol=4)
+    fig.tight_layout()
+    fig.savefig(FIGS / "roughness_methods.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    pd.DataFrame(method_med).T.to_csv(
+        ROOT / "outputs" / "cross_site" / "roughness" / "method_medians.csv")
 
     (ROOT / "outputs" / "cross_site" / "signature" / "roughness_meta.json").write_text(
         json.dumps({"git_sha": _git_sha(),

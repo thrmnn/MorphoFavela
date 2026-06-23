@@ -344,6 +344,10 @@ GALLERY = [
     ("roughness_map.png", "Roughness z0 map (R-B)",
      "Per-cell Kanda z0; dense cores collapse to low z0 (skimming), looser/edge "
      "cells rougher. Most cells λp>0.5 — out of envelope, flagged."),
+    ("roughness_methods.png", "Cross-method z0 disagreement",
+     "Macdonald / Raupach / Millward-Hopkins / Kanda median z0 per site. They "
+     "diverge up to ~20× in the λp>0.5 favela regime — the morphometric "
+     "uncertainty, and why CFD anchoring (R-C) is needed to say which is right."),
     ("stability.png", "k=6 stability",
      "Bootstrap ARI 0.90 over 20 refits — k=6 is robust."),
     ("k_selection.png", "Model selection",
