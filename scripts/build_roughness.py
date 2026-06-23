@@ -55,7 +55,9 @@ def derive_hmax(grid: gpd.GeoDataFrame, site_dir: Path) -> np.ndarray:
     j = gpd.sjoin(b[[hcol, "geometry"]].to_crs(grid.crs),
                   grid[["zone_id", "geometry"]], predicate="intersects")
     zmax = j.groupby("zone_id")[hcol].max()
-    return grid["zone_id"].map(zmax).fillna(pd.Series(fallback, index=grid.index)).to_numpy()
+    hmax = grid["zone_id"].map(zmax).fillna(pd.Series(fallback, index=grid.index)).to_numpy()
+    # H_max must be ≥ H_mean (the building set behind each can differ → small mismatch)
+    return np.maximum(hmax, grid["H_mean"].to_numpy())
 
 
 def _scalebar(ax, length_m=200):
@@ -90,6 +92,11 @@ def main():
         out["zd_over_Hmean"] = np.where(zH > 0, zd_kan / zH, np.nan)
         out["H_mean"] = zH
         out["slope_deg"] = g["slope_deg"].to_numpy()
+        # physical-validity flags: the model fails out of envelope (council, 2026-06-19)
+        out["flag_zd_gt_Hmax"] = zd_kan > zMax           # displacement above tallest building
+        out["flag_z0_collapsed"] = z0_kan < 0.01          # skimming asymptote → ~smooth
+        out["roughness_physically_valid"] = ~(
+            (zd_kan > zMax) | (z0_kan < 0.01) | ~np.isfinite(z0_kan))
         for d in DIRS:
             out[f"z0_kan_{d}"] = roughness_vec("Kan", zH, g[f"lambda_f_{d}"].to_numpy(),
                                                pai, zMax, sdev)[1]
@@ -109,6 +116,9 @@ def main():
             "frac_zd_gt_Hmean": float(np.nanmean((zd_kan > zH)[m])),
             "frac_pai_over_0.5": float(np.nanmean(out["flag_pai_over_envelope"][m])),
             "z0_spread_med": float(np.nanmedian(spread)),
+            "frac_zd_gt_Hmax": float(np.nanmean(out["flag_zd_gt_Hmax"][m])),
+            "frac_z0_collapsed": float(np.nanmean(out["flag_z0_collapsed"][m])),
+            "frac_physically_valid": float(np.nanmean(out["roughness_physically_valid"][m])),
         })
         method_med[site] = {mm: float(np.nanmedian(out[f"z0_{mm.lower()}"]))
                             for mm in ("Kan", "Mho", "Mac", "Rau")}
@@ -120,8 +130,11 @@ def main():
     sites = [s for s in CAMPAIGN_SITES if s in rose]
     ang = np.deg2rad([0, 45, 90, 135, 180, 225, 270, 315])
     ang = np.concatenate([ang, ang[:1]])
+    # Radial axis offset to the data band so the (real but compressed) ~25%
+    # directional modulation is visible — starting at 0 makes it read as a circle.
     rmax = max(max(v) for v in rose.values())
-    fig, axes = plt.subplots(1, len(sites), figsize=(2.5 * len(sites), 3),
+    rmin = min(min(v) for v in rose.values())
+    fig, axes = plt.subplots(1, len(sites), figsize=(2.5 * len(sites), 3.2),
                              subplot_kw={"polar": True})
     for ax, s in zip(np.atleast_1d(axes), sites):
         r = rose[s] + rose[s][:1]
@@ -129,15 +142,45 @@ def main():
         ax.fill(ang, r, color="#1a6fb5", alpha=0.25)
         ax.set_theta_zero_location("N")
         ax.set_theta_direction(-1)
-        ax.set_ylim(0, rmax)
+        ax.set_ylim(0.85 * rmin, 1.03 * rmax)  # zoom to the data band
         ax.set_xticks(ang[:-1])
         ax.set_xticklabels(DIRS, fontsize=6)
         ax.set_yticklabels([])
-        ax.set_title(s.replace("_", " "), fontsize=8)
-    fig.suptitle("Directional roughness z0(θ) — median per sector (Kanda 2013)",
-                 fontsize=10)
+        rr = max(rose[s]) / max(min(rose[s]), 1e-9)
+        ax.set_title(f"{s.replace('_', ' ')}\nz0 {min(rose[s]):.2f}–{max(rose[s]):.2f} m "
+                     f"({rr:.2f}×)", fontsize=7)
+    fig.suptitle("Directional roughness z0(θ), Kanda — radial axis zoomed to the data band.\n"
+                 "Frontal-area roughness is 180°-symmetric by construction (z0(θ)=z0(θ+180°)); "
+                 "site-median also damps per-cell anisotropy — see roughness_anisotropy.png.",
+                 fontsize=7.5)
     fig.tight_layout()
     fig.savefig(FIGS / "roughness_rose.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+    # per-cell directional anisotropy of λf — the structure the median rose damps.
+    fig, ax = plt.subplots(figsize=(6.5, 3.2))
+    data, labels = [], []
+    for s in sites:
+        gg = gpd.read_parquet(ROOT / "outputs" / s / "features" / "features_grid.parquet")
+        laf = gg[[f"lambda_f_{d}" for d in DIRS]].to_numpy()
+        amax, amin = np.nanmax(laf, axis=1), np.nanmin(laf, axis=1)
+        amean = np.nanmean(laf, axis=1)
+        aniso = (amax - amin) / np.where(amean > 0, amean, np.nan)
+        aniso = aniso[np.isfinite(aniso)]
+        data.append(aniso)
+        labels.append(s.replace("_", " "))
+    bp = ax.boxplot(data, vert=True, showfliers=False, patch_artist=True)
+    for patch in bp["boxes"]:
+        patch.set_facecolor("#56B4E9")
+        patch.set_alpha(0.7)
+    ax.set_xticklabels(labels, rotation=20, ha="right", fontsize=8)
+    ax.set_ylabel("per-cell λf anisotropy  (max−min)/mean over 8 sectors")
+    ax.set_title("Individual cells ARE directionally anisotropic (median ~0.37) — "
+                 "the site-median rose cancels it because cell orientations vary",
+                 fontsize=8)
+    ax.grid(axis="y", color="0.92")
+    fig.tight_layout()
+    fig.savefig(FIGS / "roughness_anisotropy.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
     # spatial z0 map (campaign sites), shared robust scale; cividis (no palette clash)
@@ -190,6 +233,33 @@ def main():
     plt.close(fig)
     pd.DataFrame(method_med).T.to_csv(
         ROOT / "outputs" / "cross_site" / "roughness" / "method_medians.csv")
+
+    # HEADLINE: physical-validity breakdown — the morphometric model fails out of
+    # envelope (council 2026-06-19). Per site, fraction of cells that are valid vs
+    # zd>H_max (impossible) vs z0→0 (skimming asymptote).
+    sm_df = pd.DataFrame(summary).set_index("site").reindex(
+        [s for s in CAMPAIGN_SITES if s in {r["site"] for r in summary}])
+    fig, ax = plt.subplots(figsize=(7, 3.4))
+    valid = sm_df["frac_physically_valid"].to_numpy()
+    zdbad = sm_df["frac_zd_gt_Hmax"].to_numpy()
+    z0bad = (1 - valid) - zdbad
+    z0bad = np.clip(z0bad, 0, None)
+    x = np.arange(len(sm_df))
+    ax.bar(x, valid, color="#1a7f4b", label="physically valid")
+    ax.bar(x, zdbad, bottom=valid, color="#b3261e", label="zd > H_max (impossible)")
+    ax.bar(x, z0bad, bottom=valid + zdbad, color="#9a5b00", label="z0 → 0 (skimming asymptote)")
+    ax.set_xticks(x)
+    ax.set_xticklabels([s.replace("_", " ") for s in sm_df.index], rotation=20,
+                       ha="right", fontsize=8)
+    ax.set_ylabel("fraction of built cells")
+    ax.set_ylim(0, 1)
+    ax.set_title("Morphometric z0/zd is physically INVALID in 30–67% of cells "
+                 "(λp>0.5 out of envelope) — per-cell estimate is not trustworthy",
+                 fontsize=8)
+    ax.legend(fontsize=8, loc="lower right")
+    fig.tight_layout()
+    fig.savefig(FIGS / "roughness_validity.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
 
     # zd/H_mean ratio map — the headline finding spatially (where zd exceeds H_mean)
     from matplotlib.colors import TwoSlopeNorm

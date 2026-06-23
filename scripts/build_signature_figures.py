@@ -331,21 +331,34 @@ GALLERY_GROUPS = [
          "BIC elbow (primary) + silhouette cross-check."),
     ]),
     ("Roughness (track/roughness)", "roughness", [
-        ("roughness_rose.png", "Directional roughness z0(θ) (R-A)",
-         "z0 per wind sector (UMEP/Kanda 2013) from λp, λf, H_mean, σH, H_max. "
-         "Anisotropic; dense-flat sites collapse (skimming)."),
-        ("roughness_map.png", "Roughness z0 map (R-B)",
-         "Per-cell Kanda z0; dense cores collapse (skimming), looser/edge cells "
-         "rougher. Most cells λp>0.5 — out of envelope, flagged."),
-        ("roughness_methods.png", "Cross-method z0 disagreement",
-         "Macdonald/Raupach/Millward-Hopkins/Kanda median z0 per site — diverge "
-         "up to ~20× in the λp>0.5 regime. Motivates CFD anchoring (R-C)."),
+        ("roughness_validity.png", "⚠ Physical validity (read first)",
+         "The headline: morphometric z0/zd is physically INVALID in 53–75% of "
+         "cells — zd exceeds the tallest building, or z0 collapses to ~0 (skimming "
+         "asymptote). λp>0.5 is past every method's calibration. Per-cell estimate "
+         "is not trustworthy; the patch scale + CFD (R-C) is the path."),
+        ("roughness_methods.png", "Cross-method z0 envelope (the result)",
+         "Macdonald/Raupach/Millward-Hopkins/Kanda diverge up to ~20× in the favela "
+         "regime. With no validation, the envelope IS the result: morphometry can't "
+         "constrain favela z0 to better than ~1.5 orders — CFD is required."),
+        ("roughness_anisotropy.png", "Per-cell λf anisotropy",
+         "Individual cells are directionally anisotropic (median ~0.37) — the "
+         "honest directional statistic. The site-median rose cancels it (varying "
+         "cell orientations), which is why the rose looks round."),
+        ("roughness_rose.png", "Directional z0(θ) rose",
+         "180°-symmetric by construction (frontal area is the same for opposite "
+         "wind) — z0(θ)=z0(θ+180°); morphometry can never break N/S symmetry, only "
+         "CFD can. Radial axis zoomed to the (compressed) modulation band."),
         ("roughness_zd_ratio.png", "Displacement zd / H_mean",
          "Diverging map centred at 1: red = displacement exceeds mean building "
-         "height (70–93% of cells) — the heterogeneity signature spatially."),
-        ("roughness_slope.png", "Roughness vs terrain slope",
-         "Morphometric z0 rises on steep slopes — but flat-datum λf/σH absorbs the "
-         "hillside; no method separates terrain from fabric (the open caveat)."),
+         "height — but note zd>H_max (impossible) in many cells (see validity)."),
+        ("roughness_map.png", "Roughness z0 map (illustrative)",
+         "Per-cell Kanda z0. Physically ill-posed at 10 m (z0 is a blended quantity "
+         "over many elements) — illustrative only; the 100 m patch is the smallest "
+         "defensible scale."),
+        ("roughness_slope.png", "Roughness vs slope (confound)",
+         "z0 rises on steep slopes — a confound, NOT a finding: flat-datum λf/σH "
+         "absorbs the hillside. Terrain-following datum is the fix; slope stays out "
+         "of the CFD inlet z0."),
     ]),
     ("Prioritization & honesty", "prioritization", [
         ("priority_map.png", "Morphometrics-only priority (WS-B)",

@@ -28,13 +28,15 @@ SEQUENTIAL = "YlOrBr"         # prioritization intensity (a hue no type owns)
 DIVERGING = "RdBu_r"          # z-scores / flat-vs-terrain delta, centred at 0
 
 # Provisional short descriptors (data-checked at gallery build; refine after review)
+# Council-proposed names (2026-06-19), pending user sign-off. Spine:
+# Footing → Plateau → Core (densification→enclosure) × a {flat, steep} slope switch.
 TYPE_NAMES = {
-    0: "T0 · sparse, tall-scattered",
-    1: "T1 · open low-rise",
-    2: "T2 · uniform open low-rise",
-    3: "T3 · flatland mid-rise (site-specific)",
-    4: "T4 · dense steep hillside",
-    5: "T5 · densest, deep-canyon",
+    0: "T0 · Open Footing",            # sparse flat single-storey fringe (λp 0.22, SVF 0.65)
+    1: "T1 · Stepped Footing",         # low-rise on ~19° slope (H/W from terrain)
+    2: "T2 · Massing Plateau",         # flat consolidated mid-rise, sky intact (conditional)
+    3: "T3 · Shaded Plateau",          # flat dense, daylight lost by frontal density (conditional)
+    4: "T4 · Cliff Stack",             # steep dense hillside, H/W 2.6, fully sun-starved
+    5: "T5 · Saturated Core",          # λp=1 maxed flat interior, deep-canyon 0.89, H/W 3.5
 }
 
 
