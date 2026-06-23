@@ -46,9 +46,12 @@ DASH = ROOT / "outputs" / "_distribution" / "html_dashboards"
 # Static sections of markdown docs / live reports (kind: doc | live).
 DOC_SECTIONS = {
     "Figure galleries & reports": [
+        ("/docs/morphology_overview.md", "▶ Morphology overview (start here)",
+         "Goal-first walkthrough: the signature, the 6 morphotypes, validation, "
+         "and the honest roughness limit — with figures and captions.", "doc"),
         ("/outputs/cross_site/signature/figures_v2/index.html",
-         "Signature figures (v2)",
-         "Expert-reviewed morphotype figure set — click to enlarge.", "live"),
+         "Signature & roughness figures",
+         "The full grouped gallery — click any figure to enlarge.", "live"),
         ("/outputs/comparative/vidigal_vs_mingze/report/index.html",
          "Mingze solar comparison", "Vidigal Ladybug-vs-raycast report.", "live"),
     ],
