@@ -369,6 +369,48 @@ profile**:
 With those, R-C fits `⟨U⟩(z)=(u*/κ)·ln((z−zd)/z0)` and reports whether κ held at
 0.40. Absent them, R-C cannot run and roughness stays morphometric-only.
 
+## Roughness→CFD coupling — refinements from the expert council (2026-06-19)
+
+A 3-expert review (urban-climate · morphometrics · CFD/wind-engineering) hardened
+the coupling. These are binding for the CFD agent and for R-C:
+
+1. **Source the inlet z0 from the UPSTREAM FETCH, not the patch.** The patch's own
+   morphometric z0 describes the region of interest, not the approach flow. Set
+   `z0_inlet(θ)` from a sector-weighted aggregate over the *upwind* fabric of
+   `buildings_extended_700m.gpkg`, not from the patch cell. (Conflating the two
+   double-counts the patch's own buildings, which are already meshed.) The handoff
+   needs a second column family `z0_inlet_<θ>` distinct from the patch z0.
+2. **Two-zone ground, not "z0≈0 everywhere."** A rough Richards–Hoxey inlet over a
+   *smooth* upstream floor makes the ABL decay before the buildings (Blocken 2007
+   horizontal-homogeneity failure). Keep a **rough approach floor matched to the
+   inlet z0** in the clearing, and a **small mesh-valid z0 ≈ 0.01–0.03 m under the
+   resolved buildings** (mesh-capped so `ks = 9.793·z0/Cs < y_p`), not zero.
+3. **Floor z0 for λp>0.5 patches.** Morphometric z0 collapses to ~0 in the skimming
+   limit (e.g. CDA-P02: z0=0.0 at λp=1.0) — physically invalid and unusable as a log
+   denominator. Apply an explicit floor + documented rule for the
+   `flag_pai_over_envelope` patches (all 4 methods are out of calibration there).
+4. **R-C primary estimator = drag-integral, not Jackson profile-fit.** On 20–30°
+   slopes the log-law/horizontal-homogeneity assumptions fail (advection + pressure
+   terms become first-order; Jackson's centroid over-predicts zd — consistent with
+   our morphometric zd>H_max). Compute z0/zd from the **total resolved surface drag**
+   (∫ pressure+viscous force). Reserve the Jackson+log-fit for **low-slope patches
+   (≤~10°)** as a cross-check; stratify by the `slope_deg` flag.
+5. **Hard gates before a CFD z0 may recalibrate Kanda:** (a) empty-domain inlet
+   **horizontal-homogeneity** sustained to the patch (±few %); (b) **grid-convergence
+   index** on the *extracted z0/zd* (≥3 grids); (c) convergence tied to the **drag
+   integral** plateau, not just residuals (AIJ Tominaga 2008 / COST 732).
+6. **Symmetry reconciliation (state as a feature):** the morphometric inlet z0(θ) is
+   180°-symmetric (frontal area is direction-symmetric); the CFD breaks the symmetry
+   internally. That is the correct division of labour — bulk symmetric inflow + the
+   resolved patch generating the channelling asymmetry. The morphometric z0 must not
+   be used as a *predictor* of ventilation asymmetry; only the CFD can supply it.
+7. **z0 is the NEUTRAL, MECHANICAL roughness.** RANS is neutral; Rio's sea-breeze is
+   thermally driven — state that buoyancy is out of scope for the roughness estimate.
+
+Single biggest coupling risk: an inlet set from the wrong (patch) roughness over an
+inconsistent (smooth) floor → the approach flow is not what you think, and with no
+field z0 the error is invisible. Mitigations 1–3 + gate 5a address it.
+
 ## Contact
 
 Format issues or methodology questions: open an issue tagged `cfd-integration`

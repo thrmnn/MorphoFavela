@@ -66,6 +66,53 @@ z0 *rises* on steep slopes, but this is reframed honestly as a **confound, not a
 clean finding**: the flat-datum λf/σH absorbs the hillside, and no morphometric
 method separates terrain from fabric. Matches the plan's Risk-1 / open-axis note.
 
+## Expert council review (2026-06-19) — the correctness reckoning
+
+Three experts (urban-climate/roughness · morphometrics · CFD) reviewed the track.
+Convergent verdict and what changed:
+
+**RC-1 · The per-cell morphometric z0/zd is NOT a valid measurement at favela
+density.** It is physically INVALID in **53–75% of cells**: zd > H_max (displacement
+above the tallest building — impossible; median λp in these cells = 1.0, Kanda X
+saturated ~0.97) or z0 → 0 (skimming asymptote — "smoother than grass"). λf ≈ 1.7–2.1
+and λp > 0.5 are 1–2 orders past every method's calibration (arrays top out ~λf 0.4,
+λp 0.4); the drag-partition exponential saturates, so z0 is set by σH/H_max, not
+fabric. **Reframe: model extrapolation, not measurement.** New `roughness_validity.png`
+leads the gallery; `flag_zd_gt_Hmax` / `flag_z0_collapsed` / `roughness_physically_valid`
+added per cell. H_max clipped ≥ H_mean (fixed a ~5% derivation mismatch — not the cause).
+
+**RC-2 · The method-spread envelope IS the result.** With ~20× divergence and zero
+favela validation, lead with the 4-method min–max band, not any single method:
+"morphometry cannot constrain favela z0 to better than ~1.5 orders; CFD required."
+
+**RC-3 · The 180° symmetry is a fundamental constraint, not a finding.** Frontal area
+is direction-symmetric → z0(θ)=z0(θ+180°) for *all* morphometric methods. Morphometry
+can never represent channelling / N-vs-S asymmetry; only CFD can. Documented as the
+boundary of geometry-only roughness and the motivation for the campaign.
+
+**RC-4 · The site-median rose cancels per-cell anisotropy (phase cancellation).**
+Per-cell λf anisotropy is real (median ~0.37) but cell orientations vary, so the
+per-sector median is near-isotropic — an artefact. Added `roughness_anisotropy.png`
+(the honest directional statistic); rose radial axis zoomed + caveated; the z0 rose
+is demoted (show λf(θ)/anisotropy instead). Patch-scale z0 should use momentum/flux
+blending, not a median of cell z0.
+
+**RC-5 · Cell z0 map is illustrative only** — z0 is a blended quantity over many
+elements; a 10 m cell is smaller than one element wake. The 100 m patch is the
+smallest defensible scale. Slope figure retitled as a confound (flat-datum λf/σH
+absorbs the hillside); fix is terrain-following morphometry; slope stays out of the
+inlet z0.
+
+**RC-6 · CFD coupling hardened** — inlet from the upstream fetch (not the patch),
+two-zone ground, z0 floor for λp>0.5, drag-integral (not Jackson) for steep patches,
+empty-domain homogeneity + GCI gates. Full list in `src/cfd_integration/README.md`.
+
+**RC-7 · Signature gaps the morphometrician flagged** (for the signature track, not
+roughness): missing configuration (party-wall adjacency, street-network/beco width);
+λp censored at 1 in T5 (dense end is λf-defined; 10 m may under-resolve the beco);
+recurrence claim is stronger at a block-scale *morphotope* than per cell. Logged here
+as cross-track; see [[morpho-signature-track]].
+
 ## R-C / R-D — gated on real CFD
 
 **RD-prep · Per-patch morphometric z0(θ) computed (the CFD-inlet hand-off).**
