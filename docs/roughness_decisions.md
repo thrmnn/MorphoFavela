@@ -113,6 +113,22 @@ roughness): missing configuration (party-wall adjacency, street-network/beco wid
 recurrence claim is stronger at a block-scale *morphotope* than per cell. Logged here
 as cross-track; see [[morpho-signature-track]].
 
+## RC-8 · Validity response — ADOPTED (user, 2026-06-19)
+
+Decision on how to handle the per-cell roughness invalidity (RC-1):
+
+- **A — now:** lead with the **method-spread envelope + validity flags**, not any
+  single z0; frame absolute roughness as CFD-gated. The `roughness_validity.png`
+  figure leads the gallery; §6.5 and the overview state the envelope is the result.
+  *Adopted as the reporting position.*
+- **B — CFD hand-off:** use the **patch-scale** morphometric z0(θ) (plausible band,
+  flags carried) as the CFD inlet prior — never the per-cell value. `patch_roughness.csv`
+  is the artifact; the contract is in `src/cfd_integration/README.md`.
+- **C + D — research moves (planned, not now):** terrain-following morphometry (to
+  strip the slope confound from σH/λf) and a sheltering/porosity correction
+  (Millward-Hopkins-style, to cap drag as λf→high). Neither substitutes for the CFD
+  anchor (R-C); both are post-review work.
+
 ## R-C / R-D — gated on real CFD
 
 **RD-prep · Per-patch morphometric z0(θ) computed (the CFD-inlet hand-off).**
