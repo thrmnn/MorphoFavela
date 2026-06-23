@@ -323,6 +323,52 @@ Before handing off results:
 
 ---
 
+## Roughness handoff (outbound: MorphoFavela → CFD inlet)
+
+This is the *reverse* direction of the contract above: MorphoFavela supplies the
+**morphometric aerodynamic roughness** that parameterizes each patch's CFD inlet.
+Produced by `scripts/build_patch_roughness.py` (track `track/roughness`).
+
+**File:** `outputs/{site}/sampling_cfd/campaign_sampling/patch_roughness.csv`
+(pooled: `outputs/cross_site/roughness/patch_roughness.csv`). One row per patch:
+
+| column | meaning |
+|--------|---------|
+| `patch_id` | patch identifier (joins the inbound results) |
+| `z0_kan`, `zd_kan` | roughness length / displacement height (m), Kanda 2013, patch mean |
+| `z0_kan_{N..NW}` | directional z0(θ) — use the sector matching the run's wind direction |
+| `lambda_p`, `H_mean`, `sigma_h`, `H_max`, `slope_deg` | inputs (provenance) |
+| `flag_pai_over_envelope` | TRUE ⇒ λp>0.5, estimate is an extrapolation — treat z0 as uncertain |
+
+**How the CFD side consumes it (decouple the two z0 roles — important):**
+
+1. **Inlet / approach flow:** set the Richards & Hoxey (1993) ABL profile from the
+   patch's directional `z0_kan_{dir}`: `U(z)=(u*/κ)·ln((z+z0)/z0)`,
+   `k=u*²/√Cμ`, `ε=u*³/(κ(z+z0))`. This is the *upstream-settlement* roughness —
+   the turbulence the patch should see arriving.
+2. **Ground inside the resolved patch:** keep wall z0 **small / mesh-valid**. The
+   explicitly-meshed buildings already supply the form drag; do **not** also inflate
+   the ground roughness under them (that double-counts and triggers the Blocken
+   et al. 2007 sand-grain/near-wall-cell inconsistency). If a wall function needs an
+   equivalent sand-grain height, derive it only for the *inlet/upstream* fetch via
+   `ks = 9.793·z0/Cs` (Fluent) and respect `yP > ks`.
+
+## Roughness return requirement (inbound, for R-C validation)
+
+To let MorphoFavela back out the **CFD-extracted** z0/zd (Jackson 1981 drag-centroid
++ log-law fit) and validate/recalibrate the morphometric estimate, the per-patch
+returns should additionally provide, for the **empty-domain or above-canopy
+profile**:
+
+- a **vertical profile of horizontally-averaged streamwise velocity** ⟨U⟩(z) above
+  the canopy (z from ~H_max to ~H_max + H_mean), in `summary.json` or a
+  `profile.csv`, and
+- the **integrated surface drag** (form + skin) or wall shear over the patch plan
+  area, to get `u*² = τ_total/ρ`.
+
+With those, R-C fits `⟨U⟩(z)=(u*/κ)·ln((z−zd)/z0)` and reports whether κ held at
+0.40. Absent them, R-C cannot run and roughness stays morphometric-only.
+
 ## Contact
 
 Format issues or methodology questions: open an issue tagged `cfd-integration`
