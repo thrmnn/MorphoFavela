@@ -153,6 +153,16 @@ flat Maré skews "lower" (7303) — face-valid. `priority_p90`/`priority_class`
 written back to `features_grid.parquet`; map in the gallery. **Not yet done:**
 CFD-anchor overlay on the map, boundary-gradient transects, weight calibration.
 
+**D17 · Signature scoped to the 5 campaign sites (2026-06-19, user).**
+The 3 calibration sites (borel, jacarezinho, morro_do_juramento) are kept *aside* —
+the morphotype signature is derived on the 5 campaign sites only, and no figure
+shows the calibration sites. k stays **6** and bootstrap ARI stays **0.90** on the
+5-site pool, so the scoping does not destabilise the typology; T3 remains the
+flatland-specific type (now RdP + Maré). The calibration sites retain their feature
+and roughness tables on disk (out-of-sample, projectable later); their stale
+morphotype labels were cleared. *Why:* calibration sites were never CFD-campaign
+sites; defining the signature on the study sites is the cleaner scientific scope.
+
 ## Open questions / revisit list
 
 - **Terrain-aware λf & SVF (plan Risk 1).** Both assume a flat datum; on 20–30°
