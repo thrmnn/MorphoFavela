@@ -349,10 +349,15 @@
       `build_project_hub.py`) with rendered docs, named per-favela Sites, and the TR HTML
       view. Plans + append-only decision log under `docs/morpho_signature_*`. Reusable
       **`project-hub` skill** distilled. Awaiting user figure review before merge to main.
-- [ ] **Roughness-estimation track** (planned, 2026-06-19) — estimate aerodynamic
-      roughness z0 / displacement zd per cell from λp, λf, H_mean, σH for CFD inlet /
-      canopy parameterization; height-heterogeneity-aware (Kanda 2013) and skeptical of
-      cube-array calibration on dense favela fabric. SOTA literature review in flight.
+- [~] **Roughness-estimation track** (branch `track/roughness`, 2026-06-19) — morphometric
+      z0(θ)/zd(θ) per cell + per wind sector via vendored UMEP (Kanda primary). **Done:**
+      R-A per-cell z0/zd + method-spread + extrapolation flags (`src/morphometry/roughness.py`);
+      R-B spatial z0 map + directional rose + cross-method figure; R-D-prep per-patch z0(θ)
+      for the CFD inlet (`patch_roughness.csv`, 119 patches); TR §6.5; CFD handoff contract
+      (`src/cfd_integration/README.md`); brisaverse `roughness_canonical.md` facts. Findings:
+      zd>H_mean 70–93%, λp>0.5 56–88% (out of envelope, flagged), methods diverge ~20×.
+      **Gated:** R-C CFD drag-centroid anchor (needs real OpenFOAM). Plan/decisions:
+      `docs/roughness_plan.md`, `docs/roughness_decisions.md`.
 - [x] **5-site street-SVF re-baseline + branch consolidation** (2026-06-18) — all five
       sites re-baselined on the corrected ray-caster (boundary-clip street sampling +
       facade-normal fix for CW polygons); removes external-highway edge bias. Validated
