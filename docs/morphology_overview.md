@@ -164,9 +164,11 @@ question the geometry cannot.
 
 ## What we're still building (council's biggest moves)
 
-- **Configuration metrics** — party-wall adjacency and street-network / *beco* width,
-  the favela's defining relational traits, are being added to the signature (in
-  progress).
+- **Configuration metrics** — *party-wall adjacency added* (council's top "what's
+  missing"): the fraction of each building's perimeter fused to a neighbour, a
+  relational trait the intensity vector never saw. It rises with density across the
+  morphotypes (`party_wall_by_type.png`), confirming the types are configurationally
+  distinct. Street-network / *beco* width is the next configuration feature.
 - **Terrain-following morphometry** — to separate hillside from fabric in σH/λf
   (option C above).
 - **Block-scale morphotope** — a "favela signature" is arguably a ~50–100 m tissue

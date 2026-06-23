@@ -318,6 +318,10 @@ GALLERY_GROUPS = [
         ("composition_by_site.png", "Composition per favela",
          "% of each morphotype per site — hillside favelas are T1/T4-dominated, "
          "flat ones T3/T5; topography drives the mix."),
+        ("party_wall_by_type.png", "Configuration: party-wall ratio",
+         "Shared-wall (party-wall) ratio by morphotype — a relational metric the "
+         "intensity vector never saw. It rises with density, confirming the types "
+         "are configurationally distinct (council's top 'what's missing')."),
         ("fingerprint_heatmap.png", "Morphotype fingerprints",
          "Type×character diverging heatmap (annotated z, dendrogram order, columns "
          "grouped density|wind|terrain)."),
