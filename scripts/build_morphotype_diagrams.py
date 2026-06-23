@@ -173,8 +173,6 @@ def composition(per_site):
     ax.set_xlim(0, 100)
     ax.set_xlabel("% of built cells")
     ax.invert_yaxis()
-    ax.text(0.5, 1.18, "hillside", transform=ax.get_yaxis_transform(),  # group cues
-            ha="left", fontsize=8, color="#8a5a00", fontweight="bold")
     handles = [Rectangle((0, 0), 1, 1, color=TYPE_COLORS[c]) for c in range(6)]
     ax.legend(handles, [f"T{c} {TYPE_LABEL[c]}" for c in range(6)], fontsize=8,
               ncol=6, loc="upper center", bbox_to_anchor=(0.5, -0.2),

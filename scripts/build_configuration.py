@@ -79,10 +79,13 @@ def main():
         lambda d: np.average(d["pwr_median"], weights=d["n"]), include_groups=False)
     ax.bar([f"T{c}\n{TYPE_LABEL[c]}" for c in pooled.index], pooled.to_numpy(),
            color=[TYPE_COLORS[c] for c in pooled.index])
+    ax.axhline(0.1, color="0.5", ls=":", lw=1)
+    ax.text(5.4, 0.12, "detached formal ≈0.1", fontsize=6, color="0.5", ha="right")
     ax.set_ylabel("median party-wall ratio")
     ax.set_ylim(0, 1)
-    ax.set_title("Configuration discriminates the types: shared-wall ratio rises "
-                 "with density (a feature the intensity vector never saw)", fontsize=8)
+    ax.set_title("Favela fabric is highly fused everywhere (0.6–1.0 vs ~0.1 detached) — "
+                 "and FLAT types (T2/T3/T5) are fully party-walled, HILLSIDE (T1/T4) "
+                 "more stepped: a configuration axis density alone misses", fontsize=7.5)
     ax.tick_params(axis="x", labelsize=7)
     ax.grid(axis="y", color="0.92")
     fig.tight_layout()

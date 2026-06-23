@@ -20,47 +20,52 @@ import numpy as np
 import pandas as pd
 
 
-def party_wall_ratio(buildings: gpd.GeoDataFrame, snap: float = 0.20) -> np.ndarray:
+def party_wall_ratio(buildings: gpd.GeoDataFrame, snap: float = 0.10) -> np.ndarray:
     """Per-building fraction of perimeter shared with an abutting neighbour.
 
-    ``snap`` (m) dilates the union boundary so near-touching walls (small
-    digitisation gaps common in favela cadastre) still count as shared.
+    Local STRtree neighbour query — each building's boundary is intersected only
+    with its handful of near neighbours (dilated by ``snap`` to catch the small
+    digitisation gaps common in favela cadastre), not the global union. O(n·k),
+    so it scales to the 40k-building sites. Per building, the shared length is the
+    boundary lying within ``snap`` of any neighbour, capped at the perimeter.
     """
-    geom = buildings.geometry
-    perim = geom.length.to_numpy()
-    union_bnd = geom.union_all().boundary
-    if snap > 0:
-        union_bnd = union_bnd.buffer(snap)
-        # exterior wall = the part of each boundary within the dilated union edge
-        ext = geom.boundary.intersection(union_bnd).length.to_numpy()
-    else:
-        ext = geom.boundary.intersection(union_bnd).length.to_numpy()
-    ratio = 1.0 - np.divide(ext, perim, out=np.zeros_like(perim), where=perim > 0)
+    from shapely import STRtree
+
+    geoms = buildings.geometry.to_numpy()
+    perim = buildings.geometry.length.to_numpy()
+    tree = STRtree(geoms)
+    shared = np.zeros(len(geoms))
+    for i, g in enumerate(geoms):
+        bnd = g.boundary
+        for j in tree.query(g.buffer(snap)):
+            if j == i:
+                continue
+            shared[i] += bnd.intersection(geoms[j].buffer(snap)).length
+    ratio = np.divide(shared, perim, out=np.zeros_like(perim), where=perim > 0)
     return np.clip(ratio, 0.0, 1.0)
 
 
 def aggregate_to_grid(
     buildings: gpd.GeoDataFrame, grid: gpd.GeoDataFrame, ratio: np.ndarray
 ) -> pd.DataFrame:
-    """Area-weighted mean party-wall ratio per cell (+ contributing building count).
+    """Footprint-area-weighted mean party-wall ratio per cell.
 
-    Area-weighted so a cell's value reflects the fabric covering it, not a count of
-    slivers. Cells with no building are NaN + ``has_config = False``.
+    Each building is assigned to the cell containing its representative point
+    (point-in-polygon via spatial index — O(n log n), not a full geometric
+    overlay), then averaged weighted by footprint area. Buildings are ~10–15 m and
+    cells 10 m, so centroid assignment is the right granularity. Cells with no
+    building are NaN + ``has_config = False``.
     """
-    b = buildings[["geometry"]].copy()
-    b["pwr"] = ratio
-    b["barea"] = b.geometry.area
-    b["bid"] = np.arange(len(b))
-    inter = gpd.overlay(
-        b, grid[["zone_id", "geometry"]], how="intersection", keep_geom_type=False
-    )
-    inter["w"] = inter.geometry.area
-    g = inter.groupby("zone_id")
+    b = gpd.GeoDataFrame(
+        {"pwr": ratio, "barea": buildings.geometry.area.to_numpy()},
+        geometry=buildings.geometry.representative_point(), crs=buildings.crs)
+    j = gpd.sjoin(b, grid[["zone_id", "geometry"]], how="inner", predicate="within")
+    g = j.groupby("zone_id")
     out = pd.DataFrame({
         "party_wall_ratio": g.apply(
-            lambda d: np.average(d["pwr"], weights=d["w"]) if d["w"].sum() else np.nan,
-            include_groups=False),
-        "n_buildings_cfg": g["bid"].nunique(),
+            lambda d: np.average(d["pwr"], weights=d["barea"])
+            if d["barea"].sum() else np.nan, include_groups=False),
+        "n_buildings_cfg": g.size(),
     })
     out = out.reindex(grid["zone_id"].to_numpy())
     out["has_config"] = out["n_buildings_cfg"].notna() & (out["n_buildings_cfg"] > 0)
