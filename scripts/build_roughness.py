@@ -167,8 +167,8 @@ def main():
     fig.savefig(FIGS / "roughness_map.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
-    # cross-method comparison — the "σH premium" (Kanda/MHN vs Macdonald baseline)
-    msites = list(method_med)
+    # cross-method comparison — campaign sites only (calibration kept aside)
+    msites = [s for s in CAMPAIGN_SITES if s in method_med]
     methods = ["Mac", "Rau", "Mho", "Kan"]
     mcolor = {"Mac": "#999999", "Rau": "#56B4E9", "Mho": "#E69F00", "Kan": "#0072B2"}
     x = np.arange(len(msites))

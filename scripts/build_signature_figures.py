@@ -432,8 +432,11 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     frames = []
     for p in sorted(glob.glob(str(ROOT / "outputs/*/features/features_grid.parquet"))):
+        site = Path(p).parents[1].name
+        if site not in CAMPAIGN_SITES:  # calibration sites kept aside (5-site viz)
+            continue
         g = gpd.read_parquet(p)
-        g["site"] = Path(p).parents[1].name
+        g["site"] = site
         frames.append(pd.DataFrame(g.drop(columns="geometry")))
     df = pd.concat(frames, ignore_index=True)
     mat = assemble_signature_matrix(df)

@@ -264,6 +264,8 @@ def experience_profile(
     """
     key = mat[["site", "zone_id"]].copy()
     key["morphotype"] = labels
+    # drop any pre-existing label columns so the merge can't collide (morphotype_x/_y)
+    df = df.drop(columns=["morphotype", "morphotype_smooth"], errors="ignore")
     j = key.merge(df, on=["site", "zone_id"], how="left")
     rows = []
     for c in sorted(set(labels)):

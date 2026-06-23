@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))  # win over the stale brisa-0.1.0 editable install
 
 from src.morphometry.signature import (  # noqa: E402
+    CAMPAIGN_SITES,
     SIGNATURE_FEATURES,
     assemble_signature_matrix,
     centroid_linkage,
@@ -43,12 +44,29 @@ RANDOM_STATE = 0
 
 
 def load_pooled() -> pd.DataFrame:
+    """Pool the 5 CAMPAIGN sites only. The 3 calibration sites (borel,
+    jacarezinho, morro_do_juramento) are kept aside — they have feature tables on
+    disk but do not define the signature or appear in any figure."""
     frames = []
     for p in sorted(glob.glob(str(ROOT / "outputs/*/features/features_grid.parquet"))):
+        site = Path(p).parents[1].name
+        if site not in CAMPAIGN_SITES:
+            continue
         g = gpd.read_parquet(p)
-        g["site"] = Path(p).parents[1].name
+        g["site"] = site
         frames.append(pd.DataFrame(g.drop(columns="geometry")))
     return pd.concat(frames, ignore_index=True)
+
+
+def clear_calibration_labels() -> None:
+    """Drop any stale morphotype labels from the calibration sites' parquets."""
+    for p in glob.glob(str(ROOT / "outputs/*/features/features_grid.parquet")):
+        if Path(p).parents[1].name in CAMPAIGN_SITES:
+            continue
+        g = gpd.read_parquet(p)
+        drop = [c for c in ("morphotype", "morphotype_smooth") if c in g.columns]
+        if drop:
+            g.drop(columns=drop).to_parquet(p)
 
 
 def write_labels_back(mat: pd.DataFrame, labels: np.ndarray) -> None:
@@ -149,6 +167,7 @@ def main() -> None:
     profile = experience_profile(df, mat, labels)
 
     write_labels_back(mat, labels)
+    clear_calibration_labels()
 
     sel.to_csv(OUT / "k_selection.csv", index=False)
     stats.to_csv(OUT / "standardization.csv", index=False)
