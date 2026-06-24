@@ -84,15 +84,18 @@ def build_callout(prov):
         render_doc_page(ROOT / "docs/work_queue.md", DOCS / "work_queue.html",
                         crumb=breadcrumb([("← Project hub", "../index.html"),
                                           ("Work queue", None)]), provenance=prov)
+    hub = "/outputs/_hub"
     latest = [
-        ("Block-scale morphotopes", f"{GAL}#morphotope", "5 tissues, 4/5 recur — new"),
-        ("Morphology overview (start here)", "docs/morphology_overview.html",
+        ("Typology → environmental failure", f"{GAL}#prioritization",
+         "the money figure: type predicts WHO-2h sun failure (14%→73%)"),
+        ("Block-scale morphotopes", f"{GAL}#morphotope", "5 tissues, 4/5 recur"),
+        ("Morphology overview (start here)", f"{hub}/docs/morphology_overview.html",
          "goal-first walkthrough, all figures + captions"),
         ("Configuration: party-wall", f"{GAL}#signature", "favela fabric is fused 0.6–1.0"),
-        ("Roughness validity", f"{GAL}#roughness", "per-cell z0/zd invalid 53–75% — envelope leads"),
+        ("Roughness validity", f"{GAL}#roughness", "per-cell z0/zd invalid 53–75%"),
     ]
     items = "".join(
-        f'<li><a href="{u}" target="_blank" style="color:#0a5;font-weight:600;'
+        f'<li><a href="{u}" style="color:#0a5;font-weight:600;'
         f'text-decoration:none">{n}</a> <span style="color:#888">— {d}</span></li>'
         for n, u, d in latest)
     return (f'<section><h2 id="latest">🆕 Latest &amp; work queue</h2>'
@@ -100,8 +103,9 @@ def build_callout(prov):
             f'solid #1a7f4b;border-radius:10px;padding:14px 18px">'
             f'<p style="margin:0 0 6px;font-weight:600">Newest results — click straight in:</p>'
             f'<ul style="margin:0 0 10px;padding-left:18px;line-height:1.7">{items}</ul>'
-            f'<p style="margin:0"><a href="docs/work_queue.html" style="font-weight:700">'
-            f'📋 Full work queue →</a> &nbsp; what is in progress, queued, and gated.</p>'
+            f'<p style="margin:0"><a href="/outputs/_hub/docs/work_queue.html" '
+            f'style="font-weight:700">📋 Full work queue →</a> &nbsp; what is in '
+            f'progress, queued, and gated.</p>'
             f'</div></section>')
 
 
