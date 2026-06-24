@@ -821,8 +821,14 @@ comparison.
 Beyond the cross-site distributions of §5, the fabric clusters into a small,
 recurrent set of **morphotypes** — a favela morphological signature. The pipeline
 clusters a lean, standardized cell-level fabric vector (λp, H_mean, σH, λf_mean,
-λf anisotropy, slope) with a Gaussian mixture (k = 6 by BIC elbow) over the ~64,000
-built campaign cells. The six types order along a **density → enclosure spine
+λf anisotropy, slope) with a Gaussian mixture (k = 6) over the ~64,000
+built campaign cells. **On the choice of k:** internal-validity indices (silhouette,
+Calinski-Harabasz, Davies-Bouldin) favour a coarser k = 2–3 — geometry alone cleanly
+separates only a few broad groups — so **k = 6 is a domain-driven granularity chosen
+for morphological interpretability, not a distance-based optimum**. Its justification
+is *cross-site reproducibility*: leave-one-site-out refits recover the six-type
+labelling at ARI 0.78 (bootstrap ARI 0.90), and the held-out experience gradient
+(below) is monotone in it. The six types order along a **density → enclosure spine
 crossed with a flat/steep switch**: T0 Open Fringe, T1 Hillside Fringe, T2 Open
 Consolidated, T3 Shaded Consolidated, T4 Hillside Core, T5 Saturated Core (λp = 1.0).
 

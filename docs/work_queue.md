@@ -23,7 +23,7 @@ hard to find. Updated every working session.
 
 Persistent mechanism = the **Workflow** tool (parallel agents, background, notifies on
 completion). Pre-authorized: auto-merge green branches, my-call on names/palette/figures,
-local compute, **no CFD**, no HPC. **Batch 1 running** (4 parallel agents): finish the
+local compute, **no CFD**, no HPC. **Batch 1 DONE + integrated** (4 parallel agents, 583 tests green): finish the
 typology predictor (isotonic recal + blind risk map on the 3 calibration favelas), cell-k
 rigor (BIC/silhouette/CH/DB + LOSO ARI), morphotope-k bootstrap stability, street-network
 / beco metrics. Each returns a self-contained deliverable; the main session integrates →

@@ -338,8 +338,15 @@ GALLERY_GROUPS = [
          "Mode-filtered + dissolved to regions; Okabe–Ito, NULL=grey, scale bars."),
         ("stability.png", "k=6 stability",
          "Bootstrap ARI 0.90 over 20 refits — k=6 is robust."),
-        ("k_selection.png", "Model selection",
-         "BIC elbow (primary) + silhouette cross-check."),
+        ("k_selection_rigor.png", "k-selection rigor (honest)",
+         "The honest verdict: internal indices (silhouette, CH, DB) favour k=2–3, BIC "
+         "elbow→k=3 — NO index peaks at k=6. k=6 is a domain-driven interpretability "
+         "choice, supported by cross-site reproducibility (leave-one-site-out ARI "
+         "0.78), not by a distance-based optimum."),
+        ("beco_by_type.png", "Beco grain (street-network config)",
+         "Circulation by morphotype: T4 Hillside Core has the FINEST alley grain "
+         "(9.5 junctions/ha), not the densest T5 (3.0/ha) — so the street wiring is "
+         "orthogonal information the density field misses (council's 2nd config feature)."),
     ]),
     ("Morphotopes (tissue scale)", "morphotope", [
         ("morphotope_maps.png", "Morphotope maps (block scale)",
@@ -354,6 +361,10 @@ GALLERY_GROUPS = [
          "Morphotope share per favela — 4 of 5 tissues recur across ≥3 sites; the "
          "dense hillside-core tissue dominates the hillside favelas. A stronger "
          "recurrence claim than the cell scale."),
+        ("morphotope_stability.png", "Tissue stability (k=5)",
+         "k=5 morphotopes are highly stable — bootstrap ARI 0.994 (min 0.965) over 20 "
+         "refits. k chosen by BIC elbow (a parsimony argument; BIC keeps decreasing, "
+         "so it's the elbow, not an optimum)."),
     ]),
     ("Roughness (track/roughness)", "roughness", [
         ("roughness_validity.png", "⚠ Physical validity (read first)",
@@ -403,6 +414,15 @@ GALLERY_GROUPS = [
          "site vs 0.7% site×type). The tiny site×type interaction = the type→failure "
          "mapping transfers across favelas. Is it the types a favela has, or where "
          "it is? — the types."),
+        ("typology_blind_riskmap.png", "Blind risk map (the payoff)",
+         "Morphology-in → prioritised WHO-2h sun-failure-out for the 3 calibration "
+         "favelas the model NEVER saw: cells projected through the frozen campaign "
+         "GMM → per-type failure rate. Jacarezinho 67%, Borel/Morro 45%; 100% of "
+         "built cells assignable."),
+        ("typology_calibration_isotonic.png", "Isotonic recalibration",
+         "Raw LOSO is under-confident (ECE 0.090); isotonic recal (fit on training "
+         "sites only) pulls it onto the diagonal (ECE 0.026, 3.5× better). The "
+         "predictor is now calibrated for prioritisation."),
         ("priority_map.png", "Morphometrics-only priority (WS-B)",
          "Geometry-only deprivation index, worst-decile per cell, rank classes. "
          "No CFD; weights provisional."),

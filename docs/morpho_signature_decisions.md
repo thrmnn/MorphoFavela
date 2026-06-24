@@ -209,3 +209,20 @@ the 6 types must stay *distinguishable on the choropleth maps* (adjacent-density
 T1/T2, T3/T4 would blend under a sequential ramp); Okabe–Ito is colourblind-safe and
 already the validated cross-figure identity palette. Density order is conveyed by the
 λp-sorted labels and the fingerprint heatmap, not by hue.
+
+**D20 · Autonomous-loop batch 1 (2026-06-19, 4 parallel agents).** Findings integrated:
+- **k=6 is NOT a distance-based optimum (honest reconciliation).** Internal indices
+  (silhouette/CH/DB) peak at k=2; BIC elbow→k=3. k=6 is a *domain-driven
+  interpretability* choice justified by **cross-site reproducibility** (leave-one-site-out
+  ARI 0.78, min 0.54 at complexo; bootstrap ARI 0.90), not by BIC. TR §5.5 + overview
+  reworded; the earlier "k=6 by BIC elbow" wording (D10) is superseded.
+  (`scripts/audit_k_selection.py`, `k_selection_rigor.png`.)
+- **Morphotope k=5 is highly stable** — bootstrap ARI 0.994 (min 0.965); k chosen by BIC
+  elbow (parsimony, not BIC optimum). (`audit_morphotope_stability.py`.)
+- **Typology predictor calibrated + applied blind.** Isotonic recalibration cut LOSO ECE
+  0.090→0.026; the **blind morphology-only risk map** on the 3 calibration favelas
+  (held entirely out) predicts WHO-2h failure for every built cell (Jacarezinho 67%,
+  Borel/Morro 45%) — the payoff. (`typology_predictor_extra.py`.)
+- **Beco/street-network = orthogonal config axis.** Finest alley grain is **T4 Hillside
+  Core (9.5 junctions/ha)**, not the densest T5 (3.0/ha) — circulation is information the
+  density field misses. (`src/morphometry/streetnet.py`.)

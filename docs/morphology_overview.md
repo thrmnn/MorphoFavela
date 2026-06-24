@@ -66,7 +66,8 @@ A cluster is only a *signature* if it reappears in independent settlements:
 
 *T0, T1, T4, T5 recur across ≥4 sites — genuine favela signatures. T2/T3 appear only
 in the flat sites: **conditional** morphotypes, present where flat buildable land
-exists. k=6 is stable (bootstrap ARI 0.90).*
+exists. k=6 is a domain-driven granularity (internal indices favour coarser k=2–3),
+justified by reproducibility — leave-one-site-out ARI 0.78, bootstrap ARI 0.90.*
 
 ## Validation 2 — fabric predicts the lived environment
 
