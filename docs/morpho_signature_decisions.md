@@ -163,6 +163,21 @@ and roughness tables on disk (out-of-sample, projectable later); their stale
 morphotype labels were cleared. *Why:* calibration sites were never CFD-campaign
 sites; defining the signature on the study sites is the cleaner scientific scope.
 
+**D18 · Block-scale morphotope (the signature at tissue scale).**
+`src/morphometry/morphotope.py` — per built cell, the morphotype *composition* (+
+Shannon diversity) of its 50 m neighbourhood; GMM (k by BIC elbow) on those vectors
+→ **k=5 morphotopes**. The cell is the measurement unit; the morphotope is the
+*signature* unit (council's strongest move). *Outcomes:* (a) **4 of 5 tissues recur
+across ≥3 sites** — a stronger, less artefact-prone recurrence claim than the cell
+scale; (b) the dense hillside-core tissue (M2: 46% T4 + 30% T5) recurs in 4 sites
+and dominates the hillside favelas, while flat sites carry M1 (mixed) + M4 (flat
+dense-core); (c) **resolves the T2/T3 "conditional cell-type" critique** — T3
+concentrates in M4 (53% T3), a coherent recurring *tissue*, so the conditional
+cell-types are real tissue states, not clustering noise. Maps are coherent regions
+(no salt-and-pepper). `morphotope` written back to features_grid; figures
+(maps/profile/recurrence) in the gallery + overview. Next: name the 5 tissues;
+bootstrap-stability on the morphotope k.
+
 ## Open questions / revisit list
 
 - **Terrain-aware λf & SVF (plan Risk 1).** Both assume a flat datum; on 20–30°

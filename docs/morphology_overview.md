@@ -80,6 +80,26 @@ floor climbs 0 → 1.0 from T0 to T5. **Saturated Core reliably produces sun-sta
 deep canyons** and recurs in all 5 sites: the prioritization signal, from geometry
 alone.*
 
+## Validation 3 — the signature at tissue scale (morphotopes)
+
+A single 10 m cell is the right unit to *measure*, but a "favela signature" is really
+a **tissue** — a block-scale mix of cell-types. So we take each cell's morphotype
+*composition* over a 50 m window and cluster those into **morphotopes**:
+
+![Morphotope maps](/outputs/cross_site/signature/figures_v2/morphotope_maps.png)
+
+*Five tissues, as coherent regions (no salt-and-pepper): Vidigal is fringe tissue,
+Rocinha a dense hillside-core, the flat sites carry dark flat-core tissue in a
+mixed matrix. **4 of 5 tissues recur across ≥3 favelas** — a stronger claim than at
+the cell scale.*
+
+![What each tissue is made of](/outputs/cross_site/signature/figures_v2/morphotope_profile.png)
+
+*The cell-type mix of each tissue — and this **answers the "are T2/T3 real?"
+critique**: the Shaded-Consolidated cell-type (T3) is not noise, it concentrates in
+the flat dense-core tissue M4, a coherent tissue that recurs in the flat sites. The
+"conditional" cell-types are real tissue states.*
+
 ---
 
 # Aerodynamic roughness — and a finding you need for decisions

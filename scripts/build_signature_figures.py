@@ -341,6 +341,20 @@ GALLERY_GROUPS = [
         ("k_selection.png", "Model selection",
          "BIC elbow (primary) + silhouette cross-check."),
     ]),
+    ("Morphotopes (tissue scale)", "morphotope", [
+        ("morphotope_maps.png", "Morphotope maps (block scale)",
+         "The favela signature at ~50 m tissue scale, not the 10 m cell — coherent "
+         "regions, not salt-and-pepper. Vidigal = fringe tissue, Rocinha = dense "
+         "hillside-core, flat sites have dark flat-core tissue."),
+        ("morphotope_profile.png", "What each tissue is made of",
+         "Cell-type composition per morphotope. Answers the T2/T3 critique: T3 isn't "
+         "noise — it concentrates in the flat dense-core tissue M4, a coherent "
+         "recurring tissue."),
+        ("morphotope_recurrence.png", "Tissue recurrence",
+         "Morphotope share per favela — 4 of 5 tissues recur across ≥3 sites; the "
+         "dense hillside-core tissue dominates the hillside favelas. A stronger "
+         "recurrence claim than the cell scale."),
+    ]),
     ("Roughness (track/roughness)", "roughness", [
         ("roughness_validity.png", "⚠ Physical validity (read first)",
          "The headline: morphometric z0/zd is physically INVALID in 53–75% of "
