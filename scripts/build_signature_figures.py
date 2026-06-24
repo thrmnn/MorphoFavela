@@ -427,8 +427,9 @@ def write_gallery():
         for name, title, decision in items:
             if not (OUT / name).exists():
                 continue
+            fid = "fig-" + name.replace(".png", "")
             cards.append(f"""
-    <section class="card">
+    <section class="card" id="{fid}">
       <h3>{title}</h3>
       <img src="{name}" loading="lazy" onclick="zoom('{name}','{title}')">
       <p class="decision">{decision}</p>

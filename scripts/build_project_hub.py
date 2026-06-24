@@ -85,14 +85,27 @@ def build_callout(prov):
                         crumb=breadcrumb([("← Project hub", "../index.html"),
                                           ("Work queue", None)]), provenance=prov)
     hub = "/outputs/_hub"
+    tr = f"{hub}/docs/technical_report.html"
+    # newest first — each lands on the EXACT figure / TR section it documents
     latest = [
-        ("Typology → environmental failure", f"{GAL}#prioritization",
-         "the money figure: type predicts WHO-2h sun failure (14%→73%)"),
-        ("Block-scale morphotopes", f"{GAL}#morphotope", "5 tissues, 4/5 recur"),
+        ("TR §6.6 roughness — invalidity caveat added",
+         f"{tr}#66-aerodynamic-roughness-z0-zd",
+         "the bulletproofing fix: per-cell z0/zd invalid 53–75%, envelope is the result"),
+        ("TR §5.5 Morphological Typology & Signature",
+         f"{tr}#55-morphological-typology-signature",
+         "the signature in the report; morphotype (cell) vs morphotope (tissue)"),
+        ("Typology → environmental failure (money figure)",
+         f"{GAL}#fig-typology_failure_lookup",
+         "type predicts WHO-2h sun failure 14%→73%, transfers leave-one-site-out"),
+        ("Variance: type vs site vs interaction",
+         f"{GAL}#fig-typology_variance",
+         "morphotype 17% vs site 2% vs 0.7% interaction → the mapping transfers"),
+        ("Block-scale morphotope (tissue) maps", f"{GAL}#fig-morphotope_maps",
+         "5 tissues, distinct from the cell types; 4/5 recur"),
+        ("TR coherence audit (punch list)", f"{hub}/docs/tr_audit.html",
+         "the weaknesses being bulletproofed — criticals done, medium queued"),
         ("Morphology overview (start here)", f"{hub}/docs/morphology_overview.html",
          "goal-first walkthrough, all figures + captions"),
-        ("Configuration: party-wall", f"{GAL}#signature", "favela fabric is fused 0.6–1.0"),
-        ("Roughness validity", f"{GAL}#roughness", "per-cell z0/zd invalid 53–75%"),
     ]
     items = "".join(
         f'<li><a href="{u}" style="color:#0a5;font-weight:600;'

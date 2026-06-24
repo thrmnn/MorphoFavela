@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| **Document version** | TR v1.0 (pre-CFD phase) |
+| **Document version** | TR v1.1 (pre-CFD; +morphology signature §5.5, roughness §6.6) |
 | **Pipeline version** | v5.5 (May 2026 milestone — ROADMAP.md) |
-| **Build date** | 2026-05-03 |
+| **Build date** | 2026-06-19 |
 | **Last numerical sweep** | [`904040e`](https://github.com/thrmnn/MorphoFavela/commit/904040e) (2026-05-03) |
 | **Author** | Theo Hermann · MIT · `thermann.ai@gmail.com` |
 | **Repository** | https://github.com/thrmnn/MorphoFavela |
@@ -826,9 +826,14 @@ built campaign cells. The six types order along a **density → enclosure spine
 crossed with a flat/steep switch**: T0 Open Fringe, T1 Hillside Fringe, T2 Open
 Consolidated, T3 Shaded Consolidated, T4 Hillside Core, T5 Saturated Core (λp = 1.0).
 
+*This section presents **two linked but distinct classifications**: the cell-scale
+**morphotype** (T0–T5; Figures 5.5a–c) and the block-scale **morphotope** (M0–M4;
+Figure 5.5d). The cell is the unit of measurement; the morphotope is the unit of
+signature. They use deliberately non-overlapping names and never share a label.*
+
 ![Idealized morphotype sections](figures/morphotype_schematics.png)
 
-*Figure 5.5a — the six morphotypes as idealized, same-scale street sections.*
+*Figure 5.5a — **cell-scale morphotypes (T0–T5)**, the six cell types as idealized, same-scale street sections.*
 
 **Validation is two-fold.** (i) *Cross-site recurrence*: **four of the six
 morphotypes (T0, T1, T4, T5) recur** across ≥3 favelas; **T2 and T3 are
@@ -849,12 +854,11 @@ high (ARI 0.90).
 
 ![Held-out experience by morphotype](figures/experience_dotplots.png)
 
-*Figure 5.5b — held-out experienced conditions per morphotype (the clustering never
-saw these); they worsen monotonically with density — out-of-sample confirmation.*
+*Figure 5.5b — held-out experienced conditions per **cell morphotype (T0–T5)** (the clustering never saw these); they worsen monotonically with density — out-of-sample confirmation.*
 
 ![Morphotype composition per favela](figures/composition_by_site.png)
 
-*Figure 5.5c — morphotype composition per favela; topography drives the mix.*
+*Figure 5.5c — **cell-morphotype (T0–T5)** composition per favela; topography drives the mix.*
 
 **Block-scale morphotopes.** *Two distinct classifications are used and must not be
 conflated:* the **morphotype** is the cell-level alphabet (T0–T5, six classes, the
@@ -872,7 +876,7 @@ Shaded-Consolidated *cell type* concentrates inside the coherent, recurring
 
 ![Morphotope maps](figures/morphotope_maps.png)
 
-*Figure 5.5d — morphotopes (M0–M4): the favela signature as coherent block-scale tissue.*
+*Figure 5.5d — **block-scale morphotopes (M0–M4)**, the tissue classification (a separate, coarser level than the cell morphotypes in 5.5a–c): the favela signature as coherent tissue.*
 
 **Configuration.** A party-wall adjacency metric (fraction of each footprint's
 perimeter fused to a neighbour) captures the relational fabric the intensity vector

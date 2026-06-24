@@ -4,17 +4,20 @@ The living board for this project — what just shipped, what's in progress, wha
 queued, and what's blocked. Surfaced at the top of the hub so new results are never
 hard to find. Updated every working session.
 
-## 🆕 Latest (review these)
+## 🆕 Latest (each links to the exact figure/section)
 
-- **Block-scale morphotopes** (2026-06-19) — the favela signature at ~50 m tissue
-  scale; 4/5 tissues recur, resolves the T2/T3 critique. → gallery "Morphotopes"
-  group + overview "Validation 3".
-- **Configuration: party-wall adjacency** — favela fabric fused everywhere
-  (0.6–1.0 vs ~0.1 detached); flat types fully party-walled, hillside more stepped.
-- **Designer morphotype schematics + per-favela maps + composition %** — in the
-  overview and gallery.
-- **Roughness physical-validity reckoning** — per-cell z0/zd invalid in 53–75% of
-  cells; lead with the method envelope (decision A adopted).
+- [TR §6.6 roughness — invalidity caveat](/outputs/_hub/docs/technical_report.html#66-aerodynamic-roughness-z0-zd)
+  — per-cell z0/zd invalid 53–75%; the envelope is the result.
+- [TR §5.5 Morphological Typology & Signature](/outputs/_hub/docs/technical_report.html#55-morphological-typology-signature)
+  — morphotype (cell) vs morphotope (tissue), two distinct levels.
+- [Typology → environmental failure (money figure)](/outputs/cross_site/signature/figures_v2/index.html#fig-typology_failure_lookup)
+  — type predicts WHO-2h sun failure 14%→73%, transfers LOSO.
+- [Variance: type vs site vs interaction](/outputs/cross_site/signature/figures_v2/index.html#fig-typology_variance)
+  — morphotype 17% vs site 2% vs 0.7% interaction → transferable.
+- [Block-scale morphotope tissue maps](/outputs/cross_site/signature/figures_v2/index.html#fig-morphotope_maps)
+  — 5 tissues, distinct from the cell types; 4/5 recur.
+- [TR coherence audit (punch list)](/outputs/_hub/docs/tr_audit.html)
+  — the weaknesses being bulletproofed.
 
 ## 🧪 TR audit (ongoing bulletproofing — `docs/tr_audit.md`)
 
