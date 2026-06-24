@@ -16,6 +16,15 @@ hard to find. Updated every working session.
 - **Roughness physical-validity reckoning** — per-cell z0/zd invalid in 53–75% of
   cells; lead with the method envelope (decision A adopted).
 
+## 🧪 TR audit (ongoing bulletproofing — `docs/tr_audit.md`)
+
+- ✅ Critical fixes: §6.6 renumber (was 2nd §6.5), roughness-invalidity + 180°
+  caveats, morphotype/morphotope disambiguation, recurrence reconciled, predictor
+  marked forthcoming, validation + validity figures embedded.
+- ☐ Remaining (medium): Exec Summary bullets for signature + roughness; §10
+  roughness-validity limitation subsection; §12 reproducibility Stages 7–8; §5.5
+  heading hierarchy; version/date bump; fix pre-existing missing `fig5_wind_panel.png`.
+
 ## ✅ Shipped this session
 
 - **Technical report §5.5 Morphological Typology & Signature** — added with
