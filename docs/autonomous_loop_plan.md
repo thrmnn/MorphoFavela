@@ -107,3 +107,23 @@ hub, and keeps going — stopping only on the gates you reserve.
 every queued analysis runnable unattended from a single interpreter, which is the
 precondition for *any* multi-hour loop. Then Blocker 2 (real CFD) is what turns the
 roughness/ventilation work from "honest placeholder" into "validated result."
+
+## Env status (2026-06-24) — consolidated env DEFERRED; work on IVF
+
+The consolidated `morphofavela` env was attempted two ways and both failed:
+1. Fresh `conda env create -f environment.yml` — **unsolvable** (`gdal=3.12.4` needs
+   Python >=3.13, but the file pins 3.11; aspirational pins never fresh-tested).
+2. Clone IVF + `mamba install` the extras — the extras **upgraded numpy to 2.4.6 and
+   broke scipy's ABI** (`scipy._cyutility ... slice_memviewslice`); unrecoverable by
+   patching. The broken clone was removed.
+
+**Working env remains `IVF`** (geopandas/sklearn/esda/libpysal/matplotlib/trimesh/
+manifold3d/triangle/seaborn — enough for the brisaverse figures, prints, and most
+analysis). Gaps: `statsmodels` (variance ANOVA — already done), `spopt`/`umap-learn`
+(Loop Batch 2 — still env-gated).
+
+**Correct recipe for a clean retry (not yet run):** clone IVF, then install extras with
+**numpy pinned to IVF's version** so nothing upgrades the ABI:
+`mamba install -p <env> -c conda-forge statsmodels weasyprint spopt umap-learn "numpy=<IVF numpy>"`
+then `pip install manifold3d triangle`. OR a fresh conda-forge solve with `gdal>=3.11`
+unpinned. Verify with `pytest tests/` before removing IVF.
