@@ -43,6 +43,7 @@ dependencies:
   - pvlib=0.15.0
   - pyvista=0.47.1
   - trimesh                # 3D bundle build (unpinned: let the solver choose)
+  - manifold3d             # boolean union → watertight print solids (src/print3d)
   - matplotlib=3.10.8
   - seaborn                # clustermap / statistical plots
   - folium=0.20.0
@@ -60,4 +61,5 @@ dependencies:
   # --- pip-only packages + the project itself ---
   - pip:
       - pyviewfactor==1.0.0
+      - triangle             # polygon triangulation backend for trimesh extrude (src/print3d)
       - -e .
