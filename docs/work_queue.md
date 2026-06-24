@@ -30,6 +30,31 @@ rigor (BIC/silhouette/CH/DB + LOSO ARI), morphotope-k bootstrap stability, stree
 gallery → hub → commit. Blockers removed: **consolidated env** (environment.yml, blocker
 #1); **names + Okabe-Ito palette FINAL** (D19).
 
+## 🖨️ 3D-print track (`src/print3d/`, on main)
+
+Patch → watertight scaled STL (terrain plinth + embedded buildings + manifold3d union;
+1:1000 → 10 cm). Built: ROC-P18 (steep hillside), MAR-P20 (flat fabric), **RDP-P20 +
+VDG-P07 (user-requested)** — in gitignored `outputs/{site}/print/`. Next: 1:500 re-emits
+on request; one print per morphotype (physical typology set); hub print gallery.
+
+## 🎨 Brisaverse figure tasks (`docs/brisa_paper_figures_handoff_2026-06-24.md`)
+
+Canonical pipeline `outputs/paper_figures/*.py`; run on **IVF**. Provenance rule: ALS
+heights=MIT/SondoTecnica, cadaster=IPP — pipeline open, data NOT redistributable.
+- **PI reworks (top):** fig04 severity 4-colour palette + side table (+ Moran's I /
+  join-count inset, `esda` in IVF); fig03 ventilation×solar legibility re-render; fig05
+  predictor audit vs `rf_predictor_stats.json` then sign/family recolor.
+- **Tasks:** fig01 composite (A schematic + B site map + C 3-D); fig03 C/D filled
+  per-site densities; full-sample imputed LOSO (bound the 0.90-AUC caveat); λf 0–1.5
+  recompute; ray-caster vs Radiance/SOLWEIG x-val; morphotope fingerprint heatmap for P4/E2.
+
+## ⚙️ Env (2026-06-24): work on IVF; consolidated env deferred
+
+Both consolidation paths failed (unsolvable pins; clone+extras broke scipy ABI). Broken
+clone removed. **IVF is the working env** (has esda/sklearn/geopandas/matplotlib/seaborn/
+trimesh/manifold3d). Gaps: spopt/umap (Batch 2), statsmodels (done). Retry recipe in
+`docs/autonomous_loop_plan.md`.
+
 ## 🧪 TR audit (ongoing bulletproofing — `docs/tr_audit.md`)
 
 - ✅ Critical fixes: §6.6 renumber (was 2nd §6.5), roughness-invalidity + 180°
