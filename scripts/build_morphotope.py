@@ -43,7 +43,12 @@ from src.morphometry.signature import (  # noqa: E402
     recurrence_matrix,
 )
 from src.svf_v2.io import _git_sha  # noqa: E402
-from src.viz.signature_style import NULL_COLOR, TYPE_COLORS, TYPE_LABEL  # noqa: E402
+from src.viz.signature_style import (  # noqa: E402
+    MORPHOTOPE_LABEL,
+    NULL_COLOR,
+    TYPE_COLORS,
+    TYPE_LABEL,
+)
 
 OUT = ROOT / "outputs" / "cross_site" / "morphotope"
 FIGS = ROOT / "outputs" / "cross_site" / "signature" / "figures_v2"
@@ -144,7 +149,7 @@ def fig_maps(k):
         ax.set_axis_off()
         ax.set_title(SITE_NAMES.get(s, s), fontsize=9)
     handles = [Rectangle((0, 0), 1, 1, color=MT_COLORS[m]) for m in range(k)]
-    fig.legend(handles, [f"M{m}" for m in range(k)], loc="lower center", ncol=k,
+    fig.legend(handles, [f"M{m} {MORPHOTOPE_LABEL.get(m, '')}" for m in range(k)], loc="lower center", ncol=k,
                fontsize=8, frameon=False)
     fig.suptitle("Morphotopes — block-scale favela tissue (50 m composition window)",
                  fontsize=10)

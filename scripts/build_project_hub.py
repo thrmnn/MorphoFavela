@@ -56,6 +56,9 @@ DOC_SECTIONS = {
          "Mingze solar comparison", "Vidigal Ladybug-vs-raycast report.", "live"),
     ],
     "Plans & decisions": [
+        ("/docs/typology_predictor_plan.md", "Typology-as-predictor plan",
+         "Use the morphotype/morphotope typology to predict environmental failure; "
+         "LOSO transfer, variance decomposition, blind risk map.", "doc"),
         ("/docs/roughness_plan.md", "Roughness-estimation plan",
          "z0/zd from morphometry for CFD; SOTA brief + equations (Kanda 2013).", "doc"),
         ("/docs/roughness_decisions.md", "Roughness decision log",
@@ -71,16 +74,35 @@ DOC_SECTIONS = {
     ],
 }
 
-CALLOUT = """<section><h2 id="review">Start here — review &amp; decisions</h2>
-<div style="background:#fff;border:1px solid #e3e7ec;border-left:5px solid #1a6fb5;
-border-radius:10px;padding:14px 18px">
-<p style="margin:0 0 8px">Page through the <b>Signature figures</b> gallery and the
-per-favela <b>Sites</b>, then the inputs I need (priority order):</p>
-<ol style="margin:0 0 4px">
-<li><b>Finalize the 6 morphotype names</b> — gates every caption + the paper narrative.</li>
-<li><b>Figure keep / refine</b> across the 9 figures (incl. the priority map).</li>
-<li><b>WS-B follow-ups</b> — CFD-anchor overlay + boundary transects (in progress).</li>
-</ol></div></section>"""
+GAL = "/outputs/cross_site/signature/figures_v2/index.html"
+
+
+def build_callout(prov):
+    """Top panel: newest results (direct links) + the live work queue, so new
+    figures are never hard to find."""
+    if (ROOT / "docs/work_queue.md").exists():
+        render_doc_page(ROOT / "docs/work_queue.md", DOCS / "work_queue.html",
+                        crumb=breadcrumb([("← Project hub", "../index.html"),
+                                          ("Work queue", None)]), provenance=prov)
+    latest = [
+        ("Block-scale morphotopes", f"{GAL}#morphotope", "5 tissues, 4/5 recur — new"),
+        ("Morphology overview (start here)", "docs/morphology_overview.html",
+         "goal-first walkthrough, all figures + captions"),
+        ("Configuration: party-wall", f"{GAL}#signature", "favela fabric is fused 0.6–1.0"),
+        ("Roughness validity", f"{GAL}#roughness", "per-cell z0/zd invalid 53–75% — envelope leads"),
+    ]
+    items = "".join(
+        f'<li><a href="{u}" target="_blank" style="color:#0a5;font-weight:600;'
+        f'text-decoration:none">{n}</a> <span style="color:#888">— {d}</span></li>'
+        for n, u, d in latest)
+    return (f'<section><h2 id="latest">🆕 Latest &amp; work queue</h2>'
+            f'<div style="background:#fff;border:1px solid #e3e7ec;border-left:5px '
+            f'solid #1a7f4b;border-radius:10px;padding:14px 18px">'
+            f'<p style="margin:0 0 6px;font-weight:600">Newest results — click straight in:</p>'
+            f'<ul style="margin:0 0 10px;padding-left:18px;line-height:1.7">{items}</ul>'
+            f'<p style="margin:0"><a href="docs/work_queue.html" style="font-weight:700">'
+            f'📋 Full work queue →</a> &nbsp; what is in progress, queued, and gated.</p>'
+            f'</div></section>')
 
 
 def _doc_card(url, name, desc, prov):
@@ -127,8 +149,8 @@ def main():
     DOCS.mkdir(parents=True, exist_ok=True)
     prov = git_provenance(ROOT, "scripts/build_project_hub.py")
 
-    blocks = [CALLOUT, sites_section(prov)]
-    titles = ["Review", "Sites"]
+    blocks = [build_callout(prov), sites_section(prov)]
+    titles = ["Latest", "Sites"]
     for title, items in DOC_SECTIONS.items():
         cards = []
         for url, name, desc, kind in items:

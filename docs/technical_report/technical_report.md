@@ -813,6 +813,59 @@ comparison.
 
 ---
 
+## 5.5 Morphological Typology & Signature
+
+*Track `track/morphotope`. Full walkthrough with all figures: the project hub's
+"Morphology overview". Code: `src/morphometry/{signature,morphotope,configuration}.py`.*
+
+Beyond the cross-site distributions of §5, the fabric clusters into a small,
+recurrent set of **morphotypes** — a favela morphological signature. The pipeline
+clusters a lean, standardized cell-level fabric vector (λp, H_mean, σH, λf_mean,
+λf anisotropy, slope) with a Gaussian mixture (k = 6 by BIC elbow) over the ~64,000
+built campaign cells. The six types order along a **density → enclosure spine
+crossed with a flat/steep switch**: T0 Open Fringe, T1 Hillside Fringe, T2 Open
+Consolidated, T3 Shaded Consolidated, T4 Hillside Core, T5 Saturated Core (λp = 1.0).
+
+![Idealized morphotype sections](figures/morphotype_schematics.png)
+
+*Figure 5.5a — the six morphotypes as idealized, same-scale street sections.*
+
+**Validation is two-fold and deliberately out-of-sample.** (i) *Cross-site
+recurrence*: four of the six types recur across ≥4 of the five favelas; the
+composition is topographic — hillside favelas (Vidigal, Rocinha, Complexo do Alemão)
+are dominated by the Hillside types (T1/T4), the flatter Rio das Pedras and Maré by
+the flat-dense types (T3/T5). (ii) *Held-out experience*: the experienced conditions
+(SVF, winter-sun hours, deep-canyon fraction) never entered the clustering, yet
+worsen monotonically along the type spine — sky-view falls 0.65 → 0.10 and the
+fraction of observers below the WHO 2 h winter-sun floor climbs 0 → 1.0 from T0 to
+T5. Bootstrap cluster stability is high (ARI 0.90).
+
+![Morphotype composition per favela](figures/composition_by_site.png)
+
+*Figure 5.5b — morphotype composition per favela; topography drives the mix.*
+
+**Block-scale morphotopes.** A single 10 m cell is the measurement unit, but a
+favela *signature* is a block-scale tissue. Clustering each cell's morphotype
+composition over a 50 m window yields **k = 5 morphotopes**; four of five recur
+across ≥3 sites — a stronger, less artefact-prone recurrence claim than the cell
+scale, and one that resolves whether the flat-dense cell-types are real (the
+Shaded-Consolidated type concentrates inside a coherent, recurring flat-core tissue).
+
+![Morphotope maps](figures/morphotope_maps.png)
+
+*Figure 5.5c — morphotopes: the favela signature as coherent block-scale tissue.*
+
+**Configuration.** A party-wall adjacency metric (fraction of each footprint's
+perimeter fused to a neighbour) captures the relational fabric the intensity vector
+misses: favela buildings are fused everywhere (median 0.6–1.0, vs ≈0.1 for detached
+formal blocks), and — orthogonally to density — the flat types are near-fully
+party-walled while the hillside types are more stepped. **Forward look:** this
+typology is the basis for a morphology-only *predictor of environmental failure*
+(per-type WHO-2 h failure rates, leave-one-site-out transfer, applied blind to the
+three calibration favelas); see the typology-predictor plan.
+
+---
+
 ## 6. CFD Patch Sampling
 
 ### 6.1 Sampling design

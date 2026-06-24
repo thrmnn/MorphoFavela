@@ -42,6 +42,16 @@ TYPE_NAMES = {
 # Short labels (no "T# ·" prefix) for compact figures.
 TYPE_LABEL = {c: n.split(" · ")[1] for c, n in TYPE_NAMES.items()}
 
+# Block-scale morphotope (tissue) names — from the cell-type composition of each
+# (2026-06-19, pending user sign-off). M0→M4 ordered by ascending Saturated-Core share.
+MORPHOTOPE_LABEL = {
+    0: "Stepped Hillside",      # 87% T1 (Hillside Fringe), uniform low slope fabric
+    1: "Mixed Flatland",        # T0/T3/T5 mix, highest diversity
+    2: "Dense Hillside Core",   # 46% T4 + 30% T5, recurs in 4 sites
+    3: "Transitional Dense",    # mixed dense (T5/T4/T3), most heterogeneous
+    4: "Flat Dense Core",       # 53% T3 + 46% T5, flatland-specific
+}
+
 
 def type_cmap(k: int = 6) -> ListedColormap:
     """ListedColormap over morphotype 0..k-1 in the canonical palette order."""
