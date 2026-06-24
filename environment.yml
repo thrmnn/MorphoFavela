@@ -42,10 +42,21 @@ dependencies:
   # --- solar / 3D / viz ---
   - pvlib=0.15.0
   - pyvista=0.47.1
+  - trimesh                # 3D bundle build (unpinned: let the solver choose)
   - matplotlib=3.10.8
+  - seaborn                # clustermap / statistical plots
   - folium=0.20.0
   - ipywidgets=8.1.8
   - tqdm=4.67.3
+  # --- spatial clustering / thematic cartography / embeddings (queued work; ---
+  #     unpinned — added 2026-06-19, not part of the original paper-pinned set) ---
+  - spopt                  # spatially-constrained regionalization (morphotope refinement)
+  - mapclassify            # choropleth classification schemes
+  - contextily             # basemaps for locator insets
+  - umap-learn             # cell embeddings (signature)
+  # --- reporting (technical-report PDF build) ---
+  - weasyprint
+  - pandoc
   # --- pip-only packages + the project itself ---
   - pip:
       - pyviewfactor==1.0.0
