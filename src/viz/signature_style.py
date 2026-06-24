@@ -28,7 +28,7 @@ SEQUENTIAL = "YlOrBr"         # prioritization intensity (a hue no type owns)
 DIVERGING = "RdBu_r"          # z-scores / flat-vs-terrain delta, centred at 0
 
 # Provisional short descriptors (data-checked at gallery build; refine after review)
-# Names (refined 2026-06-19, pending user sign-off). Two-axis scheme:
+# Names (FINAL, user pre-authorized 2026-06-19). Two-axis scheme:
 # density ladder  Fringe → Consolidated → Core  ×  condition modifier
 # (Open / Hillside / Shaded / Saturated). Density rises T0→T5; T1,T4 are the steep pair.
 TYPE_NAMES = {

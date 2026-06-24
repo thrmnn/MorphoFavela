@@ -201,3 +201,11 @@ bootstrap-stability on the morphotope k.
   with a libpysal `W`) to dissolve types into coherent morphotope regions. The
   current non-spatial labels are correct per-cell; the noise is spatial, not
   categorical.
+
+**D19 · Names + palette FINAL (user pre-authorized, 2026-06-19).** Morphotype
+(T0–T5) and morphotope (M0–M4) names locked (signature_style.py). **Palette: keep
+Okabe–Ito categorical** for the morphotypes — not an ordered density ramp. Rationale:
+the 6 types must stay *distinguishable on the choropleth maps* (adjacent-density types
+T1/T2, T3/T4 would blend under a sequential ramp); Okabe–Ito is colourblind-safe and
+already the validated cross-figure identity palette. Density order is conveyed by the
+λp-sorted labels and the fingerprint heatmap, not by hue.
