@@ -34,9 +34,9 @@ item marked ☐ open / ☑ done.*
 
 ## Medium
 
-- ☐ **Exec Summary** silent on the signature and roughness — add one bullet each (with
+- ☑ **Exec Summary** silent on the signature and roughness — add one bullet each (with
   caveats).
-- ☐ **§10 Known Limitations** has nothing on roughness validity — add a subsection.
+- ☑ **§10 Known Limitations** has nothing on roughness validity — add a subsection.
 - ☐ **§12 Reproducibility** — add Stage 7 (signature/morphotope/configuration) and
   Stage 8 (roughness) pipelines.
 - ☐ **Heading hierarchy** — §5.5 is `##` while §5.1–5.4 are `###`; normalize.

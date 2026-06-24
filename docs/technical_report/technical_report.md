@@ -60,6 +60,16 @@ At time of writing, the pipeline has produced:
   analysis pipeline (`scripts/analyze_cfd_results.py`) is shipped and
   synthetic-validated end-to-end on all 5 sites; awaiting the first real
   return (VDG-P07).
+- **A favela morphological signature** (§5.5): a 6-class cell *morphotype* and a
+  5-class block *morphotope* learned from geometry alone; four of six morphotypes
+  recur across favelas, and a held-out experienced-deprivation gradient (winter-sun
+  failure 0 → 1.0 across the density spine) validates them out-of-sample. *Caveat:*
+  k = 6 is a domain-driven granularity (internal indices favour coarser), justified
+  by cross-site reproducibility, not a distance-based optimum.
+- **Aerodynamic roughness, with a hard caveat** (§6.6): morphometric z0/zd per cell —
+  but **physically invalid in 53–75 % of cells** at favela density (out of every
+  method's envelope). The reportable result is the ~20× method-spread *envelope*;
+  absolute z0 is CFD-gated. Do not consume the per-cell z0 as a measurement.
 
 The pipeline is fully reproducible from the committed scripts; all inputs
 are documented and all intermediate outputs preserved in the canonical
@@ -1628,6 +1638,31 @@ matched irradiance columns; §5.4 (cross-site table + Figure 8)
 consumes them. The legacy `scripts/compute_solar_access.py` remains in
 the repo but is superseded — its single-date 60-min output was
 replaced by the seasonal runner on 2026-05-07.
+
+### 10.7 Per-cell aerodynamic roughness is invalid at favela density
+
+The morphometric z0/zd of §6.6 is **physically invalid in 53–75 % of built cells**:
+favela λp > 0.5 and λf ≈ 2 sit one to two orders of magnitude past the calibration
+arrays of every method (Lettau, Macdonald, Raupach, Millward-Hopkins, Kanda), so the
+drag-partition formula saturates and returns impossible values — displacement above
+the tallest building (zd > H_max) or z0 → 0 ("smoother than grass"). The per-cell z0
+field is therefore *illustrative only*; the reportable quantity is the four-method
+spread *envelope* (~20×, ≈1.5 orders of magnitude), and any absolute roughness is
+**CFD-gated** — to be validated/recalibrated by the step-R-C drag-centroid extraction
+once OpenFOAM returns. A second structural limit: morphometric z0(θ) is
+180°-symmetric by construction (frontal area is identical for opposite winds), so it
+cannot represent channelling or N-vs-S asymmetry; only the CFD can. Per-cell flags
+(`flag_zd_gt_Hmax`, `flag_z0_collapsed`, `roughness_physically_valid`) mark this.
+
+### 10.8 The morphological typology has known limits
+
+(§5.5) k = 6 morphotypes is a domain-driven granularity, not a distance-based optimum
+(internal indices favour k = 2–3); it is justified by leave-one-site-out
+reproducibility (ARI 0.78). Two morphotypes (T2, T3) are flatland-conditional rather
+than universal. The held-out experience validation leans on winter-sun/WHO-failure
+(ray-cast, semi-independent) because SVF is partly geometric (SVF ≈ f(λp, H/W)).
+Experience profiles are read on the ~35 % of cells with a street observer. The
+typology→failure *predictor* (§5.5 forward look) is a separate, forthcoming sub-study.
 
 ---
 

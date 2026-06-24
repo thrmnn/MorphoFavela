@@ -35,9 +35,10 @@ gallery → hub → commit. Blockers removed: **consolidated env** (environment.
 - ✅ Critical fixes: §6.6 renumber (was 2nd §6.5), roughness-invalidity + 180°
   caveats, morphotype/morphotope disambiguation, recurrence reconciled, predictor
   marked forthcoming, validation + validity figures embedded.
-- ☐ Remaining (medium): Exec Summary bullets for signature + roughness; §10
-  roughness-validity limitation subsection; §12 reproducibility Stages 7–8; §5.5
-  heading hierarchy; version/date bump; fix pre-existing missing `fig5_wind_panel.png`.
+- ✅ Exec Summary bullets (signature + roughness) + §10.7/§10.8 limitation
+  subsections added; version bumped.
+- ☐ Remaining (low): §12 reproducibility Stages 7–8; §5.5 heading hierarchy; the
+  pre-existing missing `fig5_wind_panel.png` ref.
 
 ## ✅ Shipped this session
 
