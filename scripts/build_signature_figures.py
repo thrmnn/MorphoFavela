@@ -386,6 +386,11 @@ GALLERY_GROUPS = [
          "of the CFD inlet z0."),
     ]),
     ("Prioritization & honesty", "prioritization", [
+        ("typology_failure_lookup.png", "Typology → environmental failure",
+         "The money figure: per-type WHO-2h winter-sun failure rate (held-out, "
+         "ray-cast). Monotone with a regime jump at T3→T4, saturating at T4/T5 "
+         "(71–73%); tight per-favela dots at T4/T5 = good transfer. Step 1 of the "
+         "typology-predictor plan."),
         ("priority_map.png", "Morphometrics-only priority (WS-B)",
          "Geometry-only deprivation index, worst-decile per cell, rank classes. "
          "No CFD; weights provisional."),

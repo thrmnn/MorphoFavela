@@ -26,10 +26,13 @@ hard to find. Updated every working session.
 
 ## 📋 Queued (prioritized)
 
-1. **Typology → environmental-failure predictor** (implement the plan):
-   `scripts/analyze_typology_predictor.py` — per-type WHO-2 h failure tables w/
-   block-bootstrap CIs, parsimony test, leave-one-site-out transfer, calibration,
-   variance decomposition, blind risk map on the 3 calibration favelas.
+1. **Typology → environmental-failure predictor** (implementing the plan):
+   - ✅ Step 1 — per-type WHO-2 h failure-rate lookup + site-bootstrap CIs +
+     per-favela overlay (`typology_failure_lookup.png`): monotone 14%→73% with a
+     T3→T4 regime jump, T4/T5 saturating; tight transfer at T4/T5.
+   - ⏳ Next: parsimony test (type one-hot vs continuous vector), leave-one-site-out
+     transfer + calibration, 3-level variance decomposition, blind risk map on the 3
+     calibration favelas.
 2. **Street-network / beco metrics** — 2nd configuration feature (circulation reach,
    alley width).
 3. **Terrain-following morphometry** — fix the roughness datum confound (council C).
