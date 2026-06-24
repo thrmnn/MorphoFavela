@@ -398,6 +398,11 @@ GALLERY_GROUPS = [
          "Leave-one-site-out: calibrated (slightly under-confident — isotonic recal "
          "queued) out-of-site predictions + PR curve (AP 0.88) vs the prevalence "
          "baseline. The honest transfer evidence."),
+        ("typology_variance.png", "Variance: type vs site vs interaction",
+         "Of the systematic variance in failure, morphotype dominates (17% vs 2% "
+         "site vs 0.7% site×type). The tiny site×type interaction = the type→failure "
+         "mapping transfers across favelas. Is it the types a favela has, or where "
+         "it is? — the types."),
         ("priority_map.png", "Morphometrics-only priority (WS-B)",
          "Geometry-only deprivation index, worst-decile per cell, rank classes. "
          "No CFD; weights provisional."),

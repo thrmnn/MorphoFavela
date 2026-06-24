@@ -830,39 +830,60 @@ Consolidated, T3 Shaded Consolidated, T4 Hillside Core, T5 Saturated Core (λp =
 
 *Figure 5.5a — the six morphotypes as idealized, same-scale street sections.*
 
-**Validation is two-fold and deliberately out-of-sample.** (i) *Cross-site
-recurrence*: four of the six types recur across ≥4 of the five favelas; the
-composition is topographic — hillside favelas (Vidigal, Rocinha, Complexo do Alemão)
-are dominated by the Hillside types (T1/T4), the flatter Rio das Pedras and Maré by
-the flat-dense types (T3/T5). (ii) *Held-out experience*: the experienced conditions
-(SVF, winter-sun hours, deep-canyon fraction) never entered the clustering, yet
-worsen monotonically along the type spine — sky-view falls 0.65 → 0.10 and the
-fraction of observers below the WHO 2 h winter-sun floor climbs 0 → 1.0 from T0 to
-T5. Bootstrap cluster stability is high (ARI 0.90).
+**Validation is two-fold.** (i) *Cross-site recurrence*: **four of the six
+morphotypes (T0, T1, T4, T5) recur** across ≥3 favelas; **T2 and T3 are
+flatland-conditional** (present only where flat buildable land exists — the cell
+typology is not fully universal at cell scale, which motivates the block scale
+below). The composition is topographic — hillside favelas (Vidigal, Rocinha,
+Complexo do Alemão) are dominated by the Hillside types (T1/T4), the flatter Rio das
+Pedras and Maré by the flat-dense types (T3/T5). (ii) *Held-out experience*: the
+experienced conditions never entered the clustering, yet worsen monotonically along
+the type spine — the fraction of observers below the WHO 2 h winter-sun floor climbs
+0 → 1.0 from T0 to T5. **Caveats:** SVF is geometrically coupled to the clustering
+inputs (SVF ≈ f(λp, H/W); excluded from the fabric set for that reason, §4.2), so the
+**winter-sun / WHO-failure** outcomes — which depend on solar geometry and terrain,
+not just density — are the cleaner held-out signal; and the experience profiles are
+read on supported cells only (~35 % of cells carry a street observer; per-type
+support 0.23–0.59, lower for the open types). Bootstrap cluster stability (k = 6) is
+high (ARI 0.90).
+
+![Held-out experience by morphotype](figures/experience_dotplots.png)
+
+*Figure 5.5b — held-out experienced conditions per morphotype (the clustering never
+saw these); they worsen monotonically with density — out-of-sample confirmation.*
 
 ![Morphotype composition per favela](figures/composition_by_site.png)
 
-*Figure 5.5b — morphotype composition per favela; topography drives the mix.*
+*Figure 5.5c — morphotype composition per favela; topography drives the mix.*
 
-**Block-scale morphotopes.** A single 10 m cell is the measurement unit, but a
+**Block-scale morphotopes.** *Two distinct classifications are used and must not be
+conflated:* the **morphotype** is the cell-level alphabet (T0–T5, six classes, the
+unit of measurement); the **morphotope** is the block-level tissue (M0–M4, five
+classes, the unit of signature), and the two use deliberately non-overlapping names
+(cell: Open/Hillside Fringe, Open/Shaded Consolidated, Hillside/Saturated Core;
+tissue: Low-rise Slope, Mixed Flatland, Compact Hillside, Mixed Dense, Compact
+Flatland). A single 10 m cell is the measurement unit, but a
 favela *signature* is a block-scale tissue. Clustering each cell's morphotype
 composition over a 50 m window yields **k = 5 morphotopes**; four of five recur
 across ≥3 sites — a stronger, less artefact-prone recurrence claim than the cell
 scale, and one that resolves whether the flat-dense cell-types are real (the
-Shaded-Consolidated type concentrates inside a coherent, recurring flat-core tissue).
+Shaded-Consolidated *cell type* concentrates inside the coherent, recurring
+*Compact Flatland tissue*, M4).
 
 ![Morphotope maps](figures/morphotope_maps.png)
 
-*Figure 5.5c — morphotopes: the favela signature as coherent block-scale tissue.*
+*Figure 5.5d — morphotopes (M0–M4): the favela signature as coherent block-scale tissue.*
 
 **Configuration.** A party-wall adjacency metric (fraction of each footprint's
 perimeter fused to a neighbour) captures the relational fabric the intensity vector
 misses: favela buildings are fused everywhere (median 0.6–1.0, vs ≈0.1 for detached
 formal blocks), and — orthogonally to density — the flat types are near-fully
-party-walled while the hillside types are more stepped. **Forward look:** this
-typology is the basis for a morphology-only *predictor of environmental failure*
-(per-type WHO-2 h failure rates, leave-one-site-out transfer, applied blind to the
-three calibration favelas); see the typology-predictor plan.
+party-walled while the hillside types are more stepped. **Forward look (forthcoming;
+not in this report):** this typology is the basis for a morphology-only *predictor of
+environmental failure* — early results show per-type WHO-2 h sun-failure rising
+monotonically (14 % → 73 %) and transferring leave-one-site-out (AUC-PR 0.77); the
+full sub-study (parsimony, calibration, blind application to the three calibration
+favelas) is in the typology-predictor plan.
 
 ---
 
@@ -1082,11 +1103,28 @@ and downstream urban-canopy analyses.
 
 ---
 
-## 6.5 Aerodynamic Roughness (z0, zd)
+## 6.6 Aerodynamic Roughness (z0, zd)
 
-*Track `track/roughness`. Figures (directional rose, per-cell z0 map,
-cross-method comparison) are in the review hub's grouped gallery, "Roughness"
-section.*
+*Track `track/roughness`. Figures in the review hub's "Roughness" gallery group.*
+
+![Roughness physical validity](figures/roughness_validity.png)
+
+*Figure 6.6 — per site, the fraction of built cells where the morphometric z0/zd is
+physically valid (green) vs impossible (zd > H_max, red; z0 → 0, brown).*
+
+> **Headline caveat (expert-council review, 2026-06-19).** The per-cell morphometric
+> z0/zd is **physically invalid in 53–75 % of built cells**: the displacement height
+> exceeds **H_max** (above the tallest building — impossible) or z0 collapses toward 0
+> (the skimming asymptote — "smoother than grass"). λp > 0.5 and λf ≈ 2 are one to two
+> orders of magnitude past every method's calibration array, so the drag formula
+> saturates and z0 is set by σH/H_max, not the fabric. **This is model extrapolation,
+> not measurement.** The per-cell z0 map is illustrative only; the **method-spread
+> envelope** (the four methods diverge ~20×, ≈1.5 orders) is the reportable result, and
+> any absolute z0 is **CFD-gated** (validated/recalibrated by the step-R-C drag-centroid
+> extraction, pending OpenFOAM). A second hard limit: morphometric z0(θ) is
+> **180°-symmetric by construction** (frontal area is identical for opposite winds), so
+> it can never represent channelling or N-vs-S asymmetry — only the CFD can. Per-cell
+> `flag_zd_gt_Hmax` / `flag_z0_collapsed` / `roughness_physically_valid` mark this.
 
 The aerodynamic roughness length **z0** and zero-plane displacement **zd** are
 the boundary condition the CFD inlet sees. They are estimated **morphometrically**
@@ -1103,7 +1141,9 @@ would discard real directional structure.
 **ground z0 inside the resolved patch stays small and mesh-valid**, because the
 explicitly-meshed buildings already supply the form drag. This removes the
 Blocken et al. (2007) sand-grain wall-function inconsistency and replaces a
-guessed inlet roughness with a derived one. Per-patch morphometric z0(θ) is
+guessed inlet roughness with a morphometrically-derived **prior** — out-of-envelope,
+flagged, and to be recalibrated by the CFD-extracted z0 of step R-C. Per-patch
+morphometric z0(θ) is
 written to `outputs/{site}/sampling_cfd/campaign_sampling/patch_roughness.csv`
 (119 patches) as the CFD-inlet hand-off.
 
@@ -1111,9 +1151,10 @@ written to `outputs/{site}/sampling_cfd/campaign_sampling/patch_roughness.csv`
 outside the calibration envelope of every published method (all fit on cube/
 obstacle arrays at λp ≈ 0.05–0.5):
 
-- **zd > H_mean in 70–93 % of built cells** — tall outliers carry disproportionate
-  drag, pushing the displacement height above the *mean* building height (expected
-  for heterogeneous canopies; Kanda/Kent).
+- **zd > H_max in 53–75 % of cells — physically impossible** (displacement above the
+  tallest building; the saturation flagged above). The milder zd > H_mean (70–93 %) is
+  expected for heterogeneous canopies (Kanda/Kent); the zd > H_max fraction is the
+  out-of-envelope failure, not a feature.
 - **λp > 0.5 in 56–88 % of cells** (77 of 119 CFD patches) — most fabric is an
   extrapolation, not an in-envelope estimate; flagged per cell/patch
   (`flag_pai_over_envelope`), never silently.

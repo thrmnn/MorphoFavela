@@ -105,7 +105,10 @@ site artefact. *Outcome:*
 
 - Types **0, 1, 2, 4, 5 recur** (≥4 sites); **type 3 appears in only 2 sites**
   (Rio das Pedras + Maré, the two flat sites) → a flatland-specific type, not a
-  universal favela signature.
+  universal favela signature. **SUPERSEDED by the 5-site re-derivation (D17,
+  `recurrence_flags.csv`):** on the 5 campaign sites, **T0/T1/T4/T5 recur and BOTH
+  T2 and T3 are flatland-conditional** (2 sites each). The TR §5.5 ("4 of 6 recur;
+  T2/T3 conditional") is the current truth; this 8-site list is stale.
 - The experienced-condition gradient (which the clustering never saw) is monotonic
   and confirms the fabric types: type 5 (densest, recurs in all 5 sites, 16–39%
   share) has `frac_below_2h = 1.0`, `frac_deep_canyon = 0.89`, H/W ≈ 3.5 — a

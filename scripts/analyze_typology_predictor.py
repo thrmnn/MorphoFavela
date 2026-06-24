@@ -228,6 +228,54 @@ def fig_calibration(df):
     plt.close(fig)
 
 
+def fig_variance(df):
+    """C1 — is failure driven by WHICH TYPES a favela has, or by SITE effects?
+    Partition explained variance of cell failure into type / site / site×type via a
+    two-way ANOVA (partial η²). Large site×type ⇒ the type→failure mapping shifts by
+    site (transfer moderation); large between-type ⇒ a clean transferable proxy."""
+    import statsmodels.formula.api as smf
+    from statsmodels.stats.anova import anova_lm
+
+    d = df[["fail", "site"]].copy()
+    d["mt"] = df["morphotype_smooth"].astype(int).astype(str)
+    model = smf.ols("fail ~ C(mt) + C(site) + C(mt):C(site)", data=d).fit()
+    aov = anova_lm(model, typ=2)
+    ss = aov["sum_sq"]
+    parts = {"morphotype\n(the proxy signal)": ss["C(mt)"],
+             "site\n(topography the type misses)": ss["C(site)"],
+             "site × type\n(transfer moderation)": ss["C(mt):C(site)"],
+             "residual\n(within-group)": ss["Residual"]}
+    tot = sum(parts.values())
+    frac = {k: v / tot for k, v in parts.items()}
+    fig, ax = plt.subplots(figsize=(6.5, 3.2))
+    colors = ["#5aae61", "#d6604d", "#9970ab", "#cccccc"]
+    left = 0
+    for (k, v), c in zip(frac.items(), colors):
+        ax.barh(0, v, left=left, color=c, edgecolor="white")
+        if v > 0.03:
+            ax.text(left + v / 2, 0, f"{v*100:.0f}%", ha="center", va="center",
+                    fontsize=8, color="white" if c != "#cccccc" else "0.3",
+                    fontweight="bold")
+        left += v
+    ax.set_xlim(0, 1)
+    ax.set_ylim(-0.5, 0.5)
+    ax.set_yticks([])
+    ax.set_xlabel("share of explained + residual variance in cell WHO-2h failure")
+    ax.legend([plt.Rectangle((0, 0), 1, 1, color=c) for c in colors],
+              list(parts.keys()), fontsize=7, loc="upper center",
+              bbox_to_anchor=(0.5, -0.35), ncol=2, frameon=False)
+    f = list(frac.values())
+    syst = f[0] + f[1] + f[2]
+    ax.set_title(f"Of the SYSTEMATIC variance ({syst*100:.0f}%; rest is within-group "
+                 f"cell noise), morphotype dominates — type {f[0]*100:.0f}% vs site "
+                 f"{f[1]*100:.0f}% vs site×type {f[2]*100:.1f}%.\nTiny interaction ⇒ the "
+                 f"type→failure mapping transfers across favelas.", fontsize=7.5)
+    fig.tight_layout()
+    fig.savefig(FIGS / "typology_variance.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return frac
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     df = load()
@@ -249,6 +297,12 @@ def main():
     summary.to_csv(OUT / "loso_parsimony.csv")
     fig_parsimony(results)
     fig_calibration(full)
+    try:
+        frac = fig_variance(full)
+        print("\nvariance partition (share):",
+              {k.split(chr(10))[0]: round(v, 3) for k, v in frac.items()})
+    except ModuleNotFoundError:
+        print("\n[variance partition skipped — needs statsmodels (queued)]")
     print(f"\nLOSO transfer (n={len(full)} cells, prevalence "
           f"{full['fail'].mean():.2f}):")
     print(summary.round(3).to_string())

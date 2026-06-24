@@ -100,8 +100,8 @@ def fig_cell_profile(prof, k):
     ax.set_xticklabels([f"M{m}" for m in range(k)])
     ax.set_ylabel("% of cells in tissue")
     ax.set_ylim(0, 100)
-    ax.set_title("What each morphotope is made of — the cell-type mix per tissue "
-                 "(T2/T3 appear embedded in specific tissues, not as noise)", fontsize=8)
+    ax.set_title("What each MORPHOTOPE (block tissue) is made of — its mix of cell MORPHOTYPES "
+                 "(T0–T5). T2/T3 cells concentrate in specific tissues, not noise.", fontsize=8)
     ax.legend(fontsize=7, ncol=3, loc="upper center", bbox_to_anchor=(0.5, -0.16),
               frameon=False)
     fig.tight_layout()
@@ -121,7 +121,7 @@ def fig_recurrence(shares, flags, k):
         if not np.isnan(v):
             ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=7,
                     color="black" if v < 0.3 else "white")
-    ax.set_title("Morphotope recurrence — tissue share per favela", fontsize=9)
+    ax.set_title("Morphotope (block tissue) recurrence — tissue share per favela", fontsize=9)
     fig.colorbar(im, ax=ax, label="share", shrink=0.8)
     fig.tight_layout()
     fig.savefig(FIGS / "morphotope_recurrence.png", dpi=150, bbox_inches="tight")
@@ -151,8 +151,8 @@ def fig_maps(k):
     handles = [Rectangle((0, 0), 1, 1, color=MT_COLORS[m]) for m in range(k)]
     fig.legend(handles, [f"M{m} {MORPHOTOPE_LABEL.get(m, '')}" for m in range(k)], loc="lower center", ncol=k,
                fontsize=8, frameon=False)
-    fig.suptitle("Morphotopes — block-scale favela tissue (50 m composition window)",
-                 fontsize=10)
+    fig.suptitle("MORPHOTOPES (M0–M4) — block-scale favela tissue, distinct from the cell "
+                 "MORPHOTYPES (T0–T5); 50 m composition window", fontsize=9)
     fig.savefig(FIGS / "morphotope_maps.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
