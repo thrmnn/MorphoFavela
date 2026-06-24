@@ -56,6 +56,10 @@ DOC_SECTIONS = {
          "Mingze solar comparison", "Vidigal Ladybug-vs-raycast report.", "live"),
     ],
     "Plans & decisions": [
+        ("/docs/autonomous_loop_plan.md", "Autonomous-loop plan + top blockers",
+         "Ranked blockers to remove for a multi-hour parallel-agent loop.", "doc"),
+        ("/docs/tr_audit.md", "TR coherence audit",
+         "Bulletproofing punch list — criticals done, medium queued.", "doc"),
         ("/docs/typology_predictor_plan.md", "Typology-as-predictor plan",
          "Use the morphotype/morphotope typology to predict environmental failure; "
          "LOSO transfer, variance decomposition, blind risk map.", "doc"),
