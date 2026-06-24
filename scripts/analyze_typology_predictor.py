@@ -111,6 +111,123 @@ def lookup_figure(df):
     return tab
 
 
+FAIL_THRESH = 0.5  # cell "fails" WHO-2h if a majority of its observers fall below 2h
+CONT_FEATURES = ["lambda_p", "lambda_f_mean", "H_mean", "sigma_h", "slope_deg",
+                 "party_wall_ratio"]
+
+
+def load_full() -> pd.DataFrame:
+    """Supported cells with the binary WHO-2h target + continuous features + type."""
+    frames = []
+    for s in CAMPAIGN_SITES:
+        p = ROOT / "outputs" / s / "features" / "features_grid.parquet"
+        if not p.exists():
+            continue
+        g = pd.DataFrame(gpd.read_parquet(p).drop(columns="geometry"))
+        g = g[g.get("has_street_support", False) & g["morphotype_smooth"].notna()]
+        g = g.dropna(subset=[TARGET])
+        g["site"] = s
+        g["fail"] = (g[TARGET] > FAIL_THRESH).astype(int)
+        g["sigma_h"] = g["sigma_h"].fillna(0.0)
+        frames.append(g)
+    df = pd.concat(frames, ignore_index=True)
+    return df.dropna(subset=CONT_FEATURES)
+
+
+def _design(df, which):
+    """Predictor matrix: 'type' (morphotype+morphotope one-hot), 'vector'
+    (continuous fabric), or 'both'."""
+    parts = []
+    if which in ("type", "both"):
+        parts.append(pd.get_dummies(df["morphotype_smooth"].astype(int), prefix="mt"))
+        parts.append(pd.get_dummies(df["morphotope"].astype("Int64"), prefix="mtop"))
+    if which in ("vector", "both"):
+        parts.append(df[CONT_FEATURES].reset_index(drop=True))
+    X = pd.concat([p.reset_index(drop=True) for p in parts], axis=1)
+    return X.astype(float).to_numpy()
+
+
+def loso(df, which):
+    """Leave-one-site-out: train on 4 favelas, predict the 5th. Returns per-fold
+    AUC-PR/ROC/Brier + pooled out-of-fold predictions (the honest transfer test)."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
+    from sklearn.preprocessing import StandardScaler
+
+    X, y, site = _design(df, which), df["fail"].to_numpy(), df["site"].to_numpy()
+    rows, oof_p, oof_y = [], np.full(len(y), np.nan), y.copy()
+    for s in CAMPAIGN_SITES:
+        tr, te = site != s, site == s
+        if te.sum() == 0 or y[tr].sum() == 0:
+            continue
+        sc = StandardScaler().fit(X[tr])
+        clf = LogisticRegression(max_iter=2000, class_weight="balanced")
+        clf.fit(sc.transform(X[tr]), y[tr])
+        p = clf.predict_proba(sc.transform(X[te]))[:, 1]
+        oof_p[te] = p
+        rows.append({"site": s, "n": int(te.sum()), "prevalence": float(y[te].mean()),
+                     "auc_pr": average_precision_score(y[te], p),
+                     "auc_roc": roc_auc_score(y[te], p) if len(set(y[te])) > 1 else np.nan,
+                     "brier": brier_score_loss(y[te], p)})
+    return pd.DataFrame(rows), oof_p, oof_y
+
+
+def fig_parsimony(results):
+    fig, ax = plt.subplots(figsize=(6, 3.6))
+    sets = ["type", "vector", "both"]
+    labels = ["type only\n(morphotype+morphotope)", "continuous\nfabric vector", "both"]
+    x = np.arange(3)
+    means = [results[s][0]["auc_pr"].mean() for s in sets]
+    ax.bar(x, means, color=["#5aae61", "#9970ab", "#1a6fb5"], alpha=0.85)
+    for s, xi in zip(sets, x):
+        ax.plot([xi] * len(results[s][0]), results[s][0]["auc_pr"], "o", ms=4,
+                color="0.25", alpha=0.6)
+    prev = results["type"][0]["prevalence"].mean()
+    ax.axhline(prev, ls=":", color="crimson", lw=1)
+    ax.text(2.4, prev + 0.01, f"no-skill (prevalence {prev:.2f})", fontsize=7,
+            color="crimson", ha="right")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=8)
+    ax.set_ylabel("AUC-PR (leave-one-site-out)")
+    ax.set_ylim(0, 1)
+    gap = means[1] - means[0]
+    ax.set_title(f"Parsimony (leave-one-site-out): type-only transfers at AUC-PR "
+                 f"{means[0]:.2f} vs {means[1]:.2f} for the full vector\n(baseline "
+                 f"{prev:.2f}) — the discrete code keeps most of the signal; the "
+                 f"vector adds Δ{gap:+.3f}", fontsize=8)
+    ax.grid(axis="y", color="0.93")
+    fig.tight_layout()
+    fig.savefig(FIGS / "typology_parsimony.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def fig_calibration(df):
+    from sklearn.calibration import calibration_curve
+    from sklearn.metrics import average_precision_score, precision_recall_curve
+    _, oof_p, oof_y = loso(df, "both")
+    ok = np.isfinite(oof_p)
+    fig, axes = plt.subplots(1, 2, figsize=(9, 3.6))
+    frac_pos, mean_pred = calibration_curve(oof_y[ok], oof_p[ok], n_bins=10,
+                                            strategy="quantile")
+    axes[0].plot([0, 1], [0, 1], ":", color="0.6")
+    axes[0].plot(mean_pred, frac_pos, "o-", color="#1a6fb5")
+    axes[0].set(xlabel="predicted failure prob", ylabel="observed failure rate",
+                title="Calibration (LOSO out-of-fold)", xlim=(0, 1), ylim=(0, 1))
+    axes[0].grid(color="0.93")
+    prec, rec, _ = precision_recall_curve(oof_y[ok], oof_p[ok])
+    ap = average_precision_score(oof_y[ok], oof_p[ok])
+    axes[1].plot(rec, prec, color="#5aae61")
+    axes[1].axhline(oof_y[ok].mean(), ls=":", color="crimson", lw=1)
+    axes[1].set(xlabel="recall", ylabel="precision",
+                title=f"PR curve (LOSO), AP={ap:.2f}", xlim=(0, 1), ylim=(0, 1))
+    axes[1].grid(color="0.93")
+    fig.suptitle("Transfer is honest: calibrated out-of-site predictions + PR vs "
+                 "the prevalence baseline", fontsize=9.5)
+    fig.tight_layout()
+    fig.savefig(FIGS / "typology_calibration.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     df = load()
@@ -121,7 +238,22 @@ def main():
         print(tab.assign(**{c: (tab[c] * 100).round(1) for c in ("mean", "lo", "hi")})
               .to_string(index=False))
     lookup_figure(df)
-    print(f"\nfigure → {FIGS/'typology_failure_lookup.png'}  (n={len(df)} supported cells)")
+
+    # Steps 2–4: parsimony + LOSO transfer + calibration
+    full = load_full()
+    results = {w: loso(full, w) for w in ("type", "vector", "both")}
+    summary = pd.DataFrame({w: {"auc_pr": results[w][0]["auc_pr"].mean(),
+                                "auc_roc": results[w][0]["auc_roc"].mean(),
+                                "brier": results[w][0]["brier"].mean()}
+                            for w in results}).T
+    summary.to_csv(OUT / "loso_parsimony.csv")
+    fig_parsimony(results)
+    fig_calibration(full)
+    print(f"\nLOSO transfer (n={len(full)} cells, prevalence "
+          f"{full['fail'].mean():.2f}):")
+    print(summary.round(3).to_string())
+    print(f"\nparsimony ΔAUC-PR (vector − type) = "
+          f"{summary.loc['vector','auc_pr'] - summary.loc['type','auc_pr']:+.3f}")
 
 
 if __name__ == "__main__":

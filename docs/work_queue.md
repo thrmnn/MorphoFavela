@@ -27,12 +27,15 @@ hard to find. Updated every working session.
 ## 📋 Queued (prioritized)
 
 1. **Typology → environmental-failure predictor** (implementing the plan):
-   - ✅ Step 1 — per-type WHO-2 h failure-rate lookup + site-bootstrap CIs +
-     per-favela overlay (`typology_failure_lookup.png`): monotone 14%→73% with a
-     T3→T4 regime jump, T4/T5 saturating; tight transfer at T4/T5.
-   - ⏳ Next: parsimony test (type one-hot vs continuous vector), leave-one-site-out
-     transfer + calibration, 3-level variance decomposition, blind risk map on the 3
-     calibration favelas.
+   - ✅ Step 1 — per-type WHO-2 h failure lookup (`typology_failure_lookup.png`):
+     monotone 14%→73%, T3→T4 regime jump, T4/T5 saturating.
+   - ✅ Steps 2–4 — parsimony + LOSO transfer + calibration: type-only transfers
+     out-of-site at **AUC-PR 0.77** (vs 0.85 full vector, 0.64 baseline; Δ0.086) —
+     the discrete code keeps most of the signal at far lower dimension. Calibrated
+     (slightly under-confident), PR AP 0.88 (`typology_parsimony.png`,
+     `typology_calibration.png`).
+   - ⏳ Next: isotonic recalibration; 3-level variance decomposition (between-type vs
+     site vs site×type); blind risk map on the 3 calibration favelas (the payoff).
 2. **Street-network / beco metrics** — 2nd configuration feature (circulation reach,
    alley width).
 3. **Terrain-following morphometry** — fix the roughness datum confound (council C).

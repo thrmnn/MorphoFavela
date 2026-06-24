@@ -113,7 +113,7 @@ def _doc_card(url, name, desc, prov):
     src = ROOT / url.lstrip("/")
     back = breadcrumb([("← Project hub", "../index.html"), (src.stem, None)])
     render_doc_page(src, DOCS / f"{src.stem}.html", crumb=back, provenance=prov)
-    return card(name, desc, f"docs/{src.stem}.html", meta=url, kind="doc")
+    return card(name, desc, f"/outputs/_hub/docs/{src.stem}.html", meta=url, kind="doc")
 
 
 def sites_section(prov):

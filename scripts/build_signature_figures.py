@@ -389,8 +389,15 @@ GALLERY_GROUPS = [
         ("typology_failure_lookup.png", "Typology → environmental failure",
          "The money figure: per-type WHO-2h winter-sun failure rate (held-out, "
          "ray-cast). Monotone with a regime jump at T3→T4, saturating at T4/T5 "
-         "(71–73%); tight per-favela dots at T4/T5 = good transfer. Step 1 of the "
-         "typology-predictor plan."),
+         "(71–73%); tight per-favela dots at T4/T5 = good transfer."),
+        ("typology_parsimony.png", "Parsimony (LOSO)",
+         "Type-only transfers out-of-site at AUC-PR 0.77 (vs 0.85 full vector, 0.64 "
+         "baseline) — the discrete code keeps most of the signal at far lower "
+         "dimension; the continuous vector adds a modest Δ0.09."),
+        ("typology_calibration.png", "Transfer calibration + PR (LOSO)",
+         "Leave-one-site-out: calibrated (slightly under-confident — isotonic recal "
+         "queued) out-of-site predictions + PR curve (AP 0.88) vs the prevalence "
+         "baseline. The honest transfer evidence."),
         ("priority_map.png", "Morphometrics-only priority (WS-B)",
          "Geometry-only deprivation index, worst-decile per cell, rank classes. "
          "No CFD; weights provisional."),
