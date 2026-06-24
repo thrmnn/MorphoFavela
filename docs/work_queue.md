@@ -19,6 +19,17 @@ hard to find. Updated every working session.
 - [TR coherence audit (punch list)](/outputs/_hub/docs/tr_audit.html)
   — the weaknesses being bulletproofed.
 
+## 🔄 Autonomous loop (Workflow-driven, 2026-06-19)
+
+Persistent mechanism = the **Workflow** tool (parallel agents, background, notifies on
+completion). Pre-authorized: auto-merge green branches, my-call on names/palette/figures,
+local compute, **no CFD**, no HPC. **Batch 1 running** (4 parallel agents): finish the
+typology predictor (isotonic recal + blind risk map on the 3 calibration favelas), cell-k
+rigor (BIC/silhouette/CH/DB + LOSO ARI), morphotope-k bootstrap stability, street-network
+/ beco metrics. Each returns a self-contained deliverable; the main session integrates →
+gallery → hub → commit. Blockers removed: **consolidated env** (environment.yml, blocker
+#1); **names + Okabe-Ito palette FINAL** (D19).
+
 ## 🧪 TR audit (ongoing bulletproofing — `docs/tr_audit.md`)
 
 - ✅ Critical fixes: §6.6 renumber (was 2nd §6.5), roughness-invalidity + 180°
