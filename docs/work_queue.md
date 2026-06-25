@@ -52,9 +52,17 @@ heights=MIT/SondoTecnica, cadaster=IPP — pipeline open, data NOT redistributab
   correct) and recoloured: family-grouped bars (A), family-hued PD (B), sign-diverging
   coefficient markers (C). Test `tests/test_compound_clustering.py` (3 cases). PNGs in
   `outputs/paper_figures/exports/` for brisaverse to promote.
-- **Remaining tasks:** fig01 composite (A schematic + B site map + C 3-D); full-sample
-  imputed LOSO (bound the 0.90-AUC caveat); λf 0–1.5 recompute; ray-caster vs
-  Radiance/SOLWEIG x-val; morphotope fingerprint heatmap for P4/E2.
+- ✅ **fig01 composite DONE (2026-06-24, commit 24ea0e4):** `fig01_composite.py` — A
+  pipeline schematic + B Rio site map/insets + C four 3-D STL massing excerpts +
+  provenance footer. Kept SEPARATE from the TR's map-only `fig01_study_sites.py`
+  (figure-tracks convention); brisaverse promotes `exports/fig01_composite.png`. Also
+  reconciled the C. do Alemão **mixed-vs-hillside** label (fig04 now reads canonical
+  `SITE_TYPES`).
+- **Remaining tasks:** full-sample imputed LOSO (bound the 0.90-AUC caveat) ← next;
+  **λf 0–1.5 recompute = USER DECISION** (change-of-support: cell vs patch λf, would
+  shift fig03/fig04 thresholds — flagged 2026-06-24); ray-caster vs Radiance/SOLWEIG
+  x-val (likely needs external tools, may be blocked); morphotype×site fingerprint
+  heatmap for P4/E2 (a cell×character `fingerprint_heatmap.png` already exists).
 
 ## ⚙️ Env (2026-06-24): work on IVF; consolidated env deferred
 
