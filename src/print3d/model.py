@@ -22,6 +22,7 @@ import numpy as np
 import rasterio
 import trimesh
 from rasterio.windows import from_bounds
+from shapely import force_2d
 from shapely.geometry import box
 from trimesh.creation import extrude_polygon
 
@@ -107,7 +108,12 @@ def _building_prisms(buildings: gpd.GeoDataFrame, embed: float) -> list[trimesh.
         for poly in polys:
             if poly.area < 1.0:
                 continue
-            prism = extrude_polygon(poly, float(alt) + embed, engine="triangle")
+            # No explicit engine: trimesh picks an available triangulator
+            # (mapbox_earcut / manifold3d). Hardcoding "triangle" silently broke
+            # the whole print pipeline whenever that optional backend was absent.
+            # force_2d: cadaster footprints carry a Z ordinate; the earcut
+            # backend rejects 3-D rings (the old "triangle" engine tolerated them).
+            prism = extrude_polygon(force_2d(poly), float(alt) + embed)
             prism.apply_translation([0, 0, float(base) - embed])
             parts.append(prism)
     return parts
