@@ -1,24 +1,36 @@
 #!/usr/bin/env python3
 """Fig 05 — RF/logit predictors of sunlight-failure risk (4-panel A–D).
 
-  (A) Random-forest permutation importance, ranked descending. SVF in
-      terracotta, others slate. LOSO ROC-AUC range annotated. The aspect
-      feature is labelled "northness" (importance is sign-agnostic, so the
-      value is identical to the stored "southness" entry — only the label
-      changes, to match panels B/C and the manuscript caption).
+  (A) Random-forest permutation importance, GROUPED and colored by feature
+      family (openness / terrain-aspect / density) with a small family
+      legend. Bars are ordered by family (families ranked by their top
+      member's importance), descending within each family. LOSO ROC-AUC
+      range annotated. The aspect feature is labelled "northness"
+      (importance is sign-agnostic, so the value is identical to the stored
+      "southness" entry — only the label changes, to match panels B/C and
+      the manuscript caption).
 
   (B) Partial-dependence curves for the top three features (SVF, northness,
-      slope). northness is derived from the stored southness PD curve by
-      negating the grid (northness = -southness) and re-sorting ascending.
-      The SVF 0.5 crossing (≈0.26) is marked dotted.
+      slope), each colored by its family hue (SVF openness, northness/slope
+      terrain — differentiated by linestyle). northness is derived from the
+      stored southness PD curve by negating the grid (northness = -southness)
+      and re-sorting ascending. The SVF 0.5 crossing (≈0.26) is marked dotted.
 
   (C) Pooled logistic-regression coefficients on standardized predictors,
       converted to the northness convention (southness-derived terms have
-      their sign flipped). 95% CI caps; per-fold LOSO estimates as faint
-      gray dots for sign-stability. pseudo-R² and n annotated.
+      their sign flipped). Markers are SIGN-COLORED on a diverging scale —
+      blue = negative β (reduces P(fail)), red = positive β (raises P(fail))
+      — with saturation ∝ |β| and a small sign legend. CI caps and per-fold
+      LOSO dots stay neutral ink/grey. pseudo-R² and n annotated.
 
   (D) Greyed placeholder for the SVF–ACH changepoint, pending the OpenFOAM
       RANS campaign (per-cell ACH not yet available). No data fabricated.
+
+Two color encodings, intentionally distinct: A and B encode feature FAMILY
+by hue (importance/PD are about which family of predictors matters); C
+encodes the SIGN of the coefficient by hue (the regression panel is about
+direction of effect). Legends in each panel name their own encoding so the
+two are unambiguous.
 
 northness convention: northness = -southness = cos(aspect). More northness =
 north-facing = more winter sun (southern hemisphere) = lower P(fail).
@@ -40,6 +52,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import to_rgb
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fig_style import PROJECT_ROOT, apply_style
@@ -55,6 +68,8 @@ OUT_SLIDE = BRISA_ROOT / "artifacts" / "slides" / "assets" / "fig05_predictors_v
 PRESENTATION_OUT = (
     PROJECT_ROOT / "outputs" / "paper_figures" / "presentation_figures" / "fig05_predictors.png"
 )
+# Local, always-writable export so the recolor is verifiable without brisaverse.
+LOCAL_EXPORT = PROJECT_ROOT / "outputs" / "paper_figures" / "exports" / "fig05_predictors.png"
 
 # Panel A: top features, with the aspect feature relabelled to "northness".
 TOP_A = ["svf", "southness", "slope_deg", "lambda_f_mean"]
@@ -90,8 +105,37 @@ TERM_SOURCE = {
     "slope_x_svf": ("slope_x_svf", 1.0),
 }
 
-ACCENT = "#E76F51"   # terracotta
-SLATE = "#5A6B7C"    # supporting slate
+# Shared feature-FAMILY palette — one hue per family, reused across A/B/C.
+# Colorblind-safe trio: warm terracotta vs cool steel-blue vs violet are
+# distinguishable under deuteranopia/protanopia. SVF keeps the headline
+# terracotta (ACCENT) it always had.
+GROUP_COLORS = {
+    "openness": "#E76F51",   # terracotta — SVF / sky openness
+    "terrain":  "#2A7DB5",   # steel blue — northness / slope / aspect
+    "density":  "#7B5EA7",   # violet     — lambda_f / lambda_p / sigma_h
+}
+GROUP_LABELS = {"openness": "openness", "terrain": "terrain-aspect", "density": "density"}
+FEATURE_GROUP = {
+    "svf": "openness",
+    "southness": "terrain",
+    "northness": "terrain",
+    "slope_deg": "terrain",
+    "eastness": "terrain",
+    "lambda_f_mean": "density",
+    "lambda_p": "density",
+    "sigma_h": "density",
+    "street_orientation_entropy": "terrain",
+    "slope_x_northness": "terrain",
+    "slope_x_southness": "terrain",
+    "slope_x_svf": "openness",  # interaction with SVF → openness family tint
+}
+
+# Panel C sign-diverging scale (encodes direction of effect, not family).
+NEG_HUE = "#2166AC"  # blue — negative β (reduces P(fail))
+POS_HUE = "#B2182B"  # red  — positive β (raises P(fail))
+
+ACCENT = GROUP_COLORS["openness"]  # terracotta (SVF headline)
+SLATE = "#5A6B7C"    # supporting slate (annotation edges)
 INK = "#1F2933"
 GRID = "#D9D9D9"
 FAINT = "#B7BFC7"    # LOSO fold dots
@@ -107,13 +151,37 @@ def _imp_dict(stats: dict) -> dict[str, float]:
     return {f: v for f, v in stats["pooled_rf"]["permutation_importance"]}
 
 
+def _feat_color(feat: str) -> str:
+    return GROUP_COLORS[FEATURE_GROUP[feat]]
+
+
+def _desaturate(hex_color: str, sat: float) -> tuple[float, float, float]:
+    """Blend a hue toward white; sat in [0,1], 1 = full color, 0 = white."""
+    r, g, b = to_rgb(hex_color)
+    sat = float(np.clip(sat, 0.18, 1.0))
+    return (1 - sat) + sat * r, (1 - sat) + sat * g, (1 - sat) + sat * b
+
+
+def _group_order(feats: list[str], imp: dict[str, float]) -> list[str]:
+    """Order features by family (families ranked by their top member's
+    importance), descending within each family. Keeps family members
+    adjacent while preserving the descending-importance reading."""
+    fam_top = {}
+    for f in feats:
+        fam = FEATURE_GROUP[f]
+        fam_top[fam] = max(fam_top.get(fam, -np.inf), imp[f])
+    fam_rank = sorted(fam_top, key=lambda g: fam_top[g], reverse=True)
+    return sorted(feats, key=lambda f: (fam_rank.index(FEATURE_GROUP[f]), -imp[f]))
+
+
 # ── Panel A ──────────────────────────────────────────────────────────────
 def panel_importance(ax, stats: dict) -> None:
     imp = _imp_dict(stats)
-    vals = [imp[f] for f in TOP_A]
-    labels = [FEATURE_LABELS[f] for f in TOP_A]
-    y_pos = np.arange(len(TOP_A))
-    colors = [ACCENT if f == "svf" else SLATE for f in TOP_A]
+    order = _group_order(TOP_A, imp)
+    vals = [imp[f] for f in order]
+    labels = [FEATURE_LABELS[f] for f in order]
+    y_pos = np.arange(len(order))
+    colors = [_feat_color(f) for f in order]
 
     ax.barh(y_pos, vals, color=colors, height=0.62, edgecolor="none", zorder=3)
     for i, v in enumerate(vals):
@@ -151,6 +219,16 @@ def panel_importance(ax, stats: dict) -> None:
             bbox=dict(boxstyle="round,pad=0.45", facecolor="white",
                       edgecolor=SLATE, linewidth=0.6))
 
+    fams = ("openness", "terrain", "density")
+    handles = [plt.Line2D([0], [0], marker="s", ls="none", markersize=8,
+                          markerfacecolor=GROUP_COLORS[g], markeredgecolor="none")
+               for g in fams]
+    ax.legend(handles, [GROUP_LABELS[g] for g in fams],
+              loc="lower right", bbox_to_anchor=(0.99, 0.30),
+              fontsize=FS_CAPTION - 1, frameon=False, handletextpad=0.4,
+              title="feature family", title_fontsize=FS_CAPTION - 1,
+              labelspacing=0.3)
+
 
 # ── Panel B ──────────────────────────────────────────────────────────────
 def _northness_pd(pd_curves: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -172,10 +250,13 @@ def panel_pd(ax, stats: dict, pd_curves: dict) -> None:
     def norm(g):
         return (g - g.min()) / (g.max() - g.min())
 
-    ax.plot(norm(svf_g), svf_v, color=ACCENT, lw=2.4, zorder=4, label="SVF")
-    ax.plot(norm(nor_g), nor_v, color=SLATE, lw=2.2, zorder=3, label="northness")
-    ax.plot(norm(slp_g), slp_v, color="#2A9D8F", lw=2.2, ls=(0, (4, 1.5)),
-            zorder=3, label="slope")
+    ax.plot(norm(svf_g), svf_v, color=_feat_color("svf"), lw=2.4, zorder=4,
+            label="SVF")
+    ax.plot(norm(nor_g), nor_v, color=_feat_color("northness"), lw=2.2, zorder=3,
+            label="northness")
+    # northness and slope share the terrain hue → differentiated by linestyle.
+    ax.plot(norm(slp_g), slp_v, color=_feat_color("slope_deg"), lw=2.2,
+            ls=(0, (4, 1.5)), zorder=3, label="slope")
 
     ax.axhline(0.5, color="#999999", lw=0.7, ls="--", zorder=1)
 
@@ -183,9 +264,9 @@ def panel_pd(ax, stats: dict, pd_curves: dict) -> None:
     thr = stats["pooled_rf"].get("svf_threshold_pd_0_5")
     if thr is not None:
         thr_norm = (thr - svf_g.min()) / (svf_g.max() - svf_g.min())
-        ax.axvline(thr_norm, color=ACCENT, lw=1.0, ls=":", zorder=4)
+        ax.axvline(thr_norm, color=_feat_color("svf"), lw=1.0, ls=":", zorder=4)
         ax.text(thr_norm + 0.015, 0.95, f"SVF crossing ≈ {thr:.2f}",
-                fontsize=FS_CAPTION, color=ACCENT, ha="left", va="top")
+                fontsize=FS_CAPTION, color=_feat_color("svf"), ha="left", va="top")
 
     ax.set_ylim(0, 1)
     ax.set_yticks([0.0, 0.5, 1.0])
@@ -234,25 +315,31 @@ def panel_logit(ax, stats: dict) -> None:
         lo.append(min(a, b))
         hi.append(max(a, b))
 
-    ax.axvline(0, color="#999999", lw=0.7, zorder=1)
+    max_abs = max(abs(e) for e in est)
 
-    # LOSO per-fold estimates as faint dots.
+    ax.axvline(0, color="#777777", lw=0.8, zorder=1)
+
+    # LOSO per-fold estimates as faint neutral dots (sign-stability cloud).
     for j, t in enumerate(terms):
         src, sign = TERM_SOURCE[t]
         fold_vals = [sign * f["coefficients"][src] for f in folds]
         ax.scatter(fold_vals, [y_pos[j]] * len(fold_vals),
                    s=14, color=FAINT, alpha=0.9, zorder=2, linewidths=0)
 
-    # Point + 95% CI caps.
+    # 95% CI caps in neutral ink.
     for j in range(len(terms)):
         ax.plot([lo[j], hi[j]], [y_pos[j], y_pos[j]], color=INK, lw=1.4,
                 zorder=3, solid_capstyle="butt")
         for xc in (lo[j], hi[j]):
             ax.plot([xc, xc], [y_pos[j] - 0.16, y_pos[j] + 0.16], color=INK,
                     lw=1.4, zorder=3)
-    colors = [ACCENT if t == "svf" else SLATE for t in terms]
-    ax.scatter(est, y_pos, s=42, color=colors, zorder=4, edgecolor="white",
-               linewidths=0.6)
+
+    # Point markers SIGN-COLORED on a diverging scale, saturation ∝ |β|.
+    marker_colors = [_desaturate(NEG_HUE if e < 0 else POS_HUE, abs(e) / max_abs)
+                     for e in est]
+    edge_colors = [NEG_HUE if e < 0 else POS_HUE for e in est]
+    ax.scatter(est, y_pos, s=64, color=marker_colors, zorder=4,
+               edgecolor=edge_colors, linewidths=1.2)
 
     for j, t in enumerate(terms):
         ax.text(est[j], y_pos[j] + 0.30, f"{est[j]:+.2f}",
@@ -276,10 +363,22 @@ def panel_logit(ax, stats: dict) -> None:
     ax.xaxis.grid(True, color=GRID, lw=0.5, zorder=0)
     ax.set_axisbelow(True)
 
+    sign_handles = [
+        plt.Line2D([0], [0], marker="o", ls="none", markersize=9,
+                   markerfacecolor=_desaturate(NEG_HUE, 0.85),
+                   markeredgecolor=NEG_HUE, markeredgewidth=1.1),
+        plt.Line2D([0], [0], marker="o", ls="none", markersize=9,
+                   markerfacecolor=_desaturate(POS_HUE, 0.85),
+                   markeredgecolor=POS_HUE, markeredgewidth=1.1),
+    ]
+    ax.legend(sign_handles, ["−  reduces P(fail)", "+  raises P(fail)"],
+              loc="lower left", fontsize=FS_CAPTION - 1, frameon=False,
+              handletextpad=0.4, labelspacing=0.3, bbox_to_anchor=(0.0, 0.02))
+
     r2 = li.get("pseudo_r2", 0.0)
     n = li.get("n", 0)
-    ax.text(0.98, 0.04, f"pseudo-R² = {r2:.2f}, n = {n:,}",
-            transform=ax.transAxes, ha="right", va="bottom",
+    ax.text(0.02, 0.40, f"pseudo-R² = {r2:.2f}\nn = {n:,}",
+            transform=ax.transAxes, ha="left", va="top",
             fontsize=FS_CAPTION, color=INK,
             bbox=dict(boxstyle="round,pad=0.45", facecolor="white",
                       edgecolor=SLATE, linewidth=0.6))
@@ -346,10 +445,13 @@ def main() -> None:
     else:
         OUT_MANUSCRIPT.parent.mkdir(parents=True, exist_ok=True)
         OUT_SLIDE.parent.mkdir(parents=True, exist_ok=True)
+        LOCAL_EXPORT.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(OUT_MANUSCRIPT, **save_kw)
         fig.savefig(OUT_SLIDE, **save_kw)
+        fig.savefig(LOCAL_EXPORT, **save_kw)
         print(f"  wrote {OUT_MANUSCRIPT}")
         print(f"  wrote {OUT_SLIDE}")
+        print(f"  wrote {LOCAL_EXPORT}")
     plt.close(fig)
 
 

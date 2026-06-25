@@ -30,6 +30,7 @@ from scipy.stats import gaussian_kde
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fig_style import (
     PROJECT_ROOT,
+    SITE_COLORS,
     SITE_LABELS,
     WIDTH_DOUBLE,
     apply_style,
@@ -148,6 +149,11 @@ def add_vertical_colorbar(
     )
 
 
+def _darken(hex_color: str, factor: float = 0.55) -> tuple[float, float, float]:
+    rgb = tuple(int(hex_color[i : i + 2], 16) / 255.0 for i in (1, 3, 5))
+    return tuple(c * factor for c in rgb)
+
+
 def ridge_panel(
     ax,
     data: dict,
@@ -156,30 +162,53 @@ def ridge_panel(
     xlim: tuple[float, float],
     threshold_label: str,
     title: str,
+    fail_side: str,
+    bw_method: float = 0.10,
 ) -> None:
     n_sites = len(SITES)
-    offsets = np.linspace(0, n_sites - 1, n_sites)
-    height_scale = 0.85
+    row_step = 1.6
+    offsets = np.arange(n_sites) * row_step
+    height_scale = 0.95
     for i, site in enumerate(SITES):
         vals = data[site]
         vals = vals[(vals >= xlim[0]) & (vals <= xlim[1])]
         if len(vals) < 30:
             continue
         try:
-            kde = gaussian_kde(vals, bw_method=0.20)
+            kde = gaussian_kde(vals, bw_method=bw_method)
             xs = np.linspace(xlim[0], xlim[1], 400)
             density = kde(xs)
-            density = density / density.max() * height_scale
+            # A delta-like atom at zero (sun) would saturate the per-ridge
+            # max and flatten the body; normalise to a robust quantile and
+            # clip so the spike reads as "tall" without erasing structure.
+            norm = np.quantile(density, 0.985)
+            density = np.clip(density / norm, 0, 1.5) * height_scale
+            base = offsets[i]
+            top = base + density
+            fill = SITE_COLORS[site]
+            edge = _darken(fill)
+            ax.fill_between(xs, base, top, color=fill, alpha=0.65, linewidth=0)
+            if fail_side == "right":
+                fail = xs >= threshold
+            else:
+                fail = xs <= threshold
             ax.fill_between(
-                xs, offsets[i], offsets[i] + density, color="#444444", alpha=0.55, linewidth=0
+                xs,
+                base,
+                top,
+                where=fail,
+                color=edge,
+                alpha=0.9,
+                hatch="////",
+                linewidth=0,
             )
-            ax.plot(xs, offsets[i] + density, color="#111111", lw=0.4)
+            ax.plot(xs, top, color=edge, lw=0.6)
         except Exception:
             pass
     ax.axvline(threshold, color="#222222", lw=0.8, ls="--", alpha=0.9)
     ax.text(
         threshold,
-        n_sites - 0.08,
+        offsets[-1] + row_step * 0.55,
         f"{threshold_label}",
         fontsize=5.5,
         ha="center",
@@ -189,6 +218,7 @@ def ridge_panel(
     )
     ax.set_yticks(offsets)
     ax.set_yticklabels([SITE_LABELS[s] for s in SITES], fontsize=6.0)
+    ax.set_ylim(offsets[0] - row_step * 0.35, offsets[-1] + row_step * 1.05)
     ax.invert_yaxis()
     ax.set_xlim(*xlim)
     ax.set_xlabel(xlabel, fontsize=6.5)
@@ -280,6 +310,7 @@ def main() -> None:
         threshold_label=r"$\lambda_f = 2.75$",
         title=r"(C) $\lambda_f$ distribution per favela "
         r"(relative threshold, pooled p75 = 2.75, marked)",
+        fail_side="right",
     )
 
     # Row D — winter-sun ridge
@@ -293,6 +324,7 @@ def main() -> None:
         xlim=(0.0, 10.5),
         threshold_label="2 h",
         title="(D) Winter-solstice direct-sun-hour distribution per favela (WHO 2 h marker)",
+        fail_side="left",
     )
 
     save_fig(fig, "fig03_ventilation_solar")

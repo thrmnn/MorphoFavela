@@ -41,12 +41,20 @@ on request; one print per morphotype (physical typology set); hub print gallery.
 
 Canonical pipeline `outputs/paper_figures/*.py`; run on **IVF**. Provenance rule: ALS
 heights=MIT/SondoTecnica, cadaster=IPP — pipeline open, data NOT redistributable.
-- **PI reworks (top):** fig04 severity 4-colour palette + side table (+ Moran's I /
-  join-count inset, `esda` in IVF); fig03 ventilation×solar legibility re-render; fig05
-  predictor audit vs `rf_predictor_stats.json` then sign/family recolor.
-- **Tasks:** fig01 composite (A schematic + B site map + C 3-D); fig03 C/D filled
-  per-site densities; full-sample imputed LOSO (bound the 0.90-AUC caveat); λf 0–1.5
-  recompute; ray-caster vs Radiance/SOLWEIG x-val; morphotope fingerprint heatmap for P4/E2.
+- ✅ **PI reworks DONE (2026-06-24):** fig04 severity 4-colour palette (blue→yellow→
+  orange→red) + per-site share **side table** + **(G) Moran's I panel** and the new
+  **compound-state spatial-clustering** statistic — Moran's I **0.33–0.51 (all p<0.05)**,
+  BB join-count z **27–112**, **53–92%** of compound cells in clusters ≥500 m² → fills the
+  manuscript `\TODO` ("compound states cluster" now evidence). Stats →
+  `outputs/brisa_ventilation_fix/compound_spatial_clustering.json`. fig03 C/D re-rendered
+  as filled per-site coloured densities (`SITE_COLORS`) with hatched failing mass
+  (bimodality / mass-at-zero now visible). fig05 audited (PASS — top-4 + sign logic
+  correct) and recoloured: family-grouped bars (A), family-hued PD (B), sign-diverging
+  coefficient markers (C). Test `tests/test_compound_clustering.py` (3 cases). PNGs in
+  `outputs/paper_figures/exports/` for brisaverse to promote.
+- **Remaining tasks:** fig01 composite (A schematic + B site map + C 3-D); full-sample
+  imputed LOSO (bound the 0.90-AUC caveat); λf 0–1.5 recompute; ray-caster vs
+  Radiance/SOLWEIG x-val; morphotope fingerprint heatmap for P4/E2.
 
 ## ⚙️ Env (2026-06-24): work on IVF; consolidated env deferred
 
