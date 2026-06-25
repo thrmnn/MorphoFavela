@@ -207,8 +207,16 @@ This is more defensible than the over-claimed parsimony story it replaces.
   **ρ(open_edge_dist, λf) = +0.49** (p≈0; per-site +0.32…+0.53), and **42 % of built cells
   are both deep (≥ median) and skimming (λf ≥ 0.65)**. Both signals are geometry-only
   tendencies; neither delivers adequacy (τ CFD-gated).
-- **Track F** (ongoing data-quality sweeps): fixed the `print3d` extrude latent break
-  (hardcoded missing `triangle` backend → engine-agnostic + force_2d) and the
-  `party_wall_ratio` schema drift.
+- **Track F — ✅ substantially done** (data-quality sweeps): (1) `print3d` extrude latent
+  break (hardcoded missing `triangle` backend → engine-agnostic + force_2d); (2)
+  `party_wall_ratio` schema drift; (3) **phantom-tower guard** — a `topo==0` corruption
+  (absurd 83–232 m extruded slivers) lived in the per-patch `buildings.gpkg` extractor
+  (the site-wide layer was already clean); added `drop_phantom_buildings` + test, swept
+  **286 phantom rows from 56 patches** (Rocinha/RdP/Maré). Site grids + canonical λf were
+  unaffected (built from the clean site-wide layer); the per-patch CFD/roughness/print
+  path is now clean. (4) numerical-claims audit of the TR → fixed 3 mismatches (§5.5
+  per-type range 13→63-68%, §12.2 test count 622, §1 footprints 98,415); the rest of the
+  TR (~50 claims incl. the full §5.2 λf table + §6.5/§6.6) VERIFIED. DTM "spikes" were
+  cosmetic (outside the 100 m analysis disk, Δ=0.00 on metrics) — no fix.
 - Blocked-isolated (skip, don't stall): ray-caster vs Radiance/SOLWEIG, CFD-τ,
   Mingze WeTransfer upload.
