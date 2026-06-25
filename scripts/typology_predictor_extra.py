@@ -59,8 +59,10 @@ FIGS = ROOT / "outputs" / "cross_site" / "signature" / "figures_v2"
 OUT = ROOT / "outputs" / "cross_site" / "typology_predictor_extra"
 TARGET = "solar_winter_frac_below2h"
 FAIL_THRESH = 0.5
-CONT_FEATURES = ["lambda_p", "lambda_f_mean", "H_mean", "sigma_h", "slope_deg",
-                 "party_wall_ratio"]
+# See analyze_typology_predictor.CONT_FEATURES: party_wall_ratio is a separate
+# per-building analysis, not a grid feature, and the dissolved λf already encodes
+# the party-wall structure — so the continuous vector is the 5 canonical columns.
+CONT_FEATURES = ["lambda_p", "lambda_f_mean", "H_mean", "sigma_h", "slope_deg"]
 CALIBRATION_SITES = ["borel", "jacarezinho", "morro_do_juramento"]
 K = 6
 
@@ -204,9 +206,12 @@ def fig_isotonic(df: pd.DataFrame) -> dict:
     _reliability(ax, yk, ik, "#1a6fb5", f"isotonic recal (ECE {ece_iso:.3f})")
     ax.set(xlabel="predicted failure probability",
            ylabel="observed failure rate", xlim=(0, 1), ylim=(0, 1))
+    verdict = ("raw is already well-calibrated; isotonic adds nothing"
+               if ece_iso >= ece_raw - 0.002 else
+               f"isotonic improves ECE by {ece_raw - ece_iso:.3f}")
     ax.set_title("Isotonic recalibration of the LOSO WHO-2h model\n"
-                 f"(both predictor set, n={ok.sum()} out-of-fold cells)",
-                 fontsize=9)
+                 f"(both set, n={ok.sum()} OOF cells) — {verdict}",
+                 fontsize=8.5)
     ax.legend(fontsize=8, loc="upper left")
     ax.grid(color="0.93")
     fig.tight_layout()

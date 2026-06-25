@@ -112,8 +112,11 @@ def lookup_figure(df):
 
 
 FAIL_THRESH = 0.5  # cell "fails" WHO-2h if a majority of its observers fall below 2h
-CONT_FEATURES = ["lambda_p", "lambda_f_mean", "H_mean", "sigma_h", "slope_deg",
-                 "party_wall_ratio"]
+# Continuous fabric vector = the canonical grid columns. party_wall_ratio is NOT
+# here: it is a separate per-building configuration analysis (party_wall_by_type.csv),
+# never a grid feature, and the dissolved λf already encodes party-wall structure
+# (touching footprints are unioned before projecting), so it would be redundant.
+CONT_FEATURES = ["lambda_p", "lambda_f_mean", "H_mean", "sigma_h", "slope_deg"]
 
 
 def load_full() -> pd.DataFrame:
@@ -191,10 +194,16 @@ def fig_parsimony(results):
     ax.set_ylabel("AUC-PR (leave-one-site-out)")
     ax.set_ylim(0, 1)
     gap = means[1] - means[0]
+    # Data-driven verdict: under the dissolved-λf re-baseline the discrete
+    # typology alone is only modestly skillful and the continuous vector carries
+    # most of the transferable signal — so phrase by the measured gap, never a
+    # fixed "type keeps most of the signal" claim that the numbers may contradict.
+    verdict = ("the discrete code keeps most of the signal"
+               if gap < 0.10 else
+               "the continuous fabric vector carries most of the transferable signal")
     ax.set_title(f"Parsimony (leave-one-site-out): type-only transfers at AUC-PR "
                  f"{means[0]:.2f} vs {means[1]:.2f} for the full vector\n(baseline "
-                 f"{prev:.2f}) — the discrete code keeps most of the signal; the "
-                 f"vector adds Δ{gap:+.3f}", fontsize=8)
+                 f"{prev:.2f}) — {verdict}; the vector adds Δ{gap:+.3f}", fontsize=8)
     ax.grid(axis="y", color="0.93")
     fig.tight_layout()
     fig.savefig(FIGS / "typology_parsimony.png", dpi=150, bbox_inches="tight")
@@ -266,10 +275,16 @@ def fig_variance(df):
               bbox_to_anchor=(0.5, -0.35), ncol=2, frameon=False)
     f = list(frac.values())
     syst = f[0] + f[1] + f[2]
+    # Data-driven: name whichever of type/site leads (they are now comparable),
+    # and read the interaction term honestly — a tiny site×type still means the
+    # (modest) type signal transfers, even though most variance is within-type.
+    lead = "morphotype leads" if f[0] > f[1] else "site leads"
+    transfer = ("negligible interaction ⇒ what type-signal exists transfers"
+                if f[2] < 0.02 else
+                "a sizeable site×type interaction ⇒ the type→failure mapping shifts by site")
     ax.set_title(f"Of the SYSTEMATIC variance ({syst*100:.0f}%; rest is within-group "
-                 f"cell noise), morphotype dominates — type {f[0]*100:.0f}% vs site "
-                 f"{f[1]*100:.0f}% vs site×type {f[2]*100:.1f}%.\nTiny interaction ⇒ the "
-                 f"type→failure mapping transfers across favelas.", fontsize=7.5)
+                 f"cell noise), {lead} — type {f[0]*100:.0f}% vs site "
+                 f"{f[1]*100:.0f}% vs site×type {f[2]*100:.1f}%.\n{transfer}.", fontsize=7.5)
     fig.tight_layout()
     fig.savefig(FIGS / "typology_variance.png", dpi=150, bbox_inches="tight")
     plt.close(fig)

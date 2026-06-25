@@ -9,11 +9,30 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.typology_predictor_extra import expected_calibration_error  # noqa: E402
+from scripts.typology_predictor_extra import (  # noqa: E402
+    CONT_FEATURES,
+    expected_calibration_error,
+)
+
+
+def test_cont_features_present_in_grid_schema():
+    """Guard the silent drift that broke this script once: the dissolved-λf
+    re-baseline regenerated features_grid without party_wall_ratio while
+    CONT_FEATURES still listed it. Any CONT_FEATURES member must exist as a
+    grid column. Skips in data-free checkouts (outputs/ is gitignored)."""
+    p = ROOT / "outputs" / "vidigal" / "features" / "features_grid.parquet"
+    if not p.exists():
+        pytest.skip("features_grid not present (gitignored outputs)")
+    import geopandas as gpd
+
+    cols = set(gpd.read_parquet(p).columns)
+    missing = [f for f in CONT_FEATURES if f not in cols]
+    assert not missing, f"CONT_FEATURES drifted from grid schema: {missing}"
 
 
 def test_ece_perfectly_calibrated_is_zero():
