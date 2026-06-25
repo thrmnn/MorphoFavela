@@ -202,8 +202,11 @@ This is more defensible than the over-claimed parsimony story it replaces.
   contiguous fabric = the pre-CFD LATERAL ventilation-tendency signal, companion to λf's
   VERTICAL regime. Pooled median 32 m; **flatland is doubly constrained** — RdP (med 42 m)
   and Maré (140 m+ deep cores) sit far from any opening *and* dominate the λf skimming
-  regime, while the perforated hillside fabric (Vidigal 22 m) is laterally shallow. Both
-  signals are geometry-only tendencies; neither delivers adequacy (τ CFD-gated).
+  regime, while the perforated hillside fabric (Vidigal 22 m) is laterally shallow. The
+  double-constraint is real at the **cell** level, not just site-level: pooled Spearman
+  **ρ(open_edge_dist, λf) = +0.49** (p≈0; per-site +0.32…+0.53), and **42 % of built cells
+  are both deep (≥ median) and skimming (λf ≥ 0.65)**. Both signals are geometry-only
+  tendencies; neither delivers adequacy (τ CFD-gated).
 - **Track F** (ongoing data-quality sweeps): fixed the `print3d` extrude latent break
   (hardcoded missing `triangle` backend → engine-agnostic + force_2d) and the
   `party_wall_ratio` schema drift.

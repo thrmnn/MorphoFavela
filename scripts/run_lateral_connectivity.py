@@ -75,6 +75,38 @@ def load_site(site: str) -> gpd.GeoDataFrame:
     return g
 
 
+def cross_signal(grids: dict) -> dict:
+    """Quantify the lateral×vertical double-constraint at the CELL level: does a
+    cell that is deep in the fabric (high open-edge distance) also sit in the
+    skimming λf regime? Spearman ρ(open_edge_dist, λf) + the joint fraction of
+    built cells that are both deep (≥ pooled-median depth) AND skimming (λf≥0.65)."""
+    from scipy.stats import spearmanr
+
+    rows, dist_all, lf_all = {}, [], []
+    for s in SITES:
+        b = grids[s][grids[s]["_built"]]
+        d = b["open_edge_dist_m"].to_numpy()
+        lf = b["lambda_f_mean"].to_numpy()
+        ok = np.isfinite(d) & np.isfinite(lf)
+        d, lf = d[ok], lf[ok]
+        dist_all.append(d)
+        lf_all.append(lf)
+        rho, p = spearmanr(d, lf)
+        rows[s] = {"spearman_rho": float(rho), "p": float(p), "n": int(d.size)}
+    d, lf = np.concatenate(dist_all), np.concatenate(lf_all)
+    rho, p = spearmanr(d, lf)
+    deep = d >= np.median(d)
+    skim = lf >= 0.65
+    return {
+        "note": "per-built-cell ρ(open_edge_dist, λf); positive ⇒ deeper cells are "
+                "also more skimming (doubly constrained at the cell level).",
+        "pooled_spearman_rho": float(rho),
+        "pooled_p": float(p),
+        "joint_deep_and_skimming_frac": float((deep & skim).mean()),
+        "per_site": rows,
+    }
+
+
 def _stats(v: np.ndarray) -> dict:
     return {
         "n": int(v.size),
@@ -127,6 +159,7 @@ def main() -> None:
         pooled.append(v)
     pooled_v = np.concatenate(pooled)
     vmax = float(np.percentile(pooled_v, 98))
+    cross = cross_signal(grids)
 
     payload = {
         "title": "Lateral-connectivity scalar — distance to nearest open edge (2026-06-25)",
@@ -144,6 +177,7 @@ def main() -> None:
         "colorbar_vmax_p98": vmax,
         "per_site": per_site,
         "pooled": _stats(pooled_v),
+        "lateral_vs_vertical": cross,
     }
     OUT_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"Wrote {OUT_JSON.relative_to(PROJECT_ROOT)}")
@@ -155,6 +189,10 @@ def main() -> None:
     pp = payload["pooled"]
     print(f"{'POOLED':<22s} {pp['n']:>6d} {pp['median']:>6.0f} {pp['p90']:>6.0f} "
           f"{pp['max']:>6.0f}")
+    print(f"\nlateral×vertical: pooled Spearman ρ(open_edge_dist, λf) = "
+          f"{cross['pooled_spearman_rho']:+.3f} (p={cross['pooled_p']:.1e}); "
+          f"{cross['joint_deep_and_skimming_frac']*100:.0f}% of built cells are both "
+          f"deep (≥median) and skimming (λf≥0.65)")
 
     make_figure(grids, vmax)
 
