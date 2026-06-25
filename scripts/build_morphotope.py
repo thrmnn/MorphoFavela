@@ -151,9 +151,70 @@ def fig_maps(k):
     handles = [Rectangle((0, 0), 1, 1, color=MT_COLORS[m]) for m in range(k)]
     fig.legend(handles, [f"M{m} {MORPHOTOPE_LABEL.get(m, '')}" for m in range(k)], loc="lower center", ncol=k,
                fontsize=8, frameon=False)
-    fig.suptitle("MORPHOTOPES (M0–M4) — block-scale favela tissue, distinct from the cell "
+    fig.suptitle(f"MORPHOTOPES (M0–M{k - 1}) — block-scale favela tissue, distinct from the cell "
                  "MORPHOTYPES (T0–T5); 50 m composition window", fontsize=9)
     fig.savefig(FIGS / "morphotope_maps.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def fig_maps_repartition(k, shares):
+    """Combined deck asset (R4-2): k=3 tissue maps + per-site repartition bars.
+
+    Saved under the filename the W1/master decks read so the slide picks up
+    the re-baselined k=3 tissues with no spec change."""
+    cmap = ListedColormap(MT_COLORS[:k])
+    camp = [(s, ROOT / "outputs" / s / "features" / "features_grid.parquet")
+            for s in CAMPAIGN_SITES]
+    camp = [(s, gpd.read_parquet(p)) for s, p in camp if p.exists()]
+    widths = [g.total_bounds[2] - g.total_bounds[0] for _, g in camp]
+
+    fig = plt.figure(figsize=(2.7 * len(camp), 5.2))
+    gs = fig.add_gridspec(2, len(camp), height_ratios=[1.0, 0.66],
+                          width_ratios=widths, hspace=0.18, wspace=0.05)
+    for j, (s, g) in enumerate(camp):
+        ax = fig.add_subplot(gs[0, j])
+        g.plot(ax=ax, color=NULL_COLOR, linewidth=0)
+        g.dropna(subset=["morphotope"]).plot(
+            ax=ax, column="morphotope", categorical=True, cmap=cmap,
+            vmin=0, vmax=k - 1, linewidth=0)
+        gpd.GeoSeries([g.geometry.union_all()], crs=g.crs).boundary.plot(
+            ax=ax, color="0.25", lw=0.5)
+        ax.set_xlim(g.total_bounds[0], g.total_bounds[2])
+        ax.set_ylim(g.total_bounds[1], g.total_bounds[3])
+        ax.set_aspect("equal")
+        ax.set_axis_off()
+        ax.set_title(SITE_NAMES.get(s, s), fontsize=9)
+
+    # Per-site repartition (share of each site's cells in each tissue).
+    bax = fig.add_subplot(gs[1, :])
+    sites = list(shares.index)
+    ylabels = [SITE_NAMES.get(s, s) for s in sites]
+    share_arr = np.nan_to_num(shares.to_numpy())  # sites × k, positional (see fig_recurrence)
+    bottoms = np.zeros(len(sites))
+    for m in range(k):
+        vals = share_arr[:, m] * 100.0
+        bax.barh(ylabels, vals, left=bottoms, color=MT_COLORS[m],
+                 edgecolor="white", linewidth=0.6, height=0.66)
+        for i, v in enumerate(vals):
+            if v >= 6:
+                bax.text(bottoms[i] + v / 2, i, f"{v:.0f}%", ha="center", va="center",
+                         fontsize=6.5, color="white" if m >= 3 else "#222222")
+        bottoms += vals
+    bax.set_xlim(0, 100)
+    bax.set_xlabel("share of built cells (%)", fontsize=8)
+    bax.tick_params(labelsize=8)
+    bax.invert_yaxis()
+    for sp in ("top", "right"):
+        bax.spines[sp].set_visible(False)
+    bax.set_title("Per-site tissue repartition", loc="left", fontsize=8.5, pad=3)
+
+    handles = [Rectangle((0, 0), 1, 1, color=MT_COLORS[m]) for m in range(k)]
+    fig.legend(handles, [f"M{m} {MORPHOTOPE_LABEL.get(m, '')}" for m in range(k)],
+               loc="lower center", ncol=k, fontsize=8, frameon=False,
+               bbox_to_anchor=(0.5, -0.03))
+    fig.suptitle(f"Block-scale morphotopes (k={k}, data-driven) — tissue maps and per-site "
+                 "repartition; bootstrap ARI 0.916", fontsize=9)
+    fig.savefig(FIGS / "morphotope_maps_repartition.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -178,6 +239,7 @@ def main():
     fig_cell_profile(prof, k)
     fig_recurrence(shares, flags, k)
     fig_maps(k)
+    fig_maps_repartition(k, shares)
     (OUT / "run_meta.json").write_text(json.dumps({
         "git_sha": _git_sha(),
         "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),

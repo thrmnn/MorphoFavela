@@ -87,7 +87,8 @@ def _draw_map(ax, site: str, grid: gpd.GeoDataFrame) -> None:
     ax.set_xlim(b[0] - pad, b[2] + pad)
     ax.set_ylim(b[1] - pad, b[3] + pad)
     ax.set_aspect("equal")
-    ax.set_xticks([]); ax.set_yticks([])
+    ax.set_xticks([])
+    ax.set_yticks([])
     for sp in ax.spines.values():
         sp.set_visible(False)
     ax.set_title(SITE_LABELS[site], fontsize=7.5, color="#222222", pad=2)
