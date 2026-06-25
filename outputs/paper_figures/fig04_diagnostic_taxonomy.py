@@ -42,13 +42,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fig_style import (
     PROJECT_ROOT,
     SITE_LABELS,
+    SITE_TYPES,
     SIZE_DOUBLE_TALL,
     apply_style,
     save_fig,
 )
 
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "maré", "riodaspedras"]
-HILLSIDE = {"vidigal", "rocinha", "complexo_do_alemao"}
 
 THRESHOLD_SUN_HRS = 2.0
 THRESHOLD_LAMBDA_F = 2.75  # interim relative pre-screen (pooled p75 of corrected λf)
@@ -275,7 +275,7 @@ def draw_site_panel(
     for spine in ax.spines.values():
         spine.set_visible(False)
     label = SITE_LABELS[site]
-    typology = "hillside" if site in HILLSIDE else "flatland"
+    typology = SITE_TYPES[site]  # canonical descriptor (fig_style); Alemão = "mixed"
     ax.set_title(
         f"({panel}) {label}  ·  {typology}  ·  n={canonical_n:,}",
         loc="left",
@@ -327,6 +327,15 @@ def draw_typology_panel(ax, taxonomy: dict) -> None:
     ax.tick_params(axis="x", labelsize=6.0)
     ax.tick_params(axis="y", labelsize=7.0)
     ax.set_title("(F) Typology aggregate", loc="left", fontsize=7.5, color="#222222", pad=4)
+    ax.text(
+        0.0,
+        -0.34,
+        "binary terrain split; C. do Alemão (mixed) grouped with its predominant hillside morro",
+        transform=ax.transAxes,
+        fontsize=4.8,
+        color="#666666",
+        va="top",
+    )
     ax.invert_yaxis()
     for spine in ("top", "right"):
         ax.spines[spine].set_visible(False)
