@@ -61,7 +61,7 @@ At time of writing, the pipeline has produced:
   synthetic-validated end-to-end on all 5 sites; awaiting the first real
   return (VDG-P07).
 - **A favela morphological signature** (§5.5): a 6-class cell *morphotype* and a
-  5-class block *morphotope* learned from geometry alone; four of six morphotypes
+  3-class block *morphotope* learned from geometry alone; four of six morphotypes
   recur across favelas, and a held-out experienced-deprivation gradient (winter-sun
   failure 0 → 1.0 across the density spine) validates them out-of-sample. *Caveat:*
   k = 6 is a domain-driven granularity (internal indices favour coarser), justified
@@ -485,7 +485,11 @@ boundary** before accumulation (repair of 2026-06-02, commit `e2252f4`):
 earlier grids attributed the full length of facades crossing a cell
 border to that cell, inflating per-cell λf 2–3×. All published grids
 were regenerated in place; λf values in earlier revisions of this
-report are superseded.
+report are superseded. As of the latest re-baseline, λf is computed on
+**dissolved footprints** (party-wall-corrected — touching cadastral
+footprints are unioned before projection): the earlier "summed" form
+double-counted shared party walls as frontal area, over-counting λf
+≈1.7×. The pooled built-cell median λf ≈ 0.83 (cell scale, dissolved).
 
 **Volumetric porosity.** `1 − (Σ building_volume_in_cell) / (cell_area ×
 H_mean)`. Characterises the void fraction in the urban canopy; strongly
@@ -653,7 +657,7 @@ impossibilities).
 | Slope, median | 25.7° | 19.3° | 1.5° |
 | SVF, median | 0.34 | 0.37 | 0.43 |
 | λp, median | 0.71 | 0.62 | 0.54 |
-| λf_mean, median (built cells, λp > 0) | 1.90 | 1.15 | 1.79 |
+| λf_mean, median (built cells, λp > 0) | 1.04 | 0.68 | 0.87 |
 | σH, median | 2.0 m | 1.6 m | 2.0 m |
 
 Source: medians computed from the concatenation of
@@ -670,13 +674,23 @@ high (0.54–0.71)** across all three typologies — informal urban form is
 denser than formal Rio fabric (typical λp in Copacabana ≈ 0.40), so the
 sampling allocation correctly prioritises high-λp strata. Second,
 **on the built fabric, hillside and flatland typologies carry comparable
-median λf (1.90 vs 1.79)**; the Mixed typology dips (1.15) because
+median λf (1.04 vs 0.87)**; the Mixed typology dips (0.68) because
 Complexo do Alemão has the lowest building heights of the campaign
-(mean H_mean = 5.3 m). (All λf values reflect the 2026-06 cell-clipping
-re-baseline — see §4.2; on an all-cells basis the flatland median drops
-to 1.01 because of Maré's unbuilt share.) Wind-canopy drag
+(mean H_mean = 5.3 m). (All λf values reflect the 2026-06 dissolved /
+party-wall-corrected re-baseline — see §4.2; on an all-cells basis the
+flatland median drops to 0.63 because of Maré's unbuilt share.) Wind-canopy drag
 will therefore not separate cleanly along the hillside↔flatland axis;
 SVF and slope are the dominant discriminators that CFD will quantify.
+
+**Flow regime from λf.** Against the Oke / Grimmond–Oke thresholds — isolated
+roughness λf < 0.15, wake interference 0.15 ≤ λf < 0.65, skimming flow λf ≥ 0.65 —
+the favela fabric is **predominantly skimming flow**: pooled across built cells,
+65 % skimming, 30 % wake interference, 5 % isolated (cell median λf ≈ 0.83,
+dissolved). Read this as a regime classification, not a ventilation grade:
+**geometry classifies the flow regime but cannot grade per-cell ventilation
+adequacy** — that requires the CFD age-of-air τ (Tier 2, pending). The at-scale
+statement is therefore that *the fabric is predominantly in the skimming-flow
+regime*, not a per-cell ventilation-deprivation grade.
 
 ### 5.3 SVF and solar access decouple on sloped terrain
 
@@ -835,15 +849,18 @@ clusters a lean, standardized cell-level fabric vector (λp, H_mean, σH, λf_me
 built campaign cells. **On the choice of k:** internal-validity indices (silhouette,
 Calinski-Harabasz, Davies-Bouldin) favour a coarser k = 2–3 — geometry alone cleanly
 separates only a few broad groups — so **k = 6 is a domain-driven granularity chosen
-for morphological interpretability, not a distance-based optimum**. Its justification
-is *cross-site reproducibility*: leave-one-site-out refits recover the six-type
-labelling at ARI 0.78 (bootstrap ARI 0.90), and the held-out experience gradient
-(below) is monotone in it. The six types order along a **density → enclosure spine
-crossed with a flat/steep switch**: T0 Open Fringe, T1 Hillside Fringe, T2 Open
-Consolidated, T3 Shaded Consolidated, T4 Hillside Core, T5 Saturated Core (λp = 1.0).
+for morphological interpretability, not a distance-based optimum** (Calinski-Harabasz
+does peak at k = 6). Its justification is *cross-site reproducibility*: leave-one-site-out
+refits recover the six-type labelling at ARI 0.763 (bootstrap ARI 0.90), and the held-out
+experience gradient (below) is monotone in it. The clustering was re-fit on the
+**dissolved (party-wall-corrected) λf** (§4.2); membership differs from the previously-published
+summed-λf typology (cross-version ARI 0.23), so the type identities below were re-derived. The six types order along a **density → enclosure spine
+crossed with a flat/steep switch**: T0 Open Fringe, T1 Flatland Consolidated
+(flatland-specific), T2 Hillside Fringe, T3 Shaded Consolidated, T4 Hillside Core,
+T5 Saturated Core (flatland-specific, λp = 1.0).
 
 *This section presents **two linked but distinct classifications**: the cell-scale
-**morphotype** (T0–T5; Figures 5.5a–c) and the block-scale **morphotope** (M0–M4;
+**morphotype** (T0–T5; Figures 5.5a–c) and the block-scale **morphotope** (M0–M2;
 Figure 5.5d). The cell is the unit of measurement; the morphotope is the unit of
 signature. They use deliberately non-overlapping names and never share a label.*
 
@@ -851,13 +868,14 @@ signature. They use deliberately non-overlapping names and never share a label.*
 
 *Figure 5.5a — **cell-scale morphotypes (T0–T5)**, the six cell types as idealized, same-scale street sections.*
 
-**Validation is two-fold.** (i) *Cross-site recurrence*: **four of the six
-morphotypes (T0, T1, T4, T5) recur** across ≥3 favelas; **T2 and T3 are
-flatland-conditional** (present only where flat buildable land exists — the cell
-typology is not fully universal at cell scale, which motivates the block scale
-below). The composition is topographic — hillside favelas (Vidigal, Rocinha,
-Complexo do Alemão) are dominated by the Hillside types (T1/T4), the flatter Rio das
-Pedras and Maré by the flat-dense types (T3/T5). (ii) *Held-out experience*: the
+**Validation is two-fold.** (i) *Cross-site recurrence*: **T4 Hillside Core is
+universal (5/5 sites) and the dominant hillside type (~50 % of hillside cells); T0,
+T2, and T3 recur** across ≥3 favelas; **T1 and T5 are flatland-conditional** (present
+only where flat buildable land exists — the cell typology is not fully universal at
+cell scale, which motivates the block scale below). The composition is topographic —
+hillside favelas (Vidigal, Rocinha, Complexo do Alemão) are dominated by the Hillside
+types (T2/T4), the flatter Rio das Pedras and Maré by the flat-dense types (T1/T5).
+(ii) *Held-out experience*: the
 experienced conditions never entered the clustering, yet worsen monotonically along
 the type spine — the fraction of observers below the WHO 2 h winter-sun floor climbs
 0 → 1.0 from T0 to T5. **Caveats:** SVF is geometrically coupled to the clustering
@@ -878,21 +896,23 @@ high (ARI 0.90).
 
 **Block-scale morphotopes.** *Two distinct classifications are used and must not be
 conflated:* the **morphotype** is the cell-level alphabet (T0–T5, six classes, the
-unit of measurement); the **morphotope** is the block-level tissue (M0–M4, five
+unit of measurement); the **morphotope** is the block-level tissue (M0–M2, three
 classes, the unit of signature), and the two use deliberately non-overlapping names
-(cell: Open/Hillside Fringe, Open/Shaded Consolidated, Hillside/Saturated Core;
-tissue: Low-rise Slope, Mixed Flatland, Compact Hillside, Mixed Dense, Compact
-Flatland). A single 10 m cell is the measurement unit, but a
-favela *signature* is a block-scale tissue. Clustering each cell's morphotype
-composition over a 50 m window yields **k = 5 morphotopes**; four of five recur
-across ≥3 sites — a stronger, less artefact-prone recurrence claim than the cell
-scale, and one that resolves whether the flat-dense cell-types are real (the
-Shaded-Consolidated *cell type* concentrates inside the coherent, recurring
-*Compact Flatland tissue*, M4).
+(cell: Open/Hillside Fringe, Flatland/Shaded Consolidated, Hillside/Saturated Core;
+tissue: Compact Hillside, Mixed Dense, Saturated Flatland). A single 10 m cell is the
+measurement unit, but a favela *signature* is a block-scale tissue. Clustering each
+cell's morphotype composition over a 50 m window yields **k = 3 morphotopes**
+(bootstrap stability ARI 0.916, min 0.810): **M0 Compact Hillside Tissue** (71 % T4
+Hillside Core + 22 % T2; recurs, 4 sites), **M1 Mixed Dense Tissue** (the most diverse
+tissue — 41 % T5 / 34 % T4 / 14 % T0), and **M2 Saturated Flatland Tissue** (94 % T5
+Saturated Core; flatland-specific, 2 sites). Two of three recur across ≥3 sites — a
+stronger, less artefact-prone recurrence claim than the cell scale, and one that
+resolves whether the flat-dense cell-types are real (the Saturated-Core *cell type*
+concentrates inside the coherent, recurring *Saturated Flatland tissue*, M2).
 
 ![Morphotope maps](figures/morphotope_maps.png)
 
-*Figure 5.5d — **block-scale morphotopes (M0–M4)**, the tissue classification (a separate, coarser level than the cell morphotypes in 5.5a–c): the favela signature as coherent tissue.*
+*Figure 5.5d — **block-scale morphotopes (M0–M2)**, the tissue classification (a separate, coarser level than the cell morphotypes in 5.5a–c): the favela signature as coherent tissue.*
 
 **Configuration.** A party-wall adjacency metric (fraction of each footprint's
 perimeter fused to a neighbour) captures the relational fabric the intensity vector
@@ -1135,9 +1155,9 @@ physically valid (green) vs impossible (zd > H_max, red; z0 → 0, brown).*
 > **Headline caveat (expert-council review, 2026-06-19).** The per-cell morphometric
 > z0/zd is **physically invalid in 53–75 % of built cells**: the displacement height
 > exceeds **H_max** (above the tallest building — impossible) or z0 collapses toward 0
-> (the skimming asymptote — "smoother than grass"). λp > 0.5 and λf ≈ 2 are one to two
-> orders of magnitude past every method's calibration array, so the drag formula
-> saturates and z0 is set by σH/H_max, not the fabric. **This is model extrapolation,
+> (the skimming asymptote — "smoother than grass"). λp > 0.5 and λf ≈ 1 (dissolved,
+> deep in the skimming-flow regime) sit well past every method's calibration array, so
+> the drag formula saturates and z0 is set by σH/H_max, not the fabric. **This is model extrapolation,
 > not measurement.** The per-cell z0 map is illustrative only; the **method-spread
 > envelope** (the four methods diverge ~20×, ≈1.5 orders) is the reportable result, and
 > any absolute z0 is **CFD-gated** (validated/recalibrated by the step-R-C drag-centroid
@@ -1151,7 +1171,12 @@ the boundary condition the CFD inlet sees. They are estimated **morphometrically
 — per 10 m cell and per wind sector — from the §4 grid (λp, λf in 8 directions,
 H_mean, σH) plus per-cell H_max derived from the building heights, using the
 vendored UMEP roughness calculator (Kent & Grimmond: Macdonald 1998, Raupach 1994,
-Millward-Hopkins 2011, Kanda 2013). Kanda is primary because it is height-
+Millward-Hopkins 2011, Kanda 2013). z0/zd were recomputed on the corrected
+**dissolved (party-wall-corrected) λf** (§4.2), and the invalidity conclusion is
+unchanged — the per-cell physically-valid fraction is now 0.47 (Vidigal), 0.35
+(Rocinha), 0.46 (Complexo do Alemão), 0.36 (Maré), 0.25 (Rio das Pedras), i.e. ~53–75 %
+invalid still — because the invalidity is driven by zd > H_max and density, not by the
+λf magnitude. Kanda is primary because it is height-
 variability-aware; Macdonald is carried as the σH-blind baseline. The directional
 λf gives a roughness rose z0(θ) — favela packing is anisotropic, so a single mean
 would discard real directional structure.
@@ -1642,7 +1667,7 @@ replaced by the seasonal runner on 2026-05-07.
 ### 10.7 Per-cell aerodynamic roughness is invalid at favela density
 
 The morphometric z0/zd of §6.6 is **physically invalid in 53–75 % of built cells**:
-favela λp > 0.5 and λf ≈ 2 sit one to two orders of magnitude past the calibration
+favela λp > 0.5 and λf ≈ 1 (dissolved) sit well past the calibration
 arrays of every method (Lettau, Macdonald, Raupach, Millward-Hopkins, Kanda), so the
 drag-partition formula saturates and returns impossible values — displacement above
 the tallest building (zd > H_max) or z0 → 0 ("smoother than grass"). The per-cell z0
@@ -1657,9 +1682,9 @@ cannot represent channelling or N-vs-S asymmetry; only the CFD can. Per-cell fla
 ### 10.8 The morphological typology has known limits
 
 (§5.5) k = 6 morphotypes is a domain-driven granularity, not a distance-based optimum
-(internal indices favour k = 2–3); it is justified by leave-one-site-out
-reproducibility (ARI 0.78). Two morphotypes (T2, T3) are flatland-conditional rather
-than universal. The held-out experience validation leans on winter-sun/WHO-failure
+(internal indices favour k = 2–3; Calinski-Harabasz does peak at k = 6); it is
+justified by leave-one-site-out reproducibility (ARI 0.763). Two morphotypes (T1, T5)
+are flatland-conditional rather than universal. The held-out experience validation leans on winter-sun/WHO-failure
 (ray-cast, semi-independent) because SVF is partly geometric (SVF ≈ f(λp, H/W)).
 Experience profiles are read on the ~35 % of cells with a street observer. The
 typology→failure *predictor* (§5.5 forward look) is a separate, forthcoming sub-study.
