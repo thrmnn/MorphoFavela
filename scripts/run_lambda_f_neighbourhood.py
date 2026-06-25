@@ -20,9 +20,20 @@ a proper Grimmond–Oke λf, WITHOUT touching the cell-scale figures.
 Finding: neighbourhood λf is lower than the cell-scale field but still runs
 ~1–3 (pooled median ≈ 1.65); ~96% of the built fabric sits ABOVE the 0.35
 skimming-flow onset, and the densest sites (Rio das Pedras, Rocinha) sit at
-median 2.4–2.7. So the favela fabric is uniformly in the skimming regime and
-actually exceeds the canonical 0–1.5 textbook λf range even at neighbourhood
-support — a stronger E2 statement than "near the skimming threshold".
+median 2.4–2.7. So the favela fabric is uniformly in the skimming regime even at
+neighbourhood support.
+
+CAVEAT (frontal-area over-count, verified 2026-06-24): the underlying cell λf
+(``compute_frontal_area_ratio``) SUMS each cadastral building's frontal area, so
+in fused party-wall favela fabric it counts internal shared walls. Against a
+dissolved merged-envelope estimate the summed λf over-counts by ~2.5× (median;
+p90 ~4.3): summed cell-λf median ≈ 1.6 vs dissolved ≈ 0.65. The aerodynamically
+correct neighbourhood λf is therefore ~2–2.5× below the numbers here — still
+ABOVE the 0.35 skimming onset (≈0.65 > 0.35), so the E2 regime conclusion holds,
+but the magnitude is inflated. A proper fix (dissolve footprints before the
+frontal projection) is a pipeline-wide change touching fig03/fig04/the predictor
+/the roughness track and is deferred to a user decision; this supplement reports
+the summed-λf neighbourhood field with the over-count flagged.
 
 Outputs:
   outputs/paper_figures/lambda_f_neighbourhood.json
@@ -163,6 +174,21 @@ def main() -> None:
             "Cell-scale λf (p75 = 2.75, threshold of fig03/fig04) is a different "
             "support and is unchanged."
         ),
+        "over_count_caveat": {
+            "issue": (
+                "Underlying cell λf sums per-cadastral-building frontal area, "
+                "counting internal party walls in fused favela fabric."
+            ),
+            "summed_vs_dissolved_ratio_median": 2.5,
+            "summed_cell_lambda_f_median": 1.6,
+            "dissolved_cell_lambda_f_median": 0.65,
+            "implication": (
+                "Aerodynamically correct neighbourhood λf is ~2–2.5× below these "
+                "values but remains > 0.35 skimming onset; E2 regime conclusion "
+                "holds, magnitude inflated. Pipeline-wide dissolve fix deferred to "
+                "user decision."
+            ),
+        },
         "per_site": per_site_summary,
         "pooled": pooled_summary,
     }
