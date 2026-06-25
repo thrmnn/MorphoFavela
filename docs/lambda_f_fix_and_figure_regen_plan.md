@@ -41,16 +41,34 @@ Prototype: `scripts/prototype_lambda_f_dissolve.py` (rocinha review PNG +
 4. **Re-baseline the neighbourhood-λf supplement** on dissolved λf (its current
    numbers carry the over-count caveat).
 
-## 3. Ventilation-axis methodology change (round-3 §1) — the bigger piece
+## 3. Ventilation-axis decision (round-3 §1, REVISED 2026-06-24) — DECIDED
 
-Build a **multi-variable geometric ventilation-potential index** =
-f(λf_dissolved, canyon aspect H:W, cluster openness/porosity), **excluding SVF**
-(keep the solar and ventilation axes independent). Continuous underneath,
-displayed as **ordinal tertiles + provisional hatching**. Recast the sparse
-"ventilation-only" state as a morphological finding ("in fabric this uniformly
-enclosed, ventilation deprivation almost always co-occurs with solar
-deprivation"). ⟶DECIDE: adopt the index now (new analysis + Methods rewrite) vs
-keep the λf-alone interim proxy with the round-3 placeholder label.
+The urban-physics council **REJECTED the multi-variable index** (H/W collinear
+with SVF on the vertical-openness/solar axis → "openness measured three times",
+unfittable without ground truth). The adopted position is exactly what the
+dissolve prototype pointed to: **λf saturation is the FINDING, not a liability.**
+
+- **Tier 1 — geometry classifies the flow REGIME at scale** (no fitting, no
+  per-cell adequacy claim): λf vs the Oke/Grimmond–Oke thresholds — **isolated
+  ≲0.15 · wake 0.15–0.65 · skimming ≳0.65**. The fabric is *uniformly skimming*
+  (the most ventilation-suppressed canopy class) = the at-scale result. **Use the
+  dissolved λf** so the regime statement rests on the honest magnitude (dissolved
+  cell median ≈1.12, neighbourhood ≈1.0 — still > 0.65 skimming onset, so the
+  conclusion is robust to the over-count correction).
+- **Tier 2 — CFD age-of-air τ carries per-cell ventilation ADEQUACY** on a
+  validated patch sample; only τ may claim "adequacy". Validation = Spearman/
+  Kendall rank concordance (geometry rank vs τ), patch sample stratified on the
+  JOINT geometric distribution. Gated on the CFD campaign (out of scope here).
+- **Drop** the λf>2.75 percentile flag + the 6.6% "ventilation-only" state
+  (report as one sentence). Axes stay orthogonal single-scalars: SVF→solar,
+  λf→regime label. The only genuinely-independent pre-CFD ventilation signal is
+  **lateral connectivity / exposure-to-open-edge** (distance-to-open-boundary) —
+  the quantity that still varies once λf plateaus; qualitative, superseded by τ.
+
+**Next analyses (council "do now"):** (a) the λf **flow-regime classification**
+(cheap — shares per band, per site, on dissolved λf); (b) optionally the single
+lateral-connectivity scalar; (c) patch-CFD rank validation (CFD-gated). The
+dissolve fix (§2) is the honest λf input to (a).
 
 ## 4. Figure regeneration (round-2 P0/P1/P2 + round-3 §0–§5)
 
