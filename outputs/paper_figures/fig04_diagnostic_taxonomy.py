@@ -14,13 +14,18 @@ Layout:
 
 Maps are rendered by classifying each site's grid on the fly. Per-panel
 share annotations and the typology aggregates are loaded from the canonical
-interim taxonomy JSON (outputs/brisa_ventilation_fix/
-taxonomy_interim_lambda_f.json) so the printed shares match the manuscript
-exactly. The spatial-clustering statistics are computed here from the same
-on-the-fly classification the maps render, and written to
+regime-stratified taxonomy JSON (outputs/brisa_ventilation_fix/
+taxonomy_regime.json) so the printed shares match the manuscript exactly.
+The spatial-clustering statistics are computed here from the same on-the-fly
+classification the maps render, and written to
 outputs/brisa_ventilation_fix/compound_spatial_clustering.json so the
-manuscript numbers are traceable. Threshold is interim/relative:
-λf > 2.75 (pooled p75 of corrected λf) ∧ winter direct sun < 2 h.
+manuscript numbers are traceable.
+
+Ventilation axis is the REGIME boundary (PI-adopted 2026-06-25): dissolved
+λf > 0.65 (skimming flow, Grimmond & Oke 1999) ∧ winter direct sun < 2 h.
+This replaces the deprecated λf > 2.75 relative pre-screen. Geometry
+classifies the flow *regime*; per-cell ventilation *adequacy* is carried by
+CFD age-of-air (gated), not read off λf.
 """
 
 from __future__ import annotations
@@ -51,7 +56,7 @@ from fig_style import (
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "maré", "riodaspedras"]
 
 THRESHOLD_SUN_HRS = 2.0
-THRESHOLD_LAMBDA_F = 2.75  # interim relative pre-screen (pooled p75 of corrected λf)
+THRESHOLD_LAMBDA_F = 0.65  # skimming-flow boundary (Grimmond & Oke 1999), dissolved λf
 
 GRID_SPACING_M = 10.0  # regular analysis grid; one cell = 100 m²
 PATCH_MIN_CELLS = 5  # ≥ 5 contiguous cells = ≥ 500 m² compound cluster
@@ -60,7 +65,7 @@ TAXONOMY_JSON = (
     PROJECT_ROOT
     / "outputs"
     / "brisa_ventilation_fix"
-    / "taxonomy_interim_lambda_f.json"
+    / "taxonomy_regime.json"
 )
 CLUSTERING_JSON = (
     PROJECT_ROOT
@@ -101,7 +106,7 @@ STATE_COLORS = [STATE_FILL[s] for s in (*STATE_NAMES, "nodata")]
 STATE_LEGEND = [
     ("adequate", "adequate (both pass)"),
     ("sunlight_constraint", f"sunlight constraint (<{THRESHOLD_SUN_HRS:.0f} h winter sun)"),
-    ("ventilation_constraint", f"ventilation constraint (λ$_f$ > {THRESHOLD_LAMBDA_F:.2f})"),
+    ("ventilation_constraint", f"ventilation constraint (skimming: λ$_f$ > {THRESHOLD_LAMBDA_F:.2f})"),
     ("compound_constraint", "compound constraint (both)"),
 ]
 COMPOUND_INK = STATE_FILL["compound_constraint"]
@@ -288,12 +293,12 @@ def draw_site_panel(
 def draw_typology_panel(ax, taxonomy: dict) -> None:
     """Hillside / flatland / all aggregates pulled from the canonical taxonomy
     JSON so the bar shares match the manuscript verbatim."""
-    aggregates = taxonomy["aggregates"]
+    aggregates = taxonomy["aggregates_lambda_f"]
     rows = []
     for label in ("hillside", "flatland", "all"):
         agg = aggregates[label]
         shares = {k: agg["shares"][k] for k in STATE_NAMES}
-        total = agg["n_classified_cells"]
+        total = agg["n_classified"]
         rows.append((label, shares, total))
 
     labels = [f"{lab}\n(n={t:,})" for lab, _, t in rows]
@@ -330,7 +335,8 @@ def draw_typology_panel(ax, taxonomy: dict) -> None:
     ax.text(
         0.0,
         -0.34,
-        "binary terrain split; C. do Alemão (mixed) grouped with its predominant hillside morro",
+        "binary terrain split; Alemão (mixed) grouped with its hillside morro. "
+        "Hillside > flatland compound — λf-independent H/W cross-check agrees",
         transform=ax.transAxes,
         fontsize=4.8,
         color="#666666",
@@ -394,8 +400,8 @@ def draw_table_panel(ax, taxonomy: dict, clustering: dict[str, dict]) -> None:
     cell_text = []
     cell_colors = []
     for site in SITES:
-        s = taxonomy["per_site"][site]["shares"]
-        n = taxonomy["per_site"][site]["n_classified"]
+        s = taxonomy["per_site"][site]["lambda_f_axis"]["shares"]
+        n = taxonomy["per_site"][site]["lambda_f_axis"]["n_classified"]
         c = clustering[site]
         star = "*" if c["morans_p_sim"] < 0.05 else ""
         row = [
@@ -505,7 +511,7 @@ def main() -> None:
         clustering[site] = compound_clustering(grid, state)
         draw_site_panel(
             ax, site, grid, state, panel,
-            canonical_n=taxonomy["per_site"][site]["n_classified"],
+            canonical_n=taxonomy["per_site"][site]["lambda_f_axis"]["n_classified"],
         )
 
     write_clustering_json(clustering)
@@ -514,7 +520,7 @@ def main() -> None:
     draw_moran_panel(fig.add_subplot(gs[3, 2:4]), clustering)
     draw_table_panel(fig.add_subplot(gs[4, :]), taxonomy, clustering)
     draw_shared_legend(fig)
-    save_fig(fig, "fig04_diagnostic_taxonomy")
+    save_fig(fig, "fig04_diagnostic_taxonomy", gate=True)
 
 
 def write_clustering_json(clustering: dict[str, dict]) -> None:
