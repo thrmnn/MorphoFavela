@@ -2,16 +2,23 @@
 """Fig 03 — Frontal-area density and winter direct-sun across five favelas.
 
 Four panels in a 4-row layout (rows 1+2 are choropleths, rows 3+4 are ridges):
-  Row 1 — (A) Per-site λf choropleths (corrected cell-clipped λf),
-          5 panels + shared colorbar; relative threshold λf = 2.75 marked.
+  Row 1 — (A) Per-site dissolved-λf choropleths (party-wall corrected),
+          5 panels + shared colorbar; flow-regime band markers on the bar.
   Row 2 — (B) Per-site winter-sun choropleths, 5 panels + shared colorbar.
-  Row 3 — (C) λf distribution as a ridge plot; relative threshold (pooled p75,
-          λf = 2.75) marked.
+  Row 3 — (C) λf distribution as a ridge plot, with the Oke/Grimmond-&-Oke
+          flow-regime bands (isolated < 0.15 ≤ wake < 0.65 ≤ skimming) shaded.
   Row 4 — (D) Winter-sun-hour distribution as a ridge plot, WHO 2 h marker.
 
-λf threshold is the INTERIM RELATIVE pre-screen — p75 of the pooled
-corrected-λf distribution (see outputs/brisa_ventilation_fix/
-taxonomy_interim_lambda_f.json) — pending CFD-ACH + LMA calibration.
+DELIVERED vs PROVISIONAL asymmetry (the framing of this figure):
+  · The SUN axis (rows B, D) is DELIVERED — measured winter direct-sun hours,
+    a per-cell outcome that stands on its own (WHO 2 h floor).
+  · The λf axis (rows A, C) is PROVISIONAL — geometry classifies the flow
+    *regime* (isolated / wake / skimming, Grimmond & Oke 1999); it does NOT
+    deliver a per-cell ventilation adequacy. Adequacy (age-of-air τ) is
+    CFD-gated and deliberately unquantified here. The skimming onset
+    (dissolved λf ≥ 0.65) is the regime boundary, not a failure threshold.
+λf is dissolved (touching footprints unioned into blocks before projecting);
+canonical source outputs/brisa_ventilation_fix/lambda_f_canonical.json.
 """
 
 from __future__ import annotations
@@ -40,12 +47,20 @@ from fig_style import (
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "maré"]
 
 THRESHOLD_SUN_HRS = 2.0
-THRESHOLD_LAMBDA_F = 2.75  # interim relative threshold (pooled p75 of corrected λf)
+
+# Oke (1988) / Grimmond & Oke (1999) flow-regime bands on dissolved λf.
+# These are REGIME boundaries, not failure thresholds: geometry says which
+# regime, not whether a cell ventilates (that is CFD-gated, see docstring).
+ISOLATED_MAX = 0.15
+SKIMMING_MIN = 0.65
+REGIME_FILL = {"isolated": "#FDD9A8", "wake": "#F08A3C", "skimming": "#B2182B"}
 
 LAMBDA_F_CMAP = "Greys"  # sequential, deliberately not a red=alarm map
 SUN_CMAP = "cividis"
 
-LAMBDA_VMIN, LAMBDA_VMAX = 0.0, 4.0  # corrected λf: p95 ≈ 4.39, threshold 2.75 sits at ~69% of range
+# dissolved λf: pooled p95 ≈ 1.79, p99 ≈ 2.34 — cap at 2.0 so the 0.65 skimming
+# onset sits at a readable ~1/3 of the range and the body is not compressed.
+LAMBDA_VMIN, LAMBDA_VMAX = 0.0, 2.0
 SUN_VMIN, SUN_VMAX = 0.0, 10.5
 
 
@@ -118,11 +133,14 @@ def add_vertical_colorbar(
     cmap: str,
     vmin: float,
     vmax: float,
-    threshold: float,
+    markers: list[tuple[float, str]],
     label: str,
-    threshold_label: str,
 ) -> None:
-    """Attach a tall thin colorbar to the right of ax_target."""
+    """Attach a tall thin colorbar to the right of ax_target.
+
+    ``markers`` is a list of (value, label) dashed lines on the bar — one for a
+    single WHO floor, two for the isolated/wake/skimming regime boundaries.
+    """
     fig = ax_target.figure
     pos = ax_target.get_position()
     cb_x = pos.x1 + 0.012
@@ -136,22 +154,31 @@ def add_vertical_colorbar(
     cb.outline.set_linewidth(0.4)
     cb.set_label(label, fontsize=5.8, color="#222222", labelpad=2.0)
     cb.ax.tick_params(labelsize=5.2, color="#444444", length=2.0)
-    cax.axhline(threshold, color="#000000", lw=1.0, ls="--")
-    cax.text(
-        2.2,
-        threshold,
-        threshold_label,
-        fontsize=5.5,
-        ha="left",
-        va="center",
-        color="#222222",
-        transform=cax.get_yaxis_transform(),
-    )
+    for value, mlabel in markers:
+        cax.axhline(value, color="#000000", lw=1.0, ls="--")
+        cax.text(
+            2.2,
+            value,
+            mlabel,
+            fontsize=5.5,
+            ha="left",
+            va="center",
+            color="#222222",
+            transform=cax.get_yaxis_transform(),
+        )
 
 
 def _darken(hex_color: str, factor: float = 0.55) -> tuple[float, float, float]:
     rgb = tuple(int(hex_color[i : i + 2], 16) / 255.0 for i in (1, 3, 5))
     return tuple(c * factor for c in rgb)
+
+
+def _row_tag(fig, axes, text: str, color: str) -> None:
+    """Short bold tag in the clear left margin of a choropleth row, rotated to
+    run up the row (DELIVERED/PROVISIONAL). Kept out of the per-panel titles."""
+    pos = axes[0].get_position()
+    fig.text(pos.x0 - 0.052, pos.y0 + pos.height / 2, text, fontsize=6.0,
+             fontweight="bold", ha="center", va="center", rotation=90, color=color)
 
 
 def ridge_panel(
@@ -164,11 +191,18 @@ def ridge_panel(
     title: str,
     fail_side: str,
     bw_method: float = 0.10,
+    regime_bands: list[tuple[float, float, str]] | None = None,
+    hatch_fail: bool = True,
 ) -> None:
     n_sites = len(SITES)
     row_step = 1.6
     offsets = np.arange(n_sites) * row_step
     height_scale = 0.95
+    # Regime bands sit behind the ridges: a PROVISIONAL backdrop (which flow
+    # regime), not a failure shading. Drawn first so ridges read on top.
+    if regime_bands:
+        for lo, hi, color in regime_bands:
+            ax.axvspan(lo, hi, color=color, alpha=0.16, linewidth=0, zorder=0)
     for i, site in enumerate(SITES):
         vals = data[site]
         vals = vals[(vals >= xlim[0]) & (vals <= xlim[1])]
@@ -188,20 +222,18 @@ def ridge_panel(
             fill = SITE_COLORS[site]
             edge = _darken(fill)
             ax.fill_between(xs, base, top, color=fill, alpha=0.65, linewidth=0)
-            if fail_side == "right":
-                fail = xs >= threshold
-            else:
-                fail = xs <= threshold
-            ax.fill_between(
-                xs,
-                base,
-                top,
-                where=fail,
-                color=edge,
-                alpha=0.9,
-                hatch="////",
-                linewidth=0,
-            )
+            if hatch_fail:
+                fail = xs >= threshold if fail_side == "right" else xs <= threshold
+                ax.fill_between(
+                    xs,
+                    base,
+                    top,
+                    where=fail,
+                    color=edge,
+                    alpha=0.9,
+                    hatch="////",
+                    linewidth=0,
+                )
             ax.plot(xs, top, color=edge, lw=0.6)
         except Exception:
             pass
@@ -284,36 +316,44 @@ def main() -> None:
         LAMBDA_F_CMAP,
         LAMBDA_VMIN,
         LAMBDA_VMAX,
-        THRESHOLD_LAMBDA_F,
-        r"$\lambda_f$ (cell-clipped, rel. thr. 2.75)",
-        "2.75",
+        [(ISOLATED_MAX, "0.15"), (SKIMMING_MIN, "0.65")],
+        r"dissolved $\lambda_f$",
     )
     add_vertical_colorbar(
         row_b_axes[-1],
         SUN_CMAP,
         SUN_VMIN,
         SUN_VMAX,
-        THRESHOLD_SUN_HRS,
+        [(THRESHOLD_SUN_HRS, "2 h")],
         "winter direct-sun h",
-        "2 h",
     )
 
-    # Row C — λf ridge
+    # DELIVERED vs PROVISIONAL row tags — the figure's framing.
+    _row_tag(fig, row_a_axes, r"$\lambda_f$ · PROVISIONAL", "#8C5A0F")
+    _row_tag(fig, row_b_axes, "sun · DELIVERED", "#2E5E1F")
+
+    # Row C — λf ridge with Oke/GO flow-regime bands (PROVISIONAL: regime, not adequacy)
     ax_c = fig.add_subplot(gs[2, :])
     lambda_data = {s: grids[s]["lambda_f_mean"].dropna().values for s in SITES}
     ridge_panel(
         ax_c,
         lambda_data,
-        THRESHOLD_LAMBDA_F,
-        r"$\lambda_f$ (cell-clipped frontal-area density)",
-        xlim=(0.0, 5.0),
-        threshold_label=r"$\lambda_f = 2.75$",
-        title=r"(C) $\lambda_f$ distribution per favela "
-        r"(relative threshold, pooled p75 = 2.75, marked)",
+        SKIMMING_MIN,
+        r"dissolved $\lambda_f$ (frontal-area density)",
+        xlim=(0.0, 2.5),
+        threshold_label=r"skimming onset, $\lambda_f = 0.65$",
+        title=r"(C) $\lambda_f$ per favela — flow-regime bands "
+        r"(isolated $<$ 0.15 $\leq$ wake $<$ 0.65 $\leq$ skimming); regime tendency, not adequacy",
         fail_side="right",
+        regime_bands=[
+            (0.0, ISOLATED_MAX, REGIME_FILL["isolated"]),
+            (ISOLATED_MAX, SKIMMING_MIN, REGIME_FILL["wake"]),
+            (SKIMMING_MIN, 2.5, REGIME_FILL["skimming"]),
+        ],
+        hatch_fail=False,
     )
 
-    # Row D — winter-sun ridge
+    # Row D — winter-sun ridge (DELIVERED: real per-cell failure below WHO 2 h, hatched)
     ax_d = fig.add_subplot(gs[3, :])
     sun_data = {s: grids[s]["solar_hours_winter"].dropna().values for s in SITES}
     ridge_panel(
@@ -322,12 +362,12 @@ def main() -> None:
         THRESHOLD_SUN_HRS,
         "winter-solstice direct-sun hours",
         xlim=(0.0, 10.5),
-        threshold_label="2 h",
-        title="(D) Winter-solstice direct-sun-hour distribution per favela (WHO 2 h marker)",
+        threshold_label="WHO 2 h",
+        title="(D) Winter-solstice direct-sun hours per favela — DELIVERED (hatched mass < WHO 2 h)",
         fail_side="left",
     )
 
-    save_fig(fig, "fig03_ventilation_solar")
+    save_fig(fig, "fig03_ventilation_solar", gate=True)
 
 
 if __name__ == "__main__":
