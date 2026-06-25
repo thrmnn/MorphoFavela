@@ -52,7 +52,14 @@ adopted (dissolved λf canonical; taxonomy ventilation axis = skimming regime).
 - ✅ **⑥** SVF-"6×" verified: pooled RF SVF=0.283 = ~4.8× next feature (southness),
   ~6.7× slope; "6×" only vs slope; sync's 1.8× was per-fold. Brisaverse-side fix.
 - ✅ **⑦** TR morphotope figure title M0–M4→M0–M2 + PDF rebuilt (`1cdb3ac`);
-  TR already dissolved-consistent (§4.5 regime, §5.5 k=3, λf table). Numerical audit run.
+  TR already dissolved-consistent (§4.5 regime, §5.5 k=3, λf table). Numerical audit PASS (13/13).
+- ✅ **λf LOCKED for brisaverse integration** (`51bbe33`): `lambda_f_canonical.json`
+  (script 10) = single source — canonical denominator (full built mask, n=64,389),
+  per-site median/mean/over-count, both groupings exact (signature_family §5.2
+  1.04/0.68/0.87 reproduced; terrain_binary taxonomy), regime shares; test-pinned.
+  **All 8 sites now dissolved-consistent** — the 3 calibration sites (borel/
+  jacarezinho/juramento) were still on summed λf and were migrated. Integration
+  readiness + concerns documented in `docs/brisa_round4_results_2026-06-25.md`.
 
 ## 🟡 Track B — figure-regen rounds 2/3 (STARTED 2026-06-25)
 
