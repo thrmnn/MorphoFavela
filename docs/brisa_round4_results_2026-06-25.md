@@ -177,6 +177,14 @@ two earlier headlines**. Do NOT cite the pre-re-baseline parsimony story.
   but most cell-level variance is within-type.
 - **Calibration / isotonic.** The raw LOSO `both` model is *already* well-calibrated
   (ECE 0.018); isotonic recal adds nothing (0.018 → 0.023). Report the raw model.
+- **⚠ Spatial-CV honesty (roadmap #1, `spatial_cv.json`).** Site-block-bootstrap (resample
+  the 5 favelas) 95% CI on the pooled-OOF AUC-PR: type **0.55 [0.48, 0.77]**, vector
+  **0.86 [0.76, 0.93]**. The vector>type gap is **NOT cleanly CI-separated** (overlap at
+  ~0.76) — with only 5 sites the bands are wide. State the flip as a DIRECTION (vector
+  well above type, which barely clears the 0.56 baseline), not a statistically separated
+  gap. VIF on the continuous vector is low (1.1–3.0) → not one collinear feature re-badged
+  (and the vector has no SVF/solar term). LOSO already holds each test site fully out, so
+  the point estimates are honest transfer; the CI is the right thing to also quote.
 - **Blind risk map stands** (`typology_blind_riskmap.png`): the model never saw
   borel / jacarezinho / morro_do_juramento; morphology-only mean p̂ = 52 / 63 / 55 %.
   Frame as **survey/simulation prioritisation**, not household-level risk — the

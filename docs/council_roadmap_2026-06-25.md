@@ -18,10 +18,11 @@ continued autonomous work. Engineering contract below is **non-negotiable**.
 
 ## Prioritized roadmap (rank = scientific_value × local-feasibility)
 
-1. **[deepen/M] Spatial-CV hardening of the predictor FLIP** — variogram-blocked
-   LOSO + block-bootstrap CIs, fused with a SHAP/VIF parsimony audit (answers "is it
-   just SVF re-badged"). Unanimous #1; the FLIP can't headline until spatially blocked.
-   The honest risk (gap shrinks toward 0.7) is the correct result to report.
+1. **[deepen/M] Spatial-CV hardening of the predictor FLIP** — ✅ DONE (commit fc50a72).
+   Site-block-bootstrap 95% CI: type 0.55 [0.48,0.77], vector 0.86 [0.76,0.93] —
+   **CI-overlapping**, so the flip is a direction not a separated gap (5 sites → wide
+   bands). VIF low (1.1–3.0). `spatial_cv.json` + CI error bars on fig_parsimony. The
+   council's predicted "gap may shrink toward 0.7" is borne out.
 2. **[deepen/S] Calibrate the blind risk map** on the 3 held-out favelas
    (borel/jacarezinho/juramento carry the solar target) → reliability curves + Brier
    + out-of-envelope flags. First confirm true hold-out (no leakage into λf lock tuning).
