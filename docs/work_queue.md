@@ -35,11 +35,31 @@ ABI intact); **TR §4.2/§4.5/§5.5/§6.6 rewritten + PDF rebuilt (30.5 MB) + 5 
 refreshed** (typology table 1.04/0.68/0.87; λf>2.75 dropped → Oke/GO regime). Whole stack
 consistent + green (648 passed).
 
+## 🟢 Round 4/5 — regime-stratified re-export ✅ COMPLETE (2026-06-25)
+
+Handoff `morphofavela_handoff_2026-06-25_round4.md` + round-5 extension in the
+sync. Results-back: `docs/brisa_round4_results_2026-06-25.md`. Both PI decisions
+adopted (dissolved λf canonical; taxonomy ventilation axis = skimming regime).
+- ✅ **① Regime taxonomy keystone** (`scripts/brisa_ventilation/09_regime_taxonomy.py`,
+  `1e5b67c`): dissolved λf>0.65 primary + H/W>0.65 cross-check, **56,631** canonical
+  denominator, methods morphometric row. **The typology inversion REVERSED** —
+  hillside 42.2% > flatland 37.3% compound (was flatland 21.6% > hillside 14.8%);
+  H/W cross-check agrees (48.1% > 39.5%). Pooled compound **39.6%**.
+- ✅ **③ fig04** re-rendered on regime axis (`f999b0b`); clustering re-run on regime
+  mask (Moran's I 0.47–0.70, holds stronger).
+- ✅ **④ lambda_f_regime.png** → two-panel maps + share strip (`4ec9898`).
+- ✅ **⑤ morphotope_maps_repartition.png** combined k=3 asset (`504c062`).
+- ✅ **⑥** SVF-"6×" verified: pooled RF SVF=0.283 = ~4.8× next feature (southness),
+  ~6.7× slope; "6×" only vs slope; sync's 1.8× was per-fold. Brisaverse-side fix.
+- ✅ **⑦** TR morphotope figure title M0–M4→M0–M2 + PDF rebuilt (`1cdb3ac`);
+  TR already dissolved-consistent (§4.5 regime, §5.5 k=3, λf table). Numerical audit run.
+
 ## 🟡 Track B — figure-regen rounds 2/3 (STARTED 2026-06-25)
 
 Handoffs: `docs/brisa_figures_handoff_round{2,3}_2026-06-24.md`. ✅ Round-3 §0
 **text-overflow HARD GATE** landed (`fig_style.check_text_overflow` + `save_fig(gate=True)`,
-tested, commit 0158731) — every rework calls it before export. **Remaining (my-call, run
+tested, commit 0158731) — every rework calls it before export. fig04 + lambda_f_regime
+already re-rendered under round 4/5 above (regime-nominal + gate). **Remaining (my-call, run
 via subagents, review each PNG):** fig04 (round-3 regime-based **nominal** taxonomy, NOT
 the 4-state heat ramp; hatch-provisional; anti-misuse banner; F/G/H 3-col reflow; Okabe-Ito
 luminance-ordered), fig03 (regime panel C from `lambda_f_regime`; DELIVERED/PROVISIONAL
