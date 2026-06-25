@@ -309,6 +309,56 @@ def fig_terrain_sensitivity(leaf):
     _save(fig, "terrain_sensitivity.png")
 
 
+TYPE_SITE_ORDER = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "maré"]
+SITE_CLEAN = {
+    "vidigal": "Vidigal", "rocinha": "Rocinha", "complexo_do_alemao": "C. do Alemão",
+    "riodaspedras": "R. das Pedras", "maré": "Maré",
+}
+
+
+def fig_type_site_fingerprint(shares, leaf):
+    """Morphotype × site composition fingerprint, commonality-forward (for P4/E2).
+
+    Unlike ``recurrence.png`` (which boxes the site-specific exception in red),
+    this foregrounds the SHARED fabric: every type's share in each favela, plus a
+    per-type count of how many favelas carry it (≥ 5%). The point is that the
+    five favelas draw on one recurrent, classifiable type set."""
+    types = [c for c in leaf if c in shares.columns]
+    M = shares.reindex(index=TYPE_SITE_ORDER, columns=types).to_numpy().T  # types × sites
+    n_present = (M >= 0.05).sum(axis=1)
+    vmax = float(np.nanmax(M))
+    n_sites = len(TYPE_SITE_ORDER)
+
+    fig, ax = plt.subplots(figsize=(6.4, 3.8))
+    im = ax.imshow(M, cmap="YlGnBu", vmin=0, vmax=vmax, aspect="auto")
+    ax.set_xticks(range(n_sites))
+    ax.set_xticklabels([SITE_CLEAN[s] for s in TYPE_SITE_ORDER], rotation=20, ha="right", fontsize=8)
+    ax.set_yticks(range(len(types)))
+    ax.set_yticklabels([TYPE_NAMES[c] for c in types], fontsize=8)
+    for lbl, c in zip(ax.get_yticklabels(), types):
+        lbl.set_color(TYPE_COLORS[c])
+        lbl.set_fontweight("bold")
+    for (i, j), v in np.ndenumerate(M):
+        if not np.isnan(v):
+            ax.text(j, i, f"{v * 100:.0f}%", ha="center", va="center", fontsize=7,
+                    color="white" if v > 0.5 * vmax else "#222222")
+    # Right-margin recurrence count per type (# favelas carrying the type ≥5%).
+    ax.text(n_sites - 0.3, -0.62, "in", ha="left", va="center", fontsize=6.5, color="#333333")
+    for i in range(len(types)):
+        recur = n_present[i] >= n_sites - 1  # present in ≥4 of 5
+        ax.text(n_sites - 0.3, i, f"{n_present[i]}/{n_sites}", ha="left", va="center",
+                fontsize=7.5, color="#1A7F37" if recur else "#999999", fontweight="bold")
+    ax.set_xlim(-0.5, n_sites - 0.5 + 1.1)
+    n_ge4 = int((n_present >= n_sites - 1).sum())
+    ax.set_title(
+        f"Morphotype × site fingerprint — a recurrent type set\n({n_ge4}/{len(types)} types "
+        f"in ≥4 favelas; T0 & T5 universal, T2/T3 terrain-conditional)",
+        fontsize=8.5, pad=6,
+    )
+    fig.colorbar(im, ax=ax, label="share of favela's cells", shrink=0.8, pad=0.12)
+    _save(fig, "type_site_fingerprint.png")
+
+
 # Themed groups → each becomes an anchored gallery section with sidebar nav.
 GALLERY_GROUPS = [
     ("Signature", "signature", [
@@ -331,6 +381,10 @@ GALLERY_GROUPS = [
         ("recurrence.png", "Cross-site recurrence",
          "Single-hue Blues; the site-specific type (T3, flatland) boxed red — the "
          "validation as a figure."),
+        ("type_site_fingerprint.png", "Morphotype × site fingerprint (P4/E2)",
+         "Commonality-forward composition heatmap with full type names + a per-type "
+         "count of how many favelas carry it (≥5%): the five favelas draw on one "
+         "recurrent, classifiable type set — evidence for the informal-typology claim."),
         ("recurrence_evidence.png", "Recurrence evidence",
          "Per-site type centroids overlaid: same profile shape across sites = "
          "recurrence shown, not asserted."),
@@ -537,6 +591,7 @@ def main():
     fig_fingerprint_heatmap(cent, leaf)
     fig_dendrogram(link, leaf, cut)
     fig_recurrence(shares, flags, leaf)
+    fig_type_site_fingerprint(shares, leaf)
     fig_recurrence_evidence(mat, labels, leaf)
     fig_experience(profile, leaf)
     fig_maps()
