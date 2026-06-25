@@ -237,12 +237,18 @@ def _prism_heights(buildings: gpd.GeoDataFrame) -> list[float]:
 
 def panel_c_excerpts(subfig) -> None:
     """Render the 3-D massing excerpts in a 2x2 grid of mplot3d axes."""
-    max_alt = 0.0
+    # Shared ramp across panels (cross-site comparable), but capped at the pooled
+    # p98 height: a handful of outlier towers (Rocinha tops 129 m vs a ~9 m median)
+    # would otherwise crush the typical 5–15 m fabric into the dark end. Buildings
+    # above the cap saturate at the top colour (colorbar extend="max").
+    heights = []
     for site, patch_id, sampling in PANEL_C_EXCERPTS:
         b = gpd.read_file(_patch_source_dir(site, patch_id, sampling) / "buildings.gpkg")
         if len(b):
-            max_alt = max(max_alt, float(b["altura"].max()))
-    height_norm = Normalize(vmin=0.0, vmax=max_alt)
+            heights.append(b["altura"].to_numpy())
+    pooled = np.concatenate(heights) if heights else np.array([1.0])
+    vmax = float(np.ceil(np.percentile(pooled, 98)))
+    height_norm = Normalize(vmin=0.0, vmax=vmax)
 
     gs = subfig.add_gridspec(2, 2, hspace=0.05, wspace=0.05, bottom=0.12)
     for i, (site, patch_id, sampling) in enumerate(PANEL_C_EXCERPTS):
@@ -251,7 +257,7 @@ def panel_c_excerpts(subfig) -> None:
 
     sm = plt.cm.ScalarMappable(norm=height_norm, cmap=BUILDING_CMAP)
     cax = subfig.add_axes((0.30, 0.07, 0.40, 0.018))
-    cbar = subfig.colorbar(sm, cax=cax, orientation="horizontal")
+    cbar = subfig.colorbar(sm, cax=cax, orientation="horizontal", extend="max")
     cbar.set_label("buildings: height above ground (m)", fontsize=4, labelpad=1.5)
     cbar.ax.tick_params(labelsize=4, pad=1)
     subfig.text(
