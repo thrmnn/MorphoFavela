@@ -19,6 +19,21 @@ hard to find. Updated every working session.
 - [TR coherence audit (punch list)](/outputs/_hub/docs/tr_audit.html)
   — the weaknesses being bulletproofed.
 
+## 🟢 λf dissolve re-baseline — Track A (2026-06-25, full autonomy)
+
+Operating charter: `docs/autonomous_execution_plan.md`. User chose **full switch to
+dissolved λf + full morphotype re-baseline + data-driven k**. DONE+committed: core
+`dissolve=` option (tested); all 5 grids migrated (over-count 1.45–2.10×); regime
+classifier (65% skimming/30% wake on dissolved); **k=6 cell morphotypes re-fit**
+(LOSO ARI 0.763, CH peaks k=6) + **re-named** (T4 Hillside Core universal; T1/T5
+flatland-conditional); **k=3 morphotopes** (data-driven, was 5; bootstrap ARI 0.916)
+= Compact Hillside / Mixed Dense / Saturated Flatland Tissue; roughness z0/zd regen on
+dissolved (RC-1 invalidity 53–75% HOLDS); predictor regen (svf-driven, robust). **statsmodels
+0.14.6 installed** (pinned, ABI intact). **In flight:** TR §5.5/§6.6 rewrite (dissolved-λf
+names + regime reframe) + PDF rebuild. **Next tracks:** B figure-regen rounds 2/3
+(firewall-in-pixels, nominal 2×2, text-overflow gate), D regime→fig03, E lateral-connectivity
+scalar, F data-quality sweeps. Blocked-isolated: ray-caster (Radiance/SOLWEIG), CFD-τ, Mingze.
+
 ## 🔄 Autonomous loop (Workflow-driven, 2026-06-19)
 
 Persistent mechanism = the **Workflow** tool (parallel agents, background, notifies on
