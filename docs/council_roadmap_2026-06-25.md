@@ -37,10 +37,14 @@ continued autonomous work. Engineering contract below is **non-negotiable**.
    only, never channelling). Verify sector-binning convention matches first.
 5. **[deepen/M] Track C re-scoped** (see below) — σH arm dropped; λf-tilt arm gated.
 6. **[deepen/S] Lateral-connectivity → 2D ventilation-susceptibility regime map** —
-   cross-tab open_edge_dist × Oke/GO regime (skimming×deep vs isolated×shallow). Strictly
-   geometric susceptibility, not air-exchange.
+   ✅ DONE (commit 782507b). Bivariate regime × depth, worst = skimming×deep; pooled
+   41.8% doubly constrained (RdP 60%). `ventilation_susceptibility.png`.
 7. **[explore/S] MAUP sensitivity** — σH/λf + regime shares at 10 m vs 20 m (both grids
-   on disk). Confirmatory rigor a methods reviewer will demand.
+   on disk). Confirmatory rigor a methods reviewer will demand. ⏳ remaining.
+
+## Status (2026-06-25): #1 #2 #4 #5(C) #6 DONE · remaining #3 (morphotype re-fit, M) · #7 (MAUP, S)
+#3 is the next substantial unit — it touches the canonical morphotype fit, so it needs
+the additive-column + A/B + LOSO-ARI contract; best as a focused effort.
 
 ## Track C — ✅ RESOLVED as a scoping null (2026-06-25, commit 9923a1c)
 
