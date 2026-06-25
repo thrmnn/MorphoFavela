@@ -197,7 +197,15 @@ This is more defensible than the over-claimed parsimony story it replaces.
 - **Track B figure reworks — ✅ DONE** (this session): fig03 regime axis +
   DELIVERED/PROVISIONAL asymmetry; fig05 AUC honesty box + sun-adequacy-floor target;
   fig01 Panel C terrain-hillshade / building-height-ramp split. All gate-checked.
-- **Tracks E/F**: lateral-connectivity scalar; data-quality sweeps (one latent bug
-  already fixed — `print3d` extrude hardcoded a missing `triangle` backend).
+- **Track E — ✅ DONE**: lateral-connectivity scalar (`scripts/run_lateral_connectivity.py`,
+  `lateral_connectivity.{json,png}`). Per built cell, the distance-transform depth into
+  contiguous fabric = the pre-CFD LATERAL ventilation-tendency signal, companion to λf's
+  VERTICAL regime. Pooled median 32 m; **flatland is doubly constrained** — RdP (med 42 m)
+  and Maré (140 m+ deep cores) sit far from any opening *and* dominate the λf skimming
+  regime, while the perforated hillside fabric (Vidigal 22 m) is laterally shallow. Both
+  signals are geometry-only tendencies; neither delivers adequacy (τ CFD-gated).
+- **Track F** (ongoing data-quality sweeps): fixed the `print3d` extrude latent break
+  (hardcoded missing `triangle` backend → engine-agnostic + force_2d) and the
+  `party_wall_ratio` schema drift.
 - Blocked-isolated (skip, don't stall): ray-caster vs Radiance/SOLWEIG, CFD-τ,
   Mingze WeTransfer upload.
