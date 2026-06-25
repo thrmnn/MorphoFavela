@@ -19,20 +19,35 @@ hard to find. Updated every working session.
 - [TR coherence audit (punch list)](/outputs/_hub/docs/tr_audit.html)
   — the weaknesses being bulletproofed.
 
-## 🟢 λf dissolve re-baseline — Track A (2026-06-25, full autonomy)
+## 🟢 λf dissolve re-baseline — Track A ✅ COMPLETE (2026-06-25, full autonomy)
 
 Operating charter: `docs/autonomous_execution_plan.md`. User chose **full switch to
-dissolved λf + full morphotype re-baseline + data-driven k**. DONE+committed: core
-`dissolve=` option (tested); all 5 grids migrated (over-count 1.45–2.10×); regime
-classifier (65% skimming/30% wake on dissolved); **k=6 cell morphotypes re-fit**
-(LOSO ARI 0.763, CH peaks k=6) + **re-named** (T4 Hillside Core universal; T1/T5
-flatland-conditional); **k=3 morphotopes** (data-driven, was 5; bootstrap ARI 0.916)
-= Compact Hillside / Mixed Dense / Saturated Flatland Tissue; roughness z0/zd regen on
-dissolved (RC-1 invalidity 53–75% HOLDS); predictor regen (svf-driven, robust). **statsmodels
-0.14.6 installed** (pinned, ABI intact). **In flight:** TR §5.5/§6.6 rewrite (dissolved-λf
-names + regime reframe) + PDF rebuild. **Next tracks:** B figure-regen rounds 2/3
-(firewall-in-pixels, nominal 2×2, text-overflow gate), D regime→fig03, E lateral-connectivity
-scalar, F data-quality sweeps. Blocked-isolated: ray-caster (Radiance/SOLWEIG), CFD-τ, Mingze.
+dissolved λf + full morphotype re-baseline + data-driven k**. **ALL DONE + committed
+(4a6ed1c→97b69ac):** core `dissolve=` option (tested); 5 grids migrated (over-count
+1.45–2.10×, `lambda_f_mean_summed` preserved); regime classifier (65% skimming/30% wake);
+**k=6 cell morphotypes re-fit** (LOSO ARI 0.763, CH peaks k=6) + **re-named** (T0 Open
+Fringe, T1 Flatland Consolidated, T2 Hillside Fringe, T3 Shaded Consolidated, T4 Hillside
+Core [universal 5/5], T5 Saturated Core [T1/T5 flatland-conditional]); **k=3 morphotopes**
+(data-driven, was 5; bootstrap ARI 0.916) = Compact Hillside / Mixed Dense / Saturated
+Flatland Tissue; roughness z0/zd regen on dissolved (RC-1 invalidity 53–75% HOLDS);
+predictor regen (svf-driven, robust, β−2.03); **statsmodels 0.14.6 installed** (pinned,
+ABI intact); **TR §4.2/§4.5/§5.5/§6.6 rewritten + PDF rebuilt (30.5 MB) + 5 figures
+refreshed** (typology table 1.04/0.68/0.87; λf>2.75 dropped → Oke/GO regime). Whole stack
+consistent + green (648 passed).
+
+## 🟡 Track B — figure-regen rounds 2/3 (STARTED 2026-06-25)
+
+Handoffs: `docs/brisa_figures_handoff_round{2,3}_2026-06-24.md`. ✅ Round-3 §0
+**text-overflow HARD GATE** landed (`fig_style.check_text_overflow` + `save_fig(gate=True)`,
+tested, commit 0158731) — every rework calls it before export. **Remaining (my-call, run
+via subagents, review each PNG):** fig04 (round-3 regime-based **nominal** taxonomy, NOT
+the 4-state heat ramp; hatch-provisional; anti-misuse banner; F/G/H 3-col reflow; Okabe-Ito
+luminance-ordered), fig03 (regime panel C from `lambda_f_regime`; DELIVERED/PROVISIONAL
+asymmetry; λf maps→regime maps), fig01 (2×2 nominal taxonomy matrix; 3-D terrain-hillshade
+vs building-height-ramp separation), fig05 (AUC honesty box full-sample 0.76–0.84 + CC
+0.87–0.93; separable PD; "P(below adequacy floor)"). Then Tracks **D** regime→fig03, **E**
+lateral-connectivity scalar, **F** data-quality sweeps. Blocked-isolated: ray-caster
+(Radiance/SOLWEIG), CFD-τ, Mingze upload.
 
 ## 🔄 Autonomous loop (Workflow-driven, 2026-06-19)
 
