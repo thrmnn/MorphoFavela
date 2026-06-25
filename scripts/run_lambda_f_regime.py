@@ -72,9 +72,10 @@ def make_figure(per_site: dict[str, np.ndarray], pooled_skim: float) -> None:
     ax.axvspan(SKIMMING_MIN, xmax, color="#CBDCE3", zorder=0)
     ax.axvline(ISOLATED_MAX, color="#999999", lw=0.6, ls=":")
     ax.axvline(SKIMMING_MIN, color="#2A6F8E", lw=1.0, ls="--")
+    label_y = len(SITES) - 0.25
     for x, lab in [(0.075, "isolated"), (0.40, "wake"), (xmax * 0.7, "skimming flow")]:
-        ax.text(x, len(SITES) - 0.35, lab, ha="center", va="bottom", fontsize=6.5,
-                color="#2A6F8E" if lab.startswith("skim") else "#666666")
+        ax.text(x, label_y, lab, ha="center", va="bottom", fontsize=6.5,
+                color="#2A6F8E" if lab.startswith("skim") else "#888888")
 
     positions = np.arange(len(SITES))[::-1]
     data = [np.clip(per_site[s][np.isfinite(per_site[s])], 0, xmax) for s in SITES]
@@ -96,6 +97,7 @@ def make_figure(per_site: dict[str, np.ndarray], pooled_skim: float) -> None:
 
     ax.set_yticks(positions)
     ax.set_yticklabels([SITE_LABELS[s] for s in SITES], fontsize=8)
+    ax.set_ylim(-0.7, len(SITES) - 0.1)
     ax.set_xlim(0, xmax)
     ax.set_xlabel(r"dissolved frontal-area density $\lambda_f$ (cell, 5–95% box)", fontsize=8)
     ax.set_title(
