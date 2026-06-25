@@ -40,6 +40,13 @@ continued autonomous work. Engineering contract below is **non-negotiable**.
 7. **[explore/S] MAUP sensitivity** — σH/λf + regime shares at 10 m vs 20 m (both grids
    on disk). Confirmatory rigor a methods reviewer will demand.
 
+## Track C — ✅ RESOLVED as a scoping null (2026-06-25, commit 9923a1c)
+
+Steps 0–2 done: σH arm disproven (corr(slope,σH)=−0.12, already terrain-following);
+doc corrected; λf terrain-step gate CLEARED (upper-bound median below 25° = 2.2% < 5%)
+→ no Step 3, canonical λf untouched. Evidence `outputs/comparative/roughness/
+slope_confound.json`. Full original plan retained below for the record.
+
 ## Track C — RE-SCOPED (chair sided with the ML dissent)
 
 **Premise partly false (empirically confirmed):** grid σH is built on `altura`
