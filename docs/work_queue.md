@@ -67,10 +67,16 @@ heights=MIT/SondoTecnica, cadaster=IPP — pipeline open, data NOT redistributab
   gap is the SVF contribution on street-adjacent cells. Full prevalence 46% vs CC 56%
   confirms the coverage bias. `scripts/run_fullsample_loso.py` + test →
   `outputs/paper_figures/fullsample_loso.json`.
-- **Remaining tasks:** **λf 0–1.5 recompute = USER DECISION** (change-of-support: cell
-  vs patch λf, would shift fig03/fig04 thresholds); ray-caster vs Radiance/SOLWEIG x-val
-  (needs external tools — check availability, likely blocked); morphotype×site
-  fingerprint heatmap for P4/E2 (`recurrence_evidence.png` may already cover it — verify).
+- ✅ **λf neighbourhood supplement DONE (2026-06-24, commit 8cef644 — user chose
+  non-destructive supplement).** `scripts/run_lambda_f_neighbourhood.py` aggregates cell
+  λf to a 100 m window (Σfrontal/Σplan = proper Grimmond–Oke λf). Finding: neighbourhood
+  λf still ~1–3 (pooled median **1.65**); **~96% of fabric past the 0.35 skimming onset**,
+  densest Rio das Pedras 2.6 / Rocinha 2.2 → favela fabric uniformly skimming-flow,
+  exceeds textbook 0–1.5 even at neighbourhood scale (stronger E2). cell-scale fig03/fig04
+  UNCHANGED. → `lambda_f_neighbourhood.json` + `exports/lambda_f_neighbourhood.png` + test.
+- **Remaining:** ⛔ ray-caster vs Radiance/SOLWEIG x-val — BLOCKED (neither installed
+  locally; needs user). Optional: morphotype×site fingerprint heatmap (largely covered by
+  `recurrence_evidence.png` / `composition_by_site.png` / `fingerprint_heatmap.png`).
 
 ## ⚙️ Env (2026-06-24): work on IVF; consolidated env deferred
 
