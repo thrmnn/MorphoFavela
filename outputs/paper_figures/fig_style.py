@@ -162,8 +162,47 @@ def apply_style() -> None:
 # ═══════════════════════════════════════════════════════════════
 
 
-def save_fig(fig: plt.Figure, name: str, dpi: int = DPI) -> None:
-    """Save figure as both SVG and PNG to exports/."""
+def check_text_overflow(fig: plt.Figure, tol_px: float = 1.0) -> list[tuple[str, float]]:
+    """Round-3 §0 text-fits-in-box gate: every text artist's rendered bbox must lie
+    inside the figure canvas (the recurring overflow defect — titles/labels/banners
+    crossing the figure edge). Returns a list of ``(text, worst_overflow_px)`` for
+    every text that extends beyond the canvas by more than ``tol_px``; empty = clean.
+
+    Figure-level (not per-axes) because ``bbox_inches='tight'`` later expands the
+    canvas to whatever is drawn — so an off-figure label is the catchable signal.
+    Call before ``save_fig`` and assert the result is empty to fail the export.
+    """
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    w, h = fig.canvas.get_width_height()
+    violations: list[tuple[str, float]] = []
+    for ax in [fig, *fig.axes]:
+        texts = list(getattr(ax, "texts", []))
+        for art in fig.axes:
+            for sub in (art.title, art.xaxis.label, art.yaxis.label):
+                if sub is not None and sub.get_text():
+                    texts.append(sub)
+        for t in texts:
+            if not t.get_visible() or not t.get_text().strip():
+                continue
+            try:
+                bb = t.get_window_extent(renderer)
+            except (RuntimeError, ValueError):
+                continue
+            over = max(0.0, -bb.x0, -bb.y0, bb.x1 - w, bb.y1 - h)
+            if over > tol_px:
+                violations.append((t.get_text()[:40], round(over, 1)))
+    # de-duplicate (titles/labels are reachable twice via the loop above)
+    return sorted(set(violations), key=lambda v: -v[1])
+
+
+def save_fig(fig: plt.Figure, name: str, dpi: int = DPI, gate: bool = False) -> None:
+    """Save figure as both SVG and PNG to exports/. With ``gate=True``, run the
+    text-overflow assertion (round-3 §0) and raise if any glyph crosses the canvas."""
+    if gate:
+        bad = check_text_overflow(fig)
+        if bad:
+            raise ValueError(f"text-overflow gate failed for {name!r}: {bad}")
     svg_path = EXPORTS_DIR / f"{name}.svg"
     png_path = EXPORTS_DIR / f"{name}.png"
     kw = dict(bbox_inches="tight", pad_inches=0.02, facecolor="white")
