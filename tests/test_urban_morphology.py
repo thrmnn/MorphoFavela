@@ -223,6 +223,30 @@ class TestComputeFrontalAreaRatio:
         r90 = compute_frontal_area_ratio(four_buildings, single_zone, wind_dir=90.0)
         assert math.isclose(r0.loc[0, "lambda_f"], r90.loc[0, "lambda_f"], rel_tol=1e-6)
 
+    def test_dissolve_removes_party_wall_overcount(self) -> None:
+        """dissolve=True unions party-walled footprints before projecting, so a
+        block split by an internal wall is not double-counted.
+
+        Setup: a 10 m × 10 m cell fully covered either by one block (height 10)
+        or by two touching 10 m × 5 m parcels split at y=5. Summed counts both
+        halves' full 10 m cross-wind width for N wind (λf=2.0); dissolved sees
+        the single 10 m silhouette (λf=1.0).
+        """
+        from shapely.geometry import box
+
+        zones = gpd.GeoDataFrame(
+            {"zone_id": [0], "geometry": [box(0, 0, 10, 10)], "zone_area": [100.0]},
+            crs="EPSG:31983",
+        )
+        split = gpd.GeoDataFrame(
+            {"height": [10.0, 10.0], "geometry": [box(0, 0, 10, 5), box(0, 5, 10, 10)]},
+            crs="EPSG:31983",
+        )
+        summed = compute_frontal_area_ratio(split, zones, wind_dir=0.0, dissolve=False)
+        dissolved = compute_frontal_area_ratio(split, zones, wind_dir=0.0, dissolve=True)
+        assert math.isclose(summed.loc[0, "lambda_f"], 2.0, rel_tol=1e-6)
+        assert math.isclose(dissolved.loc[0, "lambda_f"], 1.0, rel_tol=1e-6)
+
     def test_clipping_caps_lambda_f_below_unclipped(self) -> None:
         """Regression: clipped λf must be ≤ unclipped λf, cell by cell.
 

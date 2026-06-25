@@ -15,6 +15,7 @@ from typing import Optional
 import geopandas as gpd
 import numpy as np
 from shapely.geometry import LineString, MultiPolygon, Polygon, box
+from shapely.ops import unary_union
 
 logger = logging.getLogger(__name__)
 
@@ -264,11 +265,43 @@ def _projected_width(
     return float(projections.max() - projections.min())
 
 
+def _dissolved_frontal(group, zone_geom, zone_area, wind_dir_rad, clip_to_zone) -> float:
+    """Frontal area on the DISSOLVED footprints: touching parcels are unioned
+    into physical blocks (internal party walls drop out), each block contributes
+    its silhouette width × an area-weighted representative height, and distinct
+    blocks are summed. Removes the party-wall over-count in fused fabric without
+    erasing genuinely separate roughness elements."""
+    clipped, heights = [], []
+    for _, row in group.iterrows():
+        geom = row.geometry.intersection(zone_geom) if clip_to_zone else row.geometry
+        if geom.is_empty or geom.area <= 0:
+            continue
+        clipped.append(geom)
+        heights.append(float(row["height"]))
+    if not clipped:
+        return 0.0
+    merged = unary_union(clipped)
+    blocks = list(merged.geoms) if merged.geom_type.startswith("Multi") else [merged]
+    clipped_arr = np.array(clipped, dtype=object)
+    h_arr = np.array(heights)
+    areas = np.array([c.area for c in clipped])
+    total = 0.0
+    for block in blocks:
+        sel = np.array([c.intersects(block) for c in clipped_arr])
+        if not sel.any():
+            continue
+        w = areas[sel]
+        h_rep = float(np.average(h_arr[sel], weights=w)) if w.sum() > 0 else float(h_arr[sel].mean())
+        total += _projected_width(block, wind_dir_rad) * h_rep
+    return total / zone_area if zone_area > 0 else 0.0
+
+
 def compute_frontal_area_ratio(
     buildings: gpd.GeoDataFrame,
     zones: gpd.GeoDataFrame,
     wind_dir: float = 0.0,
     clip_to_zone: bool = True,
+    dissolve: bool = False,
 ) -> gpd.GeoDataFrame:
     """Projected frontal area density per zone.
 
@@ -283,6 +316,12 @@ def compute_frontal_area_ratio(
         from contributing their full projected width to every cell they touch
         — the bug that drove grid lambda_f to 0–54 instead of 0–1.5 and made
         it a building-count proxy.
+    dissolve : bool, default False
+        If True, union touching (party-walled) footprints into physical blocks
+        before projecting, so internal shared walls are not counted as frontal
+        area — the aerodynamically correct λf for fused favela fabric. The
+        default-False summed form over-counts ~1.7× in such fabric; ``True`` is
+        the canonical choice for absolute-λf use (roughness z0/zd, flow regime).
 
     lambda_f = sum(projected_width * height) / zone_area, with projected_width
     measured on the cell-clipped footprint when ``clip_to_zone=True``.
@@ -302,6 +341,11 @@ def compute_frontal_area_ratio(
     for zone_id, group in joined.groupby("zone_id"):
         zone_geom = zones.loc[zones["zone_id"] == zone_id, "geometry"].iloc[0]
         zone_area = zones.loc[zones["zone_id"] == zone_id, "zone_area"].iloc[0]
+        if dissolve:
+            lf_values[zone_id] = _dissolved_frontal(
+                group, zone_geom, zone_area, wind_dir_rad, clip_to_zone
+            )
+            continue
         total_frontal = 0.0
         for _, row in group.iterrows():
             geom = row.geometry
