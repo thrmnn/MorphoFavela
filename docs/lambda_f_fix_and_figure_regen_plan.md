@@ -95,6 +95,32 @@ Per figure:
   0.87–0.93, prevalence 46% vs 56%) + separable PD lines + "P(below adequacy
   floor)" + shrink the pending-CFD stub.
 
+## 4b. Morphotype-cascade stability (measured 2026-06-24) — DECISION NEEDED
+
+The "full switch" ripples into the morphotype GMM (`lambda_f_mean` + `lambda_f_aniso`
+are 2 of the 6 signature features). Non-destructive check (re-fit k=6 on the
+SAME 64,355 built cells, summed vs dissolved λf): **ARI = 0.226**, only 58% of
+cells keep their majority type. The dissolve is NOT a benign monotone rescale at
+the clustering level — it **re-defines the published types** (the track's own
+stability bar is bootstrap ARI 0.90). Cascading would churn type names,
+recurrence, the typology predictor, TR §5.5, and the brisa P4/E2 figures.
+
+State is currently SAFE: `grid_metrics` carries dissolved λf (+ summed preserved),
+but `features_grid.parquet` is NOT regenerated, so morphotypes / roughness /
+predictor still run on summed λf — nothing downstream has shifted yet.
+
+**Fork (⟶DECIDE):**
+- **A — Scoped switch (recommended):** dissolved λf canonical for absolute-physics
+  consumers (roughness z0/zd, regime classification — done); morphotype signature
+  stays on summed λf (point the signature at `lambda_f_mean_summed`). Published
+  typology/predictor/TR §5.5/figures unchanged. Rationale: morphotypes are a
+  *relative* clustering; the over-count is the issue for *absolute* λf, which is
+  exactly where the fix is applied.
+- **B — Full re-baseline:** regenerate `features_grid` on dissolved λf, re-fit the
+  morphotypes (new typology, ARI 0.23 vs current), re-name, re-validate, cascade
+  through recurrence + predictor + TR §5.5 + brisa figures. The "most-correct
+  feature" position, but a large invalidation of published work.
+
 ## 5. Still blocked / PI-level
 - ⛔ Ray-caster vs Radiance/SOLWEIG — not installed locally.
 - ⟶DECIDE (round-2): full lexical rename of taxonomy states to "Below … floor
