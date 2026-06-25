@@ -62,9 +62,16 @@ on review: the first cut mis-titled this "the σH premium" before the data was r
 — diverging map centred at zd/H_mean = 1 (RdBu, TwoSlopeNorm): red where displacement
 exceeds mean height, the spatial face of the 70–93% finding. (ii) `roughness_slope.png`
 — median z0 binned by terrain slope (≥30 cells/bin, capped at 35° where data thins).
-z0 *rises* on steep slopes, but this is reframed honestly as a **confound, not a
-clean finding**: the flat-datum λf/σH absorbs the hillside, and no morphometric
-method separates terrain from fabric. Matches the plan's Risk-1 / open-axis note.
+z0 *rises* on steep slopes, but this is a **confound, not a clean finding**.
+**Correction (2026-06-25, Track C Step 0):** the earlier claim that a *flat-datum*
+σH/λf "absorbs the hillside" is **wrong** — grid σH and λf are built on `altura`
+(height above each building's own base; `grid.py` sets `height = altura`) and are
+already terrain-following. Empirically corr(slope, σH) is small and **negative** on
+the steep sites (pooled −0.12; corr(slope, λf) −0.10 — see
+`outputs/comparative/roughness/slope_confound.json`), the wrong sign for a
+datum-inflation mechanism. The z0–slope pattern is a fabric/method co-variation, not
+a morphometric datum artefact; the only residual geometric candidate is λf's 2-D
+plan-view face projection on slopes, whose magnitude is gated in Track C Step 2.
 
 ## Expert council review (2026-06-19) — the correctness reckoning
 
