@@ -74,9 +74,18 @@ heights=MIT/SondoTecnica, cadaster=IPP — pipeline open, data NOT redistributab
   densest Rio das Pedras 2.6 / Rocinha 2.2 → favela fabric uniformly skimming-flow,
   exceeds textbook 0–1.5 even at neighbourhood scale (stronger E2). cell-scale fig03/fig04
   UNCHANGED. → `lambda_f_neighbourhood.json` + `exports/lambda_f_neighbourhood.png` + test.
-- **Remaining:** ⛔ ray-caster vs Radiance/SOLWEIG x-val — BLOCKED (neither installed
-  locally; needs user). Optional: morphotype×site fingerprint heatmap (largely covered by
-  `recurrence_evidence.png` / `composition_by_site.png` / `fingerprint_heatmap.png`).
+- ✅ **Task 8 morphotype×site fingerprint DONE (commit a228e76):**
+  `figures_v2/type_site_fingerprint.png` — commonality-forward composition heatmap (full
+  type names + per-type "in N/5 favelas" recurrence count). T0 & T5 universal, T1/T4 in
+  4/5, T2/T3 terrain-conditional → shared recurrent type set for P4/E2.
+- ⛔ **Task 7 ray-caster x-val — BLOCKED** (no Radiance/SOLWEIG locally; needs user).
+- ⚠️ **λf AUDIT (commit a184b4d, user-requested):** directional averaging CORRECT (N≡S/E≡W
+  exact); stored grid λf reproducible (99.8% match clipped recompute; ~12 stale phantom
+  cells). BUT `compute_frontal_area_ratio` **sums cadastral footprints → counts party
+  walls** → ~**2.5× over-count** in fused fabric (summed cell median ≈1.6 vs dissolved
+  ≈0.65). Aerodynamic λf is ~2–2.5× lower but still >0.35 skimming (E2 holds, magnitude
+  inflated). **USER DECISION:** pipeline-wide dissolve fix touches fig03/fig04/predictor/
+  roughness — deferred. **Brisa handoff: tasks 1–6 + 8 DONE; only 7 blocked.**
 
 ## ⚙️ Env (2026-06-24): work on IVF; consolidated env deferred
 
