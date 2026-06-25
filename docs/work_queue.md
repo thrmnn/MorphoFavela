@@ -58,11 +58,19 @@ heights=MIT/SondoTecnica, cadaster=IPP — pipeline open, data NOT redistributab
   (figure-tracks convention); brisaverse promotes `exports/fig01_composite.png`. Also
   reconciled the C. do Alemão **mixed-vs-hillside** label (fig04 now reads canonical
   `SITE_TYPES`).
-- **Remaining tasks:** full-sample imputed LOSO (bound the 0.90-AUC caveat) ← next;
-  **λf 0–1.5 recompute = USER DECISION** (change-of-support: cell vs patch λf, would
-  shift fig03/fig04 thresholds — flagged 2026-06-24); ray-caster vs Radiance/SOLWEIG
-  x-val (likely needs external tools, may be blocked); morphotype×site fingerprint
-  heatmap for P4/E2 (a cell×character `fingerprint_heatmap.png` already exists).
+- ✅ **Full-sample LOSO DONE (2026-06-24, commit 80cde80) — handoff premise CORRECTED.**
+  Aspect imputation is a **no-op** (aspect ~complete, ≤8 NaN); the real 56,631→22,238
+  drop is **SVF ~50% + street-entropy ~54%** (street-sampled). Imputing SVF (top
+  predictor) would inflate, not bound, the AUC. Honest inverse check instead:
+  reduced-feature (no SVF/street-entropy) LOSO on the **full 56,631 cells** →
+  **AUC 0.75–0.84 (mean 0.78)** vs complete-case full-feature **0.87–0.93**; the ~0.12
+  gap is the SVF contribution on street-adjacent cells. Full prevalence 46% vs CC 56%
+  confirms the coverage bias. `scripts/run_fullsample_loso.py` + test →
+  `outputs/paper_figures/fullsample_loso.json`.
+- **Remaining tasks:** **λf 0–1.5 recompute = USER DECISION** (change-of-support: cell
+  vs patch λf, would shift fig03/fig04 thresholds); ray-caster vs Radiance/SOLWEIG x-val
+  (needs external tools — check availability, likely blocked); morphotype×site
+  fingerprint heatmap for P4/E2 (`recurrence_evidence.png` may already cover it — verify).
 
 ## ⚙️ Env (2026-06-24): work on IVF; consolidated env deferred
 
