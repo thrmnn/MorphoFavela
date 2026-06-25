@@ -154,12 +154,19 @@ def figures(sel, k, Xz, labels, link, shares, profile, stats) -> None:
 
 
 def main() -> None:
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Fit the morphotype signature.")
+    ap.add_argument("--k", type=int, default=None,
+                    help="force k (default: BIC-elbow; k=6 is the domain-pinned granularity)")
+    args = ap.parse_args()
+
     OUT.mkdir(parents=True, exist_ok=True)
     df = load_pooled()
     mat = assemble_signature_matrix(df)
     Xz, stats = standardize(mat)
     sel = select_k(Xz, random_state=RANDOM_STATE)
-    k = choose_k_elbow(sel)
+    k = args.k if args.k is not None else choose_k_elbow(sel)
     labels = fit_morphotypes(Xz, k, random_state=RANDOM_STATE)
     link = centroid_linkage(Xz, labels)
     shares = recurrence_matrix(mat, labels)

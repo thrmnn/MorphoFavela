@@ -350,9 +350,14 @@ def fig_type_site_fingerprint(shares, leaf):
                 fontsize=7.5, color="#1A7F37" if recur else "#999999", fontweight="bold")
     ax.set_xlim(-0.5, n_sites - 0.5 + 1.1)
     n_ge4 = int((n_present >= n_sites - 1).sum())
+    universal = [f"T{types[i]}" for i in range(len(types)) if n_present[i] == n_sites]
+    conditional = [f"T{types[i]}" for i in range(len(types)) if n_present[i] <= 2]
+    uni_txt = " & ".join(universal) + (" universal" if universal else "")
+    cond_txt = ("/".join(conditional) + " terrain-conditional") if conditional else ""
+    detail = "; ".join(t for t in (uni_txt, cond_txt) if t)
     ax.set_title(
         f"Morphotype × site fingerprint — a recurrent type set\n({n_ge4}/{len(types)} types "
-        f"in ≥4 favelas; T0 & T5 universal, T2/T3 terrain-conditional)",
+        f"in ≥4 favelas; {detail})",
         fontsize=8.5, pad=6,
     )
     fig.colorbar(im, ax=ax, label="share of favela's cells", shrink=0.8, pad=0.12)
@@ -366,8 +371,8 @@ GALLERY_GROUPS = [
          "Idealized 40 m street section per morphotype (driven by the centroids): "
          "density, height spread, slope and canyon depth at a glance."),
         ("composition_by_site.png", "Composition per favela",
-         "% of each morphotype per site — hillside favelas are T1/T4-dominated, "
-         "flat ones T3/T5; topography drives the mix."),
+         "% of each morphotype per site — hillside favelas are T4 Hillside Core-"
+         "dominated, flat ones T5 Saturated Core; topography drives the mix."),
         ("party_wall_by_type.png", "Configuration: party-wall ratio",
          "Shared-wall ratio by morphotype — a relational metric the intensity vector "
          "never saw. Favela fabric is highly fused everywhere (0.6–1.0 vs ~0.1 for "
@@ -379,7 +384,7 @@ GALLERY_GROUPS = [
         ("dendrogram.png", "Taxonomy dendrogram",
          "Grey links (structure), leaf labels in the type palette, k=6 cut."),
         ("recurrence.png", "Cross-site recurrence",
-         "Single-hue Blues; the site-specific type (T3, flatland) boxed red — the "
+         "Single-hue Blues; the flatland-specific types (T1, T5) boxed red — the "
          "validation as a figure."),
         ("type_site_fingerprint.png", "Morphotype × site fingerprint (P4/E2)",
          "Commonality-forward composition heatmap with full type names + a per-type "

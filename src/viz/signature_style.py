@@ -27,17 +27,18 @@ NULL_COLOR = "#E0E0E0"        # no street support / unbuilt — reserved grey
 SEQUENTIAL = "YlOrBr"         # prioritization intensity (a hue no type owns)
 DIVERGING = "RdBu_r"          # z-scores / flat-vs-terrain delta, centred at 0
 
-# Provisional short descriptors (data-checked at gallery build; refine after review)
-# Names (FINAL, user pre-authorized 2026-06-19). Two-axis scheme:
-# density ladder  Fringe → Consolidated → Core  ×  condition modifier
-# (Open / Hillside / Shaded / Saturated). Density rises T0→T5; T1,T4 are the steep pair.
+# Names RE-DERIVED 2026-06-25 after the dissolved-λf re-baseline (k=6 on the
+# party-wall-corrected frontal density; ARI 0.23 vs the summed-λf typology, so the
+# membership re-sorted). Same two-axis scheme: density ladder Fringe →
+# Consolidated → Core × terrain/condition modifier. Stats are the new fabric +
+# experience centroids. The two flatland types (1, 5) are now the conditional pair.
 TYPE_NAMES = {
-    0: "T0 · Open Fringe",          # sparse flat single-storey edge (λp 0.22, SVF 0.65, sun 7h)
-    1: "T1 · Hillside Fringe",      # low-rise on ~19° slope; canyon from terrain, not mass
-    2: "T2 · Open Consolidated",    # flat, dense, sky still intact (SVF 0.46; conditional)
-    3: "T3 · Shaded Consolidated",  # flat, dense, daylight lost to frontal density (conditional)
-    4: "T4 · Hillside Core",        # steep dense hillside, H/W 2.6, fully sun-starved
-    5: "T5 · Saturated Core",       # λp=1 maxed flat interior, deep-canyon 0.89, H/W 3.5
+    0: "T0 · Open Fringe",          # open low-rise edge: λp 0.10, slope 5°, SVF 0.66, sun 7h
+    1: "T1 · Flatland Consolidated",  # flat (1°) mid-density mixed-rise: λp 0.57, H 7.4 (flatland-specific)
+    2: "T2 · Hillside Fringe",      # steep (20°) low-rise: λp 0.59, H 4.9, canyon from terrain
+    3: "T3 · Shaded Consolidated",  # steep (17°) tall dense: λp 0.65, λf 1.42, H/W 2.6, 0 h sun
+    4: "T4 · Hillside Core",        # steep (18°) maximal-coverage: λp 0.90, sun-starved
+    5: "T5 · Saturated Core",       # flat (1°) λp 1.0 interior: H 7.6, H/W 1.5 (flatland-specific)
 }
 # Short labels (no "T# ·" prefix) for compact figures.
 TYPE_LABEL = {c: n.split(" · ")[1] for c, n in TYPE_NAMES.items()}
