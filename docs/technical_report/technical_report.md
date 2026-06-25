@@ -920,10 +920,13 @@ misses: favela buildings are fused everywhere (median 0.6–1.0, vs ≈0.1 for d
 formal blocks), and — orthogonally to density — the flat types are near-fully
 party-walled while the hillside types are more stepped. **Forward look (forthcoming;
 not in this report):** this typology is the basis for a morphology-only *predictor of
-environmental failure* — early results show per-type WHO-2 h sun-failure rising
-monotonically (14 % → 73 %) and transferring leave-one-site-out (AUC-PR 0.77); the
-full sub-study (parsimony, calibration, blind application to the three calibration
-favelas) is in the typology-predictor plan.
+environmental failure*. The per-type WHO-2 h sun-failure rate separates strongly
+(≈ 17 % in open/flatland types to ≈ 66 % in the hillside cores), but the full
+sub-study finds that the **continuous fabric vector — not the discrete code —
+carries the transferable signal** (leave-one-site-out AUC-PR 0.84 vs 0.61 for the
+type code alone); the typology is best read as a descriptive, coarse prioritiser,
+with a blind risk map applied to the three calibration favelas. The parsimony,
+calibration, and blind-application detail is in the typology-predictor plan.
 
 ---
 
