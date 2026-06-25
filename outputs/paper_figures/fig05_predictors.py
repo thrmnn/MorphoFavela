@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
-"""Fig 05 — RF/logit predictors of sunlight-failure risk (4-panel A–D).
+"""Fig 05 — predictors of the winter sun-adequacy floor (4-panel A–D).
+
+Target throughout: P(winter direct sun < WHO 2 h) — failure of the
+sun-adequacy floor, NOT a ventilation outcome (which stays CFD-gated).
 
   (A) Random-forest permutation importance, GROUPED and colored by feature
       family (openness / terrain-aspect / density) with a small family
       legend. Bars are ordered by family (families ranked by their top
-      member's importance), descending within each family. LOSO ROC-AUC
-      range annotated. The aspect feature is labelled "northness"
+      member's importance), descending within each family. An honesty box
+      reports the leave-one-site-out transfer: ROC-AUC (ranking) 0.86–0.93
+      transfers across cities far better than accuracy (thresholded
+      decisions) 0.73–0.86 — quoting only the AUC would overstate
+      field-ready accuracy; the decision threshold is site-specific. The
+      aspect feature is labelled "northness"
       (importance is sign-agnostic, so the value is identical to the stored
       "southness" entry — only the label changes, to match panels B/C and
       the manuscript caption).
@@ -61,6 +68,11 @@ from src.viz import presentation_style as ps  # noqa: E402
 
 STATS_PATH = PROJECT_ROOT / "outputs" / "paper_figures" / "rf_predictor_stats.json"
 PD_PATH = PROJECT_ROOT / "outputs" / "paper_figures" / "rf_pd_curves.json"
+
+# The prediction target is failure of the winter sun-adequacy floor (WHO 2 h of
+# winter-solstice direct sun). Name it precisely everywhere instead of "P(fail)".
+TARGET_LABEL = r"P(winter sun $<$ 2 h)"  # below the sun-adequacy floor
+TARGET_SHORT = r"P($<$2 h sun)"
 
 BRISA_ROOT = Path("/home/theo/brisa_paper")
 OUT_MANUSCRIPT = BRISA_ROOT / "artifacts" / "latex" / "figures" / "fig05_predictors.png"
@@ -210,14 +222,20 @@ def panel_importance(ax, stats: dict) -> None:
     ax.set_title("Random-forest feature importance", fontsize=FS_AXLABEL,
                  color=INK, pad=6, loc="left")
 
-    auc_min = stats["loso"]["auc_min"]
-    auc_max = stats["loso"]["auc_max"]
-    ax.text(0.98, 0.04,
-            f"LOSO ROC-AUC: {auc_min:.2f}–{auc_max:.2f}\n(leave-one-site-out)",
-            transform=ax.transAxes, ha="right", va="bottom",
-            fontsize=FS_CAPTION, color=INK,
-            bbox=dict(boxstyle="round,pad=0.45", facecolor="white",
-                      edgecolor=SLATE, linewidth=0.6))
+    # Honesty box: AUC (ranking) transfers across cities far better than
+    # accuracy (thresholded decisions). Both are leave-one-site-out so neither
+    # is in-sample; reporting only the AUC would overstate field-ready accuracy.
+    lo = stats["loso"]
+    box = (
+        "cross-site (LOSO, 5 held-out favelas)\n"
+        f"ROC-AUC   {lo['auc_min']:.2f}–{lo['auc_max']:.2f}   ranking\n"
+        f"accuracy  {lo['acc_min']:.2f}–{lo['acc_max']:.2f}   decisions\n"
+        "rank transfers; threshold is site-specific"
+    )
+    ax.text(0.975, 0.04, box, transform=ax.transAxes, ha="right", va="bottom",
+            fontsize=FS_CAPTION - 2, color=INK, family="monospace",
+            bbox=dict(boxstyle="round,pad=0.5", facecolor="#FBFAF6",
+                      edgecolor=SLATE, linewidth=0.7))
 
     fams = ("openness", "terrain", "density")
     handles = [plt.Line2D([0], [0], marker="s", ls="none", markersize=8,
@@ -283,7 +301,7 @@ def panel_pd(ax, stats: dict, pd_curves: dict) -> None:
     ax.yaxis.grid(True, color=GRID, lw=0.4, zorder=0)
     ax.set_axisbelow(True)
 
-    ax.set_ylabel("P(fail)", fontsize=FS_AXLABEL, color=INK, labelpad=4)
+    ax.set_ylabel(TARGET_LABEL, fontsize=FS_AXLABEL, color=INK, labelpad=4)
     ax.set_xlabel("feature value (normalized range)", fontsize=FS_AXLABEL,
                   color=INK, labelpad=4)
     ax.legend(loc="lower left", fontsize=FS_CAPTION, frameon=False,
@@ -371,7 +389,8 @@ def panel_logit(ax, stats: dict) -> None:
                    markerfacecolor=_desaturate(POS_HUE, 0.85),
                    markeredgecolor=POS_HUE, markeredgewidth=1.1),
     ]
-    ax.legend(sign_handles, ["−  reduces P(fail)", "+  raises P(fail)"],
+    ax.legend(sign_handles,
+              [f"−  reduces {TARGET_SHORT}", f"+  raises {TARGET_SHORT}"],
               loc="lower left", fontsize=FS_CAPTION - 1, frameon=False,
               handletextpad=0.4, labelspacing=0.3, bbox_to_anchor=(0.0, 0.02))
 
