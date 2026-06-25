@@ -6,6 +6,21 @@ blocks. Supersedes the loop notes in `docs/autonomous_loop_plan.md` for sequenci
 the λf/figure specifics live in `docs/lambda_f_fix_and_figure_regen_plan.md` and the
 round-2/round-3 handoffs.
 
+## 0. Readiness (2026-06-25) — cleared for full autonomy
+
+User granted **full autonomy without interruptions**. State verified:
+- **Env READY** — IVF working; **statsmodels 0.14.6 installed** (was missing; pinned
+  install, numpy/scipy/pandas unmoved, ABI intact). All track deps present.
+- **Re-baseline forks DECIDED** — dissolved λf canonical (full switch); full morphotype
+  re-baseline; **data-driven k at every level** (accept + re-name + re-validate +
+  document; surface only if a conclusion flips); naming/palette = my call.
+- **Repo** — `main`, green (648 passed), pushed, clean.
+- **Isolated blockers (do NOT stall any track; skip + note):** ray-caster ×
+  Radiance/SOLWEIG (not installed — needs you), CFD-τ (separate repo, out of scope),
+  Mingze WeTransfer upload (external send — yours). None gate Tracks A–G.
+
+→ No remaining decision-fork will force an interruption in Tracks A–G. Running.
+
 ## 1. Operating principle
 
 Default to ACTION. Each unit of work: implement → test (`pytest` + `ruff`) →

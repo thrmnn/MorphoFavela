@@ -43,16 +43,14 @@ TYPE_NAMES = {
 # Short labels (no "T# ·" prefix) for compact figures.
 TYPE_LABEL = {c: n.split(" · ")[1] for c, n in TYPE_NAMES.items()}
 
-# Block-scale MORPHOTOPE (tissue) names — deliberately a DISTINCT vocabulary from the
-# cell-level MORPHOTYPE names (no Fringe/Consolidated/Core reuse) so the two levels are
-# never confused. Tissues are areas (M0–M4); morphotypes are the cell alphabet (T0–T5).
-# Ordered by ascending Saturated-Core cell share.
+# Block-scale MORPHOTOPE (tissue) names — DISTINCT vocabulary from the cell-level
+# MORPHOTYPE names (no Fringe/Consolidated/Core reuse) so the two levels are never
+# confused. RE-DERIVED 2026-06-25 after the dissolved-λf re-baseline: block-tissue
+# clustering now resolves at k=3 (data-driven; was k=5 on the summed-λf cell types).
 MORPHOTOPE_LABEL = {
-    0: "Low-rise Slope Tissue",   # 87% T1 cells, uniform low fabric on slope
-    1: "Mixed Flatland Tissue",   # diverse flat mix (T0/T3/T5), highest diversity
-    2: "Compact Hillside Tissue", # 46% T4 + 30% T5 cells, recurs in 4 sites
-    3: "Mixed Dense Tissue",      # heterogeneous dense (T5/T4/T3)
-    4: "Compact Flatland Tissue", # 53% T3 + 46% T5 cells, flatland-specific
+    0: "Compact Hillside Tissue",   # 71% T4 Hillside Core + 22% T2; recurs (4 sites)
+    1: "Mixed Dense Tissue",        # diverse dense (41% T5 / 34% T4 / 14% T0); highest diversity
+    2: "Saturated Flatland Tissue", # 94% T5 Saturated Core; flatland-specific (2 sites)
 }
 
 
