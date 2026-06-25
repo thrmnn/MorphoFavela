@@ -28,16 +28,24 @@ from pathlib import Path
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import patches as mpatches
+from matplotlib.colors import BoundaryNorm, ListedColormap
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
-from fig_style import SITE_COLORS, SITE_LABELS, apply_style, save_fig  # noqa: E402
+from fig_style import SITE_LABELS, apply_style, save_fig  # noqa: E402
 
 # Hillside → flatland order (round-2 cross-figure consistency).
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "maré"]
 ISOLATED_MAX = 0.15
 SKIMMING_MIN = 0.65
 REGIMES = ("isolated", "wake", "skimming")
+
+# Three-class regime palette, luminance-ordered light→dark as ventilation
+# suppression rises (CVD-safe YlOrRd family, ≥15% lightness separation per
+# round-3 §0.9). Skimming reuses fig04's compound ink for cross-figure tie.
+REGIME_FILL = {"isolated": "#FDD9A8", "wake": "#F08A3C", "skimming": "#B2182B"}
+REGIME_INT = {"isolated": 0, "wake": 1, "skimming": 2}
 
 
 def classify_regime(lf: np.ndarray) -> dict:
@@ -54,68 +62,98 @@ def classify_regime(lf: np.ndarray) -> dict:
             "median": float(np.median(v))}
 
 
-def site_lambda_f(site: str) -> np.ndarray:
+def load_site_grid(site: str) -> gpd.GeoDataFrame:
+    """Built cells with a regime int column (0 isolated / 1 wake / 2 skimming)."""
     grid = gpd.read_file(
         PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg"
     )
-    built = grid[(grid["building_count"] > 0)]
-    return built["lambda_f_mean"].to_numpy()
+    built = grid[grid["building_count"] > 0].copy()
+    lf = built["lambda_f_mean"].to_numpy()
+    regime = np.full(len(built), REGIME_INT["wake"], dtype=int)
+    regime[lf < ISOLATED_MAX] = REGIME_INT["isolated"]
+    regime[lf >= SKIMMING_MIN] = REGIME_INT["skimming"]
+    built["regime"] = regime
+    built.loc[~np.isfinite(lf), "regime"] = -1  # unclassifiable, dropped from maps
+    return built
 
 
-def make_figure(per_site: dict[str, np.ndarray], pooled_skim: float) -> None:
-    apply_style()
-    fig, ax = plt.subplots(figsize=(7.2, 3.8))
-    xmax = 4.0
-    # Regime bands behind everything.
-    ax.axvspan(0, ISOLATED_MAX, color="#F2F2F2", zorder=0)
-    ax.axvspan(ISOLATED_MAX, SKIMMING_MIN, color="#E4ECEF", zorder=0)
-    ax.axvspan(SKIMMING_MIN, xmax, color="#CBDCE3", zorder=0)
-    ax.axvline(ISOLATED_MAX, color="#999999", lw=0.6, ls=":")
-    ax.axvline(SKIMMING_MIN, color="#2A6F8E", lw=1.0, ls="--")
-    label_y = len(SITES) - 0.25
-    for x, lab in [(0.075, "isolated"), (0.40, "wake"), (xmax * 0.7, "skimming flow")]:
-        ax.text(x, label_y, lab, ha="center", va="bottom", fontsize=6.5,
-                color="#2A6F8E" if lab.startswith("skim") else "#888888")
+def _draw_map(ax, site: str, grid: gpd.GeoDataFrame) -> None:
+    cmap = ListedColormap([REGIME_FILL[r] for r in REGIMES])
+    norm = BoundaryNorm([-0.5, 0.5, 1.5, 2.5], ncolors=3)
+    g = grid[grid["regime"] >= 0]
+    g.plot(ax=ax, column="regime", cmap=cmap, norm=norm, linewidth=0)
+    b = g.total_bounds
+    pad = 15.0
+    ax.set_xlim(b[0] - pad, b[2] + pad)
+    ax.set_ylim(b[1] - pad, b[3] + pad)
+    ax.set_aspect("equal")
+    ax.set_xticks([]); ax.set_yticks([])
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+    ax.set_title(SITE_LABELS[site], fontsize=7.5, color="#222222", pad=2)
 
-    positions = np.arange(len(SITES))[::-1]
-    data = [np.clip(per_site[s][np.isfinite(per_site[s])], 0, xmax) for s in SITES]
-    bp = ax.boxplot(data, positions=positions, vert=False, widths=0.55,
-                    patch_artist=True, showfliers=False, whis=(5, 95))
-    for patch, s in zip(bp["boxes"], SITES):
-        patch.set_facecolor(SITE_COLORS[s])
-        patch.set_alpha(0.85)
-        patch.set_edgecolor("#333333")
-        patch.set_linewidth(0.6)
-    for med in bp["medians"]:
-        med.set_color("#111111")
-        med.set_linewidth(1.1)
-    for whisk in bp["whiskers"]:
-        whisk.set_color("#555555")
-        whisk.set_linewidth(0.6)
-    for cap in bp["caps"]:
-        cap.set_color("#555555")
 
-    ax.set_yticks(positions)
-    ax.set_yticklabels([SITE_LABELS[s] for s in SITES], fontsize=8)
-    ax.set_ylim(-0.7, len(SITES) - 0.1)
-    ax.set_xlim(0, xmax)
-    ax.set_xlabel(r"dissolved frontal-area density $\lambda_f$ (cell, 5–95% box)", fontsize=8)
-    ax.set_title(
-        f"Flow-regime classification — favela fabric sits in skimming flow "
-        f"({pooled_skim * 100:.0f}% of cells ≥ 0.65)",
-        loc="left", fontsize=8.5, pad=4,
-    )
-    ax.text(0.0, -0.22,
-            "Geometry classifies the regime, not per-cell ventilation adequacy "
-            "(that is CFD age-of-air τ, Tier 2). Oke/Grimmond–Oke thresholds.",
-            transform=ax.transAxes, fontsize=6.0, color="#666666", va="top")
+def _draw_strip(ax, per_site: dict[str, dict], pooled: dict) -> None:
+    rows = [(SITE_LABELS[s], per_site[s]) for s in SITES] + [("Pooled", pooled)]
+    labels = [f"{lab}\n(n={r['n']:,})" for lab, r in rows]
+    bottoms = np.zeros(len(rows))
+    for reg in REGIMES:
+        vals = np.array([r[reg] for _, r in rows]) * 100.0
+        ax.barh(labels, vals, left=bottoms, color=REGIME_FILL[reg],
+                edgecolor="#444444", linewidth=0.5, height=0.66)
+        for i, v in enumerate(vals):
+            if v >= 5:
+                ax.text(bottoms[i] + v / 2, i, f"{v:.0f}%", ha="center", va="center",
+                        fontsize=6.0, color="#FFFFFF" if reg == "skimming" else "#222222")
+        bottoms += vals
+    ax.set_xlim(0, 100)
+    ax.set_xlabel("share of built cells (%)", fontsize=7)
+    ax.tick_params(axis="x", labelsize=6.5)
+    ax.tick_params(axis="y", labelsize=7.0)
+    ax.invert_yaxis()
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
-    save_fig(fig, "lambda_f_regime")
+    ax.spines["bottom"].set_linewidth(0.4)
+    ax.spines["left"].set_linewidth(0.4)
+    ax.set_title("(B) Flow-regime shares", loc="left", fontsize=8, color="#222222", pad=4)
+
+
+def make_figure(grids: dict[str, gpd.GeoDataFrame],
+                per_site: dict[str, dict], pooled: dict) -> None:
+    apply_style()
+    fig = plt.figure(figsize=(7.5, 5.4))
+    gs = fig.add_gridspec(nrows=2, ncols=5, height_ratios=[1.0, 0.95],
+                          hspace=0.30, wspace=0.08)
+    for j, s in enumerate(SITES):
+        _draw_map(fig.add_subplot(gs[0, j]), s, grids[s])
+    fig.text(0.012, 0.965, "(A) Per-site flow-regime maps  ·  dissolved λ$_f$, 10 m cells",
+             fontsize=8, color="#222222", va="top")
+    _draw_strip(fig.add_subplot(gs[1, :3]), per_site, pooled)
+
+    # Shared legend + framing note in the bottom-right gap.
+    handles = [mpatches.Patch(facecolor=REGIME_FILL[r], edgecolor="#444444", linewidth=0.6,
+               label=lab) for r, lab in [
+        ("isolated", f"isolated roughness (λ$_f$ < {ISOLATED_MAX})"),
+        ("wake", f"wake interference ({ISOLATED_MAX} ≤ λ$_f$ < {SKIMMING_MIN})"),
+        ("skimming", f"skimming flow (λ$_f$ ≥ {SKIMMING_MIN})")]]
+    lax = fig.add_subplot(gs[1, 3:])
+    lax.axis("off")
+    lax.legend(handles=handles, loc="upper left", frameon=False, fontsize=7,
+               handlelength=1.6, bbox_to_anchor=(0.0, 0.98), title="Oke/Grimmond–Oke regime",
+               title_fontsize=7.5, alignment="left")
+    lax.text(0.0, 0.30,
+             f"~{pooled['skimming']*100:.0f}% of built cells sit in skimming flow, "
+             f"~{(1-pooled['isolated'])*100:.0f}% past the isolated-roughness regime: "
+             "the fabric is uniformly low-ventilation.\n\n"
+             "Geometry classifies the REGIME; per-cell ventilation adequacy is "
+             "carried by CFD age-of-air (gated), not read off λf.",
+             transform=lax.transAxes, fontsize=6.0, color="#555555", va="top", wrap=True)
+    save_fig(fig, "lambda_f_regime", gate=True)
 
 
 def main() -> None:
-    per_site_vals = {s: site_lambda_f(s) for s in SITES}
+    grids = {s: load_site_grid(s) for s in SITES}
+    per_site_vals = {s: grids[s]["lambda_f_mean"].to_numpy() for s in SITES}
     per_site = {s: classify_regime(v) for s, v in per_site_vals.items()}
     pooled = classify_regime(np.concatenate([per_site_vals[s] for s in SITES]))
     for s in SITES:
@@ -135,7 +173,7 @@ def main() -> None:
     out_json = PROJECT_ROOT / "outputs" / "paper_figures" / "lambda_f_regime.json"
     out_json.write_text(json.dumps(out, indent=2, ensure_ascii=False))
     print(f"  wrote {out_json.relative_to(PROJECT_ROOT)}")
-    make_figure(per_site_vals, pooled["skimming"])
+    make_figure(grids, per_site, pooled)
 
 
 if __name__ == "__main__":
