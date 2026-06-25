@@ -17,7 +17,25 @@ sys.path.insert(0, str(ROOT))
 from scripts.typology_predictor_extra import (  # noqa: E402
     CONT_FEATURES,
     expected_calibration_error,
+    feature_envelope,
 )
+
+
+def test_feature_envelope_brackets_p1_p99():
+    """The training envelope is the per-feature [p1, p99] range used to flag blind
+    calibration cells as extrapolation."""
+    import pandas as pd
+
+    from src.morphometry.signature import SIGNATURE_FEATURES
+
+    rng = np.random.default_rng(0)
+    mat = pd.DataFrame({f: rng.normal(size=20000) for f in SIGNATURE_FEATURES})
+    env = feature_envelope(mat)
+    for f in SIGNATURE_FEATURES:
+        lo, hi = env[f]
+        assert lo < hi
+        assert -2.7 < lo < -2.0  # p1 of N(0,1) ≈ -2.33
+        assert 2.0 < hi < 2.7  # p99 ≈ +2.33
 
 
 def test_cont_features_present_in_grid_schema():

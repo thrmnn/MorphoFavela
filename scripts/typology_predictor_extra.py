@@ -355,6 +355,86 @@ def blind_riskmap(assign, type_rate: dict) -> pd.DataFrame:
     return pd.DataFrame(summary_rows)
 
 
+def feature_envelope(mat: pd.DataFrame, lo: float = 1.0, hi: float = 99.0) -> dict:
+    """Per-feature training [p1, p99] range — the morphometric envelope the campaign
+    GMM was fit within. Calibration cells outside it are flagged as extrapolation."""
+    return {f: (float(np.percentile(mat[f], lo)), float(np.percentile(mat[f], hi)))
+            for f in SIGNATURE_FEATURES}
+
+
+def _prep_calibration_grid(site: str):
+    """Load a calibration favela's grid with the exact campaign feature prep."""
+    g = gpd.read_parquet(ROOT / "outputs" / site / "features" / "features_grid.parquet").copy()
+    g["lambda_f_aniso"] = (g["lambda_f_max"] - g["lambda_f_mean"]).clip(lower=0)
+    g["sigma_h"] = g["sigma_h"].fillna(0.0)
+    return g
+
+
+def validate_blind(assign, type_rate: dict, env: dict) -> pd.DataFrame:
+    """Roadmap #2 — the 3 calibration favelas carry the ray-cast WHO-2h target but were
+    never in training, so the blind prediction is externally validatable. Compute, per
+    site + pooled: Brier, AUC-PR vs prevalence, reliability curve, and the out-of-
+    envelope (extrapolation) fraction. Honest framing: p̂ is a 6-level per-type lookup,
+    so it ranks/strata, it does not finely calibrate."""
+    from sklearn.calibration import calibration_curve
+    from sklearn.metrics import average_precision_score, brier_score_loss
+
+    rows, pooled_p, pooled_y = [], [], []
+    for s in CALIBRATION_SITES:
+        g = _prep_calibration_grid(s)
+        built = g["built_mask"].fillna(False)
+        ok = built & g[SIGNATURE_FEATURES].notna().all(axis=1) & g[TARGET].notna()
+        feats = g.loc[ok]
+        X = feats[SIGNATURE_FEATURES].to_numpy(float)
+        mt = assign(feats[SIGNATURE_FEATURES])
+        phat = np.array([type_rate.get(int(c), np.nan) for c in mt])
+        y = (feats[TARGET].to_numpy() > FAIL_THRESH).astype(int)
+        out_env = np.zeros(len(feats), bool)
+        for i, f in enumerate(SIGNATURE_FEATURES):
+            lo, hi = env[f]
+            out_env |= (X[:, i] < lo) | (X[:, i] > hi)
+        m = np.isfinite(phat)
+        phat, y, out_env = phat[m], y[m], out_env[m]
+        ap = average_precision_score(y, phat) if len(set(y)) > 1 else np.nan
+        rows.append({"site": s, "n": int(m.sum()), "prevalence": float(y.mean()),
+                     "brier": float(brier_score_loss(y, phat)),
+                     "auc_pr": float(ap),
+                     "frac_out_envelope": float(out_env.mean())})
+        pooled_p.append(phat)
+        pooled_y.append(y)
+
+    pp, yy = np.concatenate(pooled_p), np.concatenate(pooled_y)
+    pooled = {"n": int(yy.size), "prevalence": float(yy.mean()),
+              "brier": float(brier_score_loss(yy, pp)),
+              "auc_pr": float(average_precision_score(yy, pp))}
+
+    fig, axes = plt.subplots(1, 2, figsize=(9.5, 4.0))
+    frac_pos, mean_pred = calibration_curve(yy, pp, n_bins=6, strategy="quantile")
+    axes[0].plot([0, 1], [0, 1], ":", color="0.6", label="perfect")
+    axes[0].plot(mean_pred, frac_pos, "o-", color="#b2182b")
+    axes[0].set(xlabel="predicted p̂ (blind, morphology-only)",
+                ylabel="observed WHO-2h failure rate", xlim=(0, 1), ylim=(0, 1),
+                title=f"Blind external validation on 3 held-out favelas\n"
+                      f"pooled Brier {pooled['brier']:.3f} · AUC-PR {pooled['auc_pr']:.2f} "
+                      f"(prevalence {pooled['prevalence']:.2f})")
+    axes[0].grid(color="0.93")
+    axes[0].legend(fontsize=8)
+    x = np.arange(len(CALIBRATION_SITES))
+    axes[1].bar(x, [r["frac_out_envelope"] * 100 for r in rows], color="#5aae61", alpha=0.85)
+    axes[1].set_xticks(x)
+    axes[1].set_xticklabels([s.replace("_", "\n") for s in CALIBRATION_SITES], fontsize=7)
+    axes[1].set_ylabel("% cells outside training envelope")
+    axes[1].set_title("Extrapolation flag (any signature feature\noutside campaign p1–p99)",
+                      fontsize=9)
+    axes[1].grid(axis="y", color="0.93")
+    fig.suptitle("Calibrated blind risk map: it transfers as a STRATIFIER, with honest "
+                 "extrapolation flags", fontsize=10)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    fig.savefig(FIGS / "typology_blind_validation.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return pd.DataFrame(rows + [{"site": "POOLED", **pooled, "frac_out_envelope": np.nan}])
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     FIGS.mkdir(parents=True, exist_ok=True)
@@ -385,6 +465,13 @@ def main():
         mean_pred_failure=(summary["mean_pred_failure"] * 100).round(1),
         frac_assignable=(summary["frac_assignable"] * 100).round(1)
     ).to_string(index=False))
+
+    # Deliverable 2b (roadmap #2) — external validation of the blind map
+    env = feature_envelope(mat)
+    val = validate_blind(assign, type_rate, env)
+    val.to_csv(OUT / "blind_riskmap_validation.csv", index=False)
+    print("[2b] Blind external validation (held-out favelas carry the ray-cast target):")
+    print(val.round(3).to_string(index=False))
 
 
 if __name__ == "__main__":
