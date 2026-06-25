@@ -13,6 +13,7 @@ figure-tracks convention keeps TR figures and paper candidates from mixing.
 brisaverse promotes ``exports/fig01_composite.png`` as its fig01.
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -23,22 +24,26 @@ import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
-import trimesh
 from fig_style import *
+from matplotlib.colors import LightSource, Normalize
+from shapely.geometry import box
+
+sys.path.insert(0, str(PROJECT_ROOT))
+from src.print3d.model import _building_prisms, _sample_terrain_core
 
 PANEL_A_PATH = Path("/home/theo/brisa_paper/shared/figures/fig01_panelA.png")
 
-# (site, patch_id, stl_path) — accented "maré" dir handled via PROJECT_ROOT join.
-PANEL_C_EXCERPTS: list[tuple[str, str, Path]] = [
-    ("rocinha", "ROC-P18", PROJECT_ROOT / "outputs" / "rocinha" / "print" / "ROC-P18_1to1000.stl"),
-    ("vidigal", "VDG-P07", PROJECT_ROOT / "outputs" / "vidigal" / "print" / "VDG-P07_1to1000.stl"),
-    ("maré", "MAR-P20", PROJECT_ROOT / "outputs" / "maré" / "print" / "MAR-P20_1to1000.stl"),
-    (
-        "riodaspedras",
-        "RDP-P20",
-        PROJECT_ROOT / "outputs" / "riodaspedras" / "print" / "RDP-P20_1to1000.stl",
-    ),
+# (site, patch_id, sampling) — accented "maré" dir handled via PROJECT_ROOT join.
+# All four resolve in campaign_sampling (VDG-P07 also exists in pilot_sampling,
+# so the historical pilot deprecation does not force a substitution here).
+PANEL_C_EXCERPTS: list[tuple[str, str, str]] = [
+    ("rocinha", "ROC-P18", "campaign_sampling"),
+    ("vidigal", "VDG-P07", "campaign_sampling"),
+    ("maré", "MAR-P20", "campaign_sampling"),
+    ("riodaspedras", "RDP-P20", "campaign_sampling"),
 ]
+
+BUILDING_CMAP = "viridis"
 
 PROVENANCE = (
     "Building footprints © IPP (municipal cadaster); ALS heights MIT/SondoTecnica. "
@@ -164,42 +169,95 @@ def panel_b_sitemap(subfig) -> None:
         add_scalebar(ax)
 
 
-def _render_excerpt(ax, site: str, patch_id: str, stl_path: Path) -> None:
-    """Render one STL as a light-shaded massing model via plot_trisurf."""
-    mesh = trimesh.load(stl_path)
-    # Meshes are < 7k faces each, so no decimation needed; plot_trisurf is fast.
-    verts = mesh.vertices
-    faces = mesh.faces
-    z = verts[:, 2]
-    tri = ax.plot_trisurf(
-        verts[:, 0],
-        verts[:, 1],
-        z,
-        triangles=faces,
-        cmap="cividis",
-        array=z[faces].mean(axis=1),
-        edgecolor="none",
-        linewidth=0,
-        antialiased=False,
-        shade=True,
+def _patch_source_dir(site: str, patch_id: str, sampling: str) -> Path:
+    return PROJECT_ROOT / "outputs" / site / "sampling_cfd" / sampling / "patches" / patch_id
+
+
+def _render_excerpt(ax, site: str, patch_id: str, sampling: str, height_norm: Normalize) -> None:
+    """Reconstruct terrain + buildings split: ground as a neutral hillshade-lit
+    surface (relief from shading, not colour), buildings coloured by height
+    above ground so the ramp encodes building height — never absolute elevation.
+    """
+    pdir = _patch_source_dir(site, patch_id, sampling)
+    meta = json.loads((pdir / "patch_meta.json").read_text())
+    cx, cy = meta["center_x"], meta["center_y"]
+    half = meta.get("analysis_patch_diameter", 100.0) / 2.0
+
+    X, Y, Z = _sample_terrain_core(pdir / "terrain.tif", cx, cy, half)
+
+    buildings = gpd.read_file(pdir / "buildings.gpkg")
+    core = box(cx - half, cy - half, cx + half, cy + half)
+    buildings = buildings.clip(core)
+    buildings = buildings[~buildings.geometry.is_empty & buildings.geometry.notna()]
+
+    ls = LightSource(azdeg=315, altdeg=45)
+    intensity = ls.hillshade(Z, vert_exag=1.0)
+    grey = 0.45 + 0.45 * intensity[..., None]
+    rgb = np.dstack([grey, grey, grey, np.ones_like(intensity)])
+    ax.plot_surface(
+        X, Y, Z, facecolors=rgb, rstride=1, cstride=1, linewidth=0, antialiased=False, shade=False
     )
-    norm = (z[faces].mean(axis=1) - z.min()) / (np.ptp(z) + 1e-9)
-    tri.set_facecolor(plt.get_cmap("cividis")(norm))
+
+    cmap = plt.get_cmap(BUILDING_CMAP)
+    for prism, alt in zip(
+        _building_prisms(buildings, embed=2.0), _prism_heights(buildings)
+    ):
+        v = prism.vertices
+        ax.plot_trisurf(
+            v[:, 0], v[:, 1], v[:, 2],
+            triangles=prism.faces,
+            color=cmap(height_norm(alt)),
+            edgecolor="none",
+            linewidth=0,
+            antialiased=False,
+            shade=True,
+        )
 
     ax.view_init(elev=35, azim=-60)
-    ax.set_box_aspect(
-        (np.ptp(verts[:, 0]), np.ptp(verts[:, 1]), np.ptp(verts[:, 2]) * 1.3 + 1e-9)
-    )
+    zr = np.ptp(Z) + (float(buildings["altura"].max()) if len(buildings) else 0.0)
+    ax.set_box_aspect((np.ptp(X), np.ptp(Y), zr * 1.3 + 1e-9))
     ax.set_axis_off()
     ax.set_title(f"{SITE_LABELS[site]} — {patch_id}", fontsize=5, pad=-2)
 
 
+def _prism_heights(buildings: gpd.GeoDataFrame) -> list[float]:
+    """Per-prism height-above-ground, matching the polygon expansion order in
+    ``_building_prisms`` (skip null/zero-height, split MultiPolygons, drop slivers)."""
+    heights = []
+    for geom, alt in zip(buildings.geometry, buildings["altura"]):
+        if geom is None or geom.is_empty or alt is None or alt <= 0:
+            continue
+        polys = geom.geoms if geom.geom_type == "MultiPolygon" else [geom]
+        for poly in polys:
+            if poly.area < 1.0:
+                continue
+            heights.append(float(alt))
+    return heights
+
+
 def panel_c_excerpts(subfig) -> None:
     """Render the 3-D massing excerpts in a 2x2 grid of mplot3d axes."""
-    gs = subfig.add_gridspec(2, 2, hspace=0.05, wspace=0.05)
-    for i, (site, patch_id, stl_path) in enumerate(PANEL_C_EXCERPTS):
+    max_alt = 0.0
+    for site, patch_id, sampling in PANEL_C_EXCERPTS:
+        b = gpd.read_file(_patch_source_dir(site, patch_id, sampling) / "buildings.gpkg")
+        if len(b):
+            max_alt = max(max_alt, float(b["altura"].max()))
+    height_norm = Normalize(vmin=0.0, vmax=max_alt)
+
+    gs = subfig.add_gridspec(2, 2, hspace=0.05, wspace=0.05, bottom=0.12)
+    for i, (site, patch_id, sampling) in enumerate(PANEL_C_EXCERPTS):
         ax = subfig.add_subplot(gs[i // 2, i % 2], projection="3d")
-        _render_excerpt(ax, site, patch_id, stl_path)
+        _render_excerpt(ax, site, patch_id, sampling, height_norm)
+
+    sm = plt.cm.ScalarMappable(norm=height_norm, cmap=BUILDING_CMAP)
+    cax = subfig.add_axes((0.30, 0.07, 0.40, 0.018))
+    cbar = subfig.colorbar(sm, cax=cax, orientation="horizontal")
+    cbar.set_label("buildings: height above ground (m)", fontsize=4, labelpad=1.5)
+    cbar.ax.tick_params(labelsize=4, pad=1)
+    subfig.text(
+        0.5, 0.115, "ground: neutral hillshade relief (no colour ramp)",
+        fontsize=3.8, ha="center", va="bottom", color="#444444",
+    )
 
 
 def main():
@@ -226,7 +284,7 @@ def main():
 
     fig.text(0.5, 0.006, PROVENANCE, fontsize=4.5, ha="center", va="bottom", color="#444444")
 
-    save_fig(fig, "fig01_composite")
+    save_fig(fig, "fig01_composite", gate=True)
 
 
 if __name__ == "__main__":
