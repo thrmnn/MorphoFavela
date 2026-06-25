@@ -11,9 +11,10 @@ hard to find. Updated every working session.
 - [TR §5.5 Morphological Typology & Signature](/outputs/_hub/docs/technical_report.html#55-morphological-typology-signature)
   — morphotype (cell) vs morphotope (tissue), two distinct levels.
 - [Typology → environmental failure (money figure)](/outputs/cross_site/signature/figures_v2/index.html#fig-typology_failure_lookup)
-  — type predicts WHO-2h sun failure 14%→73%, transfers LOSO.
+  — per-type WHO-2h sun-failure rate; continuous fabric vector is the predictor
+  (type-only LOSO AUC-PR 0.61 vs 0.84), typology = descriptive/coarse-prioritiser.
 - [Variance: type vs site vs interaction](/outputs/cross_site/signature/figures_v2/index.html#fig-typology_variance)
-  — morphotype 17% vs site 2% vs 0.7% interaction → transferable.
+  — morphotype 6% ≈ site 7%, interaction 0.5%, residual 87% (re-baselined).
 - [Block-scale morphotope tissue maps](/outputs/cross_site/signature/figures_v2/index.html#fig-morphotope_maps)
   — 5 tissues, distinct from the cell types; 4/5 recur.
 - [TR coherence audit (punch list)](/outputs/_hub/docs/tr_audit.html)
@@ -171,16 +172,19 @@ trimesh/manifold3d). Gaps: spopt/umap (Batch 2), statsmodels (done). Retry recip
 
 ## 📋 Queued (prioritized)
 
-1. **Typology → environmental-failure predictor** (implementing the plan):
-   - ✅ Step 1 — per-type WHO-2 h failure lookup (`typology_failure_lookup.png`):
-     monotone 14%→73%, T3→T4 regime jump, T4/T5 saturating.
-   - ✅ Steps 2–4 — parsimony + LOSO transfer + calibration: type-only transfers
-     out-of-site at **AUC-PR 0.77** (vs 0.85 full vector, 0.64 baseline; Δ0.086) —
-     the discrete code keeps most of the signal at far lower dimension. Calibrated
-     (slightly under-confident), PR AP 0.88 (`typology_parsimony.png`,
-     `typology_calibration.png`).
-   - ⏳ Next: isotonic recalibration; 3-level variance decomposition (between-type vs
-     site vs site×type); blind risk map on the 3 calibration favelas (the payoff).
+1. **Typology → environmental-failure predictor** — ✅ COMPLETE, with a
+   **CONCLUSION FLIP** under the dissolved-λf re-baseline (full detail in
+   `docs/brisa_round4_results_2026-06-25.md` ⚠ section; commit `2e8d4b5`):
+   - Parsimony REVERSED: type-only LOSO **AUC-PR 0.77→0.61**, gap to the continuous
+     vector **+0.086→+0.229** (vector 0.84). The continuous fabric vector carries
+     the transferable signal; the discrete typology is a descriptive/coarse-
+     prioritiser. "Discrete code keeps most of the signal" RETIRED.
+   - Variance partition flattened: morphotype 6% ≈ site 7%, interaction 0.5%,
+     residual 87%. "Morphotype dominates" RETIRED. Figure titles now data-driven.
+   - Isotonic recal: raw LOSO already well-calibrated (ECE 0.018→0.023, no gain).
+   - Blind risk map DONE (borel/jacarezinho/juramento mean p̂ 52/63/55%).
+   - Surfaced via a `party_wall_ratio` schema-drift break; both scripts repaired
+     (5-feature vector) + drift-guard test added.
 2. **Street-network / beco metrics** — 2nd configuration feature (circulation reach,
    alley width).
 3. **Terrain-following morphometry** — fix the roughness datum confound (council C).

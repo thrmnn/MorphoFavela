@@ -159,11 +159,45 @@ envelope — untouched. fig04/lambda_f_regime are manuscript/deck assets, not TR
 figures; the TR's own taxonomy is the CFD `U_mean<1.0 m/s` proposition
 (`fig_0_4_diagnostic.png`) and its §4.5 regime paragraph is already on dissolved λf.
 
-### Remaining MorphoFavela-side tracks (next, post-compaction)
-- **Track B figure reworks**: fig03 (regime panel C from `lambda_f_regime`),
-  fig01 (2×2 nominal taxonomy matrix), fig05 (AUC honesty box). All call the
-  text-fit gate; not blocking λf integration.
-- **Tracks D/E/F**: regime→fig03 sentence, lateral-connectivity scalar,
-  data-quality sweeps.
+## ⚠ TYPOLOGY-AS-PREDICTOR — conclusion FLIPPED under the dissolved-λf re-baseline
+
+Re-running `scripts/analyze_typology_predictor.py` + `typology_predictor_extra.py`
+on the dissolved-λf features (the morphotypes were re-fit on dissolved λf) **reverses
+two earlier headlines**. Do NOT cite the pre-re-baseline parsimony story.
+
+- **Parsimony reversed.** Type-only leave-one-site-out **AUC-PR fell 0.77 → 0.61**
+  (baseline prevalence 0.56), and the gap to the continuous fabric vector widened
+  **+0.086 → +0.229** (vector 0.84, both 0.84). The discrete typology alone is now
+  only *modestly* skillful; the **continuous fabric vector carries the transferable
+  signal**. Retire "the discrete code keeps most of the signal."
+- **Variance partition flattened.** Two-way partition of cell WHO-2 h failure:
+  morphotype **6%** ≈ site **7%**, site×type **0.5%**, residual **87%**. Retire
+  "morphotype dominates." The honest read: type and site contribute comparably and
+  modestly; the negligible interaction means the (small) type signal still transfers,
+  but most cell-level variance is within-type.
+- **Calibration / isotonic.** The raw LOSO `both` model is *already* well-calibrated
+  (ECE 0.018); isotonic recal adds nothing (0.018 → 0.023). Report the raw model.
+- **Blind risk map stands** (`typology_blind_riskmap.png`): the model never saw
+  borel / jacarezinho / morro_do_juramento; morphology-only mean p̂ = 52 / 63 / 55 %.
+  Frame as **survey/simulation prioritisation**, not household-level risk — the
+  modest type-only skill is exactly why.
+- Figure titles for parsimony/variance/isotonic are now **data-driven** (computed
+  from the numbers), so they can't re-assert a stale story on the next regen.
+- Cause of the break that surfaced this: the re-baseline dropped `party_wall_ratio`
+  from `features_grid` (it was never a grid column — separate per-building analysis;
+  the dissolve now encodes party walls into λf). Both predictor scripts were repaired
+  (5-feature continuous vector) + a schema-drift guard test added.
+
+**Net for the paper:** the typology is a sound *descriptive/communication* device and
+a usable coarse prioritiser, but the **continuous morphometrics are the predictor**.
+This is more defensible than the over-claimed parsimony story it replaces.
+
+## Remaining MorphoFavela-side tracks
+
+- **Track B figure reworks — ✅ DONE** (this session): fig03 regime axis +
+  DELIVERED/PROVISIONAL asymmetry; fig05 AUC honesty box + sun-adequacy-floor target;
+  fig01 Panel C terrain-hillshade / building-height-ramp split. All gate-checked.
+- **Tracks E/F**: lateral-connectivity scalar; data-quality sweeps (one latent bug
+  already fixed — `print3d` extrude hardcoded a missing `triangle` backend).
 - Blocked-isolated (skip, don't stall): ray-caster vs Radiance/SOLWEIG, CFD-τ,
   Mingze WeTransfer upload.
