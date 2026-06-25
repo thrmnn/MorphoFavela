@@ -43,7 +43,7 @@ annualisation against the measured wind roses.
 
 At time of writing, the pipeline has produced:
 
-- **98,435 building footprints** compiled from site-specific and city-wide
+- **98,415 building footprints** compiled from site-specific and city-wide
   cadastral data, with defensive geometry repair and extended context beyond
   each favela boundary.
 - **82,314 grid cells at 10 m resolution** covering the five sites, each
@@ -153,12 +153,12 @@ informal settlements:
 
 | Site | Area | Type | Buildings (extended) | 10 m cells | Mean H † | Annual mean sun ‡ |
 |------|-----:|------|--------------------:|-----------:|--------:|----------------:|
-| Vidigal | 0.30 km² | hillside | 4,600 | 3,169 | 6.3 m | 4.53 h |
-| Rocinha | 0.80 km² | hillside | 14,443 | 8,972 | 8.1 m | 3.30 h |
+| Vidigal | 0.30 km² | hillside | 4,599 | 3,169 | 6.3 m | 4.53 h |
+| Rocinha | 0.80 km² | hillside | 14,435 | 8,972 | 8.1 m | 3.30 h |
 | Rio das Pedras | 0.70 km² | flatland | 11,276 | 7,046 | 8.7 m | 3.14 h |
 | Complexo do Alemão | 1.97 km² | mixed | 28,783 | 19,708 | 5.3 m | 5.03 h |
-| Maré | 4.34 km² | flatland | 39,333 | 43,419 | 7.1 m | 7.07 h |
-| **TOTAL** | **8.11 km²** | | **98,435** | **82,314** | — | — |
+| Maré | 4.34 km² | flatland | 39,322 | 43,419 | 7.1 m | 7.07 h |
+| **TOTAL** | **8.11 km²** | | **98,415** | **82,314** | — | — |
 
 *Extended buildings = site footprints plus context buildings within a 300 m
 buffer (see Section 3.2; the v1 CFD campaign uses the additional 700 m
@@ -361,11 +361,11 @@ Extended buildings per site:
 
 | Site | Site buildings | Context buildings | Extended total |
 |------|--------------:|-----------------:|---------------:|
-| Vidigal | 3,695 | 905 | 4,600 |
-| Rocinha | 13,807 | 636 | 14,443 |
+| Vidigal | 3,695 | 904 | 4,599 |
+| Rocinha | 13,802 | 633 | 14,435 |
 | Rio das Pedras | 10,729 | 547 | 11,276 |
 | Complexo do Alemão | 21,729 | 7,054 | 28,783 |
-| Maré | 37,199 | 2,134 | 39,333 |
+| Maré | 37,188 | 2,134 | 39,322 |
 
 Implementation: `scripts/build_extended_context.py`. The 300 m buffer was
 selected as the inflection point of a sensitivity scan (200 m / 300 m /
@@ -921,7 +921,7 @@ formal blocks), and — orthogonally to density — the flat types are near-full
 party-walled while the hillside types are more stepped. **Forward look (forthcoming;
 not in this report):** this typology is the basis for a morphology-only *predictor of
 environmental failure*. The per-type WHO-2 h sun-failure rate separates strongly
-(≈ 17 % in open/flatland types to ≈ 66 % in the hillside cores), but the full
+(≈ 13 % in the Open Fringe to ≈ 63–68 % in the hillside/shaded cores), but the full
 sub-study finds that the **continuous fabric vector — not the discrete code —
 carries the transferable signal** (leave-one-site-out AUC-PR 0.84 vs 0.61 for the
 type code alone); the typology is best read as a descriptive, coarse prioritiser,
@@ -1785,7 +1785,7 @@ on Linux, `brew install gdal` on macOS) before `pip install`.
 
 ```bash
 python -m pytest tests/ -m "not integration" -q --tb=short
-# → 563 tests pass; 69 integration tests deselected
+# → 622 tests pass; 69 integration tests deselected
 # (use `python -m pytest` to bypass any older user-site `pytest` on PATH)
 ```
 
