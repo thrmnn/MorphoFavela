@@ -185,10 +185,14 @@ two earlier headlines**. Do NOT cite the pre-re-baseline parsimony story.
   gap. VIF on the continuous vector is low (1.1–3.0) → not one collinear feature re-badged
   (and the vector has no SVF/solar term). LOSO already holds each test site fully out, so
   the point estimates are honest transfer; the CI is the right thing to also quote.
-- **Blind risk map stands** (`typology_blind_riskmap.png`): the model never saw
-  borel / jacarezinho / morro_do_juramento; morphology-only mean p̂ = 52 / 63 / 55 %.
-  Frame as **survey/simulation prioritisation**, not household-level risk — the
-  modest type-only skill is exactly why.
+- **Blind risk map — now externally VALIDATED** (`typology_blind_riskmap.png` +
+  `typology_blind_validation.png`, roadmap #2): the 3 calibration favelas carry the
+  ray-cast target but were never in training. Pooled **AUC-PR 0.76, Brier 0.20** on
+  favelas the model never saw — real external transfer — but site-variable (jacarezinho
+  0.82 with **62 % of cells extrapolating** beyond the campaign p1–p99 envelope;
+  juramento 0.39 at low prevalence 0.23). Honest framing: it transfers as a **stratifier**
+  (6-level per-type lookup), with extrapolation flags — survey/simulation prioritisation,
+  not household-level or finely-calibrated probability.
 - Figure titles for parsimony/variance/isotonic are now **data-driven** (computed
   from the numbers), so they can't re-assert a stale story on the next regen.
 - Cause of the break that surfaced this: the re-baseline dropped `party_wall_ratio`

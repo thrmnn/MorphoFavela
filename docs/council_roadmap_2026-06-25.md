@@ -23,9 +23,10 @@ continued autonomous work. Engineering contract below is **non-negotiable**.
    **CI-overlapping**, so the flip is a direction not a separated gap (5 sites → wide
    bands). VIF low (1.1–3.0). `spatial_cv.json` + CI error bars on fig_parsimony. The
    council's predicted "gap may shrink toward 0.7" is borne out.
-2. **[deepen/S] Calibrate the blind risk map** on the 3 held-out favelas
-   (borel/jacarezinho/juramento carry the solar target) → reliability curves + Brier
-   + out-of-envelope flags. First confirm true hold-out (no leakage into λf lock tuning).
+2. **[deepen/S] Calibrate the blind risk map** — ✅ DONE (commit 3bfcf86). Pooled
+   AUC-PR 0.76 / Brier 0.20 on the 3 held-out favelas (never in training); site-variable
+   (jacarezinho 0.82 but 62% extrapolating; juramento 0.39 low-prevalence). Transfers as
+   a stratifier with extrapolation flags. `typology_blind_validation.png`.
 3. **[deepen/M] Tessellation + shape + grain descriptors into the morphotypes** —
    momepy-style shape (convexity, elongation, shape_index, adjacency) + footprint-area
    entropy aggregated to the grid; screen VIF vs λp; re-fit k=6, report LOSO-ARI vs
