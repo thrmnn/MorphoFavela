@@ -175,13 +175,64 @@ def loso(df, which):
     return pd.DataFrame(rows), oof_p, oof_y
 
 
-def fig_parsimony(results):
+def loso_block_bootstrap(df, which, n_boot=2000, seed=0):
+    """Site-block bootstrap CI on the pooled out-of-fold AUC-PR. Each LOSO fold's
+    held-out site is already fully out-of-sample (the strongest spatial blocking);
+    this resamples the 5 SITES with replacement and re-pools their OOF predictions
+    to put an honest uncertainty band on the transfer metric (n=5 → wide is correct).
+    """
+    from sklearn.metrics import average_precision_score
+
+    _, oof_p, oof_y = loso(df, which)
+    site = df["site"].to_numpy()
+    ok = np.isfinite(oof_p)
+    by = {}
+    for s in CAMPAIGN_SITES:
+        m = ok & (site == s)
+        if m.sum() and len(set(oof_y[m])) > 1:
+            by[s] = (oof_y[m], oof_p[m])
+    keys = list(by)
+    point = float(average_precision_score(oof_y[ok], oof_p[ok]))
+    rng = np.random.default_rng(seed)
+    boots = []
+    for _ in range(n_boot):
+        samp = rng.choice(keys, size=len(keys), replace=True)
+        yy = np.concatenate([by[s][0] for s in samp])
+        pp = np.concatenate([by[s][1] for s in samp])
+        if len(set(yy)) > 1:
+            boots.append(average_precision_score(yy, pp))
+    lo, hi = np.percentile(boots, [2.5, 97.5])
+    return {"point": point, "lo": float(lo), "hi": float(hi), "n_boot": len(boots)}
+
+
+def vif_report(df):
+    """Variance-inflation factors on the standardized continuous fabric vector —
+    answers the 'is the 0.84 just one collinear feature re-badged' referee question.
+    Note the vector contains NO SVF and NO solar term; it is pure fabric geometry."""
+    from sklearn.preprocessing import StandardScaler
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+    x = StandardScaler().fit_transform(df[CONT_FEATURES].to_numpy())
+    return {f: float(variance_inflation_factor(x, i)) for i, f in enumerate(CONT_FEATURES)}
+
+
+def fig_parsimony(results, cis=None):
     fig, ax = plt.subplots(figsize=(6, 3.6))
     sets = ["type", "vector", "both"]
     labels = ["type only\n(morphotype+morphotope)", "continuous\nfabric vector", "both"]
     x = np.arange(3)
     means = [results[s][0]["auc_pr"].mean() for s in sets]
-    ax.bar(x, means, color=["#5aae61", "#9970ab", "#1a6fb5"], alpha=0.85)
+    # Bars sit at the pooled-OOF point (what the block-bootstrap CI bands) when CIs
+    # are supplied, so bar height and error bar are the same quantity; the per-fold
+    # AUC-PR dots overlay to show the 5 held-out-site spread.
+    if cis is not None:
+        bar_vals = [cis[s]["point"] for s in sets]
+        yerr = np.clip(np.array([[bar_vals[i] - cis[s]["lo"], cis[s]["hi"] - bar_vals[i]]
+                                 for i, s in enumerate(sets)]).T, 0, None)
+        ax.bar(x, bar_vals, color=["#5aae61", "#9970ab", "#1a6fb5"], alpha=0.85,
+               yerr=yerr, capsize=5, error_kw=dict(lw=1.2, ecolor="0.2"))
+    else:
+        ax.bar(x, means, color=["#5aae61", "#9970ab", "#1a6fb5"], alpha=0.85)
     for s, xi in zip(sets, x):
         ax.plot([xi] * len(results[s][0]), results[s][0]["auc_pr"], "o", ms=4,
                 color="0.25", alpha=0.6)
@@ -201,9 +252,17 @@ def fig_parsimony(results):
     verdict = ("the discrete code keeps most of the signal"
                if gap < 0.10 else
                "the continuous fabric vector carries most of the transferable signal")
+    if cis is not None:
+        # Honest test: does the vector>type gap survive the site-block-bootstrap CI?
+        sep = "separated" if cis["type"]["hi"] < cis["vector"]["lo"] else "CI-overlapping"
+        ci_txt = (f"\nsite-block-bootstrap 95% CI: type {cis['type']['lo']:.2f}–"
+                  f"{cis['type']['hi']:.2f} vs vector {cis['vector']['lo']:.2f}–"
+                  f"{cis['vector']['hi']:.2f} ({sep})")
+    else:
+        ci_txt = ""
     ax.set_title(f"Parsimony (leave-one-site-out): type-only transfers at AUC-PR "
-                 f"{means[0]:.2f} vs {means[1]:.2f} for the full vector\n(baseline "
-                 f"{prev:.2f}) — {verdict}; the vector adds Δ{gap:+.3f}", fontsize=8)
+                 f"{means[0]:.2f} vs {means[1]:.2f} for the full vector "
+                 f"(baseline {prev:.2f}) — {verdict}; Δ{gap:+.3f}{ci_txt}", fontsize=7.5)
     ax.grid(axis="y", color="0.93")
     fig.tight_layout()
     fig.savefig(FIGS / "typology_parsimony.png", dpi=150, bbox_inches="tight")
@@ -310,7 +369,29 @@ def main():
                                 "brier": results[w][0]["brier"].mean()}
                             for w in results}).T
     summary.to_csv(OUT / "loso_parsimony.csv")
-    fig_parsimony(results)
+
+    # Rank-1 (council): site-block-bootstrap CIs on the pooled-OOF AUC-PR + VIF audit.
+    cis = {w: loso_block_bootstrap(full, w) for w in ("type", "vector", "both")}
+    vif = vif_report(full)
+    spatial_cv = {
+        "note": ("Site-block-bootstrap 95% CI on pooled out-of-fold AUC-PR (resample "
+                 "the 5 favelas with replacement). LOSO already holds each test site "
+                 "fully out; this bands the transfer metric. VIF on the standardized "
+                 "continuous fabric vector (no SVF, no solar term)."),
+        "auc_pr_ci": cis,
+        "gap_vector_minus_type_ci_separated": bool(cis["type"]["hi"] < cis["vector"]["lo"]),
+        "vif_continuous_vector": vif,
+    }
+    import json as _json
+    (OUT / "spatial_cv.json").write_text(_json.dumps(spatial_cv, indent=2))
+    print("\nsite-block-bootstrap AUC-PR 95% CI:")
+    for w in ("type", "vector", "both"):
+        print(f"  {w:<7s} {cis[w]['point']:.3f}  [{cis[w]['lo']:.3f}, {cis[w]['hi']:.3f}]")
+    print(f"  vector>type CI-separated: {spatial_cv['gap_vector_minus_type_ci_separated']}")
+    print("VIF (continuous fabric vector):",
+          {k: round(v, 1) for k, v in vif.items()})
+
+    fig_parsimony(results, cis)
     fig_calibration(full)
     try:
         frac = fig_variance(full)
