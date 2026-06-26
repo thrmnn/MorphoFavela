@@ -2,15 +2,21 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.morphometry.signature import (
+    GRAIN_COL,
+    SHAPE_DESCRIPTORS,
     SIGNATURE_FEATURES,
+    _area_entropy,
+    aggregate_shape_to_grid,
     assemble_signature_matrix,
     choose_k_elbow,
     fit_morphotypes,
     recurrence_flags,
     recurrence_matrix,
     standardize,
+    vif_screen,
 )
 
 # Canonical 6-feature fabric vector — pinned as an exact ordered literal so the
@@ -98,3 +104,63 @@ def test_recurrence_shares_sum_to_one_and_flags():
     flags = recurrence_flags(shares, min_share=0.05, min_sites=3)
     assert bool(flags.loc[0, "recurs"])          # type 0 present in all 3 sites
     assert not bool(flags.loc[1, "recurs"])       # type 1 only in 2 sites
+
+
+# --- shape/grain re-fit (#3, additive) -------------------------------------
+
+
+def test_area_entropy_uniform_is_zero_mixed_is_positive():
+    import numpy as np
+    assert _area_entropy(np.array([10.0, 10.0, 10.0]), n_bins=8) == 0.0
+    assert _area_entropy(np.array([5.0, 50.0, 500.0]), n_bins=8) > 0.4
+    assert _area_entropy(np.array([7.0]), n_bins=8) == 0.0   # <2 buildings → 0
+
+
+def test_vif_screen_flags_collinear_feature():
+    rng = np.random.default_rng(0)
+    a = rng.normal(size=400)
+    b = rng.normal(size=400)
+    c = a + 0.001 * rng.normal(size=400)   # near-perfect copy of a → high VIF
+    mat = pd.DataFrame({"a": a, "b": b, "c": c})
+    vif = vif_screen(mat, ["a", "b", "c"], threshold=10.0)
+    flagged = set(vif.loc[vif["drop"], "feature"])
+    assert {"a", "c"} & flagged          # the collinear pair is caught
+    assert "b" not in flagged            # the independent feature is kept
+
+
+def test_aggregate_shape_area_weighted_and_support_flag():
+    gpd = pytest.importorskip("geopandas")
+    from shapely.geometry import Point, box
+
+    grid = gpd.GeoDataFrame(
+        {"zone_id": [0, 1]},
+        geometry=[box(0, 0, 10, 10), box(10, 0, 20, 10)],
+        crs="EPSG:31983",
+    )
+    # cell 0: two buildings (areas 1 and 9) → area-weighted shape_index
+    # cell 1: one building → has_shape_support False (< MIN_BUILDINGS_FOR_SHAPE)
+    blds = gpd.GeoDataFrame(
+        {
+            "shape_index": [2.0, 6.0, 4.0],
+            "convexity": [1.0, 1.0, 1.0],
+            "building_adjacency": [0.0, 0.0, 0.0],
+            "elongation": [1.0, 1.0, 1.0],
+            "tessellation_neighbors": [3.0, 3.0, 3.0],
+            "fractal_dimension": [1.5, 1.5, 1.5],
+        },
+        geometry=[
+            Point(5, 5).buffer(0.5642),   # area ≈ 1
+            Point(5, 5).buffer(1.6926),   # area ≈ 9
+            Point(15, 5).buffer(1.0),
+        ],
+        crs="EPSG:31983",
+    )
+    agg = aggregate_shape_to_grid(blds, grid)
+    assert set(agg["zone_id"]) == {0, 1}
+    c0 = agg[agg["zone_id"] == 0].iloc[0]
+    # area-weighted mean of shape_index: (2*1 + 6*9)/10 = 5.6, well above the 4.0 mean
+    assert c0["shape_index_mean"] > 5.0
+    assert bool(c0["has_shape_support"])             # 2 buildings
+    assert not bool(agg[agg["zone_id"] == 1].iloc[0]["has_shape_support"])  # 1 building
+    assert GRAIN_COL in agg.columns
+    assert set(f"{c}_mean" for c in SHAPE_DESCRIPTORS) <= set(agg.columns)

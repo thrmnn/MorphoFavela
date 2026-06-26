@@ -37,6 +37,19 @@ EXPERIENCE_COLS = [
     "frac_deep_canyon", "hw_p50",
 ]
 
+# Per-building shape/grain descriptors (from
+# buildings_with_morphology_metrics.gpkg) aggregated to grid cells as
+# area-weighted means + a grain/size-diversity axis (footprint-area entropy).
+# Additive only — these never overwrite the canonical SIGNATURE_FEATURES.
+SHAPE_DESCRIPTORS = [
+    "shape_index", "convexity", "building_adjacency", "elongation",
+    "tessellation_neighbors", "fractal_dimension",
+]
+SHAPE_MEAN_COLS = [f"{c}_mean" for c in SHAPE_DESCRIPTORS]
+GRAIN_COL = "area_entropy"  # footprint-size diversity within the cell
+SHAPE_GRAIN_COLS = SHAPE_MEAN_COLS + [GRAIN_COL]
+MIN_BUILDINGS_FOR_SHAPE = 2  # support flag floor for the cell-level aggregate
+
 CAMPAIGN_SITES = [
     "vidigal", "rocinha", "riodaspedras", "complexo_do_alemao", "maré",
 ]
@@ -257,6 +270,108 @@ def bootstrap_stability(
         ).fit(Xz[idx])
         aris.append(adjusted_rand_score(reference, gm.predict(Xz)))
     return np.array(aris)
+
+
+def aggregate_shape_to_grid(
+    buildings, grid, area_bins: int = 8
+) -> pd.DataFrame:
+    """Area-weighted per-cell aggregation of the shape/grain descriptors (#3).
+
+    Each building is assigned to the grid cell containing its centroid, then the
+    shape descriptors are averaged weighting by footprint area (so a cell's
+    character reflects the fabric it is mostly made of, not its slivers). The
+    grain axis is the Shannon entropy of the within-cell footprint-area
+    distribution (``area_bins`` log-spaced bins, normalised 0..1) — high where a
+    cell mixes large and small footprints, 0 where all footprints are one size.
+
+    Returns one row per grid ``zone_id`` carrying ``*_mean`` columns, the
+    ``area_entropy`` grain axis, ``n_buildings`` support, and a
+    ``has_shape_support`` flag (``n_buildings >= MIN_BUILDINGS_FOR_SHAPE``).
+    Additive: nothing in ``grid`` is mutated.
+    """
+    import geopandas as gpd
+
+    pts = buildings.copy()
+    pts["_area"] = pts.geometry.area
+    pts = gpd.GeoDataFrame(
+        pts.drop(columns="geometry"), geometry=pts.geometry.centroid, crs=buildings.crs
+    )
+    joined = gpd.sjoin(
+        pts, grid[["zone_id", "geometry"]], how="inner", predicate="within"
+    ).drop(columns="index_right", errors="ignore")
+
+    rows = []
+    for zid, g in joined.groupby("zone_id"):
+        w = g["_area"].to_numpy(dtype=float)
+        wsum = w.sum()
+        rec = {"zone_id": zid, "n_buildings": int(len(g))}
+        for c in SHAPE_DESCRIPTORS:
+            if c in g.columns:
+                v = g[c].to_numpy(dtype=float)
+                ok = np.isfinite(v)
+                rec[f"{c}_mean"] = (
+                    float(np.average(v[ok], weights=w[ok])) if ok.any() and w[ok].sum() > 0
+                    else np.nan
+                )
+            else:
+                rec[f"{c}_mean"] = np.nan
+        rec[GRAIN_COL] = _area_entropy(w, area_bins)
+        rows.append(rec)
+
+    out = pd.DataFrame(rows)
+    out = grid[["zone_id"]].merge(out, on="zone_id", how="left")
+    out["n_buildings"] = out["n_buildings"].fillna(0).astype(int)
+    out["has_shape_support"] = out["n_buildings"] >= MIN_BUILDINGS_FOR_SHAPE
+    return out
+
+
+def _area_entropy(areas: np.ndarray, n_bins: int) -> float:
+    """Shannon entropy (0..1) of a within-cell footprint-area distribution."""
+    a = areas[np.isfinite(areas) & (areas > 0)]
+    if len(a) < 2 or a.min() == a.max():
+        return 0.0
+    lo, hi = np.log10(a.min()), np.log10(a.max())
+    # widen the outer edges slightly so min/max are not lost to histogram edge
+    # semantics (a value on an interior edge lands in the higher bin).
+    span = hi - lo
+    edges = np.logspace(lo - 1e-9 * span - 1e-12, hi + 1e-9 * span + 1e-12, n_bins + 1)
+    counts, _ = np.histogram(a, bins=edges)
+    p = counts[counts > 0] / counts.sum()
+    if len(p) < 2:
+        return 0.0
+    return float(-(p * np.log(p)).sum() / np.log(len(p)))
+
+
+def vif_screen(
+    mat: pd.DataFrame, features: list[str], threshold: float = 10.0
+) -> pd.DataFrame:
+    """Variance-inflation factor of each feature against the others.
+
+    VIF_j = 1 / (1 - R²_j) from an OLS of feature j on the remaining features
+    (standardized). Features with VIF ≥ ``threshold`` are collinear and flagged
+    ``drop``. Used to screen the shape/grain axes against λp before the
+    augmented re-fit (shape_index / FAR-like descriptors are known density
+    proxies).
+    """
+    X = mat[features].to_numpy(dtype=float)
+    keep = np.all(np.isfinite(X), axis=1)
+    X = X[keep]
+    mu, sd = X.mean(0), X.std(0)
+    sd[sd == 0] = 1.0
+    Xz = (X - mu) / sd
+    rows = []
+    for j, f in enumerate(features):
+        y = Xz[:, j]
+        others = np.delete(Xz, j, axis=1)
+        A = np.column_stack([np.ones(len(others)), others])
+        beta, *_ = np.linalg.lstsq(A, y, rcond=None)
+        resid = y - A @ beta
+        ss_res = float((resid**2).sum())
+        ss_tot = float(((y - y.mean()) ** 2).sum())
+        r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
+        vif = 1.0 / (1.0 - r2) if r2 < 1.0 else float("inf")
+        rows.append({"feature": f, "vif": vif, "drop": vif >= threshold})
+    return pd.DataFrame(rows)
 
 
 def experience_profile(

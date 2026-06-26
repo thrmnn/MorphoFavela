@@ -26,7 +26,9 @@ sys.path.insert(0, str(ROOT))  # win over the stale brisa-0.1.0 editable install
 
 from src.morphometry.signature import (  # noqa: E402
     CAMPAIGN_SITES,
+    SHAPE_GRAIN_COLS,
     SIGNATURE_FEATURES,
+    aggregate_shape_to_grid,
     assemble_signature_matrix,
     centroid_linkage,
     choose_k_elbow,
@@ -36,11 +38,13 @@ from src.morphometry.signature import (  # noqa: E402
     recurrence_matrix,
     select_k,
     standardize,
+    vif_screen,
 )
 from src.svf_v2.io import _git_sha  # noqa: E402
 
 OUT = ROOT / "outputs" / "cross_site" / "signature"
 RANDOM_STATE = 0
+SHAPE_GPKG = "morphometrics/buildings/buildings_with_morphology_metrics.gpkg"
 
 
 def load_pooled() -> pd.DataFrame:
@@ -153,13 +157,134 @@ def figures(sel, k, Xz, labels, link, shares, profile, stats) -> None:
         _save(fig, f"map_{site}.png")
 
 
+def load_shape_grid(site: str):
+    """Aggregate a site's per-building shape/grain descriptors to its 10 m grid."""
+    bld_path = ROOT / "outputs" / site / SHAPE_GPKG
+    grid_path = ROOT / "outputs" / site / "features" / "features_grid.parquet"
+    if not bld_path.exists() or not grid_path.exists():
+        return None
+    bld = gpd.read_file(bld_path)
+    grid = gpd.read_parquet(grid_path)
+    agg = aggregate_shape_to_grid(bld, grid)
+    agg["site"] = site
+    return agg
+
+
+def shape_ab(k: int) -> None:
+    """Additive shape/grain re-fit (#3): canonical-6 + VIF-screened shape axes
+    → a NEW ``morphotype_shape`` column. Reports LOSO-ARI vs the canonical
+    partition and writes the A/B artefacts. The canonical ``morphotype`` /
+    ``morphotype_smooth`` columns are never touched.
+    """
+    from sklearn.metrics import adjusted_rand_score
+
+    df = load_pooled()
+    mat = assemble_signature_matrix(df)  # canonical built cells + lambda_f_aniso
+
+    # attach the per-cell shape/grain aggregate
+    shape_frames = [load_shape_grid(s) for s in CAMPAIGN_SITES]
+    shape = pd.concat([s for s in shape_frames if s is not None], ignore_index=True)
+    aug = mat.merge(shape, on=["site", "zone_id"], how="left")
+
+    # VIF-screen the augmented set against lambda_p (+ the canonical 6)
+    screen_cols = list(SIGNATURE_FEATURES) + SHAPE_GRAIN_COLS
+    vif_ok = aug[screen_cols].dropna()
+    vif = vif_screen(vif_ok, screen_cols)
+    dropped = vif.loc[vif["drop"], "feature"].tolist()
+    kept_shape = [c for c in SHAPE_GRAIN_COLS if c not in dropped]
+
+    # augmented feature matrix: canonical 6 + kept shape axes; drop rows missing
+    # any shape support so the two partitions are compared on the same cells.
+    aug_features = list(SIGNATURE_FEATURES) + kept_shape
+    aug_mat = aug.dropna(subset=aug_features).reset_index(drop=True)
+
+    Xa = aug_mat[aug_features].to_numpy(dtype=float)
+    mu, sd = Xa.mean(0), Xa.std(0)
+    sd[sd == 0] = 1.0
+    Xaz = (Xa - mu) / sd
+    shape_labels = fit_morphotypes(Xaz, k, random_state=RANDOM_STATE)
+
+    # canonical labels on the SAME cell subset (the lambda_p ordering means both
+    # partitions share the density-sorted vocabulary, so the ARI is interpretable)
+    Xc6, _ = standardize(mat)
+    canon_full = fit_morphotypes(Xc6, k, random_state=RANDOM_STATE)
+    canon_lut = mat[["site", "zone_id"]].copy()
+    canon_lut["canon"] = canon_full
+    keyed = aug_mat[["site", "zone_id"]].merge(canon_lut, on=["site", "zone_id"], how="left")
+    canon_labels = keyed["canon"].to_numpy()
+
+    cell_ari = float(adjusted_rand_score(canon_labels, shape_labels))
+
+    # LOSO-ARI of the shape-augmented partition vs canonical, per held-out site
+    loso_rows = []
+    sites_arr = aug_mat["site"].to_numpy()
+    for held in CAMPAIGN_SITES:
+        m = sites_arr == held
+        if m.sum() == 0:
+            continue
+        loso_rows.append({
+            "held_out_site": held,
+            "n_cells": int(m.sum()),
+            "ari_shape_vs_canon": float(adjusted_rand_score(canon_labels[m], shape_labels[m])),
+        })
+    loso = pd.DataFrame(loso_rows)
+
+    # write morphotype_shape back (NEW additive column only)
+    lut = aug_mat[["site", "zone_id"]].copy()
+    lut["morphotype_shape"] = shape_labels
+    for site, grp in lut.groupby("site"):
+        path = ROOT / "outputs" / site / "features" / "features_grid.parquet"
+        g = gpd.read_parquet(path)
+        g = g.drop(columns="morphotype_shape", errors="ignore").merge(
+            grp.drop(columns="site"), on="zone_id", how="left"
+        )
+        g["morphotype_shape"] = g["morphotype_shape"].astype("Int64")
+        g.to_parquet(path)
+
+    OUT.mkdir(parents=True, exist_ok=True)
+    vif.to_csv(OUT / "shape_vif.csv", index=False)
+    loso.to_csv(OUT / "shape_loso_ari.csv", index=False)
+    meta = {
+        "git_sha": _git_sha(),
+        "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "k": int(k),
+        "canonical_features": list(SIGNATURE_FEATURES),
+        "shape_grain_features": SHAPE_GRAIN_COLS,
+        "vif_dropped": dropped,
+        "shape_features_kept": kept_shape,
+        "augmented_features": aug_features,
+        "n_cells_compared": int(len(aug_mat)),
+        "n_cells_canonical": int(len(mat)),
+        "cell_level_ari_shape_vs_canon": cell_ari,
+        "loso_ari_mean": float(loso["ari_shape_vs_canon"].mean()),
+        "loso_ari_min": float(loso["ari_shape_vs_canon"].min()),
+    }
+    (OUT / "shape_ab_meta.json").write_text(json.dumps(meta, indent=2))
+
+    print("\n=== SHAPE/GRAIN A/B (additive — canonical untouched) ===")
+    print(f"VIF-dropped (collinear w/ density): {dropped or 'none'}")
+    print(f"shape axes kept: {kept_shape}")
+    print(vif.round(2).to_string(index=False))
+    print(f"\ncell-level ARI (shape-aug vs canonical): {cell_ari:.3f}  "
+          f"on {len(aug_mat)} shared cells")
+    print(f"LOSO ARI mean={loso['ari_shape_vs_canon'].mean():.3f}  "
+          f"min={loso['ari_shape_vs_canon'].min():.3f}")
+    print(loso.to_string(index=False))
+
+
 def main() -> None:
     import argparse
 
     ap = argparse.ArgumentParser(description="Fit the morphotype signature.")
     ap.add_argument("--k", type=int, default=None,
                     help="force k (default: BIC-elbow; k=6 is the domain-pinned granularity)")
+    ap.add_argument("--shape-ab", action="store_true",
+                    help="run the additive shape/grain re-fit A/B (writes morphotype_shape)")
     args = ap.parse_args()
+
+    if args.shape_ab:
+        shape_ab(args.k if args.k is not None else 6)
+        return
 
     OUT.mkdir(parents=True, exist_ok=True)
     df = load_pooled()

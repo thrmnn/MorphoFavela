@@ -69,6 +69,63 @@ def load() -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
+def load_labelled(label_col: str) -> pd.DataFrame:
+    """Pool the 5 campaign sites carrying ``label_col`` as ``morphotype_smooth``
+    (so neighborhood_composition consumes it). Cells without that label are
+    dropped — used for the shape-augmented morphotope A/B."""
+    frames = []
+    for s in CAMPAIGN_SITES:
+        p = ROOT / "outputs" / s / "features" / "features_grid.parquet"
+        if not p.exists() or label_col not in gpd.read_parquet(p).columns:
+            continue
+        g = gpd.read_parquet(p)
+        d = pd.DataFrame(g.drop(columns="geometry"))
+        d["site"] = s
+        # drop any pre-existing morphotype_smooth so renaming label_col can't collide
+        if label_col != "morphotype_smooth" and "morphotype_smooth" in d.columns:
+            d = d.drop(columns="morphotype_smooth")
+        d = d.rename(columns={label_col: "morphotype_smooth"})
+        sub = d[["site", "zone_id", "centroid_x", "centroid_y",
+                 "morphotype_smooth"]].dropna(subset=["morphotype_smooth"]).copy()
+        sub["morphotype_smooth"] = sub["morphotype_smooth"].astype(int)
+        frames.append(sub)
+    return pd.concat(frames, ignore_index=True)
+
+
+def shape_morphotope_ari() -> None:
+    """Morphotope-level ARI of the shape-augmented partition vs the canonical
+    one. Builds k=5 morphotopes from each cell-label field independently, then
+    scores ARI on the shared cells. Reports whether the tissue-scale signature
+    survives the shape re-fit."""
+    from sklearn.metrics import adjusted_rand_score
+
+    canon = load_labelled("morphotype_smooth")
+    shape = load_labelled("morphotype_shape")
+    comp_c = neighborhood_composition(canon, radius=RADIUS)
+    comp_s = neighborhood_composition(shape, radius=RADIUS)
+    lab_c = fit_morphotopes(comp_c, REF_K, random_state=0, n_init=4)
+    lab_s = fit_morphotopes(comp_s, REF_K, random_state=0, n_init=4)
+
+    kc = comp_c[["site", "zone_id"]].copy()
+    kc["mc"] = lab_c
+    ks = comp_s[["site", "zone_id"]].copy()
+    ks["ms"] = lab_s
+    j = kc.merge(ks, on=["site", "zone_id"], how="inner")
+    ari = float(adjusted_rand_score(j["mc"].to_numpy(), j["ms"].to_numpy()))
+
+    OUT.mkdir(parents=True, exist_ok=True)
+    meta = {
+        "reference_k": REF_K,
+        "n_canon_cells": int(len(comp_c)),
+        "n_shape_cells": int(len(comp_s)),
+        "n_shared_cells": int(len(j)),
+        "morphotope_ari_shape_vs_canon": ari,
+    }
+    (OUT / "shape_morphotope_ari.json").write_text(json.dumps(meta, indent=2))
+    print(f"morphotope-level ARI (shape-aug vs canonical), k={REF_K}: {ari:.3f}  "
+          f"on {len(j)} shared cells")
+
+
 def bootstrap_ari(comp: pd.DataFrame, ref_labels: np.ndarray, k: int):
     """N_BOOT GMM refits on SUBSAMPLE_FRAC random subsamples of the composition
     vectors; ARI of each refit against the reference labels on the shared cells.
@@ -134,6 +191,16 @@ def fig_stability(sel: pd.DataFrame, elbow_k: int, bic_min_k: int, aris: np.ndar
 
 
 def main():
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Morphotope stability / shape A/B audit.")
+    ap.add_argument("--shape", action="store_true",
+                    help="report morphotope-level ARI of the shape-augmented vs canonical labels")
+    args = ap.parse_args()
+    if args.shape:
+        shape_morphotope_ari()
+        return
+
     OUT.mkdir(parents=True, exist_ok=True)
     df = load()
     comp = neighborhood_composition(df, radius=RADIUS)

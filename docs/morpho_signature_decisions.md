@@ -181,6 +181,57 @@ cell-types are real tissue states, not clustering noise. Maps are coherent regio
 (maps/profile/recurrence) in the gallery + overview. Next: name the 5 tissues;
 bootstrap-stability on the morphotope k.
 
+## S1 — Canonical morphometry hardening (2026-06-26)
+
+**D21 · Built-cell + phantom-tower invariants unified behind shared helpers.**
+`src/morphometry/invariants.py` now owns `built_mask(grid)` (canonical
+`building_count > 0`; lenient `(λp>0.01)|(building_count>0)` variant — identical
+on the campaign grids, pooled **n=64,389**) and `drop_phantom_buildings`
+(topo==0 / altura≈base>40 m). `run_pilot_sampling` re-exports the latter;
+`features.py`, `signature.py`, `svf_v2/scene.py`, and the extended-context /
+ventilation / cross-site scripts call the shared helpers instead of inlined
+predicates. `extruding_only=True` keeps `build_extended_context` bit-for-bit
+(its historical `(topo==0)&(altura>0)`), so the grids — and the λf lock file —
+are unchanged. Contract test (`tests/test_invariants.py`) pins the pooled
+n=64,389. `SIGNATURE_FEATURES` is now pinned as an exact ordered literal in
+`tests/test_signature.py` (silent feature-drift guard).
+
+**D22 · Shape/grain morphotype re-fit (#3) — additive, a reported sensitivity,
+NOT a re-baseline.** Per-building shape/grain descriptors
+(`buildings_with_morphology_metrics.gpkg`) are aggregated to the 10 m grid as
+**area-weighted means** plus a grain axis, **`area_entropy`** (Shannon entropy of
+the within-cell footprint-area distribution, 0..1). A `morphotype_shape` column
+is written back additively; `morphotype` / `morphotype_smooth` / `morphotope`
+and every `λf` value are **bit-for-bit untouched** (snapshot-verified).
+
+- **VIF screen (vs the canonical 6 + each other).** `shape_index_mean` is
+  collinear with density (**VIF 10.45 ≥ 10**) and dropped — it re-expresses λp,
+  exactly the known confound. The other six axes are kept (convexity 5.89,
+  elongation 6.47, building_adjacency 1.76, tessellation_neighbors 1.12,
+  fractal_dimension 1.19, area_entropy 1.47); `lambda_f_mean`/`lambda_f_aniso`
+  sit just under the gate (8.69 / 8.99) and are retained as canonical.
+- **Shape adds a separable axis — it is NOT just density re-expressed.**
+  Cell-level ARI(shape-augmented vs canonical) = **0.175** (LOSO mean 0.181,
+  min 0.130 at Rio das Pedras) over 39,888 shared cells. A partition that merely
+  re-encoded density would land near ARI≈1; 0.18 means the screened shape/grain
+  axes reshuffle a large fraction of cells into genuinely different types. At
+  **tissue scale the ARI rises to 0.436** (k=5 morphotopes built from each
+  cell-label field) — the 50 m composition window absorbs much of the cell-level
+  churn, so the recurrent-tissue signature is the more robust scale (consistent
+  with D18). *Decision:* keep the canonical density-anchored 6-feature fit as the
+  signature; report `morphotype_shape` as a shape-sensitivity extension. The low
+  ARI is the finding, not a defect — it quantifies how much fabric *character*
+  (grain, convexity, adjacency) is orthogonal to the density field the canonical
+  signature is built on. Artefacts: `outputs/cross_site/signature/shape_*.{csv,json}`.
+
+## S1 — Clustering-validity hardening (2026-06-26)
+
+**D23 · Bootstrap-ARI promoted to the k-selection summary.** `audit_k_selection.py`
+gains `bootstrap_ari()` (B=200 GMM refits on resamples, Hungarian-matched to the
+reference k=6 labels) and emits `k_selection_summary.json` consolidating
+elbow_k, silhouette_peak_k, mean/min LOSO-ARI, and the bootstrap-ARI 2.5/97.5
+percentile CI. Schema pinned by `tests/test_audit_k_selection.py`.
+
 ## Open questions / revisit list
 
 - **Terrain-aware λf & SVF (plan Risk 1).** Both assume a flat datum; on 20–30°
