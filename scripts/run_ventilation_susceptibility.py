@@ -36,7 +36,7 @@ from matplotlib.patches import Patch
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
-from fig_style import SITE_LABELS, apply_style, save_fig  # noqa: E402
+from fig_style import SITE_LABELS, add_provenance, apply_style, save_fig  # noqa: E402
 
 from scripts.run_lateral_connectivity import open_edge_distance  # noqa: E402
 
@@ -140,6 +140,7 @@ def main() -> None:
              "2-D geometric ventilation susceptibility — vertical λ$_f$ regime × lateral "
              "depth-to-open-edge\n(two separate geometry-only axes; worst = skimming × deep; "
              "pre-CFD, not air exchange)", ha="center", va="top", fontsize=7.0)
+    add_provenance(fig)
     save_fig(fig, "ventilation_susceptibility", gate=True)
 
 

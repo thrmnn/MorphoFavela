@@ -787,7 +787,9 @@ comfort, photovoltaic, and health-outcome studies is the annual proxy
 The same envelope was extended to all five sites in May 2026
 (`scripts/run_street_solar.py` + `outputs/paper_figures/figS_solar_envelope.py`,
 both site-agnostic — the canonical fig07 wrapper for Vidigal is a
-4-line invocation of the same renderer). Cross-site headline numbers:
+4-line invocation of the same renderer). Per-site envelope panels are in the
+SI (`figures/figS_solar_envelope_{rocinha,complexo_do_alemao,riodaspedras}.png`).
+Cross-site headline numbers:
 
 | Site | n streets | winter h | annual h | summer h | WHO < 2 h winter | WHO < 2 h annual | WHO < 2 h summer | range h |
 |------|--:|--:|--:|--:|--:|--:|--:|--:|
