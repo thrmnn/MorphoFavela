@@ -339,6 +339,31 @@
 ## Next Steps & Priorities
 
 ### Recently Completed
+- [x] **Dissolved λf canonicalised + downstream re-baseline** (2026-06-25) — party-wall-corrected
+      (dissolved) λf is now the single authoritative source, pinned bit-for-bit in
+      `outputs/brisa_ventilation_fix/lambda_f_canonical.json` and test-locked
+      (`tests/test_lambda_f_lockfile.py`; pooled built mask n = 64,389). Oke / Grimmond-Oke
+      flow-regime split ≈ 65 % skimming / 30 % wake / 5 % isolated. Regime-stratified four-state
+      taxonomy supersedes the interim λf>2.75 cut; the old "typology inversion" is retired
+      (hillside 42.2 % > flatland 37.3 % compound, H/W cross-check agrees). See
+      `docs/brisa_round4_results_2026-06-25.md`.
+- [x] **k=6 cell morphotypes + k=3 block morphotopes** re-fit on dissolved λf
+      (`scripts/build_signature.py`, `src/morphometry/signature.py`).
+- [x] **Typology→WHO-2 h-sun predictor — conclusion FLIPPED** (2026-06) — under the re-baseline
+      the continuous fabric vector (LOSO AUC-PR ≈ 0.84) beats the discrete type (≈ 0.61);
+      spatially-blocked block-bootstrap 95 % CIs overlap (so the flip is a direction, not a clean
+      gap) with low VIF (1.1–3.0). Blind risk map externally validated on 3 calibration favelas
+      (pooled AUC-PR 0.76). `scripts/analyze_typology_predictor.py` + `typology_predictor_extra.py`.
+- [x] **New geometric scalars** (2026-06) — lateral-connectivity (distance-to-open-edge,
+      `run_lateral_connectivity.py`); 2-D ventilation-susceptibility (regime × depth,
+      `run_ventilation_susceptibility.py`, pooled 41.8 % doubly constrained); effective
+      wind-exposure (directional λf × wind rose, `run_wind_exposure.py`).
+- [x] **Track C (terrain-following morphometry) resolved as a scoping null** (2026-06-25,
+      commit 9923a1c) — σH already terrain-following (corr(slope,σH) negative); λf terrain-step
+      gate cleared (<5 %); canonical λf untouched.
+- [~] **Roughness z0/zd via UMEP** — invalid for **53–75 % of cells** (zd>H_mean, λp>0.5 out of
+      Kanda envelope); the validity envelope *is* the result. CFD drag-centroid anchor gated on
+      real OpenFOAM. `src/morphometry/roughness.py`, `scripts/build_roughness.py`.
 - [x] **Morpho-signature track (WS-0 → WS-B) + review hub** (2026-06-19, branch
       `track/morpho-signature`) — two-table feature substrate respecting the street/grid
       change-of-support (`src/morphometry/features.py`); favela morphotype clustering
@@ -614,8 +639,14 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
   cross-validation (`scripts/compare_mingze_vidigal.py`)
 - 5-site street-SVF re-baseline on the corrected ray-caster (boundary-clip + facade-normal),
   validated vs Mingze Ladybug (Vidigal MAE 1.77 → 1.70 h); `run_meta.json` provenance manifests
-- **Status**: BRISA chain consolidated onto `main` (2026-06-18, 41 commits fast-forwarded,
-  merged branches pruned); ready for a fresh next track
+- Dissolved (party-wall corrected) λf canonicalised + test-locked (`lambda_f_canonical.json`,
+  pooled n = 64,389; ≈ 65/30/5 skimming/wake/isolated); regime-stratified taxonomy replaces the
+  interim λf>2.75 cut; k=6 morphotypes + k=3 morphotopes re-fit; predictor FLIP (continuous vector
+  >> discrete type) with spatial-CV CIs; new lateral-connectivity / ventilation-susceptibility /
+  wind-exposure scalars; Track C resolved as a null; roughness z0 out-of-envelope 53–75 %
+- **Status**: BRISA chain consolidated onto `main` (2026-06-18); dissolved-λf re-baseline +
+  geometric-scalar tracks landed (2026-06-25); standing plan in
+  `docs/council_roadmap_2026-06-25.md` + `docs/repo_parallel_plan_2026-06-26.md`
 
 ### v5.5.0 (late April – early May 2026)
 - Wind input for all 5 sites: INMET BDMEP + Iowa State ASOS pipelines, measured roses

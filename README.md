@@ -19,7 +19,9 @@ A Python pipeline for the morphometric and CFD-coupled analysis of pedestrian-le
 
 ## Status
 
-See [ROADMAP.md](ROADMAP.md) for the full roadmap and version history. **As of June 2026**: 5 campaign sites + 3 calibration sites (Borel, Jacarezinho, Morro do Juramento) onboarded; 119-patch CFD campaign sampled and exported; wind input complete; result-side analysis pipeline shipped + synthetic-validated end-to-end on all 5 sites; SVF cross-validated against UMEP `svfForProcessing153` (closes the §10.3 limitation). Grid λf was re-baselined on 2026-06-02 by the cell-clipping repair — pre-June λf values are superseded. Street-level pipeline now runs on canonical observer networks with length-weighted segment SVF, cross-validated against an independent Ladybug model (Vidigal, MAE 1.77 h, deprivation-flag agreement 72 %). CFD pilot ladder staged in `~/Airflow`; ingestion layer plumbed and waiting on first real return.
+See [ROADMAP.md](ROADMAP.md) for the full roadmap and version history. **As of June 2026**: 5 campaign sites + 3 calibration sites (Borel, Jacarezinho, Morro do Juramento) onboarded; 119-patch CFD campaign sampled and exported; wind input complete; result-side analysis pipeline shipped + synthetic-validated end-to-end on all 5 sites; SVF cross-validated against UMEP `svfForProcessing153` (closes the §10.3 limitation). CFD pilot ladder staged in `~/Airflow`; ingestion layer plumbed and waiting on first real return.
+
+**Dissolved λf is now canonical.** Party-wall-corrected frontal-area density (touching footprints unioned into blocks before projection) is the single authoritative source, pinned bit-for-bit in `outputs/brisa_ventilation_fix/lambda_f_canonical.json` (gitignored output; regenerable) and test-locked (`tests/test_lambda_f_lockfile.py`). Pooled built mask n = 64,389; Oke / Grimmond-Oke flow-regime split ≈ 65 % skimming / 30 % wake / 5 % isolated. On top of it: **k = 6 cell morphotypes + k = 3 block morphotopes**; a typology→WHO-2 h-sun-failure predictor where the re-baseline **flipped** the headline — the continuous fabric vector (LOSO AUC-PR ≈ 0.84) outperforms the discrete type (≈ 0.61), with spatially-blocked block-bootstrap CIs (which overlap, so the flip is a direction not a clean gap) and low VIF; the blind risk map is externally validated on 3 calibration favelas (pooled AUC-PR 0.76). New geometric scalars: lateral-connectivity (distance-to-open-edge), 2-D ventilation-susceptibility (regime × depth), and effective wind-exposure (directional λf × wind rose). Roughness z0/zd via UMEP is **out of validity envelope for 53–75 % of cells** — that envelope is the result, not a defect. Track C (terrain-following morphometry) resolved as a scoping null. See [`docs/council_roadmap_2026-06-25.md`](docs/council_roadmap_2026-06-25.md), [`docs/repo_parallel_plan_2026-06-26.md`](docs/repo_parallel_plan_2026-06-26.md), and [`docs/brisa_round4_results_2026-06-25.md`](docs/brisa_round4_results_2026-06-25.md) for the standing plan and round-4/5 results.
 
 ## Repository Map
 
@@ -245,13 +247,13 @@ MorphoFavela/
 ├── README.md, ROADMAP.md                 # Entry points (see also Repository Map above)
 │
 ├── src/                                  # Library code (importable)
-│   ├── morphometry/                      # Core morphometric metrics
+│   ├── morphometry/                      # Core metrics + morphotypes/signature, roughness z0/zd, prioritization
 │   ├── svf_v2/                           # Sky-view-factor computation (CPU ray-casting)
 │   ├── solar/                            # Façade + ground solar access
 │   ├── cfd_integration/                  # CFD I/O contract, wind weighting (see its README)
 │   ├── visualization/                    # Map + chart helpers
 │   ├── viz/                              # Dashboard panel + map composition helpers
-│   ├── urban_morphology.py               # BCR, FAR, λp, λf (cell-clipped since 2026-06)
+│   ├── urban_morphology.py               # BCR, FAR, λp, λf (dissolved / party-wall corrected; canonical)
 │   ├── typology.py                       # Settlement typology
 │   ├── exposure/                         # Sky-exposure-plane exceedance + deprivation
 │   ├── spatial_analysis.py               # Moran's I, LISA, Gi*
@@ -276,7 +278,13 @@ MorphoFavela/
 │   ├── build_html_dashboard.py           # Interactive HTML site dashboards
 │   ├── build_mingze_bundle.py            # 3D-data bundle for collaborators
 │   ├── compare_mingze_vidigal.py         # Cross-method solar validation (Ladybug)
-│   ├── brisa_ventilation/                # Numbered BRISA pipeline (λf repair → taxonomy)
+│   ├── analyze_typology_predictor.py     # Typology → WHO-2h-sun predictor (continuous-vector flip)
+│   ├── build_signature.py                # k=6 cell morphotypes + k=3 block morphotopes
+│   ├── run_lateral_connectivity.py       # Distance-to-open-edge lateral ventilation scalar
+│   ├── run_ventilation_susceptibility.py # 2-D regime × depth susceptibility map
+│   ├── run_wind_exposure.py              # Effective wind-exposure (directional λf × wind rose)
+│   ├── build_roughness.py                # Per-cell z0/zd via UMEP (validity-envelope flagged)
+│   ├── brisa_ventilation/                # Numbered BRISA pipeline (λf repair → regime taxonomy → lock file)
 │   ├── brisa_deck/                       # BRISA presentation figure scripts
 │   ├── hpc/                              # SLURM helpers (most CFD HPC code is in ~/Airflow)
 │   └── data_utils/, debug/               # Small helpers

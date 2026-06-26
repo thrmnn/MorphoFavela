@@ -25,6 +25,10 @@ docs/
 ├── onboarding/                          # Reader paths for first-time visitors
 │   └── local_setup.md                   # Concentrated troubleshooting (GDAL, conda, GPU)
 │
+├── council_roadmap_2026-06-25.md        # Standing expert-council roadmap (prioritised tracks, engineering contract)
+├── repo_parallel_plan_2026-06-26.md     # Full-repo audit → 6-stream parallel execution plan (Wave 1/2)
+├── brisa_round4_results_2026-06-25.md   # Round-4/5 results: canonical λf, regime taxonomy, predictor FLIP
+├── roughness_plan.md, roughness_decisions.md  # Roughness z0/zd track plan + decision log (validity envelope)
 ├── FAVELA_EXTRACTION_WORKFLOW.md        # GIS workflow for new-site building extraction
 ├── GPU_SVF_EXACT_VALIDATION.md          # GPU-vs-CPU SVF parity report (Phase 3.5)
 ├── PRODUCTION_READINESS_PLAN.md         # Repo hardening checklist (packaging, CI, cleanup phases)
@@ -44,6 +48,7 @@ docs/
 | Onboard a new site | Project root [`data/README.md`](../data/README.md) + [`FAVELA_EXTRACTION_WORKFLOW.md`](FAVELA_EXTRACTION_WORKFLOW.md) |
 | Compute a specific indicator | [`methodology/morphometric_indicators.md`](methodology/morphometric_indicators.md) |
 | Validate SVF against a benchmark | [`GPU_SVF_EXACT_VALIDATION.md`](GPU_SVF_EXACT_VALIDATION.md) (CPU↔GPU parity) and TR §10.3 (UMEP cross-val) |
+| See the current plan + latest results | [`council_roadmap_2026-06-25.md`](council_roadmap_2026-06-25.md) (standing tracks), [`repo_parallel_plan_2026-06-26.md`](repo_parallel_plan_2026-06-26.md) (execution waves), [`brisa_round4_results_2026-06-25.md`](brisa_round4_results_2026-06-25.md) (canonical λf + predictor flip) |
 
 ## Conventions
 
