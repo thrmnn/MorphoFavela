@@ -98,11 +98,30 @@ def _normalize_wind_direction(name: str) -> Optional[str]:
 
 
 def _make_metadata(meta_dict: dict) -> PatchSimulationMetadata:
-    """Build a PatchSimulationMetadata from a parsed summary.json dict."""
+    """Build a PatchSimulationMetadata from a parsed summary.json dict.
+
+    The ``wind_direction`` field is contract-enforced: it must be one of
+    the 8 cardinals (``N/NE/E/SE/S/SW/W/NW``) or the documented
+    ``wind_NNN`` numeric-degree form (README Layout B). An unknown name
+    raises ``ValueError`` — `summary.json` describes the simulation, so a
+    bad direction is a producer-side contract violation, not a directory
+    to warn-and-skip.
+
+    ``synthetic`` (default False) and ``provenance`` (default None) are
+    optional and backward-compatible: real/legacy returns that omit them
+    validate unchanged.
+    """
+    wind_direction = meta_dict["wind_direction"]
+    if _normalize_wind_direction(wind_direction) is None:
+        raise ValueError(
+            f"Unknown wind_direction {wind_direction!r} in summary.json for "
+            f"patch {meta_dict.get('patch_id')!r}. Must be one of "
+            f"{sorted(WIND_DIRECTIONS_8)} or the wind_NNN form."
+        )
     return PatchSimulationMetadata(
         patch_id=meta_dict["patch_id"],
         site=meta_dict["site"],
-        wind_direction=meta_dict["wind_direction"],
+        wind_direction=wind_direction,
         wind_speed_ref=meta_dict["wind_speed_ref"],
         converged=meta_dict.get("converged", True),
         residual_final=meta_dict.get("residual_final"),
@@ -110,6 +129,8 @@ def _make_metadata(meta_dict: dict) -> PatchSimulationMetadata:
         turbulence_model=meta_dict.get("turbulence_model", "kOmegaSST"),
         n_iterations=meta_dict.get("n_iterations", 0),
         wall_clock_s=meta_dict.get("wall_clock_s", 0.0),
+        synthetic=meta_dict.get("synthetic", False),
+        provenance=meta_dict.get("provenance"),
     )
 
 

@@ -57,6 +57,8 @@ class PatchSimulationMetadata:
     turbulence_model: str = "kOmegaSST"
     n_iterations: int = 0
     wall_clock_s: float = 0.0
+    synthetic: bool = False  # True ⇒ generated, not a real OpenFOAM solve
+    provenance: Optional[dict] = None  # free-form generator/source block (synthetic trees)
 
 
 @dataclass

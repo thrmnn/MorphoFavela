@@ -110,6 +110,68 @@ class TestLoadPatchCSV:
             load_patch_csv(csv)
 
 
+class TestProvenanceAndContract:
+    """S4: synthetic/provenance fields + wind_direction contract enforcement."""
+
+    def test_legacy_metadata_defaults(self, tmp_path, synthetic_samples, synthetic_metadata):
+        """A real/legacy summary.json without the new keys loads with
+        synthetic=False / provenance=None — backward compatible."""
+        assert "synthetic" not in synthetic_metadata
+        assert "provenance" not in synthetic_metadata
+        csv = tmp_path / "sample_points.csv"
+        synthetic_samples.to_csv(csv, index=False)
+        with open(tmp_path / "summary.json", "w") as f:
+            json.dump(synthetic_metadata, f)
+
+        result = load_patch_csv(csv)
+        assert result.metadata.synthetic is False
+        assert result.metadata.provenance is None
+
+    def test_synthetic_stamped_metadata(self, tmp_path, synthetic_samples, synthetic_metadata):
+        """A synthetic-stamped summary.json round-trips synthetic=True and
+        the provenance block."""
+        meta = dict(synthetic_metadata)
+        meta["synthetic"] = True
+        meta["provenance"] = {
+            "generator": "scripts/generate_synthetic_cfd_results.py",
+            "warning": "SYNTHETIC — not a CFD solve.",
+        }
+        csv = tmp_path / "sample_points.csv"
+        synthetic_samples.to_csv(csv, index=False)
+        with open(tmp_path / "summary.json", "w") as f:
+            json.dump(meta, f)
+
+        result = load_patch_csv(csv)
+        assert result.metadata.synthetic is True
+        assert result.metadata.provenance["generator"].endswith(
+            "generate_synthetic_cfd_results.py"
+        )
+
+    def test_invalid_wind_direction_raises(self, tmp_path, synthetic_samples, synthetic_metadata):
+        """An unknown wind_direction in summary.json is a contract violation."""
+        meta = dict(synthetic_metadata)
+        meta["wind_direction"] = "NORTHEAST"
+        csv = tmp_path / "sample_points.csv"
+        synthetic_samples.to_csv(csv, index=False)
+        with open(tmp_path / "summary.json", "w") as f:
+            json.dump(meta, f)
+
+        with pytest.raises(ValueError, match="Unknown wind_direction"):
+            load_patch_csv(csv)
+
+    def test_wind_nnn_direction_accepted(self, tmp_path, synthetic_samples, synthetic_metadata):
+        """The documented wind_NNN form is a valid summary.json direction."""
+        meta = dict(synthetic_metadata)
+        meta["wind_direction"] = "wind_045"
+        csv = tmp_path / "sample_points.csv"
+        synthetic_samples.to_csv(csv, index=False)
+        with open(tmp_path / "summary.json", "w") as f:
+            json.dump(meta, f)
+
+        result = load_patch_csv(csv)
+        assert result.metadata.wind_direction == "wind_045"
+
+
 class TestNormalizeWindDirection:
     """The Airflow producer uses wind_NNN/ directories instead of N/, NE/, etc.
     The normalizer accepts both and returns the canonical cardinal name."""
