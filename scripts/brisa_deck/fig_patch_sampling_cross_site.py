@@ -24,7 +24,7 @@ from matplotlib.patches import Patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 logging.getLogger("pilot_sampling").setLevel(logging.ERROR)
-from scripts.run_pilot_sampling import (  # noqa: E402
+from scripts.run_pilot_sampling import (
     CONFIG,
     PATCH_RADIUS_M,
     SITE_PRESETS,
@@ -35,9 +35,10 @@ from scripts.run_pilot_sampling import (  # noqa: E402
 
 PAPER_FIG_DIR = PROJECT_ROOT / "outputs" / "paper_figures"
 sys.path.insert(0, str(PAPER_FIG_DIR))
-from fig_style import SITE_LABELS, apply_style  # noqa: E402
+from _assets import BRISA_ASSETS_DIR
+from fig_style import SITE_LABELS, apply_style
 
-OUT_DIR = Path("/home/theo/brisa_paper/artifacts/slides/assets")
+OUT_DIR = BRISA_ASSETS_DIR
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "maré"]

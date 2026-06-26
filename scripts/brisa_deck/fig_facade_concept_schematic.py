@@ -25,9 +25,10 @@ from matplotlib.patches import Polygon
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PAPER_FIG_DIR = PROJECT_ROOT / "outputs" / "paper_figures"
 sys.path.insert(0, str(PAPER_FIG_DIR))
-from fig_style import apply_style  # noqa: E402
+from _assets import BRISA_ASSETS_DIR
+from fig_style import apply_style
 
-OUT = Path("/home/theo/brisa_paper/artifacts/slides/assets/fig_facade_concept_schematic.png")
+OUT = BRISA_ASSETS_DIR / "fig_facade_concept_schematic.png"
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
 # Facade colours encode expected winter direct-sun hours

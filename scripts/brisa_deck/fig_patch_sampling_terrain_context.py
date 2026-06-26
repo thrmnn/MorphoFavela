@@ -40,7 +40,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 logging.getLogger("pilot_sampling").setLevel(logging.ERROR)
 
 # Read-only upstream imports (clustering / colour / hillshade / config).
-from scripts.run_pilot_sampling import (  # noqa: E402
+from _assets import BRISA_ASSETS_DIR
+
+from scripts.run_pilot_sampling import (
     CONFIG,
     PATCH_RADIUS_M,
     SITE_PRESETS,
@@ -50,7 +52,7 @@ from scripts.run_pilot_sampling import (  # noqa: E402
     assign_strata,
 )
 
-OUT_DIR = Path("/home/theo/brisa_paper/artifacts/slides/assets")
+OUT_DIR = BRISA_ASSETS_DIR
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # City-wide context layers (wider than the favela).
@@ -120,7 +122,7 @@ def render(site: str = "vidigal", out_name: str = "fig_patch_sampling_terrain.pn
         )
     patches = pd.read_csv(patch_path)
     if "eligible" in patches.columns:
-        patches = patches[patches["eligible"] == True]  # noqa: E712
+        patches = patches[patches["eligible"] == True]
 
     # Wider extent: favela grid bounds + ~300 m halo, then snap to aspect ~1.65.
     gbb = g.total_bounds
