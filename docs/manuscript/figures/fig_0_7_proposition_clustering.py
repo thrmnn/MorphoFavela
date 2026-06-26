@@ -33,17 +33,22 @@ import geopandas as gpd
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-from libpysal.weights import Rook
 from esda.moran import Moran, Moran_Local
-from matplotlib.patches import Patch
+from libpysal.weights import Rook
 from scipy.sparse.csgraph import connected_components
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
 sys.path.insert(0, str(PROJECT_ROOT / "docs" / "manuscript" / "figures"))
 
-from fig_style import (  # noqa: E402
+from fig_0_4_diagnostic import (
+    BUILDING_COLOR,
+    NOT_ASSESSED_COLOR,
+    STATE_COLORS,
+    TYPOLOGY_OF,
+    build_diagnostic_grid,
+)
+from fig_style import (
     SITE_LABELS,
     SITE_ORDER,
     WIDTH_DOUBLE,
@@ -53,13 +58,6 @@ from fig_style import (  # noqa: E402
     clean_map_axes,
     load_boundary,
     load_buildings,
-)
-from fig_0_4_diagnostic import (  # noqa: E402
-    BUILDING_COLOR,
-    NOT_ASSESSED_COLOR,
-    STATE_COLORS,
-    TYPOLOGY_OF,
-    build_diagnostic_grid,
 )
 
 EXPORTS_DIR = Path(__file__).resolve().parent / "exports"

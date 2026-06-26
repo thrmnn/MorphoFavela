@@ -7,7 +7,6 @@ No local-coordinate STL translation.
 
 import logging
 from pathlib import Path
-from typing import Optional, Tuple
 
 import geopandas as gpd
 import numpy as np
@@ -21,7 +20,7 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
-def load_dtm(dtm_path: Path) -> Tuple[np.ndarray, rasterio.Affine, object, tuple]:
+def load_dtm(dtm_path: Path) -> tuple[np.ndarray, rasterio.Affine, object, tuple]:
     """Load DTM raster and return (array, transform, crs, bounds)."""
     logger.info(f"Loading DTM from {dtm_path}")
     with rasterio.open(dtm_path) as src:
@@ -76,7 +75,7 @@ def sample_dtm_at_points(
 
 def build_terrain_mesh(
     dtm_path: Path,
-    bbox: Optional[Tuple[float, float, float, float]] = None,
+    bbox: tuple[float, float, float, float] | None = None,
     subsample: int = 1,
 ) -> pv.PolyData:
     """
@@ -138,7 +137,7 @@ def _extrude_polygon(
     footprint: Polygon,
     base_elev: float,
     height: float,
-) -> Optional[pv.PolyData]:
+) -> pv.PolyData | None:
     """Extrude a single polygon into a closed 3D solid."""
     if height <= 0 or np.isnan(height) or np.isnan(base_elev):
         return None
@@ -181,8 +180,8 @@ def build_building_meshes(
     height_field: str = "altura",
     base_field: str = "base",
     use_dtm_for_base: bool = False,
-    area: Optional[str] = None,
-) -> Tuple[Optional[pv.PolyData], gpd.GeoDataFrame]:
+    area: str | None = None,
+) -> tuple[pv.PolyData | None, gpd.GeoDataFrame]:
     """
     Build extruded building meshes from footprints.
 
@@ -316,10 +315,10 @@ def build_scene(
     height_field: str = "altura",
     base_field: str = "base",
     use_dtm_for_base: bool = False,
-    area: Optional[str] = None,
+    area: str | None = None,
     dtm_subsample: int = 1,
-    cache_vtk: Optional[Path] = None,
-) -> Tuple[pv.PolyData, pv.PolyData, gpd.GeoDataFrame]:
+    cache_vtk: Path | None = None,
+) -> tuple[pv.PolyData, pv.PolyData, gpd.GeoDataFrame]:
     """
     Build a complete 3D scene (terrain + buildings) in world coordinates.
 

@@ -44,7 +44,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fig_style import (  # noqa: E402
+from fig_style import (
     PROJECT_ROOT,
     SITE_LABELS,
     WIDTH_DOUBLE,

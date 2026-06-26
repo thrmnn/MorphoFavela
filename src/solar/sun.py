@@ -14,7 +14,6 @@ from __future__ import annotations
 import logging
 import math
 from datetime import datetime
-from typing import List, Tuple
 
 import numpy as np
 
@@ -49,7 +48,7 @@ def compute_sun_positions(
     hour_start: int = 6,
     hour_end: int = 18,
     interval_minutes: int = 60,
-) -> List[Tuple[float, float]]:
+) -> list[tuple[float, float]]:
     """Compute sun positions above the horizon for a given day.
 
     Returns a list of ``(altitude_deg, azimuth_deg)`` tuples where the
@@ -93,7 +92,7 @@ def _sun_positions_pvlib(
     hour_start: int,
     hour_end: int,
     interval_minutes: int,
-) -> List[Tuple[float, float]]:
+) -> list[tuple[float, float]]:
     """Compute sun positions using pvlib."""
     import pandas as pd
     import pvlib
@@ -114,7 +113,7 @@ def _sun_positions_pvlib(
     location = pvlib.location.Location(latitude, longitude, tz=tz_str)
     solar_pos = location.get_solarposition(times)
 
-    positions: List[Tuple[float, float]] = []
+    positions: list[tuple[float, float]] = []
     for _, row in solar_pos.iterrows():
         alt = float(row["elevation"])
         az = float(row["azimuth"])
@@ -138,7 +137,7 @@ def _sun_positions_analytical(
     hour_start: int,
     hour_end: int,
     interval_minutes: int,
-) -> List[Tuple[float, float]]:
+) -> list[tuple[float, float]]:
     """Simple analytical solar position (Spencer / NOAA approx)."""
     dt = datetime.fromisoformat(date)
     day_of_year = dt.timetuple().tm_yday
@@ -149,7 +148,7 @@ def _sun_positions_analytical(
 
     lat_rad = math.radians(latitude)
 
-    positions: List[Tuple[float, float]] = []
+    positions: list[tuple[float, float]] = []
     minutes = hour_start * 60
     end_minutes = hour_end * 60
 

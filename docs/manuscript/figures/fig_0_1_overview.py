@@ -25,7 +25,6 @@ import matplotlib.gridspec as gridspec
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import rasterio
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
@@ -34,8 +33,7 @@ from shapely.geometry import box
 # Reuse the canonical paper-figure style.
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
-from fig_style import (  # noqa: E402
-    SITE_COLORS,
+from fig_style import (
     SITE_LABELS,
     SITE_ORDER,
     WIDTH_DOUBLE,

@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 import geopandas as gpd
 import numpy as np
@@ -44,10 +43,10 @@ class SVFAuditResult:
     coverage_pct: float = 0.0
 
     # Computation details
-    computation_height_m: Optional[float] = None
+    computation_height_m: float | None = None
     method: str = "unknown"
-    n_rays: Optional[int] = None
-    grid_spacing_m: Optional[float] = None
+    n_rays: int | None = None
+    grid_spacing_m: float | None = None
     terrain_integrated: bool = False
 
     # Issues
@@ -61,8 +60,8 @@ class SVFAuditResult:
 def audit_svf(
     svf_points: gpd.GeoDataFrame,
     buildings: gpd.GeoDataFrame,
-    boundary: Optional[gpd.GeoDataFrame] = None,
-    scene_stl_path: Optional[Path] = None,
+    boundary: gpd.GeoDataFrame | None = None,
+    scene_stl_path: Path | None = None,
     svf_col: str = "svf",
 ) -> SVFAuditResult:
     """Run automated quality checks on SVF computation results.

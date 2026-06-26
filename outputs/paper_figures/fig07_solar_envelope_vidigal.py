@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from figS_solar_envelope import render_envelope  # noqa: E402
+from figS_solar_envelope import render_envelope
 
 SUPTITLE = (
     "Vidigal — street-level solar envelope.  Same points, same scale, three reference cases.\n"

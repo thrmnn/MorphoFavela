@@ -29,13 +29,12 @@ import matplotlib as mpl
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.lines import Line2D
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.stats import gaussian_kde, pearsonr
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
-from fig_style import (  # noqa: E402
+from fig_style import (
     SITE_COLORS,
     SITE_LABELS,
     SITE_ORDER,

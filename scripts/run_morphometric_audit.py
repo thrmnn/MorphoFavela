@@ -21,8 +21,8 @@ import geopandas as gpd
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.config import get_area_output_dir, is_informal_area  # noqa: E402
-from src.svf_v2.paths import resolve_boundary, resolve_paths  # noqa: E402
+from src.config import get_area_output_dir, is_informal_area
+from src.svf_v2.paths import resolve_boundary, resolve_paths
 
 logging.basicConfig(
     level=logging.INFO,

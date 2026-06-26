@@ -5,7 +5,6 @@ Explicit registry of file names per area, with a glob fallback for unknown areas
 """
 
 from pathlib import Path
-from typing import Optional, Tuple
 
 from src.config import get_area_data_dir
 
@@ -76,7 +75,7 @@ AREA_FILES = {
 }
 
 
-def resolve_paths(area: str) -> Tuple[Path, Path, Path]:
+def resolve_paths(area: str) -> tuple[Path, Path, Path]:
     """
     Resolve (dtm_path, footprints_path, roads_path) for a given area.
 
@@ -105,7 +104,7 @@ def resolve_paths(area: str) -> Tuple[Path, Path, Path]:
     return dtm, fp, rd
 
 
-def resolve_boundary(area: str) -> Optional[Path]:
+def resolve_boundary(area: str) -> Path | None:
     """Resolve boundary shapefile path for a given area.
 
     Returns None (non-fatal) if no boundary file is registered or found.

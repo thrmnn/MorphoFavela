@@ -20,18 +20,18 @@ from pyproj import CRS
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.config import get_area_output_dir  # noqa: E402
-from src.solar.facade import (  # noqa: E402
+from src.config import get_area_output_dir
+from src.solar.facade import (
     aggregate_by_building,
     aggregate_by_building_floor,
     compute_facade_solar_access,
     summarize_housing_units,
 )
-from src.solar.sun import REFERENCE_DATES  # noqa: E402
-from src.svf_v2.facades import compute_facade_svf  # noqa: E402
-from src.svf_v2.paths import resolve_paths  # noqa: E402
-from src.svf_v2.sampling import sample_facade_points  # noqa: E402
-from src.svf_v2.scene import build_scene  # noqa: E402
+from src.solar.sun import REFERENCE_DATES
+from src.svf_v2.facades import compute_facade_svf
+from src.svf_v2.paths import resolve_paths
+from src.svf_v2.sampling import sample_facade_points
+from src.svf_v2.scene import build_scene
 
 logging.basicConfig(
     level=logging.INFO,

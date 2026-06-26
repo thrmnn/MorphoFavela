@@ -43,9 +43,9 @@ from shapely.ops import unary_union
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
-from fig_style import apply_style  # noqa: E402
+from fig_style import apply_style
 
-from src.urban_morphology import _projected_width  # noqa: E402
+from src.urban_morphology import _projected_width
 
 # The 8 wind directions collapse to 4 distinct cross-wind axes (N≡S, E≡W,
 # NE≡SW, SE≡NW); averaging these four equals the canonical 8-direction mean.

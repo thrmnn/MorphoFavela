@@ -43,15 +43,15 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.cfd_integration import (  # noqa: E402
+from src.cfd_integration import (
     aggregate_to_grid,
     aggregate_to_patch,
     load_campaign_results,
     load_wind_rose,
     weighted_by_wind_rose,
 )
-from src.cfd_integration.schema import WIND_DIRECTIONS_8  # noqa: E402
-from src.morphometry.aspect import (  # noqa: E402
+from src.cfd_integration.schema import WIND_DIRECTIONS_8
+from src.morphometry.aspect import (
     aspect_to_sincos,
     aspect_wind_alignment,
     dominant_wind_direction_deg,

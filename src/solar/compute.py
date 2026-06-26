@@ -18,7 +18,6 @@ import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 import geopandas as gpd
 import numpy as np
@@ -92,7 +91,7 @@ def _ray_hits(
 
 
 def _compute_sun_directions(
-    sun_positions: List[Tuple[float, float]],
+    sun_positions: list[tuple[float, float]],
 ) -> np.ndarray:
     """Convert a list of (altitude, azimuth) to Nx3 direction array."""
     dirs = np.array(
@@ -281,7 +280,7 @@ def compute_solar_access_grid(
     interval_minutes: int = 30,
     ray_length: float = MAX_RAY_LENGTH,
     n_jobs: int = 1,
-    svf_array: Optional[np.ndarray] = None,
+    svf_array: np.ndarray | None = None,
     site_elevation_m: float = 100.0,
 ) -> gpd.GeoDataFrame:
     """Compute ground-level solar access on a regular grid.
@@ -457,7 +456,7 @@ def compute_solar_access_streets(
     evaluation_height: float = 1.5,
     ray_length: float = MAX_RAY_LENGTH,
     n_jobs: int = 1,
-    svf_col: Optional[str] = None,
+    svf_col: str | None = None,
     site_elevation_m: float = 100.0,
 ) -> gpd.GeoDataFrame:
     """Compute solar access for pre-sampled street points.

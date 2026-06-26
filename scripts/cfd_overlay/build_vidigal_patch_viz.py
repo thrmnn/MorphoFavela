@@ -46,7 +46,7 @@ from shapely.geometry import Point
 # reuse the tested single-patch QGIS generator's helpers
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
-import build_qgis_project as bqp  # noqa: E402
+import build_qgis_project as bqp
 
 EPSG = 31983
 WIND8 = ("N", "NE", "E", "SE", "S", "SW", "W", "NW")

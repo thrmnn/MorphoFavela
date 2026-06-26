@@ -14,8 +14,8 @@ animate the shadow sweep frame-by-frame without re-running the ray cast.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Sequence
 
 import geopandas as gpd
 import numpy as np

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import geopandas as gpd
 import matplotlib as mpl
@@ -90,7 +89,7 @@ def figure_site_overview(
     buildings: gpd.GeoDataFrame,
     dtm_path: Path,
     output_path: Path,
-    boundary: Optional[gpd.GeoDataFrame] = None,
+    boundary: gpd.GeoDataFrame | None = None,
     area_name: str = "Study Area",
 ):
     """Figure 1: Site overview -- buildings on hillshade DTM."""
@@ -656,7 +655,7 @@ def figure_street_svf_map(
     buildings: gpd.GeoDataFrame,
     dtm_path: Path,
     output_path: Path,
-    boundary: Optional[gpd.GeoDataFrame] = None,
+    boundary: gpd.GeoDataFrame | None = None,
     area_name: str = "Study Area",
 ):
     """Figure 7: Street-level SVF -- segments colored by svf_mean on hillshade DTM.
@@ -795,7 +794,7 @@ def figure_building_heights(
     buildings: gpd.GeoDataFrame,
     dtm_path: Path,
     output_path: Path,
-    boundary: Optional[gpd.GeoDataFrame] = None,
+    boundary: gpd.GeoDataFrame | None = None,
     area_name: str = "Study Area",
 ):
     """Figure 8: Building footprints colored by height on hillshade DTM.

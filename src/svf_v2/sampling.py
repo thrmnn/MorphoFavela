@@ -6,7 +6,6 @@ All coordinates are in world CRS (EPSG:31983).
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import geopandas as gpd
 import numpy as np
@@ -73,8 +72,8 @@ def sample_grid_points(
     footprints_gdf: gpd.GeoDataFrame,
     grid_spacing: float = 2.0,
     pedestrian_height: float = 1.5,
-    buffer_around_buildings: Optional[float] = None,
-    boundary_gdf: Optional[gpd.GeoDataFrame] = None,
+    buffer_around_buildings: float | None = None,
+    boundary_gdf: gpd.GeoDataFrame | None = None,
 ) -> np.ndarray:
     """
     Generate a regular grid of observer points excluding building interiors.
@@ -337,9 +336,9 @@ def sample_street_points(
     dtm_path: Path,
     spacing: float = 1.5,
     pedestrian_height: float = 1.5,
-    footprints_gdf: Optional[gpd.GeoDataFrame] = None,
+    footprints_gdf: gpd.GeoDataFrame | None = None,
     building_safety_margin: float = 0.5,
-    boundary_gdf: Optional[gpd.GeoDataFrame] = None,
+    boundary_gdf: gpd.GeoDataFrame | None = None,
 ) -> gpd.GeoDataFrame:
     """
     Sample observer points along road centre-lines.

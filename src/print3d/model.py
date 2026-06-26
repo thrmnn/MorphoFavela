@@ -126,7 +126,7 @@ def _fuse(parts: list[trimesh.Trimesh], solid: bool) -> tuple[trimesh.Trimesh, b
         try:
             merged = trimesh.boolean.union(parts, engine="manifold")
             return merged, True
-        except Exception:  # noqa: BLE001 — fall back to a sliceable soup of closed solids
+        except Exception:
             pass
     return trimesh.util.concatenate(parts), False
 

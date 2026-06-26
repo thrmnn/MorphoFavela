@@ -64,7 +64,7 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.cfd_integration.schema import WIND_DIRECTIONS_8  # noqa: E402
+from src.cfd_integration.schema import WIND_DIRECTIONS_8
 
 logger = logging.getLogger(__name__)
 

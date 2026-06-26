@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -66,7 +65,7 @@ def load_wind_rose(path: Path, site: str) -> WindRose:
 
 def weighted_by_wind_rose(
     per_direction: dict[str, dict],
-    wind_rose: Optional[WindRose] = None,
+    wind_rose: WindRose | None = None,
     weight_by: str = "frequency",
 ) -> dict:
     """Combine per-direction metrics into a single weighted metric dict.

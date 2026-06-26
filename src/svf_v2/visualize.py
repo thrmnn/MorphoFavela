@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -94,7 +93,7 @@ def plot_svf_heatmap(
     points: np.ndarray,
     svf: np.ndarray,
     output_path: Path,
-    footprints_gdf: Optional[gpd.GeoDataFrame] = None,
+    footprints_gdf: gpd.GeoDataFrame | None = None,
 ):
     """Scatter-plot heatmap of grid SVF values with optional building footprints."""
     fig, ax = plt.subplots(figsize=(12, 10))
@@ -129,10 +128,10 @@ def plot_svf_heatmap(
 def plot_street_svf(
     gdf: gpd.GeoDataFrame,
     output_path: Path,
-    roads_gdf: Optional[gpd.GeoDataFrame] = None,
-    footprints_gdf: Optional[gpd.GeoDataFrame] = None,
-    segments_gdf: Optional[gpd.GeoDataFrame] = None,
-    boundary_gdf: Optional[gpd.GeoDataFrame] = None,
+    roads_gdf: gpd.GeoDataFrame | None = None,
+    footprints_gdf: gpd.GeoDataFrame | None = None,
+    segments_gdf: gpd.GeoDataFrame | None = None,
+    boundary_gdf: gpd.GeoDataFrame | None = None,
     dtm_path=None,
     mode: str = "auto",
 ):
@@ -479,8 +478,8 @@ def plot_svf_distribution(
 def plot_svf_interactive(
     gdf: gpd.GeoDataFrame,
     output_path: Path,
-    segments_gdf: Optional[gpd.GeoDataFrame] = None,
-    footprints_gdf: Optional[gpd.GeoDataFrame] = None,
+    segments_gdf: gpd.GeoDataFrame | None = None,
+    footprints_gdf: gpd.GeoDataFrame | None = None,
     svf_col: str = "svf",
 ) -> Path:
     """Create an interactive Folium map of SVF results.

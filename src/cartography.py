@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -31,7 +30,7 @@ _SCALE_LENGTHS = [10, 20, 50, 100, 200, 500, 1000, 2000]
 
 def add_scale_bar(
     ax: Axes,
-    length_m: Optional[float] = None,
+    length_m: float | None = None,
     location: str = "lower left",
 ) -> None:
     """Add a pure-matplotlib scale bar, auto-sized from axes extent.

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -45,7 +44,7 @@ def compute_zone_solar_deficit(
     zones_gdf: gpd.GeoDataFrame,
     solar_gdf: gpd.GeoDataFrame,
     solar_col: str = "solar_hours",
-    reference_hours: Optional[float] = None,
+    reference_hours: float | None = None,
 ) -> gpd.GeoDataFrame:
     """Aggregate solar access points to zones and compute solar deficit.
 
@@ -307,7 +306,7 @@ def compute_zone_building_density(
 def compute_exposure_index(
     zones_gdf: gpd.GeoDataFrame,
     metrics: dict[str, str],
-    weights: Optional[dict[str, float]] = None,
+    weights: dict[str, float] | None = None,
 ) -> gpd.GeoDataFrame:
     """Weighted composite exposure index from normalised metrics.
 

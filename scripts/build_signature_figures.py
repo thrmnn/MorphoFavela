@@ -22,13 +22,13 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))  # win over the stale brisa-0.1.0 editable install
 
-import matplotlib  # noqa: E402
+import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-from scipy.cluster.hierarchy import dendrogram  # noqa: E402
+import matplotlib.pyplot as plt
+from scipy.cluster.hierarchy import dendrogram
 
-from src.morphometry.signature import (  # noqa: E402
+from src.morphometry.signature import (
     CAMPAIGN_SITES,
     SIGNATURE_FEATURES,
     assemble_signature_matrix,
@@ -36,7 +36,7 @@ from src.morphometry.signature import (  # noqa: E402
     fit_morphotypes,
     standardize,
 )
-from src.viz.signature_style import (  # noqa: E402
+from src.viz.signature_style import (
     DIVERGING,
     NULL_COLOR,
     TYPE_COLORS,

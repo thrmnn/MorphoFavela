@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Optional
 
 import geopandas as gpd
 import numpy as np
@@ -482,7 +481,7 @@ def _compute_zone_entropy(
 def compute_zone_metrics(
     buildings: gpd.GeoDataFrame,
     zones: gpd.GeoDataFrame,
-    streets: Optional[gpd.GeoDataFrame] = None,
+    streets: gpd.GeoDataFrame | None = None,
     floor_height: float = 3.0,
     wind_dir: float = 0.0,
     n_bins: int = 36,

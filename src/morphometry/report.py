@@ -12,7 +12,7 @@ import re
 import textwrap
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -237,7 +237,7 @@ def _figure_page(
     pdf: PdfPages,
     title: str,
     img_path: Path,
-    caption: Optional[str] = None,
+    caption: str | None = None,
     area_label: str = "",
 ):
     """Embed a figure image filling maximum available page area."""
@@ -324,7 +324,7 @@ def _figure_page(
 
 def _render_text_block(
     ax,
-    lines: List[str],
+    lines: list[str],
     y_start: float,
     y_stop: float = 0.06,
     fontsize: float = 9.5,
@@ -471,7 +471,7 @@ def _section_header(ax, title: str, y: float) -> float:
 def _text_page(
     pdf: PdfPages,
     title: str,
-    lines: List[str],
+    lines: list[str],
     area_label: str = "",
 ):
     """Single page of wrapped text content."""
@@ -491,7 +491,7 @@ def _compact_table(
     ax,
     df: pd.DataFrame,
     y_top: float,
-    col_widths: Optional[List[float]] = None,
+    col_widths: list[float] | None = None,
     fontsize: float = 8.5,
     row_height: float = 0.024,
 ) -> float:
@@ -565,7 +565,7 @@ def _table_page(
     title: str,
     df: pd.DataFrame,
     area_label: str = "",
-    col_widths: Optional[List[float]] = None,
+    col_widths: list[float] | None = None,
 ):
     """Render a table as a compact PDF page (not stretched to fill)."""
     fig = _base_page(pdf, area_label=area_label)
@@ -606,16 +606,16 @@ def _density_qualifier(lp: float) -> str:
 
 def _build_study_site_lines(
     area: str,
-    grid_data: Dict[str, Any],
+    grid_data: dict[str, Any],
     audit_result: SVFAuditResult,
-    streets_svf: Optional[gpd.GeoDataFrame],
-    buildings: Optional[gpd.GeoDataFrame],
-) -> List[str]:
+    streets_svf: gpd.GeoDataFrame | None,
+    buildings: gpd.GeoDataFrame | None,
+) -> list[str]:
     """Page 2: Study Site & Data Sources."""
     area_label = _area_name(area)
     n_cells = grid_data.get("n_cells", 0)
     n_buildings = grid_data.get("n_buildings", 0)
-    lines: List[str] = []
+    lines: list[str] = []
 
     lines.append("### Study Site")
     lines.append(
@@ -676,13 +676,13 @@ def _build_study_site_lines(
 
 
 def _build_methodology_lines(
-    grid_data: Dict[str, Any],
+    grid_data: dict[str, Any],
     audit_result: SVFAuditResult,
-    streets_svf: Optional[gpd.GeoDataFrame],
-) -> List[str]:
+    streets_svf: gpd.GeoDataFrame | None,
+) -> list[str]:
     """Page 3: Methodology."""
     n_cells = grid_data.get("n_cells", 0)
-    lines: List[str] = []
+    lines: list[str] = []
 
     lines.append("### Grid Morphometrics")
     lines.append(
@@ -748,10 +748,10 @@ def _build_methodology_lines(
 
 def _build_audit_lines(
     audit_result: SVFAuditResult,
-    grid_data: Dict[str, Any],
-) -> List[str]:
+    grid_data: dict[str, Any],
+) -> list[str]:
     """Page 4: SVF Audit Results -- compact summary + inline findings."""
-    lines: List[str] = []
+    lines: list[str] = []
 
     lines.append("### Computation Details")
     lines.append(f"**Method:** {audit_result.method}.")
@@ -800,11 +800,11 @@ def _build_audit_lines(
 
 
 def _build_morphometric_narrative(
-    grid_data: Dict[str, Any],
-    buildings: Optional[gpd.GeoDataFrame],
-) -> List[str]:
+    grid_data: dict[str, Any],
+    buildings: gpd.GeoDataFrame | None,
+) -> list[str]:
     """Page 9: Morphometric Results -- analytical narrative."""
-    lines: List[str] = []
+    lines: list[str] = []
     g = grid_data
 
     svf_mean = g.get("svf_mean")
@@ -918,9 +918,9 @@ def _build_morphometric_narrative(
     return lines
 
 
-def _build_spatial_patterns(grid_data: Dict[str, Any]) -> List[str]:
+def _build_spatial_patterns(grid_data: dict[str, Any]) -> list[str]:
     """Page 11: Spatial Patterns & Correlations narrative."""
-    lines: List[str] = []
+    lines: list[str] = []
 
     svf_slope_r = grid_data.get("svf_slope_r")
     svf_lp_r = grid_data.get("svf_lp_r")
@@ -985,7 +985,7 @@ def _build_spatial_patterns(grid_data: Dict[str, Any]) -> List[str]:
     return lines
 
 
-def _build_strata_table(grid: gpd.GeoDataFrame) -> Optional[pd.DataFrame]:
+def _build_strata_table(grid: gpd.GeoDataFrame) -> pd.DataFrame | None:
     """Build a compact CFD strata DataFrame (SVF x Slope x lambda_p).
 
     Returns None if insufficient data.
@@ -1026,11 +1026,11 @@ def _build_strata_table(grid: gpd.GeoDataFrame) -> Optional[pd.DataFrame]:
 
 
 def _build_cfd_lines(
-    grid_data: Dict[str, Any],
-    strata_df: Optional[pd.DataFrame],
-) -> List[str]:
+    grid_data: dict[str, Any],
+    strata_df: pd.DataFrame | None,
+) -> list[str]:
     """Page 15: CFD Campaign Implications -- narrative (table rendered separately)."""
-    lines: List[str] = []
+    lines: list[str] = []
 
     lines.append(
         "The CFD simulation campaign requires representative patches drawn "
@@ -1078,9 +1078,9 @@ def _build_cfd_lines(
 
 def _build_street_svf_lines(
     streets_svf: gpd.GeoDataFrame,
-) -> List[str]:
+) -> list[str]:
     """Narrative for the street-level SVF discussion (inserted before/after figure)."""
-    lines: List[str] = []
+    lines: list[str] = []
     svf_col = "svf_mean" if "svf_mean" in streets_svf.columns else "svf"
 
     if svf_col not in streets_svf.columns:
@@ -1128,8 +1128,8 @@ def _build_street_svf_lines(
 def _morphometric_results_page(
     pdf: PdfPages,
     grid: gpd.GeoDataFrame,
-    grid_data: Dict[str, Any],
-    buildings: Optional[gpd.GeoDataFrame],
+    grid_data: dict[str, Any],
+    buildings: gpd.GeoDataFrame | None,
     area_label: str,
 ):
     """Page 9: Compact summary-statistics table + analytical narrative."""
@@ -1190,7 +1190,7 @@ def _morphometric_results_page(
 def _cfd_implications_page(
     pdf: PdfPages,
     grid: gpd.GeoDataFrame,
-    grid_data: Dict[str, Any],
+    grid_data: dict[str, Any],
     area_label: str,
 ):
     """Page 15: CFD strata as compact table + narrative."""
@@ -1226,7 +1226,7 @@ def _cfd_implications_page(
 def _audit_results_page(
     pdf: PdfPages,
     audit_result: SVFAuditResult,
-    grid_data: Dict[str, Any],
+    grid_data: dict[str, Any],
     area_label: str,
 ):
     """Page 4: SVF Audit -- text + small data-quality table."""
@@ -1269,11 +1269,11 @@ def generate_pdf_report(
     area: str,
     grid: gpd.GeoDataFrame,
     audit_result: SVFAuditResult,
-    figure_paths: Dict[str, Path],
+    figure_paths: dict[str, Path],
     n_buildings: int = 0,
-    streets_svf: Optional[gpd.GeoDataFrame] = None,
-    buildings: Optional[gpd.GeoDataFrame] = None,
-    dtm_path: Optional[Path] = None,
+    streets_svf: gpd.GeoDataFrame | None = None,
+    buildings: gpd.GeoDataFrame | None = None,
+    dtm_path: Path | None = None,
 ):
     """Generate the complete morphometric audit PDF report.
 
@@ -1305,7 +1305,7 @@ def generate_pdf_report(
     area_label = _area_name(area)
 
     # ── Pre-compute grid statistics for narrative ────────────────────
-    grid_data: Dict[str, Any] = {
+    grid_data: dict[str, Any] = {
         "n_cells": len(grid),
         "n_buildings": n_buildings,
     }

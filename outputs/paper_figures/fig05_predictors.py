@@ -63,8 +63,9 @@ from matplotlib.colors import to_rgb
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fig_style import PROJECT_ROOT, apply_style
+
 sys.path.insert(0, str(PROJECT_ROOT))
-from src.viz import presentation_style as ps  # noqa: E402
+from src.viz import presentation_style as ps
 
 STATS_PATH = PROJECT_ROOT / "outputs" / "paper_figures" / "rf_predictor_stats.json"
 PD_PATH = PROJECT_ROOT / "outputs" / "paper_figures" / "rf_pd_curves.json"

@@ -55,7 +55,7 @@ from scipy.stats import gaussian_kde
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
-from fig_style import SITE_COLORS, SITE_LABELS, apply_style, save_fig  # noqa: E402
+from fig_style import SITE_COLORS, SITE_LABELS, apply_style, save_fig
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Optional
 
 import geopandas as gpd
 import numpy as np
@@ -36,7 +35,7 @@ def aggregate_to_patch(
     patch_result: CFDPatchResult,
     patch_center_xy: tuple[float, float],
     analysis_patch_diameter: float = 100.0,
-    canopy_height: Optional[float] = None,
+    canopy_height: float | None = None,
     stagnation_threshold: float = 0.5,
 ) -> dict:
     """Aggregate CFD sample points to a single patch-level summary.

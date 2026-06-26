@@ -40,7 +40,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-from fig_style import (  # noqa: E402
+from fig_style import (
     PROJECT_ROOT,
     SITE_COLORS,
     SITE_LABELS,
@@ -50,7 +50,7 @@ from fig_style import (  # noqa: E402
     save_fig,
 )
 
-from src.morphometry.aspect import aspect_quadrant  # noqa: E402
+from src.morphometry.aspect import aspect_quadrant
 
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "maré"]
 QUADRANTS = ("N", "E", "S", "W")

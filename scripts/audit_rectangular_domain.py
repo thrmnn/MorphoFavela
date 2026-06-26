@@ -70,7 +70,7 @@ import pandas as pd
 from shapely.geometry import Point
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from src.urban_morphology import compute_frontal_area_ratio  # noqa: E402
+from src.urban_morphology import compute_frontal_area_ratio
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SITES = ["vidigal", "riodaspedras", "rocinha", "complexo_do_alemao", "maré"]

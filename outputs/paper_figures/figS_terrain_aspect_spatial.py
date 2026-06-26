@@ -26,7 +26,7 @@ import numpy as np
 from matplotlib.colors import ListedColormap, to_rgb
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fig_style import (  # noqa: E402
+from fig_style import (
     PROJECT_ROOT,
     WIDTH_DOUBLE,
     add_north_arrow,

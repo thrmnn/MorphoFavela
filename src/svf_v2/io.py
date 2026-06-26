@@ -3,8 +3,8 @@ Output: GeoPackage, GeoTIFF, CSV, plots, and 3D visual inspection exports.
 """
 
 import logging
+from datetime import UTC
 from pathlib import Path
-from typing import Optional
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -58,12 +58,12 @@ def write_run_meta(output_dir: Path, output_type: str, n_points: int, **params) 
     invisible precisely because no such provenance was written.
     """
     import json
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     meta = {
         "output_type": output_type,
         "git_sha": _git_sha(),
-        "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         "n_points": int(n_points),
         **params,
     }
@@ -83,7 +83,7 @@ def save_grid_results(
     crs,
     output_dir: Path,
     grid_spacing: float = 2.0,
-    footprints_gdf: Optional[gpd.GeoDataFrame] = None,
+    footprints_gdf: gpd.GeoDataFrame | None = None,
 ):
     """
     Save grid SVF results as GeoPackage, GeoTIFF, and CSV.
@@ -189,9 +189,9 @@ def _rasterise_svf(
 def save_street_results(
     street_gdf: gpd.GeoDataFrame,
     output_dir: Path,
-    roads_gdf: Optional[gpd.GeoDataFrame] = None,
-    footprints_gdf: Optional[gpd.GeoDataFrame] = None,
-    boundary_gdf: Optional[gpd.GeoDataFrame] = None,
+    roads_gdf: gpd.GeoDataFrame | None = None,
+    footprints_gdf: gpd.GeoDataFrame | None = None,
+    boundary_gdf: gpd.GeoDataFrame | None = None,
     dtm_path=None,
 ):
     """
@@ -304,7 +304,7 @@ def save_street_results(
 def save_facade_results(
     facade_gdf: gpd.GeoDataFrame,
     output_dir: Path,
-    footprints_gdf: Optional[gpd.GeoDataFrame] = None,
+    footprints_gdf: gpd.GeoDataFrame | None = None,
 ):
     """
     Save facade SVF results.
@@ -403,8 +403,8 @@ def save_scene_vtk(
 def plot_alignment_check(
     footprints_gdf: gpd.GeoDataFrame,
     output_path: Path,
-    roads_gdf: Optional[gpd.GeoDataFrame] = None,
-    sample_points: Optional[np.ndarray] = None,
+    roads_gdf: gpd.GeoDataFrame | None = None,
+    sample_points: np.ndarray | None = None,
     title: str = "Alignment Check",
 ) -> Path:
     """
@@ -463,7 +463,7 @@ def plot_alignment_check(
 def plot_offset_diagnostic(
     street_gdf: gpd.GeoDataFrame,
     output_path: Path,
-    footprints_gdf: Optional[gpd.GeoDataFrame] = None,
+    footprints_gdf: gpd.GeoDataFrame | None = None,
 ) -> Path:
     """
     Two-panel diagnostic showing building-offset vectors for street points.
@@ -554,7 +554,7 @@ def plot_offset_diagnostic(
 def plot_road_z_check(
     street_gdf: gpd.GeoDataFrame,
     output_path: Path,
-    dtm_z_range: Optional[tuple] = None,
+    dtm_z_range: tuple | None = None,
 ) -> Path:
     """
     Scatter of street sample points coloured by Z elevation.

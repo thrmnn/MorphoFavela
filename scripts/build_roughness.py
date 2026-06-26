@@ -24,19 +24,19 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import matplotlib  # noqa: E402
+import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.pyplot as plt
 
-from src.morphometry.roughness import (  # noqa: E402
+from src.morphometry.roughness import (
     DIRS,
     extrapolation_flags,
     method_spread_z0,
     roughness_vec,
 )
-from src.morphometry.signature import CAMPAIGN_SITES  # noqa: E402
-from src.svf_v2.io import _git_sha  # noqa: E402
+from src.morphometry.signature import CAMPAIGN_SITES
+from src.svf_v2.io import _git_sha
 
 FIGS = ROOT / "outputs" / "cross_site" / "signature" / "figures_v2"
 HEIGHT_COLS = ["height", "altura", "H", "mean_height", "building_height", "bld_h", "z"]

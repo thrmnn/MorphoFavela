@@ -22,28 +22,28 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import matplotlib  # noqa: E402
+import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.colors import ListedColormap  # noqa: E402
-from matplotlib.patches import Rectangle  # noqa: E402
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+from matplotlib.patches import Rectangle
 
-from src.morphometry.morphotope import (  # noqa: E402
+from src.morphometry.morphotope import (
     N_TYPES,
     cell_type_profile,
     fit_morphotopes,
     neighborhood_composition,
     select_k_bic,
 )
-from src.morphometry.signature import (  # noqa: E402
+from src.morphometry.signature import (
     CAMPAIGN_SITES,
     choose_k_elbow,
     recurrence_flags,
     recurrence_matrix,
 )
-from src.svf_v2.io import _git_sha  # noqa: E402
-from src.viz.signature_style import (  # noqa: E402
+from src.svf_v2.io import _git_sha
+from src.viz.signature_style import (
     MORPHOTOPE_LABEL,
     NULL_COLOR,
     TYPE_COLORS,

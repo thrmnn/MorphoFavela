@@ -55,7 +55,7 @@ SITE_PRESETS = _pilot.SITE_PRESETS
 CONFIG = _pilot.CONFIG
 PATCH_RADIUS_M = _pilot.PATCH_RADIUS_M
 
-from src.cartography import (  # noqa: E402
+from src.cartography import (
     add_north_arrow,
     add_scale_bar,
     add_terrain_contours,

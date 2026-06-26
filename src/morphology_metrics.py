@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Iterable, List, Optional, Tuple
+from collections.abc import Iterable
 
 import geopandas as gpd
 import numpy as np
@@ -21,7 +21,7 @@ from shapely.strtree import STRtree
 logger = logging.getLogger(__name__)
 
 
-def _get_polygon_parts(geom: Polygon | MultiPolygon) -> List[Polygon]:
+def _get_polygon_parts(geom: Polygon | MultiPolygon) -> list[Polygon]:
     if geom is None or geom.is_empty:
         return []
     if isinstance(geom, Polygon):
@@ -31,7 +31,7 @@ def _get_polygon_parts(geom: Polygon | MultiPolygon) -> List[Polygon]:
     return []
 
 
-def _largest_polygon(geom: Polygon | MultiPolygon) -> Optional[Polygon]:
+def _largest_polygon(geom: Polygon | MultiPolygon) -> Polygon | None:
     parts = _get_polygon_parts(geom)
     if not parts:
         return None
@@ -52,7 +52,7 @@ def _safe_area(geom) -> float:
 
 def _minimum_rotated_rectangle_axes(
     geom: Polygon | MultiPolygon,
-) -> Tuple[float, float, float]:
+) -> tuple[float, float, float]:
     """
     Return (L_major, L_minor, angle_rad) from the minimum rotated rectangle.
     Angle is the orientation of the major axis.
@@ -105,7 +105,7 @@ def _count_corners(geom: Polygon | MultiPolygon) -> int:
     return count
 
 
-def _interior_angles(geom: Polygon | MultiPolygon) -> List[float]:
+def _interior_angles(geom: Polygon | MultiPolygon) -> list[float]:
     """Return interior angles in degrees for polygon exterior rings."""
     parts = _get_polygon_parts(geom)
     angles = []
@@ -143,7 +143,7 @@ def _shared_wall_length(geom_a: Polygon | MultiPolygon, geom_b: Polygon | MultiP
 
 def _build_neighbor_indices(
     geoms: Iterable[Polygon | MultiPolygon],
-) -> Tuple[List[List[int]], np.ndarray]:
+) -> tuple[list[list[int]], np.ndarray]:
     """
     Build neighbor indices and shared wall lengths.
 
@@ -194,7 +194,7 @@ def _mean_distance_between_buildings(centroids: np.ndarray) -> float:
 
 def _build_voronoi_cells(
     centroids: np.ndarray, envelope: Polygon | None, buffer_distance: float
-) -> List[Polygon]:
+) -> list[Polygon]:
     if len(centroids) == 0:
         return []
     points = [Point(pt[0], pt[1]) for pt in centroids]
@@ -222,12 +222,12 @@ def _build_voronoi_cells(
 
 
 def _assign_voronoi_cells_to_points(
-    cells: List[Polygon], centroids: np.ndarray
-) -> List[Optional[Polygon]]:
+    cells: list[Polygon], centroids: np.ndarray
+) -> list[Polygon | None]:
     if not cells:
         return [None] * len(centroids)
     tree = STRtree(cells)
-    assignments: List[Optional[Polygon]] = [None] * len(centroids)
+    assignments: list[Polygon | None] = [None] * len(centroids)
     for idx, (x, y) in enumerate(centroids):
         point = Point(x, y)
         candidates = tree.query(point)
@@ -244,9 +244,9 @@ def _assign_voronoi_cells_to_points(
 
 def calculate_morphology_metrics(
     buildings: gpd.GeoDataFrame,
-    streets: Optional[gpd.GeoDataFrame] = None,
+    streets: gpd.GeoDataFrame | None = None,
     street_buffer: float = 1.0,
-    site_boundary: Optional[Polygon] = None,
+    site_boundary: Polygon | None = None,
     voronoi_buffer: float = 50.0,
     weight_mode: str = "adjacent",
 ) -> gpd.GeoDataFrame:

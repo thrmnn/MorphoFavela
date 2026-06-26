@@ -25,7 +25,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))  # win over the stale brisa-0.1.0 editable install
 
-from src.morphometry.signature import (  # noqa: E402
+from src.morphometry.signature import (
     assemble_signature_matrix,
     bootstrap_stability,
     fit_morphotypes,
@@ -34,7 +34,7 @@ from src.morphometry.signature import (  # noqa: E402
     spatial_purity,
     standardize,
 )
-from src.svf_v2.io import _git_sha  # noqa: E402
+from src.svf_v2.io import _git_sha
 
 OUT = ROOT / "outputs" / "cross_site" / "signature"
 RANDOM_STATE = 0

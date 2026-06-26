@@ -38,15 +38,15 @@ import pyvista as pv
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.solar.animation import (  # noqa: E402
+from src.solar.animation import (
     build_animation_manifest,
     compute_sun_positions_with_times,
     sunlit_matrix_to_wide_gdf,
 )
-from src.solar.compute import compute_sunlit_matrix  # noqa: E402
-from src.solar.sun import DEFAULT_LATITUDE, DEFAULT_LONGITUDE  # noqa: E402
-from src.svf_v2.paths import resolve_paths  # noqa: E402
-from src.svf_v2.scene import build_scene  # noqa: E402
+from src.solar.compute import compute_sunlit_matrix
+from src.solar.sun import DEFAULT_LATITUDE, DEFAULT_LONGITUDE
+from src.svf_v2.paths import resolve_paths
+from src.svf_v2.scene import build_scene
 
 logging.basicConfig(
     level=logging.INFO,

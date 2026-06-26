@@ -36,7 +36,7 @@ from matplotlib.patches import Patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
-from fig_style import WIDTH_DOUBLE, apply_style  # noqa: E402
+from fig_style import WIDTH_DOUBLE, apply_style
 
 EXPORTS_DIR = Path(__file__).resolve().parent / "exports"
 EXPORTS_DIR.mkdir(exist_ok=True)

@@ -29,12 +29,12 @@ import geopandas as gpd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))  # win over the stale brisa-0.1.0 editable install
 
-from src.morphometry.features import (  # noqa: E402
+from src.morphometry.features import (
     build_experience_table,
     build_fabric_table,
     summarize_streets_to_cells,
 )
-from src.svf_v2.io import _git_sha  # noqa: E402
+from src.svf_v2.io import _git_sha
 
 
 def _read(path: Path) -> gpd.GeoDataFrame | None:

@@ -11,7 +11,6 @@ import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Optional, Tuple
 
 import numpy as np
 import pyvista as pv
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 # Optional: embree-backed multi_ray_trace
 # Requires trimesh with a working embree backend (pyembree or embreex).
 try:
-    import trimesh  # noqa: F401
+    import trimesh
 
     _MULTI_RAY_TRACE_AVAILABLE = bool(getattr(trimesh.ray, "has_embree", False))
 except Exception:
@@ -67,7 +66,7 @@ TREGENZA_BANDS = [
 # Zenith cap is a single patch at elevation 90 deg.
 
 
-def generate_tregenza_patches() -> Tuple[np.ndarray, np.ndarray]:
+def generate_tregenza_patches() -> tuple[np.ndarray, np.ndarray]:
     """
     Generate the Tregenza 145-patch sky subdivision.
 
@@ -370,10 +369,10 @@ def compute_svf_raycasting(
     scene_mesh: pv.PolyData,
     sky_directions: np.ndarray,
     max_ray_length: float = 500.0,
-    normals: Optional[np.ndarray] = None,
-    sky_weights: Optional[np.ndarray] = None,
+    normals: np.ndarray | None = None,
+    sky_weights: np.ndarray | None = None,
     n_jobs: int = 1,
-    checkpoint_path: Optional[Path] = None,
+    checkpoint_path: Path | None = None,
     checkpoint_interval: int = 500,
 ) -> np.ndarray:
     """
@@ -668,10 +667,10 @@ def compute_svf(
     backend: str = "raycasting",
     n_sky_patches: int = 145,
     sky_model: str = "tregenza",
-    normals: Optional[np.ndarray] = None,
+    normals: np.ndarray | None = None,
     max_ray_length: float = 500.0,
     n_jobs: int = 1,
-    checkpoint_path: Optional[Path] = None,
+    checkpoint_path: Path | None = None,
     checkpoint_interval: int = 500,
     **kwargs,
 ) -> np.ndarray:

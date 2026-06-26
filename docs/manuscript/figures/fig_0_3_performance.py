@@ -32,17 +32,14 @@ from pathlib import Path
 
 import geopandas as gpd
 import matplotlib.gridspec as gridspec
-import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.lines import Line2D
 from scipy.stats import binned_statistic_2d
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
-from fig_style import (  # noqa: E402
-    SITE_LABELS,
+from fig_style import (
     SITE_ORDER,
     WIDTH_DOUBLE,
     add_north_arrow,
@@ -213,13 +210,15 @@ def draw_wind_rose_inset(parent_ax, rose: dict, anchor=(0.86, 0.18),
     # White-disc backing so the rose sits readably on the heatmap.
     backing = fig.add_axes([x - w * 0.08, y - h * 0.08,
                             w * 1.16, h * 1.16])
-    backing.set_xticks([]); backing.set_yticks([])
+    backing.set_xticks([])
+    backing.set_yticks([])
     for s in backing.spines.values():
         s.set_visible(False)
     backing.add_patch(plt.Circle((0.5, 0.5), 0.5, transform=backing.transAxes,
                                  facecolor="white", edgecolor="none",
                                  alpha=0.85, zorder=0))
-    backing.set_xlim(0, 1); backing.set_ylim(0, 1)
+    backing.set_xlim(0, 1)
+    backing.set_ylim(0, 1)
     backing.set_aspect("equal")
 
     rose_ax = fig.add_axes([x, y, w, h], projection="polar")

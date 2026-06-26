@@ -41,18 +41,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
 sys.path.insert(0, str(PROJECT_ROOT / "docs" / "manuscript" / "figures"))
 
-from fig_style import (  # noqa: E402
-    SITE_LABELS,
-    SITE_ORDER,
-    WIDTH_DOUBLE,
-    add_north_arrow,
-    add_scalebar,
-    apply_style,
-    clean_map_axes,
-    load_boundary,
-    load_buildings,
-)
-from fig_0_4_diagnostic import (  # noqa: E402
+from fig_0_4_diagnostic import (
     BUILDING_COLOR,
     NOT_ASSESSED_COLOR,
     STATE_COLORS,
@@ -63,6 +52,17 @@ from fig_0_4_diagnostic import (  # noqa: E402
     TYPOLOGY_AGGREGATE_ORDER,
     TYPOLOGY_OF,
     _aggregate_solar_to_cells,
+)
+from fig_style import (
+    SITE_LABELS,
+    SITE_ORDER,
+    WIDTH_DOUBLE,
+    add_north_arrow,
+    add_scalebar,
+    apply_style,
+    clean_map_axes,
+    load_boundary,
+    load_buildings,
 )
 
 EXPORTS_DIR = Path(__file__).resolve().parent / "exports"
@@ -312,7 +312,7 @@ def main() -> None:
             g = grids[s]
             focal_col = f"state_{FOCAL_SCENARIO[0]}"
             flips = g.apply(
-                lambda r: flip_label(r["state_baseline"], r[focal_col]),
+                lambda r, focal_col=focal_col: flip_label(r["state_baseline"], r[focal_col]),
                 axis=1,
             )
             cls = flips.dropna()

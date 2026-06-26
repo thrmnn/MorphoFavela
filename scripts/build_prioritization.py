@@ -24,20 +24,20 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import matplotlib  # noqa: E402
+import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.colors import BoundaryNorm, ListedColormap  # noqa: E402
+import matplotlib.pyplot as plt
+from matplotlib.colors import BoundaryNorm, ListedColormap
 
-from src.morphometry.prioritization import (  # noqa: E402
+from src.morphometry.prioritization import (
     CLASS_LABELS,
     WEIGHTS,
     aggregate_priority_to_cells,
     priority_score,
 )
-from src.morphometry.signature import CAMPAIGN_SITES  # noqa: E402
-from src.svf_v2.io import _git_sha  # noqa: E402
+from src.morphometry.signature import CAMPAIGN_SITES
+from src.svf_v2.io import _git_sha
 
 SIG = ROOT / "outputs" / "cross_site" / "signature"
 FIGS = SIG / "figures_v2"

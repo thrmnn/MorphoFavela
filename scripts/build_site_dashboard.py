@@ -34,8 +34,8 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 ROOT = Path("/home/theo/MorphoFavela")
 sys.path.insert(0, str(ROOT))
 
-from src.svf_v2.paths import AREA_FILES  # noqa: E402
-from src.viz.folha.sites import SHEET_NUMBER  # noqa: E402
+from src.svf_v2.paths import AREA_FILES
+from src.viz.folha.sites import SHEET_NUMBER
 
 TYPOLOGY = {
     "vidigal": ("hillside canyon", "#2C5F8D"),

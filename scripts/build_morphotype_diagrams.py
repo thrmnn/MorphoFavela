@@ -23,15 +23,15 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import matplotlib  # noqa: E402
+import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.colors import ListedColormap  # noqa: E402
-from matplotlib.patches import Polygon, Rectangle  # noqa: E402
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+from matplotlib.patches import Polygon, Rectangle
 
-from src.morphometry.signature import CAMPAIGN_SITES  # noqa: E402
-from src.viz.signature_style import NULL_COLOR, TYPE_COLORS, TYPE_LABEL  # noqa: E402
+from src.morphometry.signature import CAMPAIGN_SITES
+from src.viz.signature_style import NULL_COLOR, TYPE_COLORS, TYPE_LABEL
 
 FIGS = ROOT / "outputs" / "cross_site" / "signature" / "figures_v2"
 SITE_NAMES = {"vidigal": "Vidigal", "rocinha": "Rocinha", "riodaspedras": "Rio das Pedras",

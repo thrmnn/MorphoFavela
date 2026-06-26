@@ -24,13 +24,13 @@ import pandas as pd
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
 
-from src.morphometry.signature import CAMPAIGN_SITES  # noqa: E402
-from src.morphometry.streetnet import (  # noqa: E402
+from src.morphometry.signature import CAMPAIGN_SITES
+from src.morphometry.streetnet import (
     cell_streetnet_metrics,
     find_roads_path,
     summarise_by_type,
 )
-from src.viz.signature_style import TYPE_COLORS, TYPE_LABEL  # noqa: E402
+from src.viz.signature_style import TYPE_COLORS, TYPE_LABEL
 
 FIG_DIR = os.path.join(ROOT, "outputs/cross_site/signature/figures_v2")
 CSV_DIR = os.path.join(ROOT, "outputs/cross_site/streetnet")

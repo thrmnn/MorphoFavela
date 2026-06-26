@@ -26,7 +26,7 @@ import geopandas as gpd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
-from src.morphometry.indicators import WIND_DIRECTIONS, compute_lambda_f_directional  # noqa: E402
+from src.morphometry.indicators import WIND_DIRECTIONS, compute_lambda_f_directional
 
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "maré"]
 HEIGHT_CANDIDATES = ("height", "altura")

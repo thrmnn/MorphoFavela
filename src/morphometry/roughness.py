@@ -22,7 +22,7 @@ import numpy as np
 _VENDOR = Path(__file__).resolve().parents[2] / "vendor" / "umep_processing" / "util"
 if str(_VENDOR) not in sys.path:
     sys.path.insert(0, str(_VENDOR))
-from RoughnessCalcFunctionV2 import RoughnessCalc  # noqa: E402
+from RoughnessCalcFunctionV2 import RoughnessCalc
 
 DIRS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 METHODS = ("Kan", "Mho", "Mac", "Rau")  # Kanda primary; Macdonald = σH-free baseline

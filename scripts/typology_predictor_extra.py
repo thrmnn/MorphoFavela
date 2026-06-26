@@ -41,19 +41,19 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import matplotlib  # noqa: E402
+import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.colors import Normalize  # noqa: E402
+import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 
-from src.morphometry.signature import (  # noqa: E402
+from src.morphometry.signature import (
     CAMPAIGN_SITES,
     SIGNATURE_FEATURES,
     assemble_signature_matrix,
     standardize,
 )
-from src.viz.signature_style import TYPE_LABEL  # noqa: E402
+from src.viz.signature_style import TYPE_LABEL
 
 FIGS = ROOT / "outputs" / "cross_site" / "signature" / "figures_v2"
 OUT = ROOT / "outputs" / "cross_site" / "typology_predictor_extra"
