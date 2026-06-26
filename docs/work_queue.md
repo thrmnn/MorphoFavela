@@ -6,6 +6,13 @@ hard to find. Updated every working session.
 
 ## 🆕 Latest (each links to the exact figure/section)
 
+- **✅ Council roadmap (7 items) + 7-stream repo-audit parallel run COMPLETE
+  (2026-06-26)** — see `docs/repo_parallel_plan_2026-06-26.md` +
+  `docs/council_roadmap_2026-06-25.md`. Highlights: spatial-CV CIs on the predictor
+  flip (CI-overlapping), blind-map external validation (AUC-PR 0.76), wind-exposure +
+  2D ventilation-susceptibility scalars, **MAUP regime-share resolution-dependence
+  (+18.4 pp at 20 m, TR §10.9)**, additive `morphotype_shape` (separable axis, ARI
+  0.18), `src/morphometry/invariants.py`, always-on test guards, cfd provenance. 660 green.
 - [TR §6.6 roughness — invalidity caveat](/outputs/_hub/docs/technical_report.html#66-aerodynamic-roughness-z0-zd)
   — per-cell z0/zd invalid 53–75%; the envelope is the result.
 - [TR §5.5 Morphological Typology & Signature](/outputs/_hub/docs/technical_report.html#55-morphological-typology-signature)
