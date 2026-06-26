@@ -224,13 +224,16 @@ def build_building_meshes(
     # registry these rows carry a corrupt `altura` mis-derived as the base
     # elevation (Rocinha 33, Rio das Pedras 8, Maré 22), which would extrude
     # into phantom towers up to 232 m. True height is unrecoverable, so drop.
-    if "topo" in gdf.columns:
-        corrupt = gdf["topo"] == 0
-        if corrupt.any():
-            logger.warning(
-                f"  Dropping {int(corrupt.sum())} building(s) with corrupt height (topo == 0)"
-            )
-            gdf = gdf[~corrupt].copy()
+    # Shared detector in src.morphometry.invariants (default = full mask; the
+    # extra altura<=0 topo==0 rows the scene already skips at extrusion).
+    from src.morphometry.invariants import phantom_mask
+
+    corrupt = phantom_mask(gdf)
+    if corrupt.any():
+        logger.warning(
+            f"  Dropping {int(corrupt.sum())} building(s) with corrupt height (topo == 0)"
+        )
+        gdf = gdf[~corrupt].copy()
 
     # Optional filtering for informal areas
     # skip_area_filter=True: large buildings (schools, commercial) still

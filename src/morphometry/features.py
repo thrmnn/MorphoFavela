@@ -26,6 +26,8 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
+from src.morphometry.invariants import built_mask
+
 # Cell-native fabric columns. svf / svf_count are intentionally NOT here.
 FABRIC_COLS = [
     "zone_id", "zone_area", "lambda_p", "far", "sigma_h", "H_mean",
@@ -59,9 +61,9 @@ def build_fabric_table(grid: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     aspect_rad = np.deg2rad(out["aspect_deg"])
     out["northness"] = np.cos(aspect_rad)
     out["eastness"] = np.sin(aspect_rad)
-    out["built_mask"] = (out.get("lambda_p", 0) > 0.01) | (
-        out.get("building_count", 0) > 0
-    )
+    # Lenient variant ((λp>0.01)|(building_count>0)); identical to the canonical
+    # building_count>0 mask on the campaign grids (pooled n=64,389).
+    out["built_mask"] = built_mask(out, lenient=True)
     return out
 
 

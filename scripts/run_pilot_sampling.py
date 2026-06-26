@@ -790,29 +790,10 @@ def compute_v1_domain(
 # ═══════════════════════════════════════════════════════════════════
 
 
-def drop_phantom_buildings(buildings: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Drop phantom-tower footprints before they reach the per-patch packages.
-
-    The ``topo == 0`` corruption (the source copied ``base`` into ``altura`` and
-    zeroed the rooftop) produces absurd extruded heights — 83–232 m slivers in
-    Rocinha — that poison H_mean / σ_H / λf and the roughness z0/zd. The
-    site-wide ``buildings_extended_300m`` layer was already cleaned (task #25);
-    the per-patch extractor draws from a rawer source and never got the guard.
-    Detector: ``topo == 0``, or ``altura ≈ base`` with an implausible (> 40 m)
-    favela height.
-    """
-    if "topo" not in buildings.columns or "altura" not in buildings.columns:
-        return buildings
-    phantom = buildings["topo"] == 0
-    if "base" in buildings.columns:
-        phantom = phantom | (
-            ((buildings["altura"] - buildings["base"]).abs() < 0.01)
-            & (buildings["altura"] > 40)
-        )
-    n = int(phantom.sum())
-    if n:
-        print(f"  dropped {n} phantom-tower footprint(s) (topo==0 / altura==base >40 m)")
-    return buildings[~phantom].copy()
+# drop_phantom_buildings now lives in src.morphometry.invariants (shared home);
+# re-exported here so existing callers + tests/test_phantom_buildings.py still
+# import it from this module.
+from src.morphometry.invariants import drop_phantom_buildings  # noqa: E402,F401
 
 
 def export_patch_data(

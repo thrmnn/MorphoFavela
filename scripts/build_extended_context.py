@@ -34,6 +34,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import EXPECTED_CRS, get_area_data_dir  # noqa: E402
+from src.morphometry.invariants import phantom_mask  # noqa: E402
 from src.svf_v2.paths import resolve_boundary, resolve_paths  # noqa: E402
 
 logging.basicConfig(
@@ -160,16 +161,16 @@ def build_extended_buildings(
     # Drop registry-corrupt heights — rows with topo (absolute top elevation)
     # == 0 carry an altura mis-derived as the base elevation, which extrudes
     # into phantom towers up to 232 m. The SVF scene builder already filters
-    # these (src/svf_v2/scene.py), but other consumers read this gpkg directly,
-    # so clean them at the source too.
-    if {"topo", "altura"}.issubset(extended.columns):
-        phantom = (extended["topo"] == 0) & (extended["altura"] > 0)
-        if phantom.any():
-            logger.warning(
-                "Dropping %d topo==0 phantom-height building(s) before write.",
-                int(phantom.sum()),
-            )
-            extended = extended[~phantom].copy()
+    # these (src/svf_v2/scene.py); shared detector in src.morphometry.invariants.
+    # ``extruding_only`` keeps zero-height topo==0 rows, matching the historical
+    # ``(topo==0) & (altura>0)`` predicate (behaviour-preserving on the grids).
+    phantom = phantom_mask(extended, extruding_only=True)
+    if phantom.any():
+        logger.warning(
+            "Dropping %d topo==0 phantom-height building(s) before write.",
+            int(phantom.sum()),
+        )
+        extended = extended[~phantom].copy()
 
     # Save
     data_dir = get_area_data_dir(area).parent  # data/{area}/

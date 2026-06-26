@@ -15,6 +15,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from src.morphometry.invariants import built_mask
+
 # Lean, low-redundancy fabric signature vector. Rationale in the decision log:
 # porosity (r=-0.97 w/ lambda_p) and far (collinear w/ lambda_p*H_mean) dropped;
 # street_orientation_entropy dropped (59% NaN, ~0 variance); orientation
@@ -48,7 +50,10 @@ def assemble_signature_matrix(df: pd.DataFrame) -> pd.DataFrame:
     for single-building cells, and drops any row still carrying a NaN feature
     (count returned via ``.attrs['n_dropped']``).
     """
-    out = df[df["built_mask"]].copy()
+    # Prefer the persisted lenient built_mask (from build_fabric_table); fall
+    # back to the canonical building_count>0 helper if the column is absent.
+    mask = df["built_mask"].to_numpy() if "built_mask" in df.columns else built_mask(df)
+    out = df[mask].copy()
     out["lambda_f_aniso"] = (out["lambda_f_max"] - out["lambda_f_mean"]).clip(lower=0)
     out["sigma_h"] = out["sigma_h"].fillna(0.0)
 

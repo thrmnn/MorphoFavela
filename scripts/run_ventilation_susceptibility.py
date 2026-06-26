@@ -39,6 +39,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
 from fig_style import SITE_LABELS, add_provenance, apply_style, save_fig  # noqa: E402
 
 from scripts.run_lateral_connectivity import open_edge_distance  # noqa: E402
+from src.morphometry.invariants import built_mask as built_cell_mask  # noqa: E402
 
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "maré"]
 ISO_MAX, SKIM_MIN = 0.15, 0.65
@@ -59,10 +60,9 @@ for _r in REGIMES:
 
 def built(site: str) -> gpd.GeoDataFrame:
     g = gpd.read_file(PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg")
-    g = g[g["building_count"] > 0].copy()
-    built_mask = (g["building_count"] > 0).to_numpy()
+    g = g[built_cell_mask(g)].copy()
     g["open_edge_dist_m"] = open_edge_distance(
-        g["centroid_x"].to_numpy(), g["centroid_y"].to_numpy(), built_mask)
+        g["centroid_x"].to_numpy(), g["centroid_y"].to_numpy(), built_cell_mask(g))
     lf = g["lambda_f_mean"].to_numpy()
     reg = np.full(len(g), 1)  # wake
     reg[lf < ISO_MAX] = 0

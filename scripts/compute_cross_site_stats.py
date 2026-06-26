@@ -21,6 +21,7 @@ Output:
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,9 @@ from scipy.spatial import cKDTree
 from scipy.stats import pearsonr
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.morphometry.invariants import built_mask as built_cell_mask  # noqa: E402
 
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "maré", "riodaspedras"]
 HILLSIDE = {"vidigal", "rocinha", "complexo_do_alemao"}
@@ -68,7 +72,7 @@ def aggregate_solar(
 def classify(grid: gpd.GeoDataFrame) -> pd.Series:
     sun = grid["solar_hours_winter"]
     vent = grid["lambda_f_mean"]
-    built = (grid["lambda_p"].fillna(0) > 0.01) | (grid["building_count"] > 0)
+    built = pd.Series(built_cell_mask(grid, lenient=True), index=grid.index)
     sun_known = sun.notna()
     vent_known = vent.notna()
     both = built & sun_known & vent_known
