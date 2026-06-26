@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 _spec = importlib.util.spec_from_file_location(
@@ -60,7 +61,7 @@ def test_canonical_denominator_is_56k_not_64k():
     not the 64,389 raw built mask."""
     p = ROOT / "outputs" / "brisa_ventilation_fix" / "taxonomy_regime.json"
     if not p.exists():
-        return  # output not generated in this checkout
+        pytest.skip("live regime JSON absent; axis-logic unit tests cover the rest")
     j = json.loads(p.read_text())
     n = j["aggregates_lambda_f"]["all"]["n_classified"]
     assert 55_000 < n < 58_000, n

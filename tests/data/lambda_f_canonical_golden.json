@@ -1,0 +1,259 @@
+{
+  "title": "Canonical dissolved λf — single authoritative source (2026-06-25)",
+  "lambda_f_definition": "dissolved (party-wall corrected): touching footprints unioned into blocks before projecting frontal area; mean of the 4 distinct cross-wind axes (lambda_f_mean). Pre-fix per-building sum preserved as lambda_f_mean_summed.",
+  "canonical_denominator": "full built mask building_count > 0 (pooled n = 64,389). Matches TR §5.2 and lambda_f_regime.json. NOT the taxonomy n_classified (~56,631), which additionally requires a winter-sun observation and is taxonomy-specific.",
+  "groupings_note": "signature_family (ternary, TR §5.2): Hillside{Vid,Roc} Mixed{CDA} Flatland{RdP,Maré}. terrain_binary (taxonomy): hillside{Vid,Roc,CDA} flatland{RdP,Maré} — CDA folds into hillside. Do not conflate.",
+  "flow_regime_thresholds": {
+    "isolated_max": 0.15,
+    "skimming_min": 0.65,
+    "reference": "Oke (1988) / Grimmond & Oke (1999)"
+  },
+  "flow_regime_pooled": {
+    "isolated": 0.048020624640854805,
+    "wake": 0.29989594495954286,
+    "skimming": 0.6520834303996024
+  },
+  "per_site": {
+    "vidigal": {
+      "label": "Vidigal",
+      "lambda_f_dissolved": {
+        "n": 2756,
+        "median": 0.8260461554283425,
+        "mean": 0.8798358236714792
+      },
+      "lambda_f_summed": {
+        "n": 2756,
+        "median": 1.3116507343768113,
+        "mean": 1.4679758669855578
+      },
+      "over_count_factor_median": 1.5878661570631738,
+      "companions": {
+        "svf": {
+          "n": 2663,
+          "median": 0.4468954248366013,
+          "mean": 0.4349602429578777
+        },
+        "lambda_p": {
+          "n": 2756,
+          "median": 0.6703054935839445,
+          "mean": 0.6144686794745049
+        },
+        "H_mean": {
+          "n": 2756,
+          "median": 6.293833333333334,
+          "mean": 6.286882282392661
+        },
+        "sigma_h": {
+          "n": 2453,
+          "median": 1.6147426265507452,
+          "mean": 1.6835905034036323
+        },
+        "slope_deg": {
+          "n": 2756,
+          "median": 26.117767106682983,
+          "mean": 25.54034422659511
+        }
+      }
+    },
+    "rocinha": {
+      "label": "Rocinha",
+      "lambda_f_dissolved": {
+        "n": 8031,
+        "median": 1.1171841595865137,
+        "mean": 1.1675553545551287
+      },
+      "lambda_f_summed": {
+        "n": 8031,
+        "median": 2.185068943148959,
+        "mean": 2.3141876695729877
+      },
+      "over_count_factor_median": 1.9558717552508849,
+      "companions": {
+        "svf": {
+          "n": 7314,
+          "median": 0.22049323691693745,
+          "mean": 0.2646471063691875
+        },
+        "lambda_p": {
+          "n": 8031,
+          "median": 0.808681605279369,
+          "mean": 0.7014509728079847
+        },
+        "H_mean": {
+          "n": 8031,
+          "median": 8.043333333333333,
+          "mean": 8.069348164902369
+        },
+        "sigma_h": {
+          "n": 7247,
+          "median": 2.133116030599367,
+          "mean": 2.253757434515612
+        },
+        "slope_deg": {
+          "n": 8031,
+          "median": 24.584566165887974,
+          "mean": 23.48969037223367
+        }
+      }
+    },
+    "complexo_do_alemao": {
+      "label": "Complexo do Alemão",
+      "lambda_f_dissolved": {
+        "n": 17768,
+        "median": 0.681154644352697,
+        "mean": 0.6996602447432618
+      },
+      "lambda_f_summed": {
+        "n": 17768,
+        "median": 1.1544357627930382,
+        "mean": 1.320935850961881
+      },
+      "over_count_factor_median": 1.694821832845464,
+      "companions": {
+        "svf": {
+          "n": 6984,
+          "median": 0.34826260127181863,
+          "mean": 0.365709347561154
+        },
+        "lambda_p": {
+          "n": 17768,
+          "median": 0.6880121237367351,
+          "mean": 0.6314296949054575
+        },
+        "H_mean": {
+          "n": 17768,
+          "median": 5.2370833333333335,
+          "mean": 5.322345907018965
+        },
+        "sigma_h": {
+          "n": 15601,
+          "median": 1.6128511676186645,
+          "mean": 1.6200288583189908
+        },
+        "slope_deg": {
+          "n": 17768,
+          "median": 18.99280695380532,
+          "mean": 18.927306063065245
+        }
+      }
+    },
+    "riodaspedras": {
+      "label": "Rio das Pedras",
+      "lambda_f_dissolved": {
+        "n": 6605,
+        "median": 1.1524581954476794,
+        "mean": 1.171955951096968
+      },
+      "lambda_f_summed": {
+        "n": 6605,
+        "median": 2.694574597567793,
+        "mean": 2.6970669763082777
+      },
+      "over_count_factor_median": 2.338110491305994,
+      "companions": {
+        "svf": {
+          "n": 2763,
+          "median": 0.1515515918506518,
+          "mean": 0.19759975991157352
+        },
+        "lambda_p": {
+          "n": 6605,
+          "median": 0.9273691401245958,
+          "mean": 0.7832388149205207
+        },
+        "H_mean": {
+          "n": 6605,
+          "median": 8.866125,
+          "mean": 8.696510972139043
+        },
+        "sigma_h": {
+          "n": 6196,
+          "median": 2.2825078078514887,
+          "mean": 2.3086608982412287
+        },
+        "slope_deg": {
+          "n": 6605,
+          "median": 1.499547079964178,
+          "mean": 3.46962288907697
+        }
+      }
+    },
+    "maré": {
+      "label": "Maré",
+      "lambda_f_dissolved": {
+        "n": 29229,
+        "median": 0.8148675650800027,
+        "mean": 0.848254810901138
+      },
+      "lambda_f_summed": {
+        "n": 29229,
+        "median": 1.603610033420952,
+        "mean": 1.8503017872278262
+      },
+      "over_count_factor_median": 1.9679394568410777,
+      "companions": {
+        "svf": {
+          "n": 9396,
+          "median": 0.35157790774204056,
+          "mean": 0.38561423605778494
+        },
+        "lambda_p": {
+          "n": 29229,
+          "median": 0.8324521362847972,
+          "mean": 0.6928617617721304
+        },
+        "H_mean": {
+          "n": 29229,
+          "median": 6.92625,
+          "mean": 7.068407250995912
+        },
+        "sigma_h": {
+          "n": 23681,
+          "median": 1.9020113622747425,
+          "mean": 1.9703496633991882
+        },
+        "slope_deg": {
+          "n": 29195,
+          "median": 1.5098161532817684,
+          "mean": 2.68806833284863
+        }
+      }
+    }
+  },
+  "groupings": {
+    "signature_family": {
+      "Hillside": {
+        "n": 10787,
+        "median": 1.0441533325413968,
+        "mean": 1.0940451082294276
+      },
+      "Mixed": {
+        "n": 17768,
+        "median": 0.681154644352697,
+        "mean": 0.6996602447432618
+      },
+      "Flatland": {
+        "n": 35834,
+        "median": 0.8727376764986616,
+        "mean": 0.9079201017141496
+      }
+    },
+    "terrain_binary": {
+      "hillside": {
+        "n": 28555,
+        "median": 0.7809718734355291,
+        "mean": 0.8486439436550206
+      },
+      "flatland": {
+        "n": 35834,
+        "median": 0.8727376764986616,
+        "mean": 0.9079201017141496
+      }
+    },
+    "pooled": {
+      "n": 64389,
+      "median": 0.830777788823418,
+      "mean": 0.8816325262994292
+    }
+  }
+}

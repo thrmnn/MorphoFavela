@@ -2,9 +2,18 @@
 Pytest configuration and shared fixtures for SVF tests.
 """
 
+import sys
+
 import numpy as np
 import pytest
 import pyvista as pv
+
+# Fast-fail if a wrong-PATH interpreter (e.g. system python) masquerades as the
+# IVF env: the pipeline and several guards assume >=3.11 semantics.
+assert sys.version_info >= (3, 11), (
+    f"Python >= 3.11 required (IVF env); got {sys.version.split()[0]}. "
+    "A wrong-PATH interpreter is likely active — activate the IVF conda env."
+)
 
 # Optional GPU imports
 try:

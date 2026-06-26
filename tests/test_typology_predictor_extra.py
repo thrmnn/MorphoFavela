@@ -38,17 +38,31 @@ def test_feature_envelope_brackets_p1_p99():
         assert 2.0 < hi < 2.7  # p99 ≈ +2.33
 
 
-def test_cont_features_present_in_grid_schema():
-    """Guard the silent drift that broke this script once: the dissolved-λf
-    re-baseline regenerated features_grid without party_wall_ratio while
-    CONT_FEATURES still listed it. Any CONT_FEATURES member must exist as a
-    grid column. Skips in data-free checkouts (outputs/ is gitignored)."""
-    p = ROOT / "outputs" / "vidigal" / "features" / "features_grid.parquet"
-    if not p.exists():
+GRID_HEADER = ROOT / "tests" / "data" / "features_grid_header.parquet"
+REAL_GRID = ROOT / "outputs" / "vidigal" / "features" / "features_grid.parquet"
+
+
+def test_cont_features_present_in_grid_header_fixture():
+    """Always-on schema-drift guard: the committed header-only grid fixture
+    carries the exact real column set, so this fires in a clean checkout / CI
+    where the gitignored live grid is absent. Guards the silent drift that broke
+    this script once (re-baseline dropped party_wall_ratio while CONT_FEATURES
+    still listed it)."""
+    import geopandas as gpd
+
+    cols = set(gpd.read_parquet(GRID_HEADER).columns)
+    missing = [f for f in CONT_FEATURES if f not in cols]
+    assert not missing, f"CONT_FEATURES drifted from grid schema: {missing}"
+
+
+def test_cont_features_present_in_live_grid():
+    """Extra layer over the header fixture: re-check against the live grid when
+    the gitignored output is present."""
+    if not REAL_GRID.exists():
         pytest.skip("features_grid not present (gitignored outputs)")
     import geopandas as gpd
 
-    cols = set(gpd.read_parquet(p).columns)
+    cols = set(gpd.read_parquet(REAL_GRID).columns)
     missing = [f for f in CONT_FEATURES if f not in cols]
     assert not missing, f"CONT_FEATURES drifted from grid schema: {missing}"
 
