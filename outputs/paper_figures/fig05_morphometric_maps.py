@@ -150,6 +150,7 @@ def main():
             add_scalebar(ax)
 
     fig.tight_layout(h_pad=0.5, w_pad=0.5)
+    add_provenance(fig)
     save_fig(fig, "fig05_morphometric_maps")
 
 

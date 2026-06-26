@@ -196,9 +196,11 @@ def check_text_overflow(fig: plt.Figure, tol_px: float = 1.0) -> list[tuple[str,
     return sorted(set(violations), key=lambda v: -v[1])
 
 
-def save_fig(fig: plt.Figure, name: str, dpi: int = DPI, gate: bool = False) -> None:
-    """Save figure as both SVG and PNG to exports/. With ``gate=True``, run the
-    text-overflow assertion (round-3 §0) and raise if any glyph crosses the canvas."""
+def save_fig(fig: plt.Figure, name: str, dpi: int = DPI, gate: bool = True) -> None:
+    """Save figure as both SVG and PNG to exports/. With ``gate=True`` (the
+    default), run the text-overflow assertion (round-3 §0) and raise if any glyph
+    crosses the canvas. Pass ``gate=False`` only for structural exceptions (e.g.
+    3-D axes whose tick labels can't be bbox-measured)."""
     if gate:
         bad = check_text_overflow(fig)
         if bad:
@@ -319,6 +321,33 @@ def hillshade(dtm: np.ndarray, res: float, az: float = 315, alt: float = 45) -> 
     az_r, alt_r = np.radians(az), np.radians(alt)
     shade = np.sin(alt_r) * np.cos(slope) + np.cos(alt_r) * np.sin(slope) * np.cos(az_r - aspect)
     return np.clip(shade, 0, 1)
+
+
+PROVENANCE_TEXT = (
+    "Building footprints © IPP (municipal cadaster); ALS heights MIT/SondoTecnica. "
+    "Pipeline open; input data not redistributable."
+)
+
+
+def add_provenance(fig_or_ax, text: str = PROVENANCE_TEXT) -> None:
+    """Stamp the canonical data-provenance caption along the bottom edge of a
+    spatial/choropleth figure. Accepts either a Figure (caption spans the figure)
+    or an Axes (caption anchored to that axes). Keep it tiny and grey so it reads
+    as a credit line, not a label."""
+    import matplotlib.figure as _mfig
+
+    if isinstance(fig_or_ax, _mfig.Figure):
+        fig_or_ax.text(
+            0.5, 0.002, text,
+            ha="center", va="bottom", fontsize=4.5, color="#888",
+            transform=fig_or_ax.transFigure,
+        )
+    else:
+        fig_or_ax.text(
+            0.5, -0.02, text,
+            ha="center", va="top", fontsize=4.5, color="#888",
+            transform=fig_or_ax.transAxes,
+        )
 
 
 def stat_annotation(ax, text: str, loc: str = "upper left") -> None:

@@ -55,6 +55,7 @@ from fig_style import (
     add_north_arrow,
     add_scalebar,
     apply_style,
+    check_text_overflow,
     clean_map_axes,
     load_boundary,
     load_buildings,
@@ -365,7 +366,7 @@ def main() -> None:
         "spatially random; I < 0 → regularly dispersed."
     )
     ax_cap_a.text(0.0, 0.95, cap_a, transform=ax_cap_a.transAxes,
-                  ha="left", va="top", fontsize=5.8, color="#333",
+                  ha="left", va="top", fontsize=5.5, color="#333",
                   linespacing=1.4)
 
     # Row 1: LISA maps.
@@ -417,8 +418,12 @@ def main() -> None:
              "PROPOSITION B — Moran's I + LISA on the Fig 0.4 diagnostic. Synthetic CFD; pattern conserved on real CFD if morphology dominates.",
              ha="center", va="top", fontsize=5.5, style="italic", color="#a0522d")
 
-    out_png = EXPORTS_DIR / "fig_0_7_proposition_clustering.png"
-    out_svg = EXPORTS_DIR / "fig_0_7_proposition_clustering.svg"
+    bad = check_text_overflow(fig)
+    if bad:
+        raise ValueError(f"text-overflow gate failed for fig_0_7_clustering: {bad}")
+
+    out_png = EXPORTS_DIR / "fig_0_7_clustering.png"
+    out_svg = EXPORTS_DIR / "fig_0_7_clustering.svg"
     print(f"Saving {out_png.name} + {out_svg.name} ...")
     fig.savefig(out_png, dpi=600, bbox_inches="tight", pad_inches=0.05,
                 facecolor="white")

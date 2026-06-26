@@ -62,7 +62,7 @@ import numpy as np
 from matplotlib.colors import to_rgb
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fig_style import PROJECT_ROOT, apply_style
+from fig_style import PROJECT_ROOT, apply_style, check_text_overflow
 
 sys.path.insert(0, str(PROJECT_ROOT))
 from src.viz import presentation_style as ps
@@ -218,7 +218,7 @@ def panel_importance(ax, stats: dict) -> None:
     ax.xaxis.grid(True, color=GRID, lw=0.5, zorder=1)
     ax.set_axisbelow(True)
 
-    ax.text(-0.30, 1.04, "A", transform=ax.transAxes,
+    ax.text(-0.16, 1.04, "A", transform=ax.transAxes,
             fontsize=FS_PANEL, fontweight="bold", color=INK, va="bottom", ha="left")
     ax.set_title("Random-forest feature importance", fontsize=FS_AXLABEL,
                  color=INK, pad=6, loc="left")
@@ -403,7 +403,7 @@ def panel_logit(ax, stats: dict) -> None:
             bbox=dict(boxstyle="round,pad=0.45", facecolor="white",
                       edgecolor=SLATE, linewidth=0.6))
 
-    ax.text(-0.30, 1.04, "C", transform=ax.transAxes,
+    ax.text(-0.16, 1.04, "C", transform=ax.transAxes,
             fontsize=FS_PANEL, fontweight="bold", color=INK, va="bottom", ha="left")
     ax.set_title("Pooled logistic regression (standardized)",
                  fontsize=FS_AXLABEL, color=INK, pad=6, loc="left")
@@ -456,6 +456,10 @@ def main() -> None:
     panel_pd(fig.add_subplot(gs[0, 1]), stats, pd_curves)
     panel_logit(fig.add_subplot(gs[1, 0]), stats)
     panel_changepoint_placeholder(fig.add_subplot(gs[1, 1]))
+
+    bad = check_text_overflow(fig)
+    if bad:
+        raise ValueError(f"text-overflow gate failed for fig05_predictors: {bad}")
 
     save_kw = dict(dpi=300, facecolor="white", bbox_inches="tight", pad_inches=0.1)
     if args.preset == "presentation":

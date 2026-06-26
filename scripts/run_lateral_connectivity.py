@@ -39,7 +39,7 @@ from scipy.ndimage import distance_transform_edt
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "outputs" / "paper_figures"))
-from fig_style import SITE_LABELS, apply_style, save_fig
+from fig_style import SITE_LABELS, add_provenance, apply_style, save_fig
 
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "maré"]
 CELL_M = 10.0
@@ -147,6 +147,7 @@ def make_figure(grids: dict, vmax: float) -> None:
         "(geometry-only, pre-CFD companion to the λ$_f$ vertical regime; not an adequacy)",
         ha="center", va="top", fontsize=7.0,
     )
+    add_provenance(fig)
     save_fig(fig, "lateral_connectivity", gate=True)
 
 

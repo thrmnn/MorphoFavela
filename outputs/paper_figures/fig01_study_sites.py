@@ -175,6 +175,7 @@ def main():
         ax.set_title(f"{SITE_LABELS[site]} ({typ}, {n_bld} bld.)", fontsize=5, pad=1)
         add_scalebar(ax)
 
+    add_provenance(fig)
     save_fig(fig, "fig01_study_sites")
 
 

@@ -165,8 +165,8 @@ def main() -> None:
     fig.text(
         0.5,
         0.905,
-        "Northness (cos aspect) and eastness (sin aspect) component maps of the "
-        "10 m morphometric grid. The circular decomposition handles the 0/360° "
+        "Northness (cos aspect) and eastness (sin aspect) component maps of the\n"
+        "10 m morphometric grid. The circular decomposition handles the 0/360°\n"
         "discontinuity; near-flat cells register near zero on both axes.",
         ha="center",
         va="top",
