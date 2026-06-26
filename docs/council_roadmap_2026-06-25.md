@@ -28,9 +28,10 @@ continued autonomous work. Engineering contract below is **non-negotiable**.
    (jacarezinho 0.82 but 62% extrapolating; juramento 0.39 low-prevalence). Transfers as
    a stratifier with extrapolation flags. `typology_blind_validation.png`.
 3. **[deepen/M] Tessellation + shape + grain descriptors into the morphotypes** —
-   momepy-style shape (convexity, elongation, shape_index, adjacency) + footprint-area
-   entropy aggregated to the grid; screen VIF vs λp; re-fit k=6, report LOSO-ARI vs
-   canonical (preserve canonical morphotype column).
+   ✅ DONE (S1, commit d04c317). Additive `morphotype_shape` column; VIF-screened (dropped
+   shape_index_mean 10.45); **shape is a separable axis, not density re-expressed** (cell
+   LOSO-ARI 0.181, morphotope 0.436); canonical morphotype/morphotope/λf bit-for-bit.
+   Decision log D21–D23. **ALL 7 roadmap items + the 6-stream repo-audit plan now complete.**
 4. **[deepen/S] Directional λf × wind-rose → effective wind-EXPOSURE scalar** —
    Σ_θ freq(θ)·λf_θ per cell from the unused 8-sector λf + `wind_rose.json`. Frame as
    geometric exposure *tendency*, NOT adequacy (τ gated; z0 is 180°-symmetric → frequency

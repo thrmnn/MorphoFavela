@@ -42,6 +42,22 @@ spatially-blocked CV for predictor claims · local compute only · reversible.
 - S1 runs strictly after Wave 1, so S7's sweep of the shared scripts lands first and S1 edits
   the cleaned versions — no collision.
 
+## EXECUTION OUTCOME (2026-06-26) — all streams ✅ COMPLETE
+
+Wave 1 (concurrent where disjoint): **S3** `3bebb2a` (always-on golden λf/regime/FLIP/schema
+guards, 15→21), **S6** `5d8b5e8` (nav-doc resync), **S4** `bf44adb` (cfd synthetic/provenance
++ wind_direction enforcement), **S7** `4909877/1f6cc14/8d0415f/e595f15` (deps + 147 dead-noqa
+strip + PEP-585/604 typing + brisa_deck path de-hardcode + branch report), **S2** `7d247a4`
+(MAUP A/B — **regime shares SHIFT +18.4 pp skimming at 20 m**; absolute shares are
+resolution-dependent, quote only at 10 m; cross-site ordering preserved — TR §10.9), **S5**
+`710ada8` (text-overflow gate default-ON for every figure + provenance helper + fig_0_7 fix),
+integration `6abad48` (PDF rebuilt once).
+Wave 2 (alone): **S1** `be237a5/2e43697/d04c317/f152bdf` — canonical morphotype re-fit (#3):
+n=64,389 held, canonical morphotype/morphotope/λf bit-for-bit, additive `morphotype_shape`;
+**shape/grain is a separable axis (cell LOSO-ARI 0.181, morphotope 0.436)** — not density
+re-expressed; bootstrap-ARI + `src/morphometry/invariants.py` shared mask/phantom helpers.
+Full suite 660 passed, ruff clean throughout. Hard contract honored on every stream.
+
 ## Excluded (hard-blocked) — not in any stream
 CFD-τ · ray-caster vs Radiance/SOLWEIG · Mingze upload · BRISA manuscript edits · git
 force-push/history-rewrite/branch-deletion (S7 emits a REPORT only).
