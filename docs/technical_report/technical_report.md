@@ -1692,6 +1692,30 @@ are flatland-conditional rather than universal. The held-out experience validati
 Experience profiles are read on the ~35 % of cells with a street observer. The
 typology→failure *predictor* (§5.5 forward look) is a separate, forthcoming sub-study.
 
+### 10.9 Sensitivity to grid resolution (MAUP)
+
+![MAUP A/B: pooled flow-regime shares 10 m vs 20 m.](figures/maup_regime_shares.png)
+
+The Modifiable Areal Unit Problem is the standard objection to grid-based
+morphometrics. A direct A/B (`scripts/run_maup_sensitivity.py`,
+`outputs/comparative/maup/maup_sensitivity.json`) re-derives the pooled Oke /
+Grimmond-Oke flow-regime shares on built cells (`building_count > 0`) at the
+production 10 m grid and at a doubled 20 m grid, holding the regime thresholds
+fixed (λf < 0.15 isolated, ≥ 0.65 skimming). The shares are **not** invariant
+to cell size: skimming rises from 65.2 % to 83.7 % (**+18.4 pp**) while wake
+falls from 30.0 % to 13.2 % (**−16.8 pp**) and isolated barely moves (−1.7 pp);
+the pooled λf median nearly doubles (+139 %) and σH rises +15.6 %. This is the
+expected MAUP signature — frontal area aggregates while plan area grows
+quadratically, so coarsening inflates λf and pushes cells across the skimming
+threshold — and it is reported as measured rather than smoothed into a
+"stable" verdict. The operational consequence is narrow: the *absolute*
+regime-share figures are resolution-dependent and must always be quoted at the
+locked 10 m resolution (the figures in §5.2 and `lambda_f_canonical.json`),
+which this A/B reproduces exactly; the cross-site *ordering* of morphologies is
+preserved. The complementary distribution-shape analysis at §4.6 (Figure S3)
+shows the 10 m grid additionally resolves multimodality that 20 m aggregation
+erases, which is the basis for fixing 10 m as the production grid.
+
 ---
 
 ## 11. Next Steps
