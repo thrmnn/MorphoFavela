@@ -24,13 +24,14 @@ dependencies = [
     "libpysal>=4.8.0",
     "esda>=2.5.0",
     "folium>=0.14.0",
-    "ipywidgets>=8.0.0",
-    "pyarrow>=10.0.0",
-    "pyogrio>=0.7.0",
-    "fiona>=1.9.0",
+    "trimesh>=4.0.0",      # mesh I/O for 3D print export (src/print3d) + SVF embree path
+    # I/O backends — not imported directly, but required at runtime:
+    "pyarrow>=10.0.0",     # geopandas/pandas parquet engine
+    "pyogrio>=0.7.0",      # geopandas vector I/O engine
+    "fiona>=1.9.0",        # geopandas OGR fallback engine
+    "openpyxl>=3.1.0",     # pandas .xlsx engine (scripts/compare_mingze_vidigal)
     "statsmodels>=0.14.0",
-    "openpyxl>=3.1.0",
-    "branca>=0.6.0",
+    "branca>=0.6.0",       # folium colormap dependency, also imported directly
     "pyproj>=3.5.0",
 ]
 
