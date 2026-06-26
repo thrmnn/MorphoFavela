@@ -13,6 +13,22 @@ from src.morphometry.signature import (
     standardize,
 )
 
+# Canonical 6-feature fabric vector — pinned as an exact ordered literal so the
+# production GMM fit cannot silently drift (added/removed/reordered feature).
+# Changing this requires a documented A/B in docs/morpho_signature_decisions.md.
+CANONICAL_SIGNATURE_FEATURES = (
+    "lambda_p",
+    "H_mean",
+    "sigma_h",
+    "lambda_f_mean",
+    "lambda_f_aniso",
+    "slope_deg",
+)
+
+
+def test_signature_features_exact_order_pin():
+    assert tuple(SIGNATURE_FEATURES) == CANONICAL_SIGNATURE_FEATURES
+
 
 def _pooled():
     # 3 built cells (one single-building → sigma_h NaN) + 1 unbuilt (filtered out)
