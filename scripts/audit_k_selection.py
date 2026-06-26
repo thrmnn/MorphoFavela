@@ -22,6 +22,7 @@ matrix (the same ``assemble_signature_matrix`` + ``standardize`` the production
 from __future__ import annotations
 
 import glob
+import json
 import sys
 from pathlib import Path
 
@@ -50,6 +51,7 @@ from src.morphometry.signature import (  # noqa: E402
 
 FIG_DIR = ROOT / "outputs" / "cross_site" / "signature" / "figures_v2"
 CSV_DIR = ROOT / "outputs" / "cross_site" / "audit_k_selection"
+SUMMARY_DIR = ROOT / "outputs" / "cross_site" / "signature"
 RANDOM_STATE = 0
 KRANGE = range(2, 11)
 K_CHOSEN = 6
@@ -156,6 +158,57 @@ def loso_stability(
     return pd.DataFrame(rows)
 
 
+def _one_boot_ari(b: int, Xz: np.ndarray, reference: np.ndarray, k: int, m: int) -> float:
+    """A single bootstrap refit-and-score (seeded by ``b`` for reproducibility)."""
+    rng = np.random.default_rng(b)
+    idx = rng.choice(len(Xz), size=m, replace=False)
+    gm = GaussianMixture(
+        n_components=k, covariance_type="full", random_state=b, n_init=1
+    ).fit(Xz[idx])
+    boot = match_labels(reference[idx], gm.predict(Xz[idx]), k)
+    return float(adjusted_rand_score(reference[idx], boot))
+
+
+def bootstrap_ari(
+    Xz: np.ndarray,
+    reference: np.ndarray,
+    k: int,
+    n_boot: int = 200,
+    frac: float = 0.8,
+    random_state: int = RANDOM_STATE,
+    n_jobs: int = 4,
+) -> dict:
+    """Bootstrap cluster stability: ``n_boot`` GMM refits on ``frac`` resamples,
+    each Hungarian-matched to the reference k labels, scored by ARI on the
+    held-in subsample. Returns mean + 2.5/97.5 percentile CI + min.
+
+    A reviewer in the Fleischmann lineage demands this on top of the LOSO
+    stability; the percentile CI is the headline robustness number for k=6. Each
+    bootstrap is seeded by its index, so the result is reproducible regardless of
+    ``n_jobs`` (capped to share the workstation).
+    """
+    m = int(round(frac * len(Xz)))
+    if n_jobs == 1:
+        aris = np.array([_one_boot_ari(b, Xz, reference, k, m) for b in range(n_boot)])
+    else:
+        from joblib import Parallel, delayed
+
+        aris = np.array(
+            Parallel(n_jobs=n_jobs)(
+                delayed(_one_boot_ari)(b, Xz, reference, k, m) for b in range(n_boot)
+            )
+        )
+    return {
+        "n_boot": n_boot,
+        "frac": frac,
+        "mean": float(aris.mean()),
+        "min": float(aris.min()),
+        "ci_2.5": float(np.percentile(aris, 2.5)),
+        "ci_97.5": float(np.percentile(aris, 97.5)),
+        "_aris": aris,
+    }
+
+
 def plot_battery(sel: pd.DataFrame, elbow_k: int, sil_k: int) -> Path:
     panels = [
         ("bic", "BIC (lower = better)", "min"),
@@ -214,11 +267,32 @@ def main() -> None:
     loso = loso_stability(mat, Xz, full_labels, K_CHOSEN)
     loso.to_csv(CSV_DIR / "loso_stability.csv", index=False)
 
+    boot = bootstrap_ari(Xz, full_labels, K_CHOSEN)
+    pd.DataFrame({"boot": range(boot["n_boot"]), "ari": boot.pop("_aris")}).to_csv(
+        CSV_DIR / "bootstrap_ari.csv", index=False
+    )
+
     fig_path = plot_battery(sel, elbow_k, sil_k)
 
     mean_ari = float(loso["ari_vs_full"].mean())
     min_ari = float(loso["ari_vs_full"].min())
     worst = loso.loc[loso["ari_vs_full"].idxmin(), "held_out_site"]
+
+    summary = {
+        "n_cells": int(n_cells),
+        "k_chosen": K_CHOSEN,
+        "elbow_k": int(elbow_k),
+        "silhouette_peak_k": int(sil_k),
+        "calinski_harabasz_peak_k": int(ch_k),
+        "davies_bouldin_best_k": int(db_k),
+        "loso_ari_mean": mean_ari,
+        "loso_ari_min": min_ari,
+        "loso_ari_worst_fold": str(worst),
+        "bootstrap_ari": boot,
+    }
+    summary_path = SUMMARY_DIR / "k_selection_summary.json"
+    SUMMARY_DIR.mkdir(parents=True, exist_ok=True)
+    summary_path.write_text(json.dumps(summary, indent=2))
 
     print(f"n_cells clustered      : {n_cells}")
     print(f"BIC elbow (kneedle)    : k={elbow_k}")
@@ -227,11 +301,14 @@ def main() -> None:
     print(f"Davies-Bouldin best    : k={db_k}")
     print(f"LOSO ARI (k={K_CHOSEN}) mean    : {mean_ari:.3f}")
     print(f"LOSO ARI (k={K_CHOSEN}) min     : {min_ari:.3f}  (worst fold: {worst})")
+    print(f"bootstrap ARI (B={boot['n_boot']}) : mean={boot['mean']:.3f}  "
+          f"CI[{boot['ci_2.5']:.3f}, {boot['ci_97.5']:.3f}]  min={boot['min']:.3f}")
     print("\nLOSO per-fold:")
     print(loso.to_string(index=False))
     print(f"\nfigure  -> {fig_path}")
     print(f"battery -> {CSV_DIR / 'k_battery.csv'}")
     print(f"loso    -> {CSV_DIR / 'loso_stability.csv'}")
+    print(f"summary -> {summary_path}")
 
 
 if __name__ == "__main__":
