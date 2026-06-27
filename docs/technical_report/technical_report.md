@@ -930,6 +930,136 @@ type code alone); the typology is best read as a descriptive, coarse prioritiser
 with a blind risk map applied to the three calibration favelas. The parsimony,
 calibration, and blind-application detail is in the typology-predictor plan.
 
+**Shape/grain is a separable additive axis, not density re-expressed (A/B sensitivity).**
+The canonical signature is built on a density-anchored six-feature vector
+(λp, H̄, σ_H, λf, λf-anisotropy, slope); the `morphotype` / `morphotope` /
+`morphotype_smooth` partitions and every λf value are frozen bit-for-bit. As an
+*additive A/B sensitivity* — never a re-baseline — we re-fit the GMM (k = 6) on the
+canonical vector augmented with per-building shape and grain descriptors
+(area-weighted convexity, building adjacency, elongation, tessellation-neighbour
+count, fractal dimension, plus a within-cell grain axis `area_entropy`). A VIF
+screen drops `shape_index_mean` (VIF = 10.45 ≥ 10) as collinear with density — it
+merely re-expresses λp, the known confound — and keeps the six remaining axes
+(convexity 5.89, elongation 6.47, building_adjacency 1.76, tessellation 1.12,
+fractal_dimension 1.19, area_entropy 1.47). The shape-augmented partition is
+*genuinely different* from the canonical one: cell-level ARI(shape vs canonical) =
+0.175 (LOSO mean 0.181, min 0.130 at Rio das Pedras) over 39,888 shared cells — a
+partition that merely re-encoded density would land near ARI ≈ 1, so an ARI near
+0.18 means the screened grain/convexity/adjacency axes reshuffle a large fraction of
+cells into different types. At tissue scale the agreement rises to ARI = 0.436
+(k = 5 morphotopes built from each label field): the ~50 m composition window
+absorbs much of the cell-level churn, so the recurrent-tissue signature is again the
+more robust scale. The low ARI is the finding, not a defect — it quantifies how much
+fabric *character* is orthogonal to the density field the canonical signature is
+built on. *Decision:* keep the density-anchored six-feature fit as the canonical
+signature and report `morphotype_shape` as a shape-sensitivity extension only.
+*(Provenance: `outputs/cross_site/signature/shape_ab_meta.json`,
+`shape_vif.csv`, `outputs/cross_site/morphotope_stability/shape_morphotope_ari.json`;
+decision-log D22.)*
+
+**Hardening the predictor flip: spatially-blocked CV, block-bootstrap CIs, and an
+external blind map.** The forward-look finding above — that the *continuous fabric
+vector*, not the discrete type code, carries the transferable signal (leave-one-site-out
+AUC-PR 0.84 vs 0.61 for the type code) — is hardened here. Transfer is evaluated under
+spatially-blocked leave-one-site-out CV (each test favela is held out whole), and the
+pooled out-of-fold AUC-PR is banded by a site-block bootstrap that resamples the five
+favelas with replacement (B = 2000): vector 0.86 [0.76, 0.93], type 0.55 [0.48, 0.77].
+With only five site blocks the bands are wide and **overlapping** — the vector-minus-type
+gap is *not* statistically separated (`gap_vector_minus_type_ci_separated = false`). The
+honest reading is therefore a **direction** (the continuous vector transfers better than
+the discrete code), not a cleanly separated gap; the headline 0.84 / 0.61 point estimates
+stand, but the confidence bands at n = 5 sites are too wide to certify the margin. The
+continuous fabric vector itself is low-collinearity (VIF 1.1–3.0: λp 1.68, λf 3.00,
+H̄ 2.26, σ_H 1.30, slope 1.09 — no SVF, no solar term), so the transfer is not riding on
+a redundant predictor. As a genuinely external check, the trained predictor is applied
+*blind* to three calibration favelas it was never fitted on (Borel, Jacarezinho,
+Morro do Juramento), producing a per-building risk map (Figure 5.5e): pooled AUC-PR 0.76
+and Brier 0.20 over 3,797 buildings, but site-variable (AUC-PR 0.82 at Jacarezinho vs
+0.39 at Morro do Juramento) with a large out-of-envelope fraction at some sites — so the
+blind map is flagged as *extrapolation*, a coarse prioritiser rather than a per-building
+guarantee. As with the geometric ventilation tendencies elsewhere in this report, these
+remain τ-gated, geometry-only descriptors: they are not a claim of per-cell ventilation
+adequacy, which awaits CFD integration.
+*(Provenance: `outputs/cross_site/typology_predictor/spatial_cv.json`,
+`outputs/cross_site/typology_predictor_extra/blind_riskmap_validation.csv`,
+`blind_riskmap_summary.csv`.)*
+
+![Blind external validation of the morphology-only failure predictor applied to three held-out calibration favelas.](figures/typology_blind_validation.png)
+
+*Figure 5.5e — **external blind validation** of the continuous-fabric-vector predictor on three favelas it was never fitted on (Borel, Jacarezinho, Morro do Juramento): pooled AUC-PR 0.76, Brier 0.20 over 3,797 buildings, but site-variable and extrapolation-flagged. A direction, not a per-building guarantee.*
+
+---
+
+## 5.6 Geometric ventilation tendencies (τ-gated, pre-CFD)
+
+*Code: `scripts/run_lateral_connectivity.py`, `scripts/run_ventilation_susceptibility.py`,
+`scripts/run_wind_exposure.py`. Data: `outputs/paper_figures/{lateral_connectivity,
+ventilation_susceptibility,wind_exposure}.json`.*
+
+Three additive geometric scalars complement the λ$_f$ vertical flow regime of §4.2
+with two more degrees of ventilation freedom — lateral depth and directional
+exposure. **All three are strictly geometric *tendencies*, not air-exchange
+adequacies.** The defensible per-cell ventilation outcome is age-of-air τ, which is
+CFD-gated and supersedes every scalar here (§10.2); these maps are read only as a
+pre-CFD prioritisation surface, never as a claim that a given cell is or is not
+adequately ventilated. They are reported because they are the independent
+ventilation signals available from geometry alone before the OpenFOAM campaign
+lands.
+
+**(1) Lateral connectivity — depth into contiguous fabric.** For each built 10 m
+cell, the Euclidean distance (via a distance transform on the built mask, with a
+1-cell open border so the settlement perimeter counts as open) to the nearest open
+cell — an interior unbuilt cell or the exterior. Deeper cells are farther from any
+opening, so lateral inflow must penetrate further; this is the *lateral* companion
+to λ$_f$'s *vertical* signal. The pooled built-cell median depth is **31.6 m**, rising
+to a maximum of **232.6 m** in Maré, the largest and most contiguous fabric; the
+flatter, more fragmented Vidigal sits shallowest (median **22.4 m**) and the dense
+Rio das Pedras deepest (median **42.4 m**). The two axes are positively coupled at
+the cell level — pooled Spearman ρ(open-edge depth, λ$_f$) = **+0.487** (p ≈ 0) —
+so deeper cells also tend to sit in the skimming regime: the fabric is *doubly
+constrained*, not trading vertical suppression for lateral access.
+
+![Lateral-connectivity tendency: distance from each built cell to the nearest open edge (interior unbuilt cell or settlement perimeter), per site. Geometry-only, pre-CFD companion to the λf vertical regime; darker = deeper into contiguous fabric = lower lateral ventilation tendency; not an adequacy. Source: outputs/paper_figures/lateral_connectivity.json, exports/lateral_connectivity.png (run_lateral_connectivity.py, 2026-06-25).](figures/lateral_connectivity.png)
+
+*Figure 5.6a — lateral-connectivity tendency (depth to nearest open edge); pooled median 31.6 m.*
+
+**(2) Ventilation susceptibility — regime × depth.** The vertical and lateral
+signals are crossed into a 3×2 bivariate class (λ$_f$ regime — isolated/wake/skimming
+— against depth split at the pooled median **31.6 m**), kept as *two separate axes,
+never summed into a single index*. The worst geometric class is **skimming ∩ deep**
+(vertically suppressed *and* laterally buried), which holds a pooled **41.8 %** of
+built cells — the same fraction as the joint deep-and-skimming count above, since
+both read off the median split. Its share tracks density and contiguity: highest in
+Rio das Pedras (**59.6 %**) and Rocinha (**54.6 %**), lowest in Vidigal (**30.8 %**).
+
+![Two-dimensional geometric ventilation susceptibility per site: vertical λf flow regime (isolated/wake/skimming) crossed with lateral depth-to-open-edge (shallow/deep, split at the pooled 32 m median). Two separate geometry-only axes; worst class is skimming × deep (darkest red); pre-CFD, not air exchange or adequacy. Source: outputs/paper_figures/ventilation_susceptibility.json, exports/ventilation_susceptibility.png (run_ventilation_susceptibility.py, 2026-06-25).](figures/ventilation_susceptibility.png)
+
+*Figure 5.6b — geometric ventilation susceptibility (regime × depth); pooled skimming ∩ deep share 41.8 %.*
+
+**(3) Effective wind exposure — directional λ$_f$ weighted by the wind rose.** Each
+cell's 8-sector frontal-area density is weighted by the measured wind-rose frequency
+(§2.3), exposure = Σ$_θ$ freq(θ)·λ$_f$(θ). Because λ$_f$ is exactly 180°-symmetric,
+this is a frequency weighting of the four cross-wind axes — it captures *how often the
+fabric blocks the prevailing wind*, never channelling or sheltering. The diagnostic
+is the ratio to the isotropic baseline (exposure ÷ λ$_f$ mean): the pooled ratio is
+**near-isotropic** — median **1.007**, mean **0.994** — meaning the prevailing wind
+on average meets neither a markedly more open nor a more blocked face than a uniform
+rose would. Site alignment varies modestly with the dominant sector: Vidigal (E,
+30 %) sits slightly sheltered (ratio median **0.950**) while Rio das Pedras (SW, 26 %)
+and Maré (SE, 26 %) are marginally more exposed (**1.010**). The practical reading is
+that directional fabric alignment is a second-order effect at these sites; the
+first-order ventilation constraints are the regime and depth of (1)–(2).
+
+![Effective wind-exposure tendency per site: directional frontal-area density λf weighted by the measured wind-rose frequency, Σ freq(θ)·λf(θ). Geometry × climatology, pre-CFD; frequency weighting of the cross-wind axes only, not channelling, sheltering, or adequacy. Per-panel labels give the dominant sector and frequency. Source: outputs/paper_figures/wind_exposure.json, exports/wind_exposure.png (run_wind_exposure.py, 2026-06-25).](figures/wind_exposure.png)
+
+*Figure 5.6c — effective wind-exposure tendency; pooled exposure-to-isotropic ratio median 1.007 (near-isotropic).*
+
+Taken together, the three scalars frame the favela fabric as vertically suppressed
+and laterally deep in a coupled way, with directional exposure only a minor
+modulation. None of this is an air-exchange verdict: the cells flagged here are
+*candidates* for poor ventilation, and the CFD age-of-air field (§10.2, §11) remains
+the arbiter.
+
 ---
 
 ## 6. CFD Patch Sampling
@@ -1717,6 +1847,8 @@ which this A/B reproduces exactly; the cross-site *ordering* of morphologies is
 preserved. The complementary distribution-shape analysis at §4.6 (Figure S3)
 shows the 10 m grid additionally resolves multimodality that 20 m aggregation
 erases, which is the basis for fixing 10 m as the production grid.
+
+![Per-site flow-regime composition at 10 m vs 20 m for all five sites; the pooled skimming inflation under cell-size doubling is directional everywhere but uneven in magnitude.](figures/maup_per_site_regime.png)
 
 ---
 
