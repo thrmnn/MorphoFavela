@@ -6,13 +6,22 @@ hard to find. Updated every working session.
 
 ## 🆕 Latest (each links to the exact figure/section)
 
+- **✅ Paper-integration track (2026-06-27)** — `docs/paper_integration_plan_2026-06-26.md`.
+  New TR §5.6 (three τ-gated geometric ventilation scalars: lateral-connectivity, regime×depth
+  susceptibility 41.8% skimming∩deep, near-isotropic wind-exposure) + §5.5 augmentation
+  (`morphotype_shape` separable axis ARI 0.18; predictor-flip hardening — spatially-blocked CV,
+  block-bootstrap CIs overlapping, blind-map AUC-PR 0.76). Mingze HTML refreshed (MAE 1.77→1.70 h).
+  **⚠ MAUP CORRECTION:** the 20 m grids were still on summed λf → the old "+18.4 pp skimming"
+  was a confound. Dissolve-migrated the 20 m grids (task #24); the real effect REVERSES —
+  coarsening **lowers** λf −40.7% and shifts skimming **−34.1 pp** (65→31%) into wake. §10.9
+  + Fig S3 corrected, suffix→path guard test added.
 - **✅ Council roadmap (7 items) + 7-stream repo-audit parallel run COMPLETE
   (2026-06-26)** — see `docs/repo_parallel_plan_2026-06-26.md` +
   `docs/council_roadmap_2026-06-25.md`. Highlights: spatial-CV CIs on the predictor
   flip (CI-overlapping), blind-map external validation (AUC-PR 0.76), wind-exposure +
-  2D ventilation-susceptibility scalars, **MAUP regime-share resolution-dependence
-  (+18.4 pp at 20 m, TR §10.9)**, additive `morphotype_shape` (separable axis, ARI
-  0.18), `src/morphometry/invariants.py`, always-on test guards, cfd provenance. 660 green.
+  2D ventilation-susceptibility scalars, MAUP regime-share resolution-dependence
+  (TR §10.9, numbers since corrected — see above), additive `morphotype_shape` (separable
+  axis, ARI 0.18), `src/morphometry/invariants.py`, always-on test guards, cfd provenance.
 - [TR §6.6 roughness — invalidity caveat](/outputs/_hub/docs/technical_report.html#66-aerodynamic-roughness-z0-zd)
   — per-cell z0/zd invalid 53–75%; the envelope is the result.
 - [TR §5.5 Morphological Typology & Signature](/outputs/_hub/docs/technical_report.html#55-morphological-typology-signature)

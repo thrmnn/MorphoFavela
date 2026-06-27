@@ -611,11 +611,10 @@ This analysis justifies the 10 m resolution as the production grid:
   only resolved at 10 m.
 - Computational cost at 10 m is manageable (< 85 s per site).
 
-Figure S3 predates the 2026-06-02 λf cell-clipping re-baseline. Both
-resolutions were computed with the same pre-repair estimator, so the
-*sensitivity* conclusion (shape preservation, multimodality only at
-10 m) stands, but the absolute λf values shown are superseded by
-§4.2/§5.2. The 20 m grids are queued for re-baselining.
+The 20 m grids have been re-baselined onto the dissolved (party-wall-corrected)
+λf, so both resolutions now share the canonical estimator; the quantitative
+resolution A/B is in §10.9, and the *sensitivity* conclusion (shape
+preservation, multimodality only at 10 m) holds on the corrected basis.
 
 Supplementary variants (Vidigal-only upscaled-vs-native scatter, and
 side-by-side difference maps) are archived in
@@ -1833,22 +1832,30 @@ morphometrics. A direct A/B (`scripts/run_maup_sensitivity.py`,
 `outputs/comparative/maup/maup_sensitivity.json`) re-derives the pooled Oke /
 Grimmond-Oke flow-regime shares on built cells (`building_count > 0`) at the
 production 10 m grid and at a doubled 20 m grid, holding the regime thresholds
-fixed (λf < 0.15 isolated, ≥ 0.65 skimming). The shares are **not** invariant
-to cell size: skimming rises from 65.2 % to 83.7 % (**+18.4 pp**) while wake
-falls from 30.0 % to 13.2 % (**−16.8 pp**) and isolated barely moves (−1.7 pp);
-the pooled λf median nearly doubles (+139 %) and σH rises +15.6 %. This is the
-expected MAUP signature — frontal area aggregates while plan area grows
-quadratically, so coarsening inflates λf and pushes cells across the skimming
-threshold — and it is reported as measured rather than smoothed into a
-"stable" verdict. The operational consequence is narrow: the *absolute*
-regime-share figures are resolution-dependent and must always be quoted at the
-locked 10 m resolution (the figures in §5.2 and `lambda_f_canonical.json`),
-which this A/B reproduces exactly; the cross-site *ordering* of morphologies is
-preserved. The complementary distribution-shape analysis at §4.6 (Figure S3)
-shows the 10 m grid additionally resolves multimodality that 20 m aggregation
-erases, which is the basis for fixing 10 m as the production grid.
+fixed (λf < 0.15 isolated, ≥ 0.65 skimming). **Both resolutions are placed on
+the same dissolved (party-wall-corrected) λf basis** — an earlier draft of this
+appendix compared the dissolved 10 m grid against a 20 m grid still carrying the
+pre-dissolve *summed* λf, which inflated the coarse grid by the over-count factor
+(2.7–4.4×) and produced a spurious *rise* in skimming; that comparison is
+superseded. On a like-for-like dissolved basis the shares are **not** invariant
+to cell size, and the genuine effect runs the other way: skimming **falls** from
+65.2 % to 31.1 % (**−34.1 pp**) while wake rises from 30.0 % to 58.8 %
+(**+28.8 pp**) and isolated edges up from 4.8 % to 10.1 % (**+5.3 pp**); the
+pooled λf median drops from 0.831 to 0.493 (**−40.7 %**) even as σH rises
++15.6 %. This is the expected geometric scaling — λf is a frontal-over-plan ratio,
+and doubling the cell width grows the dissolved frontal area roughly linearly
+while the plan-area denominator grows quadratically, so λf nearly halves and
+cells migrate *out* of the skimming band into wake. It is reported as measured
+rather than smoothed into a "stable" verdict. The operational consequence is
+narrow: the *absolute* regime-share figures are strongly resolution-dependent and
+must always be quoted at the locked 10 m resolution (the figures in §5.2 and
+`lambda_f_canonical.json`), which this A/B reproduces exactly; the cross-site
+*ordering* of morphologies is preserved (max per-site swing 25–39 pp, same
+direction everywhere). The complementary distribution-shape analysis at §4.6
+(Figure S3) shows the 10 m grid additionally resolves multimodality that 20 m
+aggregation erases, which is the basis for fixing 10 m as the production grid.
 
-![Per-site flow-regime composition at 10 m vs 20 m for all five sites; the pooled skimming inflation under cell-size doubling is directional everywhere but uneven in magnitude.](figures/maup_per_site_regime.png)
+![Per-site flow-regime composition at 10 m vs 20 m for all five sites; coarsening lowers λf and shifts cells out of skimming into wake everywhere, uneven in magnitude (25–39 pp).](figures/maup_per_site_regime.png)
 
 ---
 

@@ -12,8 +12,15 @@ re-running with ``dissolve=False``).
 Idempotent: if ``lambda_f_mean_summed`` already exists the site is skipped unless
 ``--force``.
 
-    python scripts/migrate_lambda_f_dissolve.py            # all 5 campaign sites
+    python scripts/migrate_lambda_f_dissolve.py            # all 5 campaign sites, 10 m
     python scripts/migrate_lambda_f_dissolve.py --site rocinha
+    python scripts/migrate_lambda_f_dissolve.py --grid-suffix _20m   # the 20 m MAUP grids
+
+The ``--grid-suffix`` selects the resolution variant (``""`` = canonical 10 m,
+``"_20m"`` = the resolution-sensitivity grids under ``morphometrics_20m/``). The
+20 m grids shipped on the pre-dissolve summed λf, which confounded the MAUP A/B
+(summed-vs-dissolved over-count masqueraded as a cell-size effect); migrating
+them puts both resolutions on the same dissolved basis.
 """
 
 from __future__ import annotations
@@ -44,8 +51,21 @@ def _prep_buildings(site: str, crs) -> gpd.GeoDataFrame:
     return bld
 
 
-def migrate_site(site: str, force: bool = False) -> None:
-    gpath = PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg"
+def grid_path(site: str, grid_suffix: str = "") -> Path:
+    """Resolve a site's grid_metrics.gpkg for a resolution variant.
+
+    ``grid_suffix`` selects the resolution: ``""`` = canonical 10 m,
+    ``"_20m"`` = the resolution-sensitivity grid. Getting this wrong is exactly
+    how the 20 m MAUP grids were left on summed λf (see module docstring).
+    """
+    return PROJECT_ROOT / "outputs" / site / f"morphometrics{grid_suffix}" / "grid" / "grid_metrics.gpkg"
+
+
+def migrate_site(site: str, force: bool = False, grid_suffix: str = "") -> None:
+    gpath = grid_path(site, grid_suffix)
+    if not gpath.exists():
+        print(f"  {site}{grid_suffix}: grid absent — skipping")
+        return
     grid = gpd.read_file(gpath)
     if "lambda_f_mean_summed" in grid.columns and not force:
         print(f"  {site}: already migrated (use --force to redo) — skipping")
@@ -77,10 +97,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--site", default=None, help="single site (default: all 5)")
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--grid-suffix", default="", help="resolution variant: '' (10 m) or '_20m'")
     args = ap.parse_args()
     sites = [args.site] if args.site else SITES
     for site in sites:
-        migrate_site(site, force=args.force)
+        migrate_site(site, force=args.force, grid_suffix=args.grid_suffix)
     print("done.")
 
 
