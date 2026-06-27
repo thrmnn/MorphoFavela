@@ -59,3 +59,30 @@ adversarial numerical verification fan out inside each spine step.
 - **Mingze WeTransfer upload** — the local HTML refresh is fine; the *send* is the user's.
 - **git-history rewrite (#39)** — explicitly excluded; no force-push/history-rewrite.
 - **brisaverse manuscript edits** — external repo. The TR here is the in-scope local proxy.
+
+## EXECUTION OUTCOME (2026-06-27) — scope 1–5 ✅ COMPLETE, pushed, 710 green
+
+Multi-agent workflow (4 parallel drafters/side-streams → serial integrator → 2 read-only
+auditors) + a follow-on correctness fix. Commits `daeeca8`→`aa63446` on `track/paper-integration`.
+
+- **#1 TR §5.6** (`08f1743`) — three τ-gated geometric ventilation scalars integrated
+  (lateral-connectivity, regime×depth susceptibility 41.8 % skimming∩deep, near-isotropic
+  wind-exposure); 3 PNGs travelled; numerical audit 54/54, report-sync PASS.
+- **#2 TR §5.5** (`08f1743`) — `morphotype_shape` separable axis (ARI 0.18 cell / 0.44 tissue,
+  canonical frozen) + predictor-flip hardening (spatially-blocked CV, overlapping block-bootstrap
+  CIs → direction not separated gap, VIF 1.1–3.0, external blind map AUC-PR 0.76, Fig 5.5e).
+- **#3 20 m grid + Fig S3** (`e314ade` fig script, `aa63446` fix) — **uncovered a confound**: the
+  20 m grids were still on the pre-dissolve *summed* λf, so the published "+18.4 pp skimming at
+  20 m" MAUP claim was an artifact. Parametrized `migrate_lambda_f_dissolve.py` by `--grid-suffix`,
+  dissolve-migrated the 20 m grids; the like-for-like effect REVERSES — coarsening lowers λf
+  median −40.7 % and shifts skimming **−34.1 pp** (65→31 %) into wake (+28.8 pp), the correct
+  frontal/plan geometric scaling. §10.9 + §4.6 corrected, both MAUP figures regenerated, guard
+  test `tests/test_migrate_lambda_f_dissolve.py` pins the suffix→path mapping. Closed task #24.
+- **#4 Mingze HTML** — refreshed locally vs current canonical Vidigal solar (MAE 1.77→1.70 h,
+  Pearson 0.565→0.589, etc.); local-only, upload remains user-driven. Closed task #41.
+- **#5 Verification** — workflow auditors PASS + a fresh post-correction numerical audit on the
+  reversed §10.9 (16/16 traced, signs correct). Canonical 10 m λf bit-for-bit untouched throughout.
+
+Watch-item (advisory, from the final audit): the §10.9 bracket strings "25–39 pp" (true
+25.0–38.6) and "2.7–4.4×" (true 2.68–4.41) are rounded; a future regeneration nudging Maré's
+swing past 39 pp or a site's over-count outside 2.65–4.45 would warrant re-checking those two.
