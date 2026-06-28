@@ -68,8 +68,9 @@ At time of writing, the pipeline has produced:
   by cross-site reproducibility, not a distance-based optimum.
 - **Aerodynamic roughness, with a hard caveat** (§6.6): morphometric z0/zd per cell —
   but **physically invalid in 53–75 % of cells** at favela density (out of every
-  method's envelope). The reportable result is the ~20× method-spread *envelope*;
-  absolute z0 is CFD-gated. Do not consume the per-cell z0 as a measurement.
+  method's envelope). The reportable result is the 4×–148× method-spread *envelope*
+  (Macdonald↔Raupach, widest in flat-saturated fabric); absolute z0 is CFD-gated. Do
+  not consume the per-cell z0 as a measurement.
 
 The pipeline is fully reproducible from the committed scripts; all inputs
 are documented and all intermediate outputs preserved in the canonical
@@ -991,6 +992,26 @@ adequacy, which awaits CFD integration.
 
 *Figure 5.5f — **external blind validation** of the continuous-fabric-vector predictor on three favelas it was never fitted on (Borel, Jacarezinho, Morro do Juramento): pooled AUC-PR 0.76, Brier 0.20 over 3,797 buildings, but site-variable and extrapolation-flagged. A direction, not a per-building guarantee.*
 
+**A unified cross-site risk surface (all eight favelas).** The campaign out-of-fold
+scores and the calibration blind map are folded into one per-cell winter-sun-failure
+risk surface using the *same* continuous fabric-vector logistic predictor everywhere,
+with honest per-cell provenance (`scripts/run_cross_site_riskmap.py`,
+`outputs/cross_site/risk_map/cross_site_risk.json`). For the five campaign favelas the
+score is **out-of-fold** (each site held out of training): per-site AUC-PR runs 0.73
+(Complexo do Alemão) to 0.94 (Rocinha), consistent with the §5.5 pooled 0.84. For the
+three calibration favelas the score is **blind** (model fit on all five campaign sites)
+with an out-of-envelope flag: AUC-PR 0.74 at Borel (16 % of cells out-of-envelope), 0.90
+at Jacarezinho (60 % out-of-envelope — read as extrapolation), 0.51 at Morro do Juramento
+(10 %). Applied uniformly, the continuous vector also *beats* the earlier morphotype-rate
+blind map on the same calibration sites — corroborating that the continuous fabric vector,
+not the discrete code, is the transferable predictor. The surface stays morphology-only:
+it predicts the winter-sun (solar-geometry) outcome, not ventilation adequacy, which is
+CFD-gated (§5.6, §10.2).
+
+![Unified cross-site winter-sun-failure risk surface across all eight favelas: per-cell predicted WHO-2h winter-sun-failure probability from the continuous fabric-vector logistic predictor. Top row — five campaign favelas scored out-of-fold (site held out of training); bottom row — three calibration favelas scored blind (model fit on all campaign sites) with per-panel out-of-envelope fraction. Morphology-only winter-sun risk, not ventilation adequacy (τ CFD-gated). Source: outputs/cross_site/risk_map/cross_site_risk.json, exports/cross_site_riskmap.png (run_cross_site_riskmap.py, 2026-06-28).](figures/cross_site_riskmap.png)
+
+*Figure 5.5g — **unified cross-site risk surface** (8 favelas): campaign sites out-of-fold (AUC-PR 0.73–0.94), calibration sites blind + out-of-envelope-flagged (AUC-PR 0.51–0.90). One predictor, honest provenance per cell; morphology-only, not adequacy.*
+
 ---
 
 ### 5.6 Geometric ventilation tendencies (τ-gated, pre-CFD)
@@ -1057,9 +1078,31 @@ first-order ventilation constraints are the regime and depth of (1)–(2).
 
 *Figure 5.6c — effective wind-exposure tendency; pooled exposure-to-isotropic ratio median 1.007 (near-isotropic).*
 
+**(4) Multi-constraint synthesis — how many axes constrain each cell.** The three
+signals can be read together as a single *ranked* layer without violating the
+no-summing rule of (2): rather than averaging their incommensurable continuous
+scales, each built cell is flagged on three independent qualitative axes — vertical
+(skimming, λ$_f$ ≥ 0.65), lateral (deep, open-edge distance ≥ the pooled 31.6 m
+median), and directional (wind-aligned, exposure ratio ≥ 1.0) — and the index is the
+**count of constraints triggered (0–3)**, a checklist, not a weighted sum. This
+generalises the *doubly constrained* (skimming ∩ deep) finding of (2) to a *triply
+constrained* one. Pooled, **11.8 %** of built cells trip no constraint, **24.2 %**
+trip all three, and the mean is **1.72** of 3. The cross-site ordering is the now-familiar
+topographic split, sharpened: the flat, saturated fabric is worst — Rio das Pedras
+**55.4 %** triply constrained (mean 2.36) and Maré **32.0 %** (mean 1.88) — while the
+steep hillside favelas retain lateral relief and sit far lower (Vidigal and Rocinha
+both **6.9 %**, Complexo do Alemão **10.3 %**), because slope-driven stepping keeps
+open edges within reach even at high λ$_f$. The index is a geometry-only triage
+surface (pre-CFD, not adequacy) and inherits every caveat of (1)–(3).
+
+![Geometric multi-constraint ventilation-tendency index per site: the count (0–3) of independent geometry-only ventilation constraints triggered per built cell — vertical skimming (λf ≥ 0.65), lateral depth (open-edge distance ≥ pooled median), directional wind-alignment (exposure ratio ≥ 1). A checklist count, not a weighted sum of the incommensurable continuous axes; pre-CFD tendency, not adequacy. Per-panel labels give the triply-constrained share and mean count. Source: outputs/paper_figures/ventilation_index.json, exports/ventilation_index.png (run_ventilation_index.py, 2026-06-28).](figures/ventilation_index.png)
+
+*Figure 5.6d — geometric multi-constraint ventilation index (count of triggered axes, 0–3); pooled 24.2 % triply constrained, flatland (Rio das Pedras 55 %, Maré 32 %) far worse than hillside (~7 %).*
+
 Taken together, the three scalars frame the favela fabric as vertically suppressed
 and laterally deep in a coupled way, with directional exposure only a minor
-modulation. None of this is an air-exchange verdict: the cells flagged here are
+modulation; the multi-constraint index condenses this into a single ranked triage
+surface. None of this is an air-exchange verdict: the cells flagged here are
 *candidates* for poor ventilation, and the CFD age-of-air field (§10.2, §11) remains
 the arbiter.
 
@@ -1287,7 +1330,7 @@ and downstream urban-canopy analyses.
 
 ![Roughness physical validity](figures/roughness_validity.png)
 
-*Figure 6.6 — per site, the fraction of built cells where the morphometric z0/zd is
+*Figure 6.6a — per site, the fraction of built cells where the morphometric z0/zd is
 physically valid (green) vs impossible (zd > H_max, red; z0 → 0, brown).*
 
 > **Headline caveat (expert-council review, 2026-06-19).** The per-cell morphometric
@@ -1297,7 +1340,8 @@ physically valid (green) vs impossible (zd > H_max, red; z0 → 0, brown).*
 > deep in the skimming-flow regime) sit well past every method's calibration array, so
 > the drag formula saturates and z0 is set by σH/H_max, not the fabric. **This is model extrapolation,
 > not measurement.** The per-cell z0 map is illustrative only; the **method-spread
-> envelope** (the four methods diverge ~20×, ≈1.5 orders) is the reportable result, and
+> envelope** (the four methods diverge 4×–148× across site medians, up to ~2 orders in
+> the flat-saturated fabric; Figure 6.6b) is the reportable result, and
 > any absolute z0 is **CFD-gated** (validated/recalibrated by the step-R-C drag-centroid
 > extraction, pending OpenFOAM). A second hard limit: morphometric z0(θ) is
 > **180°-symmetric by construction** (frontal area is identical for opposite winds), so
@@ -1341,11 +1385,20 @@ obstacle arrays at λp ≈ 0.05–0.5):
 - **λp > 0.5 in 56–88 % of cells** (77 of 119 CFD patches) — most fabric is an
   extrapolation, not an in-envelope estimate; flagged per cell/patch
   (`flag_pai_over_envelope`), never silently.
-- **The four methods diverge by up to ~20× in the dense regime** — and the naive
-  expectation that the σH-aware methods simply lift z0 above Macdonald does *not*
-  hold: in the skimming limit Kanda can fall *below* Macdonald (Maré, Rio das
-  Pedras). The disagreement is the morphometric uncertainty, and resolving it
-  requires anchoring against CFD.
+- **The four methods diverge 4×–148× across site medians** — narrowest in the steep,
+  height-variable hillside fabric (Vidigal 4×) and blowing out in the flat, saturated
+  fabric (Maré 25×, Rio das Pedras 148×), always bracketed Macdonald (floor, σH-blind,
+  collapses fastest as λ$_p$ → 1) ↔ Raupach (ceiling). The naive expectation that the
+  σH-aware methods simply *lift* z0 above Macdonald does **not** hold: in the skimming
+  limit Kanda falls *below* the σH-blind Macdonald in **27–47 % of cells at every
+  site** (most at Vidigal), even though its site-median stays above. The disagreement
+  is the morphometric uncertainty — the **Macdonald↔Raupach envelope is the reportable
+  inlet-BC prior** (Figure 6.6b), and resolving the absolute value requires anchoring
+  against CFD.
+
+![Inlet-BC roughness method-spread envelope per site: median z0 from the four morphometric methods (Macdonald, Raupach, Millward-Hopkins, Kanda) on a log axis, with the Macdonald↔Raupach band and per-site spread factor. The four methods disagree 4×–148× in the λp>0.5 favela regime, widest where the fabric is flat-saturated and most out-of-envelope; the envelope, not any single method, is the reportable pre-CFD inlet prior, and absolute z0 is CFD-gated. Source: outputs/cross_site/roughness/method_medians.csv, exports/roughness_envelope.png (fig_roughness_envelope.py, 2026-06-28).](figures/roughness_envelope.png)
+
+*Figure 6.6b — inlet-BC roughness method-spread envelope (log z0): the four methods span 4× (Vidigal) to 148× (Rio das Pedras), bracketed Macdonald↔Raupach; the envelope is the reportable prior, absolute z0 CFD-gated.*
 
 No published z0/zd estimate exists for any favela or informal settlement; the
 height-randomness (which raises roughness) versus extreme-λp skimming (which lowers
@@ -1810,7 +1863,8 @@ arrays of every method (Lettau, Macdonald, Raupach, Millward-Hopkins, Kanda), so
 drag-partition formula saturates and returns impossible values — displacement above
 the tallest building (zd > H_max) or z0 → 0 ("smoother than grass"). The per-cell z0
 field is therefore *illustrative only*; the reportable quantity is the four-method
-spread *envelope* (~20×, ≈1.5 orders of magnitude), and any absolute roughness is
+spread *envelope* (4×–148× across site medians, Macdonald↔Raupach, up to ~2 orders in
+the flat-saturated fabric; §6.6 Figure 6.6b), and any absolute roughness is
 **CFD-gated** — to be validated/recalibrated by the step-R-C drag-centroid extraction
 once OpenFOAM returns. A second structural limit: morphometric z0(θ) is
 180°-symmetric by construction (frontal area is identical for opposite winds), so it
