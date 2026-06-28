@@ -224,9 +224,9 @@ def main():
     ax.set_xticklabels([s.replace("_", " ") for s in msites], rotation=25, ha="right",
                        fontsize=8)
     ax.set_ylabel("median z0 (m)")
-    ax.set_title("Cross-method z0 disagreement — the four methods span up to ~20× "
-                 "in the λp>0.5 favela regime (which is right is unknown w/o CFD)",
-                 fontsize=8.5)
+    ax.set_title("Cross-method z0 disagreement — the four methods span 4×–148× "
+                 "(widest in flat-saturated fabric) in the λp>0.5 favela regime "
+                 "(which is right is unknown w/o CFD)", fontsize=8.5)
     ax.legend(fontsize=8, ncol=4)
     fig.tight_layout()
     fig.savefig(FIGS / "roughness_methods.png", dpi=150, bbox_inches="tight")
