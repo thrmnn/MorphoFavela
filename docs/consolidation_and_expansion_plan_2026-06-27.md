@@ -114,9 +114,32 @@ barrier only where a stage needs all prior results (e.g. dedup before the audit,
 single PDF rebuild). Adversarial verify on every numerical claim — the §6.5 Blocken miss
 and the MAUP confound are the bug class this catches.
 
-## 5. Compaction-safe summary
+## EXECUTION OUTCOME (2026-06-28) — consolidation + E2/E1/E5 ✅ COMPLETE
 
-Everything shipped is committed + pushed on `track/paper-integration` (5 ahead of main,
-clean FF). Next session: run §2 (consolidate + merge to main + close tr_audit) then §3
-(pick an expansion from the menu) using the §4 workflow. Canonical λf/morphotype stay
-bit-for-bit throughout.
+Run autonomously on `track/consolidate-expand` (off the FF-consolidated `main`).
+Both read-only gates passed at the end: report-sync **PASS**, numerical-claims
+**35/35 VERIFIED, 0 mismatch**.
+
+- **C0** — FF `main` ← paper-integration (`f6fb966`); pruned `track/roughness`,
+  `track/morpho-signature`, `origin/track/{morphotope,viz}`; branched fresh.
+- **C1** (`fc24420`) — closed every open `tr_audit.md` item: embedded recurrence
+  Fig 5.5d (renumber d→e→f), §12.3 Stage 7/8, §5.5/§5.6/§6.6 headings → `###`,
+  header → TR v1.2 / pipeline v6.0, §12.2 → 663 pass / 710 full. (The three §5.5
+  caveats + §6.6 roughness_validity figure were already present from paper-integration.)
+- **E2** (`e7b4b56` code/test, `9cbf8fe` prose) — multi-constraint ventilation index,
+  TR §5.6(4) + Fig 5.6d. Ordinal **count** of three triggered axes (0–3), NOT a
+  weighted sum — honors the council no-sum rule. Pooled 24.2 % triply constrained;
+  flatland (RdP 55 %, Maré 32 %) ≫ hillside (~7 %). Pure `count_constraints` tested.
+- **E1** (`e0d0cf7` fig, `9cbf8fe` prose) — inlet-BC method-spread envelope, TR §6.6
+  Fig 6.6b. Corrected the rounded "~20×" to the measured **4×–148×** (Macdonald↔Raupach,
+  widest in flat-saturated fabric) across exec-summary/§6.6/§10; **fixed a claim error** —
+  Kanda falls below Macdonald in 27–47 % of cells at *every* site (not just Maré/RdP),
+  Macdonald is the floor at all site-medians.
+- **E5** (`db332e3` code/test, `9cbf8fe` prose) — unified 8-favela cross-site risk
+  surface, TR §5.5 Fig 5.5g. One continuous-vector predictor everywhere: campaign OOF
+  AUC-PR 0.73–0.94, calibration blind 0.51–0.90 + out-of-envelope flags; continuous
+  vector beats the prior type-rate blind map. Pure `out_of_envelope_mask` tested.
+- Hub + work_queue refreshed (`240fe0c`). Canonical λf/morphotype bit-for-bit untouched.
+
+**Deferred (menu §3):** E3 (full MAUP curve), E4 (seasonal solar), E6 (tissue transitions).
+**Still blocked/external:** CFD-τ, ray-caster x-val, Mingze upload, git-history #39.
