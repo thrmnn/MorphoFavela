@@ -2008,8 +2008,8 @@ on Linux, `brew install gdal` on macOS) before `pip install`.
 
 ```bash
 python -m pytest tests/ -m "not integration" -q --tb=short
-# → 663 tests pass; 69 integration tests deselected
-# (full suite: 710 pass + 22 skip + integration; use `python -m pytest`
+# → 673 tests pass; 69 integration tests deselected
+# (full suite: 720 pass + 22 skip + integration; use `python -m pytest`
 #  to bypass any older user-site `pytest` on PATH)
 ```
 
