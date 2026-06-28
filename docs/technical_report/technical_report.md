@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| **Document version** | TR v1.1 (pre-CFD; +morphology signature §5.5, roughness §6.6) |
-| **Pipeline version** | v5.5 (May 2026 milestone — ROADMAP.md) |
-| **Build date** | 2026-06-19 |
+| **Document version** | TR v1.2 (pre-CFD; +morphology signature §5.5, ventilation tendencies §5.6, roughness §6.6) |
+| **Pipeline version** | v6.0 (June 2026 milestone — ROADMAP.md) |
+| **Build date** | 2026-06-27 |
 | **Last numerical sweep** | [`904040e`](https://github.com/thrmnn/MorphoFavela/commit/904040e) (2026-05-03) |
 | **Author** | Theo Hermann · MIT · `thermann.ai@gmail.com` |
 | **Repository** | https://github.com/thrmnn/MorphoFavela |
@@ -838,7 +838,7 @@ comparison.
 
 ---
 
-## 5.5 Morphological Typology & Signature
+### 5.5 Morphological Typology & Signature
 
 *Track `track/morphotope`. Full walkthrough with all figures: the project hub's
 "Morphology overview". Code: `src/morphometry/{signature,morphotope,configuration}.py`.*
@@ -861,8 +861,8 @@ crossed with a flat/steep switch**: T0 Open Fringe, T1 Flatland Consolidated
 T5 Saturated Core (flatland-specific, λp = 1.0).
 
 *This section presents **two linked but distinct classifications**: the cell-scale
-**morphotype** (T0–T5; Figures 5.5a–c) and the block-scale **morphotope** (M0–M2;
-Figure 5.5d). The cell is the unit of measurement; the morphotope is the unit of
+**morphotype** (T0–T5; Figures 5.5a–d) and the block-scale **morphotope** (M0–M2;
+Figure 5.5e). The cell is the unit of measurement; the morphotope is the unit of
 signature. They use deliberately non-overlapping names and never share a label.*
 
 ![Idealized morphotype sections](figures/morphotype_schematics.png)
@@ -895,6 +895,10 @@ high (ARI 0.90).
 
 *Figure 5.5c — **cell-morphotype (T0–T5)** composition per favela; topography drives the mix.*
 
+![Cross-site morphotype recurrence](figures/recurrence.png)
+
+*Figure 5.5d — **cross-site recurrence** of the cell morphotypes (validation (i)): T4 Hillside Core is universal (5/5 sites); T0, T2, T3 recur across ≥3 favelas; T1 and T5 are flatland-conditional. The recurring core is what makes the typology a signature rather than a per-site artefact.*
+
 **Block-scale morphotopes.** *Two distinct classifications are used and must not be
 conflated:* the **morphotype** is the cell-level alphabet (T0–T5, six classes, the
 unit of measurement); the **morphotope** is the block-level tissue (M0–M2, three
@@ -913,7 +917,7 @@ concentrates inside the coherent, recurring *Saturated Flatland tissue*, M2).
 
 ![Morphotope maps](figures/morphotope_maps.png)
 
-*Figure 5.5d — **block-scale morphotopes (M0–M2)**, the tissue classification (a separate, coarser level than the cell morphotypes in 5.5a–c): the favela signature as coherent tissue.*
+*Figure 5.5e — **block-scale morphotopes (M0–M2)**, the tissue classification (a separate, coarser level than the cell morphotypes in 5.5a–d): the favela signature as coherent tissue.*
 
 **Configuration.** A party-wall adjacency metric (fraction of each footprint's
 perimeter fused to a neighbour) captures the relational fabric the intensity vector
@@ -972,7 +976,7 @@ continuous fabric vector itself is low-collinearity (VIF 1.1–3.0: λp 1.68, λ
 H̄ 2.26, σ_H 1.30, slope 1.09 — no SVF, no solar term), so the transfer is not riding on
 a redundant predictor. As a genuinely external check, the trained predictor is applied
 *blind* to three calibration favelas it was never fitted on (Borel, Jacarezinho,
-Morro do Juramento), producing a per-building risk map (Figure 5.5e): pooled AUC-PR 0.76
+Morro do Juramento), producing a per-building risk map (Figure 5.5f): pooled AUC-PR 0.76
 and Brier 0.20 over 3,797 buildings, but site-variable (AUC-PR 0.82 at Jacarezinho vs
 0.39 at Morro do Juramento) with a large out-of-envelope fraction at some sites — so the
 blind map is flagged as *extrapolation*, a coarse prioritiser rather than a per-building
@@ -985,11 +989,11 @@ adequacy, which awaits CFD integration.
 
 ![Blind external validation of the morphology-only failure predictor applied to three held-out calibration favelas.](figures/typology_blind_validation.png)
 
-*Figure 5.5e — **external blind validation** of the continuous-fabric-vector predictor on three favelas it was never fitted on (Borel, Jacarezinho, Morro do Juramento): pooled AUC-PR 0.76, Brier 0.20 over 3,797 buildings, but site-variable and extrapolation-flagged. A direction, not a per-building guarantee.*
+*Figure 5.5f — **external blind validation** of the continuous-fabric-vector predictor on three favelas it was never fitted on (Borel, Jacarezinho, Morro do Juramento): pooled AUC-PR 0.76, Brier 0.20 over 3,797 buildings, but site-variable and extrapolation-flagged. A direction, not a per-building guarantee.*
 
 ---
 
-## 5.6 Geometric ventilation tendencies (τ-gated, pre-CFD)
+### 5.6 Geometric ventilation tendencies (τ-gated, pre-CFD)
 
 *Code: `scripts/run_lateral_connectivity.py`, `scripts/run_ventilation_susceptibility.py`,
 `scripts/run_wind_exposure.py`. Data: `outputs/paper_figures/{lateral_connectivity,
@@ -1277,7 +1281,7 @@ and downstream urban-canopy analyses.
 
 ---
 
-## 6.6 Aerodynamic Roughness (z0, zd)
+### 6.6 Aerodynamic Roughness (z0, zd)
 
 *Track `track/roughness`. Figures in the review hub's "Roughness" gallery group.*
 
@@ -1950,8 +1954,9 @@ on Linux, `brew install gdal` on macOS) before `pip install`.
 
 ```bash
 python -m pytest tests/ -m "not integration" -q --tb=short
-# → 630 tests pass; 69 integration tests deselected
-# (use `python -m pytest` to bypass any older user-site `pytest` on PATH)
+# → 663 tests pass; 69 integration tests deselected
+# (full suite: 710 pass + 22 skip + integration; use `python -m pytest`
+#  to bypass any older user-site `pytest` on PATH)
 ```
 
 If this passes, the codebase is loaded correctly. If GDAL or pyvista
@@ -1994,6 +1999,19 @@ python scripts/run_street_solar.py --site <site> --n-jobs -1
 python scripts/validate_svf_against_umep.py --site <site> \
   --pixel-size 1.0 --observer-height 1.5
 # Outputs → outputs/<site>/morphometrics/svf/umep_validation/
+
+# Stage 7: morphological signature (cross-site; run once after all grids exist).
+# Cell morphotype → block morphotope → party-wall configuration.
+python scripts/build_signature.py --k 6      # add --shape-ab for the §5.5 sensitivity
+python scripts/build_morphotope.py
+python scripts/build_configuration.py
+# Outputs → outputs/cross_site/signature/ (+ figures_v2/)
+
+# Stage 8: aerodynamic roughness z0(θ)/zd(θ) (per-cell map + per-patch CFD inlet).
+python scripts/build_roughness.py
+python scripts/build_patch_roughness.py
+# Outputs → outputs/<site>/morphometrics/roughness/
+#         + outputs/<site>/sampling_cfd/campaign_sampling/patch_roughness.csv
 ```
 
 ### 12.4 Per-figure regeneration

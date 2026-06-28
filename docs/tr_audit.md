@@ -20,29 +20,29 @@ item marked ☐ open / ☑ done.*
 
 ## High
 
-- ☐ **§5.5 circularity caveat** — SVF ≈ f(λp, H/W) (excluded from the fabric set for
+- ☑ **§5.5 circularity caveat** — SVF ≈ f(λp, H/W) (excluded from the fabric set for
   exactly this reason, D2), so the SVF gradient is partly mechanical; the **winter-sun
-  / WHO-failure** outcomes are the cleaner held-out signal.
-- ☐ **§5.5 support caveat** — experience medians are on supported cells only (~35% of
-  cells carry an observer; per-type support 0.23–0.59; open types less observed).
-- ☐ **§5.5 conditional-type caveat** — the cell typology is not fully universal (T2/T3
-  flatland-conditional) before pivoting to morphotopes.
+  / WHO-failure** outcomes are the cleaner held-out signal. *(In TR §5.5 caveats para.)*
+- ☑ **§5.5 support caveat** — experience medians are on supported cells only (~35% of
+  cells carry an observer; per-type support 0.23–0.59; open types less observed). *(TR §5.5.)*
+- ☑ **§5.5 conditional-type caveat** — the cell typology is not fully universal (T2/T3
+  flatland-conditional) before pivoting to morphotopes. *(TR §5.5 validation (i).)*
 - ☑ **Predictor work marked forthcoming** — WHO-2h prediction / LOSO / parsimony is
   referenced as "basis" but is a separate sub-study → flag "(forthcoming)".
-- ☐ **Embed the validation figures** — recurrence + experience-dotplots into §5.5;
-  roughness_validity into §6.6 (currently §6.6 shows zero figures).
+- ☑ **Embed the validation figures** — experience-dotplots (Fig 5.5b) + recurrence
+  (Fig 5.5d, added 2026-06-28) in §5.5; roughness_validity (Fig 6.6) in §6.6.
 
 ## Medium
 
 - ☑ **Exec Summary** silent on the signature and roughness — add one bullet each (with
   caveats).
 - ☑ **§10 Known Limitations** has nothing on roughness validity — add a subsection.
-- ☐ **§12 Reproducibility** — add Stage 7 (signature/morphotope/configuration) and
-  Stage 8 (roughness) pipelines.
-- ☐ **Heading hierarchy** — §5.5 is `##` while §5.1–5.4 are `###`; normalize.
-- ☐ **Version/date** header stale (v1.0, 2026-05-03) vs the 2026-06 content → bump.
-- ☐ **§6.6 cross-references** — eight "§6.5" refs now ambiguous; disambiguate after
-  renumber.
+- ☑ **§12 Reproducibility** — added Stage 7 (signature/morphotope/configuration) and
+  Stage 8 (roughness) to §12.3 (2026-06-28).
+- ☑ **Heading hierarchy** — §5.5/§5.6/§6.6 normalized to `###` to nest under §5/§6 (2026-06-28).
+- ☑ **Version/date** header bumped to TR v1.2 / pipeline v6.0 / build 2026-06-27.
+- ☑ **§6.6 cross-references** — verified: all eight surviving "§6.5" refs point to the
+  rectangular-domain section (correct); roughness is consistently "§6.6". No ambiguity remains.
 
 ## Cell-count note (resolved)
 
