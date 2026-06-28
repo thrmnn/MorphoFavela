@@ -6,6 +6,19 @@ hard to find. Updated every working session.
 
 ## 🆕 Latest (each links to the exact figure/section)
 
+- **✅ Consolidation + expansion run (2026-06-28)** —
+  `docs/consolidation_and_expansion_plan_2026-06-27.md`. Consolidated
+  paper-integration → `main` (FF) and pruned the stale tracks; closed the
+  `tr_audit.md` coherence punch-list (recurrence Fig 5.5d, §12.3 Stage 7/8,
+  heading/version hygiene, §12.2 → 663/710). Then three expansions: **E2** the
+  geometric multi-constraint ventilation index (TR §5.6(4), Fig 5.6d — count of
+  triggered axes 0–3, NOT a weighted sum; pooled 24.2% triply constrained, flatland
+  ≫ hillside); **E1** the inlet-BC roughness method-spread envelope (TR §6.6 Fig
+  6.6b — corrected the rounded "~20×" to the measured **4×–148×**, Macdonald↔Raupach,
+  and fixed the Kanda<Macdonald bullet to "27–47% of cells at every site"); **E5**
+  the unified 8-favela cross-site risk surface (TR §5.5 Fig 5.5g — campaign OOF
+  AUC-PR 0.73–0.94, calibration blind 0.51–0.90 + out-of-envelope flags). Canonical
+  λf/morphotype untouched. New tests for the E2/E5 pure cores.
 - **✅ Paper-integration track (2026-06-27)** — `docs/paper_integration_plan_2026-06-26.md`.
   New TR §5.6 (three τ-gated geometric ventilation scalars: lateral-connectivity, regime×depth
   susceptibility 41.8% skimming∩deep, near-isotropic wind-exposure) + §5.5 augmentation
