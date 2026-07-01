@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| **Document version** | TR v1.2 (pre-CFD; +morphology signature §5.5, ventilation tendencies §5.6, roughness §6.6) |
+| **Document version** | TR v1.3 (pre-CFD; +morphology signature §5.5, ventilation tendencies §5.6, roughness §6.6, full MAUP curve §10.9, façade-solar cross-check §5.4) |
 | **Pipeline version** | v6.0 (June 2026 milestone — ROADMAP.md) |
-| **Build date** | 2026-06-27 |
+| **Build date** | 2026-07-01 |
 | **Last numerical sweep** | [`904040e`](https://github.com/thrmnn/MorphoFavela/commit/904040e) (2026-05-03) |
 | **Author** | Theo Hermann · MIT · `thermann.ai@gmail.com` |
 | **Repository** | https://github.com/thrmnn/MorphoFavela |
@@ -154,10 +154,10 @@ informal settlements:
 
 | Site | Area | Type | Buildings (extended) | 10 m cells | Mean H † | Annual mean sun ‡ |
 |------|-----:|------|--------------------:|-----------:|--------:|----------------:|
-| Vidigal | 0.30 km² | hillside | 4,599 | 3,169 | 6.3 m | 4.53 h |
-| Rocinha | 0.80 km² | hillside | 14,435 | 8,972 | 8.1 m | 3.30 h |
+| Vidigal | 0.30 km² | hillside | 4,599 | 3,169 | 6.3 m | 4.45 h |
+| Rocinha | 0.80 km² | hillside | 14,435 | 8,972 | 8.1 m | 2.76 h |
 | Rio das Pedras | 0.70 km² | flatland | 11,276 | 7,046 | 8.7 m | 3.14 h |
-| Complexo do Alemão | 1.97 km² | mixed | 28,783 | 19,708 | 5.3 m | 5.03 h |
+| Complexo do Alemão | 1.97 km² | mixed | 28,783 | 19,708 | 5.3 m | 5.02 h |
 | Maré | 4.34 km² | flatland | 39,322 | 43,419 | 7.1 m | 7.07 h |
 | **TOTAL** | **8.11 km²** | | **98,415** | **82,314** | — | — |
 
@@ -612,10 +612,12 @@ This analysis justifies the 10 m resolution as the production grid:
   only resolved at 10 m.
 - Computational cost at 10 m is manageable (< 85 s per site).
 
-The 20 m grids have been re-baselined onto the dissolved (party-wall-corrected)
-λf, so both resolutions now share the canonical estimator; the quantitative
-resolution A/B is in §10.9, and the *sensitivity* conclusion (shape
-preservation, multimodality only at 10 m) holds on the corrected basis.
+All resolution variants (5, 15, 20, 30 m) have been re-baselined onto the
+dissolved (party-wall-corrected) λf, so every grid shares the canonical
+estimator; the quantitative resolution sweep is the full 5–30 m curve in §10.9,
+and the *sensitivity* conclusion (shape preservation, multimodality only
+resolved at the finer grids, monotonic regime drift with preserved cross-site
+ordering) holds on the corrected basis.
 
 Supplementary variants (Vidigal-only upscaled-vs-native scatter, and
 side-by-side difference maps) are archived in
@@ -762,11 +764,11 @@ S/W cells have *more open sky* yet the figure shows them receiving
 ![Figure 7. Vidigal street-level solar envelope.](figures/fig07_solar_envelope_vidigal.png)
 
 **Figure 7.** Three street-level solar maps on the same point set,
-same scale. (a) Winter solstice (worst case, mean 2.59 h, 36.5 % of
+same scale. (a) Winter solstice (worst case, mean 2.48 h, 37.3 % of
 points fully shaded). (b) Annual proxy: unweighted mean of four
 reference dates — winter and summer solstices plus March and September
-equinoxes (mean 4.53 h, 7.7 % fully shaded). (c) Summer solstice
-(best case, mean 6.21 h, 8.3 % fully shaded). Computed by
+equinoxes (mean 4.45 h, 7.7 % fully shaded). (c) Summer solstice
+(best case, mean 6.18 h, 8.3 % fully shaded). Computed by
 `scripts/run_street_solar.py` (30-min sampling, 5 h–19 h window,
 pvlib sun positions, ray-cast against `scene.stl` = DTM + extruded
 LiDAR footprints), with all four per-date arrays plus annual-mean
@@ -774,15 +776,15 @@ columns written into a single
 `outputs/vidigal/morphometrics/svf/svf_streets_solar.gpkg`.
 
 The seasonal swing on Vidigal is large enough that a winter-only
-analysis substantially understates summer access: 42.4 % of street
-cells gain ≥ 4 hours and 28.2 % gain ≥ 6 hours between winter and
-summer solstice, and 1,564 of the 2,510 winter-zero-hour cells (62 %)
+analysis substantially understates summer access: 42.9 % of street
+cells gain ≥ 4 hours and 28.6 % gain ≥ 6 hours between winter and
+summer solstice, and 1,621 of the 2,567 winter-zero-hour cells (63 %)
 recover to ≥ 2 h in summer. Mean seasonal range across all street
-cells is 4.25 h. Under the WHO 2-hour daily-sunlight benchmark, 54.1 %
+cells is 3.69 h. Under the WHO 2-hour daily-sunlight benchmark, 55.5 %
 of Vidigal's street cells fall short on the winter solstice but only
 19.3 % on the summer solstice; **the year-round figure to use for
 comfort, photovoltaic, and health-outcome studies is the annual proxy
-(28.6 % below 2 h)**, not the winter worst case.
+(29.0 % below 2 h)**, not the winter worst case.
 
 The same envelope was extended to all five sites in May 2026
 (`scripts/run_street_solar.py` + `outputs/paper_figures/figS_solar_envelope.py`,
@@ -793,10 +795,10 @@ Cross-site headline numbers:
 
 | Site | n streets | winter h | annual h | summer h | WHO < 2 h winter | WHO < 2 h annual | WHO < 2 h summer | range h |
 |------|--:|--:|--:|--:|--:|--:|--:|--:|
-| Vidigal | 6,876 | 2.59 | 4.53 | 6.21 | 54.1 % | 28.6 % | 19.3 % | 3.62 |
-| Rocinha | 38,690 | 2.08 | 3.30 | 4.56 | 67.1 % | 49.1 % | 34.1 % | 2.48 |
-| Complexo do Alemão | 47,508 | 3.22 | 5.03 | 6.66 | 44.2 % | 20.9 % | 12.9 % | 3.45 |
-| Rio das Pedras | 16,905 | 1.99 | 3.14 | 4.22 | 62.5 % | 44.0 % | 29.7 % | 2.23 |
+| Vidigal | 6,876 | 2.48 | 4.45 | 6.18 | 55.5 % | 29.0 % | 19.3 % | 3.69 |
+| Rocinha | 35,316 | 1.56 | 2.76 | 4.02 | 72.4 % | 52.8 % | 36.9 % | 2.46 |
+| Complexo do Alemão | 47,508 | 3.22 | 5.02 | 6.65 | 44.1 % | 21.1 % | 13.1 % | 3.43 |
+| Rio das Pedras | 16,905 | 1.99 | 3.14 | 4.21 | 62.4 % | 44.0 % | 29.6 % | 2.22 |
 | Maré | 84,147 | 5.20 | 7.07 | 8.70 | 27.8 % | 9.9 % | 5.3 % | 3.50 |
 
 Two structural patterns:
@@ -811,10 +813,10 @@ Two structural patterns:
   doesn't lift the worst cells as far.
 
 * **WHO benchmark gap.** Even on the annual proxy, Rocinha and Rio das
-  Pedras leave 49 % and 44 % of street cells below the WHO 2 h/day
+  Pedras leave 53 % and 44 % of street cells below the WHO 2 h/day
   threshold. CDA and Vidigal sit at 21 % and 29 %. **Annual mean is the
   number that should drive comfort and health-outcome modelling**; the
-  winter worst case (44–67 % below WHO) is the conservative bound for
+  winter worst case (44–72 % below WHO) is the conservative bound for
   PV-siting and seasonal-affective studies, not the everyday figure.
 
 Cross-site comparison by aspect quadrant:
@@ -836,6 +838,50 @@ re-export from
 `outputs/paper_figures/fig07_solar_envelope_vidigal.py` and use the
 shared 0–12 h colour scale from that script for direct visual
 comparison.
+
+#### 5.4.1 Façade-level validation (independent Ladybug run)
+
+Our raycast produces a *street-level* field only. An independent
+collaboration (Mingze, Ladybug Tools in Grasshopper;
+`data/external/mingze/mingze_update_2026-07`, cross-checked by
+`scripts/compare_mingze_facade.py`) extends the same five sites to the
+**façade**: buildings discretised into 3 m storey bands (7.95 M façade
+points) and streets at 1.2 m eye height (194 k points over ~290 km of
+road), stepping the sun at 0.5 h across the full year and classifying every
+point against the same WHO 2 h/day floor. This is a genuinely additive
+vertical dimension our street pipeline cannot see, computed by a different
+engine — so it is both an *extension* and an independent *cross-check*.
+
+*Façade deprivation.* Four of the five settlements sit at a structural
+floor of **50–56 %** of façade area below the WHO minimum (Complexo do
+Alemão 50 %, Maré 54 %, Vidigal and Rio das Pedras 56 %), while **Rocinha
+stands apart at 72 %**; the deficit is seasonal but persistent (never below
+57 % at any settlement). The driver is *vertical position, not building
+height*: occupants gain sun floor-by-floor, yet raising every building on a
+street together leaves the canyon equally dark (a 15 m fabric is no brighter
+than a 5 m one), and on hillsides the valley-floor→ridge gradient runs from
+~1 h to 4+ h — a gradient absent on the flat sites. Rocinha is also the most
+*unequal* (street-sun Gini 0.70 vs 0.59–0.63 elsewhere; 81 % of its deprived
+façades receive no direct sun at all).
+
+*Cross-check against our raycast (Figure 7d).* At street level the two
+independent pipelines agree on the **ordering**: Maré is least deprived by a
+wide margin (Mingze 12 %, ours 27.8 % winter) — confirming street width, not
+elevation, as the decisive variable for ground-level access — and Rocinha /
+Rio das Pedras are the worst street pair in both. Our winter-solstice
+worst-day metric runs **~1.9× harsher** than Mingze's full-year envelope
+(the expected relationship between a single worst day and an annual mean),
+and the only rank exchange is the statistically-close Rocinha/Rio das Pedras
+pair. Mingze's stated **16–42 pp street-over-façade recovery** — the open sky
+above the roadway supplying what the enclosed wall cannot — is consistent
+with our finding that the public realm is the primary reserve of ground-level
+daylight. The comparison is deliberately read at the level of ordering and
+mechanism, not absolute magnitude, given the different engine (Ladybug vs our
+pvlib raycast) and temporal basis (full-year vs winter-solstice).
+
+![Figure 7d. Façade-vs-street solar deprivation across the five favelas and a street-to-street cross-check of our raycast against the independent Ladybug run. (A) WHO-2h deprivation by settlement: Mingze façade (annual), Mingze street (annual, three sites reported), and our street winter-solstice field. (B) Street ordering agrees across engines; our winter worst-day metric sits near the ours = 2× Mingze line. Source: outputs/comparative/mingze_facade/mingze_facade_crosscheck.json (compare_mingze_facade.py, 2026-07-01).](figures/mingze_facade_crosscheck.png)
+
+*Figure 7d — façade-vs-street deprivation and the cross-engine street cross-check; ordering preserved, Maré least deprived, Rocinha the façade outlier at 72 %.*
 
 ---
 
@@ -1823,12 +1869,16 @@ Maré 2026-04-30; extended to all 5 sites 2026-05-01.) The
    (S6 Vidigal, S7 Maré, S8 Rocinha, S9 Rio das Pedras,
    S10 Complexo do Alemão) for per-cell scatters.
 
-### 10.4 Resolution sensitivity is 10 m vs 20 m only
+### 10.4 Resolution sensitivity now spans 5–30 m
 
-Finer grids
-(5 m, 2 m) would be prohibitively expensive at site scale but
-warrant a spot-check for the CFD patches specifically. Not a
-priority for the current milestone.
+*Superseded (2026-07-01).* The sensitivity analysis is no longer a single 10-vs-20
+doubling: §10.9 now reports the **full resolution curve over 5, 10, 15, 20 and
+30 m** for all five sites, built on the canonical dissolved λf at every step. The
+5 m grid — earlier deferred as prohibitively expensive — was tractable at site
+scale (≈ 229 k built cells pooled; the Maré 5 m grid alone is 172 k cells). The
+curve is smooth and monotonic and, crucially, preserves cross-site ordering
+(Spearman ρ = 0.90). The only finer bound not yet swept is 2 m, which remains a
+targeted spot-check for individual CFD patches rather than a site-scale grid.
 
 ### 10.5 Cidade de Deus excluded
 
@@ -1883,37 +1933,51 @@ typology→failure *predictor* (§5.5 forward look) is a separate, forthcoming s
 
 ### 10.9 Sensitivity to grid resolution (MAUP)
 
-![MAUP A/B: pooled flow-regime shares 10 m vs 20 m.](figures/maup_regime_shares.png)
+![Full MAUP resolution curve, 5–30 m. (A) Pooled Oke/Grimmond-Oke flow-regime shares vs cell size — skimming falls and wake rises monotonically. (B) Pooled λf_mean median (falls) and σH median (rises) vs cell size. (C) Per-site skimming share vs cell size; cross-site ordering is preserved (Spearman ρ = 0.90, 5↔30 m). 10 m production lock marked.](figures/maup_resolution_curve.png)
 
 The Modifiable Areal Unit Problem is the standard objection to grid-based
-morphometrics. A direct A/B (`scripts/run_maup_sensitivity.py`,
-`outputs/comparative/maup/maup_sensitivity.json`) re-derives the pooled Oke /
-Grimmond-Oke flow-regime shares on built cells (`building_count > 0`) at the
-production 10 m grid and at a doubled 20 m grid, holding the regime thresholds
-fixed (λf < 0.15 isolated, ≥ 0.65 skimming). **Both resolutions are placed on
-the same dissolved (party-wall-corrected) λf basis** — an earlier draft of this
-appendix compared the dissolved 10 m grid against a 20 m grid still carrying the
-pre-dissolve *summed* λf, which inflated the coarse grid by the over-count factor
-(2.7–4.4×) and produced a spurious *rise* in skimming; that comparison is
-superseded. On a like-for-like dissolved basis the shares are **not** invariant
-to cell size, and the genuine effect runs the other way: skimming **falls** from
-65.2 % to 31.1 % (**−34.1 pp**) while wake rises from 30.0 % to 58.8 %
-(**+28.8 pp**) and isolated edges up from 4.8 % to 10.1 % (**+5.3 pp**); the
-pooled λf median drops from 0.831 to 0.493 (**−40.7 %**) even as σH rises
-+15.6 %. This is the expected geometric scaling — λf is a frontal-over-plan ratio,
-and doubling the cell width grows the dissolved frontal area roughly linearly
-while the plan-area denominator grows quadratically, so λf nearly halves and
-cells migrate *out* of the skimming band into wake. It is reported as measured
-rather than smoothed into a "stable" verdict. The operational consequence is
-narrow: the *absolute* regime-share figures are strongly resolution-dependent and
-must always be quoted at the locked 10 m resolution (the figures in §5.2 and
-`lambda_f_canonical.json`), which this A/B reproduces exactly; the cross-site
-*ordering* of morphologies is preserved (max per-site swing 25–39 pp, same
-direction everywhere). The complementary distribution-shape analysis at §4.6
-(Figure S3) shows the 10 m grid additionally resolves multimodality that 20 m
-aggregation erases, which is the basis for fixing 10 m as the production grid.
+morphometrics: results computed on a fixed lattice can be artefacts of the cell
+size. Rather than a single doubling, we sweep the **full resolution curve** over
+{5, 10, 15, 20, 30} m (`scripts/run_maup_sensitivity.py`,
+`outputs/comparative/maup/maup_curve.json`), re-deriving the pooled Oke /
+Grimmond-Oke flow-regime shares on built cells (`building_count > 0`) at each
+resolution with the regime thresholds held fixed (λf < 0.15 isolated, ≥ 0.65
+skimming). **Every resolution is placed on the same dissolved (party-wall-
+corrected) λf basis** — an earlier 10-vs-20 draft compared the dissolved 10 m
+grid against a 20 m grid still carrying the pre-dissolve *summed* λf, which
+inflated the coarse grid by the over-count factor (2.7–4.4×) and produced a
+spurious *rise* in skimming; that comparison is superseded, and the whole curve
+is now built by re-running `migrate_lambda_f_dissolve.py` at each cell size.
 
-![Per-site flow-regime composition at 10 m vs 20 m for all five sites; coarsening lowers λf and shifts cells out of skimming into wake everywhere, uneven in magnitude (25–39 pp).](figures/maup_per_site_regime.png)
+The curve is **smooth and monotonic**, which is the strongest possible answer to
+the MAUP objection: the shares are *not* invariant to cell size, but they move in
+a single physically-interpretable direction with no reversals. As cells coarsen
+from 5 m to 30 m the pooled skimming share falls **86.8 % → 65.2 % → 44.9 % →
+31.1 % → 16.2 %** while wake rises **10.9 % → 69.5 %** and isolated rises
+**2.3 % → 14.2 %**; the pooled λf_mean median falls monotonically **1.524 →
+0.831 → 0.606 → 0.493 → 0.389** while σH_median *rises* monotonically **1.53 →
+2.28 m**. The two trends have the same geometric cause: λf is a frontal-over-plan
+ratio, so widening the cell grows the dissolved frontal area roughly linearly
+while the plan-area denominator grows quadratically — λf falls and cells migrate
+*out* of skimming into wake — and each coarser cell simultaneously pools a wider
+spread of building heights, so σH rises. The 10 m → 20 m step quoted in earlier
+drafts (skimming −34.1 pp, λf median −40.7 %, σH +15.6 %) is simply two adjacent
+points on this curve.
+
+The operational consequences are two, and both are narrow. First, the *absolute*
+regime-share figures are strongly resolution-dependent — the 5 m grid reads the
+fabric as 86.8 % skimming, the 30 m grid as 16.2 % — so absolute shares must
+**always** be quoted at the locked 10 m resolution (the figures in §5.2 and
+`lambda_f_canonical.json`), which the curve reproduces exactly at its 10 m point.
+Second, and reassuringly, the cross-site *ordering* of morphologies is **preserved
+across the whole sweep**: the per-site skimming trajectories (panel C) fall in
+near-parallel, and the rank correlation of per-site skimming between the finest
+and coarsest grids is **Spearman ρ = 0.90** (the only exchange is the
+statistically-close Rocinha/Rio das Pedras pair). Comparative statements between
+sites are therefore robust to cell size even though the absolute numbers are not.
+The complementary distribution-shape analysis at §4.6 (Figure S3) shows the 10 m
+grid additionally resolves multimodality that coarser aggregation erases, which
+— together with this curve — is the basis for fixing 10 m as the production grid.
 
 ---
 
@@ -1945,9 +2009,11 @@ aggregation erases, which is the basis for fixing 10 m as the production grid.
       publish `src/cfd_integration/rectangular_domain_v1.json` as
       the canonical contract (closed 2026-05-08, see §6.5; 119/119
       eligible after the buffer extension, no patches dropped).
-- [ ] Optional: 20 m grids already exist; generate the variant Fig S3
-      forms (`--variants` flag) if reviewers request the scatter or
-      difference-map views
+- [x] Full MAUP resolution curve (5/10/15/20/30 m) built on the
+      canonical dissolved λf for all five sites (closed 2026-07-01,
+      see §10.9; monotonic regime drift, cross-site ordering preserved
+      at Spearman ρ = 0.90). Supersedes the earlier optional 20 m-only
+      variant task.
 - [ ] Draft the Nature Cities manuscript (separate from this technical
       report) once the result-side pipeline is operational
 
@@ -2008,8 +2074,8 @@ on Linux, `brew install gdal` on macOS) before `pip install`.
 
 ```bash
 python -m pytest tests/ -m "not integration" -q --tb=short
-# → 673 tests pass; 69 integration tests deselected
-# (full suite: 720 pass + 22 skip + integration; use `python -m pytest`
+# → 680 tests pass; 69 integration tests deselected
+# (full suite: 727 pass + 22 skip + integration; use `python -m pytest`
 #  to bypass any older user-site `pytest` on PATH)
 ```
 

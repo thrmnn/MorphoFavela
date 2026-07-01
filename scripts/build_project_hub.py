@@ -102,6 +102,48 @@ VENT_FIGS = [
 ]
 
 
+MZ_DIR = "/outputs/comparative/mingze_facade"
+FACADE_FIGS = [
+    ("/mingze_facade_crosscheck.png", "Façade vs street + cross-check (ours vs Ladybug)",
+     "Our raycast street field cross-checked against Mingze's independent Ladybug "
+     "run: ordering agrees, Maré least deprived, our winter worst-day ≈1.9× the "
+     "annual envelope. Façade deprivation 50–56 % floor, Rocinha 72 %."),
+    ("/figures/fig2_facade_deprivation.png", "Façade deprivation by settlement (Mingze)",
+     "Share of façade area below WHO 2 h/day: Rocinha 72 %, others 50–56 %."),
+    ("/figures/fig3_drivers.png", "Drivers: height-invariance + valley→ridge (Mingze)",
+     "Taller ≠ brighter (flat lines); hillside sun rises valley-floor→ridge."),
+    ("/figures/fig4_street_gini.png", "Street-sun inequality / Gini (Mingze)",
+     "Rocinha most unequal (Gini 0.70); p10–median–p90 of direct sun hours."),
+    ("/figures/fig1_seasonal_riodaspedras.png", "Seasonal 3-D solar model — Rio das Pedras (Mingze)",
+     "Annual direct-sun on the full 3-D fabric at 3 m façade resolution, four seasonal dates."),
+]
+
+
+def facade_solar_section(prov):
+    """Façade-level solar (independent Ladybug run) + our street cross-check."""
+    cards = [
+        card(title, desc, MZ_DIR + href, img=MZ_DIR + href,
+             meta="façade-level solar · WHO 2 h/day", kind="ok")
+        for href, title, desc in FACADE_FIGS
+        if (ROOT / (MZ_DIR + href).lstrip("/")).exists()
+    ]
+    return section("Solar access — façade & street (Mingze / Ladybug + our cross-check)",
+                   cards, anchor="facade-solar")
+
+
+def maup_section(prov):
+    """MAUP resolution-curve figure (5–30 m)."""
+    fig = "/outputs/comparative/maup/maup_resolution_curve.png"
+    if not (ROOT / fig.lstrip("/")).exists():
+        return ""
+    c = card("MAUP resolution curve (5–30 m)",
+             "Flow-regime shares, λf/σH medians, and per-site skimming vs cell "
+             "size. Monotonic drift; cross-site ordering preserved (Spearman "
+             "ρ = 0.90). Absolute shares must be quoted at the 10 m lock.",
+             fig, img=fig, meta="TR §10.9 · dissolved λf", kind="info")
+    return section("Grid-resolution sensitivity (MAUP)", [c], anchor="maup")
+
+
 def ventilation_section(prov):
     """Dedicated §5.6 gallery so the geometry-only ventilation tendencies are a
     first-class hub item (image cards with lightbox, linking to the report)."""
@@ -125,6 +167,14 @@ def build_callout(prov):
     tr = f"{hub}/docs/technical_report.html"
     # newest first — each lands on the EXACT figure / TR section it documents
     latest = [
+        ("Façade-level solar + Ladybug cross-check (§5.4.1) — NEW",
+         "#facade-solar",
+         "Mingze's façade run (50–72 % WHO-2h deprivation) + our street cross-check: "
+         "ordering agrees, Maré least deprived, Rocinha façade outlier 72 %"),
+        ("MAUP resolution curve 5–30 m (§10.9) — NEW",
+         "#maup",
+         "full grid-size sweep; monotonic regime drift, cross-site ordering "
+         "preserved (Spearman ρ = 0.90)"),
         ("Geometric ventilation tendencies (§5.6) — 4-figure gallery",
          "#ventilation",
          "lateral depth · regime×depth susceptibility · wind exposure · "
@@ -207,8 +257,9 @@ def main():
     DOCS.mkdir(parents=True, exist_ok=True)
     prov = git_provenance(ROOT, "scripts/build_project_hub.py")
 
-    blocks = [build_callout(prov), ventilation_section(prov), sites_section(prov)]
-    titles = ["Latest", "Ventilation", "Sites"]
+    blocks = [build_callout(prov), facade_solar_section(prov), ventilation_section(prov),
+              maup_section(prov), sites_section(prov)]
+    titles = ["Latest", "Facade-solar", "Ventilation", "Maup", "Sites"]
     for title, items in DOC_SECTIONS.items():
         cards = []
         for url, name, desc, kind in items:
