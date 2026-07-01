@@ -807,7 +807,7 @@ Two structural patterns:
   (3.45 h) have the largest winter→summer recoveries — terrain shadowing
   on hillside structures depresses the winter floor harder, which the
   high summer sun then erases. The flatland sites recover less in
-  absolute terms (Rocinha 2.48 h, RdP 2.23 h, Maré 3.50 h)
+  absolute terms (Rocinha 2.46 h, RdP 2.22 h, Maré 3.50 h)
   because their winter floor was less depressed: the fabric is denser
   and shadowing is canyon-driven rather than terrain-driven, so summer
   doesn't lift the worst cells as far.
@@ -816,8 +816,10 @@ Two structural patterns:
   Pedras leave 53 % and 44 % of street cells below the WHO 2 h/day
   threshold. CDA and Vidigal sit at 21 % and 29 %. **Annual mean is the
   number that should drive comfort and health-outcome modelling**; the
-  winter worst case (44–72 % below WHO) is the conservative bound for
-  PV-siting and seasonal-affective studies, not the everyday figure.
+  winter worst case (28–72 % below WHO campaign-wide — reaching 72 % at
+  Rocinha, and above 44 % everywhere except the flat outlier Maré at 28 %)
+  is the conservative bound for PV-siting and seasonal-affective studies,
+  not the everyday figure.
 
 Cross-site comparison by aspect quadrant:
 
@@ -839,49 +841,55 @@ re-export from
 shared 0–12 h colour scale from that script for direct visual
 comparison.
 
-#### 5.4.1 Façade-level validation (independent Ladybug run)
+#### 5.4.1 Façade-level extension and street-level cross-check (independent Ladybug run)
 
 Our raycast produces a *street-level* field only. An independent
 collaboration (Mingze, Ladybug Tools in Grasshopper;
-`data/external/mingze/mingze_update_2026-07`, cross-checked by
+`data/external/mingze/mingze_update_2026-07`, figures cross-checked by
 `scripts/compare_mingze_facade.py`) extends the same five sites to the
-**façade**: buildings discretised into 3 m storey bands (7.95 M façade
-points) and streets at 1.2 m eye height (194 k points over ~290 km of
-road), stepping the sun at 0.5 h across the full year and classifying every
-point against the same WHO 2 h/day floor. This is a genuinely additive
-vertical dimension our street pipeline cannot see, computed by a different
-engine — so it is both an *extension* and an independent *cross-check*.
+**façade**: buildings discretised into 3 m storey bands (Mingze reports
+7.95 M façade points) and streets at 1.2 m eye height (194 k points over
+~290 km of road), stepping the sun at 0.5 h across the year and classifying
+every point against the same WHO 2 h/day floor. This is a genuinely additive
+vertical dimension our street pipeline cannot produce. **We have not re-run
+or independently verified Mingze's Ladybug model; the façade figures below
+are reported as his** — only the *street* layer is a true two-pipeline
+cross-check.
 
-*Façade deprivation.* Four of the five settlements sit at a structural
-floor of **50–56 %** of façade area below the WHO minimum (Complexo do
-Alemão 50 %, Maré 54 %, Vidigal and Rio das Pedras 56 %), while **Rocinha
-stands apart at 72 %**; the deficit is seasonal but persistent (never below
-57 % at any settlement). The driver is *vertical position, not building
-height*: occupants gain sun floor-by-floor, yet raising every building on a
-street together leaves the canyon equally dark (a 15 m fabric is no brighter
-than a 5 m one), and on hillsides the valley-floor→ridge gradient runs from
-~1 h to 4+ h — a gradient absent on the flat sites. Rocinha is also the most
-*unequal* (street-sun Gini 0.70 vs 0.59–0.63 elsewhere; 81 % of its deprived
-façades receive no direct sun at all).
+*Façade deprivation (Mingze, unverified by us).* Four of the five settlements
+sit at a structural floor of **50–56 %** of façade area below the WHO minimum
+(Complexo do Alemão 50 %, Maré 54 %, Vidigal and Rio das Pedras 56 %), while
+**Rocinha stands apart at 72 %**; he reports the deficit as seasonal but
+persistent (never below 57 % at any settlement). His stated driver is
+*vertical position, not building height*: occupants gain sun floor-by-floor,
+yet raising every building on a street together leaves the canyon equally
+dark (a 15 m fabric no brighter than a 5 m one), and on hillsides the
+valley-floor→ridge gradient runs ~1 h → 4+ h — absent on the flat sites. He
+reports Rocinha as the most *unequal* (street-sun Gini 0.70 vs 0.59–0.63
+elsewhere; 81 % of its deprived façades receiving no direct sun at all).
 
-*Cross-check against our raycast (Figure 7d).* At street level the two
-independent pipelines agree on the **ordering**: Maré is least deprived by a
-wide margin (Mingze 12 %, ours 27.8 % winter) — confirming street width, not
-elevation, as the decisive variable for ground-level access — and Rocinha /
-Rio das Pedras are the worst street pair in both. Our winter-solstice
-worst-day metric runs **~1.9× harsher** than Mingze's full-year envelope
-(the expected relationship between a single worst day and an annual mean),
-and the only rank exchange is the statistically-close Rocinha/Rio das Pedras
-pair. Mingze's stated **16–42 pp street-over-façade recovery** — the open sky
-above the roadway supplying what the enclosed wall cannot — is consistent
-with our finding that the public realm is the primary reserve of ground-level
-daylight. The comparison is deliberately read at the level of ordering and
-mechanism, not absolute magnitude, given the different engine (Ladybug vs our
-pvlib raycast) and temporal basis (full-year vs winter-solstice).
+*Street-level cross-check against our raycast (Figure 7d).* Here the two
+pipelines can be compared directly, and they agree on the **grouping, not the
+fine rank**: both identify Maré as least deprived by a wide margin (Mingze
+12 %, ours 27.8 % winter) — confirming street width, not elevation, as the
+decisive variable for ground-level access — and both put Rocinha and Rio das
+Pedras as the two worst. Mingze has street figures for only three sites, and
+across those the worst pair *swaps* (he ranks Rio das Pedras worst, we rank
+Rocinha), so we claim agreement on grouping, not on rank. Our winter-solstice
+single-day floor is systematically harsher than his annual field (site ratios
+**1.6–2.3×**); we do **not** read this as a calibration, since the two metrics
+reduce the temporal dimension differently — ours is the 21 June worst day,
+his an annual reduction — and a genuine fixed offset would not spread over
+1.5×. His stated **16–42 pp street-over-façade recovery** — the open sky above
+the roadway supplying what the enclosed wall cannot — is consistent with our
+finding that the public realm is the primary reserve of ground-level daylight.
+The comparison is deliberately read at the level of grouping and mechanism,
+not absolute magnitude, given the different engine (Ladybug vs our pvlib
+raycast) and temporal basis.
 
 ![Figure 7d. Façade-vs-street solar deprivation across the five favelas and a street-to-street cross-check of our raycast against the independent Ladybug run. (A) WHO-2h deprivation by settlement: Mingze façade (annual), Mingze street (annual, three sites reported), and our street winter-solstice field. (B) Street ordering agrees across engines; our winter worst-day metric sits near the ours = 2× Mingze line. Source: outputs/comparative/mingze_facade/mingze_facade_crosscheck.json (compare_mingze_facade.py, 2026-07-01).](figures/mingze_facade_crosscheck.png)
 
-*Figure 7d — façade-vs-street deprivation and the cross-engine street cross-check; ordering preserved, Maré least deprived, Rocinha the façade outlier at 72 %.*
+*Figure 7d — façade-vs-street deprivation and the cross-engine street cross-check; grouping agrees (Maré least deprived, Rocinha/RdP worst), Rocinha the façade outlier at 72 %.*
 
 ---
 
@@ -1933,7 +1941,7 @@ typology→failure *predictor* (§5.5 forward look) is a separate, forthcoming s
 
 ### 10.9 Sensitivity to grid resolution (MAUP)
 
-![Full MAUP resolution curve, 5–30 m. (A) Pooled Oke/Grimmond-Oke flow-regime shares vs cell size — skimming falls and wake rises monotonically. (B) Pooled λf_mean median (falls) and σH median (rises) vs cell size. (C) Per-site skimming share vs cell size; cross-site ordering is preserved (Spearman ρ = 0.90, 5↔30 m). 10 m production lock marked.](figures/maup_resolution_curve.png)
+![Full MAUP resolution curve, 5–30 m. (A) Pooled Oke/Grimmond-Oke flow-regime shares vs cell size — skimming falls and wake rises monotonically. (B) Pooled λf_mean median (falls) and σH median (rises) vs cell size. (C) Per-site skimming share vs cell size; cross-site ordering is broadly preserved (Spearman ρ = 0.90 — a single Rocinha/Rio das Pedras rank swap, 5↔30 m). 10 m production lock marked.](figures/maup_resolution_curve.png)
 
 The Modifiable Areal Unit Problem is the standard objection to grid-based
 morphometrics: results computed on a fixed lattice can be artefacts of the cell
@@ -1949,35 +1957,47 @@ inflated the coarse grid by the over-count factor (2.7–4.4×) and produced a
 spurious *rise* in skimming; that comparison is superseded, and the whole curve
 is now built by re-running `migrate_lambda_f_dissolve.py` at each cell size.
 
-The curve is **smooth and monotonic**, which is the strongest possible answer to
-the MAUP objection: the shares are *not* invariant to cell size, but they move in
-a single physically-interpretable direction with no reversals. As cells coarsen
-from 5 m to 30 m the pooled skimming share falls **86.8 % → 65.2 % → 44.9 % →
-31.1 % → 16.2 %** while wake rises **10.9 % → 69.5 %** and isolated rises
-**2.3 % → 14.2 %**; the pooled λf_mean median falls monotonically **1.524 →
-0.831 → 0.606 → 0.493 → 0.389** while σH_median *rises* monotonically **1.53 →
-2.28 m**. The two trends have the same geometric cause: λf is a frontal-over-plan
-ratio, so widening the cell grows the dissolved frontal area roughly linearly
-while the plan-area denominator grows quadratically — λf falls and cells migrate
-*out* of skimming into wake — and each coarser cell simultaneously pools a wider
-spread of building heights, so σH rises. The 10 m → 20 m step quoted in earlier
-drafts (skimming −34.1 pp, λf median −40.7 %, σH +15.6 %) is simply two adjacent
-points on this curve.
+The curve is **monotone with no reversals** — every pooled series, and all five
+per-site skimming trajectories, move in a single direction. This is emphatically
+*not* scale-invariance: the **absolute** shares are strongly cell-size dependent
+and there is no plateau at which the metric stabilises, so the MAUP objection
+stands in full for any absolute number. What the monotonicity does buy is that
+the drift is single-directional and physically interpretable, so the *direction*
+of every effect and the cross-site *ordering* survive even though the absolute
+values do not. As cells coarsen from 5 m to 30 m the pooled skimming share falls
+**86.8 % → 65.2 % → 44.9 % → 31.1 % → 16.2 %** while wake rises **10.9 % →
+69.5 %** and isolated rises **2.3 % → 14.2 %**; the pooled λf_mean median falls
+**1.524 → 0.831 → 0.606 → 0.493 → 0.389** while σH_median *rises* **1.53 →
+2.28 m**. The mechanism is **dilution, not a change in the fabric**: the built-cell
+filter (`building_count > 0`) admits progressively more open ground as cells
+enlarge, so each coarse "built" cell averages in more empty area — the
+frontal-area density λf is diluted and cells migrate *out* of skimming into wake,
+while the same wider footprint pools a broader spread of building heights, lifting
+σH. (λf median falls by ×0.55–0.64 per doubling — close to, but consistently
+slower than, the ×0.5 a naive area argument would predict, consistent with a
+dilution effect rather than a clean geometric scaling law.) The 10 m → 20 m step
+quoted in earlier drafts (skimming −34.1 pp, λf median −40.7 %, σH +15.6 %) is
+simply two adjacent points on this curve.
 
-The operational consequences are two, and both are narrow. First, the *absolute*
-regime-share figures are strongly resolution-dependent — the 5 m grid reads the
-fabric as 86.8 % skimming, the 30 m grid as 16.2 % — so absolute shares must
-**always** be quoted at the locked 10 m resolution (the figures in §5.2 and
-`lambda_f_canonical.json`), which the curve reproduces exactly at its 10 m point.
-Second, and reassuringly, the cross-site *ordering* of morphologies is **preserved
-across the whole sweep**: the per-site skimming trajectories (panel C) fall in
-near-parallel, and the rank correlation of per-site skimming between the finest
-and coarsest grids is **Spearman ρ = 0.90** (the only exchange is the
-statistically-close Rocinha/Rio das Pedras pair). Comparative statements between
-sites are therefore robust to cell size even though the absolute numbers are not.
-The complementary distribution-shape analysis at §4.6 (Figure S3) shows the 10 m
-grid additionally resolves multimodality that coarser aggregation erases, which
-— together with this curve — is the basis for fixing 10 m as the production grid.
+The operational consequences are two. First, the *absolute* regime-share figures
+are strongly resolution-dependent — the 5 m grid reads the fabric as 86.8 %
+skimming, the 30 m grid as 16.2 % — so absolute shares must **always** be quoted
+at the locked 10 m resolution (the figures in §5.2 and `lambda_f_canonical.json`),
+which the curve reproduces exactly at its 10 m point. Because the curve has no
+plateau, 10 m is not a physically privileged *stability* point: it is an
+arbitrary-but-fixed convention justified by the §4.6 multimodality analysis (the
+10 m grid resolves distributional structure coarser grids erase), not by anything
+in this curve. Second, the cross-site *ordering* of morphologies is **broadly
+preserved**: the per-site skimming trajectories (panel C) fall in near-parallel,
+and the rank correlation of per-site skimming between the finest (5 m) and
+coarsest (30 m) grids is **Spearman ρ = 0.90**. With only five sites this ρ is the
+value produced by a single adjacent rank swap and carries no meaningful confidence
+interval (permutation p ≈ 0.04); the swap is the statistically-close Rocinha /
+Rio das Pedras pair — the two most-deprived hillside sites, too close to separate
+reliably. We therefore read it as *ordering broadly preserved, with the two worst
+sites not reliably distinguishable*, not as a robustness guarantee — a reassuring
+but appropriately hedged result: comparative *groupings* between sites survive
+cell-size changes even though absolute numbers and fine rank distinctions do not.
 
 ---
 

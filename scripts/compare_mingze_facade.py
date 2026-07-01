@@ -49,6 +49,20 @@ MZ_FACADE_DEP = {"rocinha": 72, "riodaspedras": 56, "vidigal": 56,
 MZ_STREET_DEP = {"rocinha": 38, "riodaspedras": 40, "maré": 12}  # text (3 sites)
 MZ_STREET_GINI = {"rocinha": 0.70, "vidigal": 0.63, "maré": 0.61,
                   "riodaspedras": 0.59, "complexo_do_alemao": 0.59}  # Fig 4
+# Method / headline figures reported in Mingze's write-up (traceable but not
+# recomputable by us — we did not re-run his Ladybug model). Verbatim from the
+# Google Doc text so downstream claims can be traced to a source field.
+MZ_REPORTED = {
+    "facade_test_points": 7_950_000,
+    "street_test_points": 194_000,
+    "road_length_km": 290,
+    "facade_band_m": 3.0,
+    "street_eye_height_m": 1.2,
+    "sun_step_hours": 0.5,
+    "seasonal_facade_floor_never_below_pct": 57,
+    "rocinha_deprived_facades_zero_sun_pct": 81,
+    "street_over_facade_recovery_pp": [16, 42],
+}
 
 WHO_HOURS = 2.0
 
@@ -93,6 +107,7 @@ def main() -> None:
         "mingze_facade_deprivation_pct": MZ_FACADE_DEP,
         "mingze_street_deprivation_pct": MZ_STREET_DEP,
         "mingze_street_gini": MZ_STREET_GINI,
+        "mingze_reported_unverified": MZ_REPORTED,
         "our_street_winter": ours,
         "street_to_street": {
             "sites": common,
@@ -102,14 +117,15 @@ def main() -> None:
             "our_worst_day_harsher_factor_median": round(float(np.median(ratios)), 2),
         },
         "findings": [
-            "Maré is the least street-deprived in both (Mingze 12 %, ours 27.8 %) "
-            "— the flat, wide-street settlement, corroborating 'street width decisive'.",
-            "Rocinha and Rio das Pedras are the worst street pair in both.",
-            f"Our winter worst-day metric runs ~{np.median(ratios):.1f}× Mingze's "
-            "full-year envelope, as expected for a single-day floor.",
+            "Grouping agrees, not fine rank: Maré least street-deprived in both "
+            "(Mingze 12 %, ours 27.8 %), Rocinha+RdP the worst pair in both; but "
+            "the worst pair swaps between engines (n=3 sites with Mingze street data).",
+            f"Our winter single-day floor is harsher than Mingze's annual field "
+            f"(site ratios {min(ratios)}–{max(ratios)}×); NOT read as a calibration "
+            "— the metrics reduce the temporal dimension differently.",
             "Façade deprivation (50–72 %) exceeds street everywhere (Mingze's "
             "16–42 pp recovery); the façade layer is additive to our street-only "
-            "pipeline.",
+            "pipeline and is Mingze's alone (we did not re-run his model).",
         ],
     }
     (out_dir / "mingze_facade_crosscheck.json").write_text(
@@ -141,12 +157,12 @@ def main() -> None:
     lim = [0, 80]
     ax[1].plot(lim, lim, "--", color="#888", lw=1, label="y = x")
     ax[1].plot(lim, [2 * v for v in lim], ":", color="#B2182B", lw=1,
-               label="ours = 2× Mingze")
+               label="ours = 2× (reference)")
     ax[1].set_xlim(0, 50)
     ax[1].set_ylim(0, 80)
     ax[1].set_xlabel("Mingze street deprivation (annual, %)")
     ax[1].set_ylabel("Our street deprivation (winter, %)")
-    ax[1].set_title("(B) Street ordering agrees; ours ≈2× (worst-day)", fontsize=9)
+    ax[1].set_title("(B) Grouping agrees; ours 1.6–2.3× (worst-day vs annual)", fontsize=9)
     ax[1].legend(frameon=False, fontsize=7.5, loc="upper left")
     ax[1].spines[["top", "right"]].set_visible(False)
 
