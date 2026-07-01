@@ -847,49 +847,83 @@ Our raycast produces a *street-level* field only. An independent
 collaboration (Mingze, Ladybug Tools in Grasshopper;
 `data/external/mingze/mingze_update_2026-07`, figures cross-checked by
 `scripts/compare_mingze_facade.py`) extends the same five sites to the
-**façade**: buildings discretised into 3 m storey bands (Mingze reports
-7.95 M façade points) and streets at 1.2 m eye height (194 k points over
-~290 km of road), stepping the sun at 0.5 h across the year and classifying
-every point against the same WHO 2 h/day floor. This is a genuinely additive
-vertical dimension our street pipeline cannot produce. **We have not re-run
-or independently verified Mingze's Ladybug model; the façade figures below
-are reported as his** — only the *street* layer is a true two-pipeline
-cross-check.
+**façade**. In his words, "for each, a three-dimensional model combining
+building massing with the underlying terrain was assembled and imported into
+the Ladybug Tools environment"; façades were "discretized into horizontal
+bands at 3 m vertical resolution, one per storey, and street networks were
+sampled at 1.2 m eye height, yielding 7.95 million façade test points and
+194,000 street points across approximately 290 km of roads." Direct-sun hours
+were accumulated by stepping the sun "at a 0.5 h interval across the whole
+year," then each point was classified against the same WHO 2 h/day floor.
+This is a genuinely additive vertical dimension our street pipeline cannot
+produce. **We have not re-run or independently verified Mingze's Ladybug
+model; the figures and quoted findings in this subsection are his**, reproduced
+here with permission — only the *street* layer (Figure 7h) is a true
+two-pipeline cross-check.
 
-*Façade deprivation (Mingze, unverified by us).* Four of the five settlements
-sit at a structural floor of **50–56 %** of façade area below the WHO minimum
-(Complexo do Alemão 50 %, Maré 54 %, Vidigal and Rio das Pedras 56 %), while
-**Rocinha stands apart at 72 %**; he reports the deficit as seasonal but
-persistent (never below 57 % at any settlement). His stated driver is
-*vertical position, not building height*: occupants gain sun floor-by-floor,
-yet raising every building on a street together leaves the canyon equally
-dark (a 15 m fabric no brighter than a 5 m one), and on hillsides the
-valley-floor→ridge gradient runs ~1 h → 4+ h — absent on the flat sites. He
-reports Rocinha as the most *unequal* (street-sun Gini 0.70 vs 0.59–0.63
-elsewhere; 81 % of its deprived façades receiving no direct sun at all).
+![Figure 7d (Mingze, Ladybug Tools). The seasonal solar simulation for a single favela. (a) Annual direct-sun exposure for Rio das Pedras on the full three-dimensional model, computed in Ladybug at 3 m façade resolution and 0.5 h temporal steps; the scale runs from 0 (blue) to 11 (yellow) hours per day, with narrow street canyons in deep shadow and rooftops and open ground sunlit. (b) The same fabric at the four seasonal dates, from the June solstice (worst) to the December solstice (best). Reproduced from `data/external/mingze/mingze_update_2026-07`.](figures/mingze_fig1_seasonal.png)
 
-*Street-level cross-check against our raycast (Figure 7d).* Here the two
-pipelines can be compared directly, and they agree on the **grouping, not the
-fine rank**: both identify Maré as least deprived by a wide margin (Mingze
-12 %, ours 27.8 % winter) — confirming street width, not elevation, as the
-decisive variable for ground-level access — and both put Rocinha and Rio das
-Pedras as the two worst. Mingze has street figures for only three sites, and
-across those the worst pair *swaps* (he ranks Rio das Pedras worst, we rank
-Rocinha), so we claim agreement on grouping, not on rank. Our winter-solstice
-single-day floor is systematically harsher than his annual field (site ratios
-**1.6–2.3×**); we do **not** read this as a calibration, since the two metrics
-reduce the temporal dimension differently — ours is the 21 June worst day,
-his an annual reduction — and a genuine fixed offset would not spread over
-1.5×. His stated **16–42 pp street-over-façade recovery** — the open sky above
-the roadway supplying what the enclosed wall cannot — is consistent with our
+*Figure 7d — Mingze's Ladybug seasonal solar model (Rio das Pedras); the method basis for the façade results below.*
+
+*Façade deprivation (Mingze's result).* His headline is that "four of the five
+settlements converge on a structural floor of roughly 50 % façade deprivation
+despite spanning an order of magnitude in population and ranging from flat to
+steeply sloped, while Rocinha stands apart at 72 %" (Figure 7e: Complexo do
+Alemão 50 %, Maré 54 %, Vidigal and Rio das Pedras 56 %, Rocinha 72 %).
+Deprivation "breathes with the seasons, peaking at the June solstice and easing
+in December, but never falls below 57 % in any settlement," which he reads as a
+persistent rather than seasonal deficit.
+
+![Figure 7e (Mingze, Ladybug Tools). Annual façade solar deprivation by settlement — share of façade area below the two-hour daily minimum. Four settlements cluster near a 50 % structural floor, whereas Rocinha reaches 72 %. Reproduced from `data/external/mingze/mingze_update_2026-07`.](figures/mingze_fig2_facade_deprivation.png)
+
+*Figure 7e — Mingze's façade WHO-2h deprivation by settlement (Rocinha 72 %, others 50–56 %).*
+
+*Drivers (Mingze's result).* He finds the deficit "governed by position rather
+than by overall building height: occupants gain sunlight by ascending floor by
+floor, yet raising every building on a street together leaves the canyon equally
+dark, so a fifteen-metre fabric is no brighter than a five-metre one" (Figure 7f
+a,b). "On hillsides, vertical topographic position dominates, with valley floors
+receiving about one hour of direct sun and ridges four or more, a gradient absent
+from the flat settlements" (Figure 7f c). This is the vertical-dimension analogue
+of the terrain–aspect dissociation we report at street level in §5.3.
+
+![Figure 7f (Mingze, Ladybug Tools). Drivers of deprivation. (a) Sun gained from ground floor to roof within the same building: most occupants rise into light, except in Rocinha. (b) Mean sun against whole-building height: lines stay flat, so a taller building is not a brighter one. (c) Mean sun from valley floor to ridge: on hillsides exposure rises steeply with elevation, a gradient absent in the flat settlements (dotted). Reproduced from `data/external/mingze/mingze_update_2026-07`.](figures/mingze_fig3_drivers.png)
+
+*Figure 7f — Mingze's decomposition: sun rises with floor and with elevation, but not with whole-building height.*
+
+*Inequality (Mingze's result).* Beyond the mean, he reports Rocinha as "not
+merely the most deprived but also the most unequal: 81 % of its deprived façades
+receive no direct sun at all, and its Gini coefficient of 0.70 is the highest of
+the five" (Figure 7g; the other four sites 0.59–0.63).
+
+![Figure 7g (Mingze, Ladybug Tools). Inequality of street-level sun within each settlement. Bars span the 10th to 90th percentile of direct sun hours with the median marked; Rocinha is both the most deprived and the most unequal (Gini = 0.70). Reproduced from `data/external/mingze/mingze_update_2026-07`.](figures/mingze_fig4_street_gini.png)
+
+*Figure 7g — Mingze's street-sun inequality (p10–median–p90) and Gini per settlement.*
+
+*Street-level cross-check against our raycast (Figure 7h).* The street layer is
+where the two pipelines can be compared directly, and they agree on the
+**grouping, not the fine rank**: both identify Maré as least deprived by a wide
+margin (Mingze 12 %, ours 27.8 % winter) — consistent with his conclusion that
+"street width rather than elevation [is] the decisive variable for ground-level
+access" — and both put Rocinha and Rio das Pedras as the two worst. Mingze has
+street figures for only three sites, and across those the worst pair *swaps* (he
+ranks Rio das Pedras worst, we rank Rocinha; he notes the two "share almost
+identical street deprivation … through opposite mechanisms, dense relief versus
+uniform flat enclosure"), so we claim agreement on grouping, not on rank. Our
+winter-solstice single-day floor is systematically harsher than his annual field
+(site ratios **1.6–2.3×**); we do **not** read this as a calibration, since the
+two metrics reduce the temporal dimension differently — ours is the 21 June worst
+day, his an annual reduction — and a genuine fixed offset would not spread over
+1.5×. His stated **16–42 pp street-over-façade recovery** — "the open sky above
+the roadway provides what the enclosed wall cannot" — is consistent with our
 finding that the public realm is the primary reserve of ground-level daylight.
-The comparison is deliberately read at the level of grouping and mechanism,
-not absolute magnitude, given the different engine (Ladybug vs our pvlib
-raycast) and temporal basis.
+The comparison is deliberately read at the level of grouping and mechanism, not
+absolute magnitude, given the different engine (Ladybug vs our pvlib raycast) and
+temporal basis.
 
-![Figure 7d. Façade-vs-street solar deprivation across the five favelas and a street-to-street cross-check of our raycast against the independent Ladybug run. (A) WHO-2h deprivation by settlement: Mingze façade (annual), Mingze street (annual, three sites reported), and our street winter-solstice field. (B) Street ordering agrees across engines; our winter worst-day metric sits near the ours = 2× Mingze line. Source: outputs/comparative/mingze_facade/mingze_facade_crosscheck.json (compare_mingze_facade.py, 2026-07-01).](figures/mingze_facade_crosscheck.png)
+![Figure 7h. Façade-vs-street solar deprivation across the five favelas and a street-to-street cross-check of our raycast against the independent Ladybug run. (A) WHO-2h deprivation by settlement: Mingze façade (annual), Mingze street (annual, three sites reported), and our street winter-solstice field. (B) Street grouping agrees across engines; our winter worst-day metric sits between the y = x and the 2× reference lines (site ratios 1.6–2.3×). Source: outputs/comparative/mingze_facade/mingze_facade_crosscheck.json (compare_mingze_facade.py, 2026-07-01).](figures/mingze_facade_crosscheck.png)
 
-*Figure 7d — façade-vs-street deprivation and the cross-engine street cross-check; grouping agrees (Maré least deprived, Rocinha/RdP worst), Rocinha the façade outlier at 72 %.*
+*Figure 7h — our cross-check: façade-vs-street deprivation and the cross-engine street comparison; grouping agrees (Maré least deprived, Rocinha/RdP worst), Rocinha the façade outlier at 72 %.*
 
 ---
 
