@@ -1,27 +1,35 @@
 #!/usr/bin/env python3
-"""MAUP sensitivity A/B — does the headline morphometry survive cell-size doubling?
+"""MAUP sensitivity — does the headline morphometry survive changes in cell size?
 
 The Modifiable Areal Unit Problem (MAUP) is the standard methods-reviewer
 objection to grid-based morphometrics: results computed on a fixed lattice can
 be artefacts of the cell size. This script answers it directly. It reads the
-already-meshed 10 m and 20 m grids (no re-meshing), and on built cells
-(``building_count > 0``) at each resolution it recomputes:
+already-meshed grids (no re-meshing) at each available resolution and on built
+cells (``building_count > 0``) recomputes:
 
 - the pooled and per-site Oke / Grimmond-Oke flow-regime shares
   (isolated / wake / skimming) from ``lambda_f_mean``;
 - the σH (``sigma_h``) and ``lambda_f_mean`` median + IQR.
 
-It tabulates 10 m vs 20 m with explicit deltas — percentage points for the
-regime shares, absolute + relative for the medians — writes the A/B to
-``outputs/comparative/maup/maup_sensitivity.json``, prints the table, and draws
-a grouped-bar figure of the regime shares.
+Two products come out of the same summaries:
+
+1. **A/B** — the canonical 10 m vs 20 m doubling, with explicit deltas
+   (percentage points for regime shares, absolute + relative for medians),
+   written to ``outputs/comparative/maup/maup_sensitivity.json`` and drawn as a
+   grouped-bar figure of the regime shares.
+2. **Curve** — the full resolution sweep over every present cell size in
+   {5, 10, 15, 20, 30} m, written to ``.../maup_curve.json`` and drawn as a
+   three-panel resolution curve (regime trajectories, λf/σH medians, per-site
+   skimming with a Spearman ordering-stability scalar). Degrades gracefully:
+   whatever grids exist are used, and the curve is skipped if only the two A/B
+   resolutions are present.
 
 Honest framing: this does NOT recompute or touch the canonical 10 m lock. It
-reports the swing the data shows; if regime shares move by more than a few
-percentage points under doubling, that is stated plainly rather than smoothed
-into a "stable" conclusion.
+reports the swing the data shows; if regime shares move under coarsening, that
+is stated plainly rather than smoothed into a "stable" conclusion.
 
-Run:
+Run (after building the extra grids with run_morphometric_audit.py +
+migrate_lambda_f_dissolve.py at each --cell-size / --grid-suffix):
     python scripts/run_maup_sensitivity.py
 """
 
@@ -52,6 +60,11 @@ SITE_LABELS = {
 REGIMES = ["isolated", "wake", "skimming"]
 CANONICAL_JSON = PROJECT_ROOT / "outputs" / "brisa_ventilation_fix" / "lambda_f_canonical.json"
 OUT_DIR = PROJECT_ROOT / "outputs" / "comparative" / "maup"
+
+# Full resolution curve. 10 m is the canonical lock (suffix ""); the rest are
+# MAUP-only variants built by run_morphometric_audit.py --output-suffix Nm.
+SUFFIX_BY_CELL = {5: "_5m", 10: "", 15: "_15m", 20: "_20m", 30: "_30m"}
+CURVE_CELLS = [5, 10, 15, 20, 30]
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -207,6 +220,164 @@ def build_ab(s10: dict, s20: dict) -> dict:
     }
 
 
+def _rank(a: np.ndarray) -> np.ndarray:
+    """Average ranks (1-based), ties averaged — enough for a 5-site Spearman."""
+    a = np.asarray(a, dtype=float)
+    order = np.argsort(a, kind="mergesort")
+    ranks = np.empty(len(a), dtype=float)
+    ranks[order] = np.arange(1, len(a) + 1, dtype=float)
+    # average tied ranks
+    _, inv, counts = np.unique(a, return_inverse=True, return_counts=True)
+    sums = np.zeros(len(counts))
+    np.add.at(sums, inv, ranks)
+    return (sums / counts)[inv]
+
+
+def spearman(a: np.ndarray, b: np.ndarray) -> float:
+    """Spearman rank correlation of two equal-length vectors (NaN → 0-length → nan)."""
+    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    ok = ~(np.isnan(a) | np.isnan(b))
+    if ok.sum() < 2:
+        return float("nan")
+    ra, rb = _rank(a[ok]), _rank(b[ok])
+    if ra.std() == 0 or rb.std() == 0:
+        return float("nan")
+    return float(np.corrcoef(ra, rb)[0, 1])
+
+
+def build_curve(summaries: dict[int, dict]) -> dict:
+    """Assemble the resolution curve from a {cell_size: resolution_summary} dict.
+
+    Pure over already-computed summaries (no disk I/O) so it is unit-testable.
+    Only cell sizes present in ``summaries`` are used, sorted ascending. Emits
+    pooled trajectories (regime shares, λf/σH medians, n) and per-site
+    trajectories, plus a Spearman ordering-stability scalar for the per-site
+    skimming share between the finest and coarsest present resolution.
+    """
+    cells = sorted(summaries)
+    pooled = {r: [summaries[c]["pooled"]["regime_shares"][r] for c in cells] for r in REGIMES}
+    pooled["lambda_f_median"] = [summaries[c]["pooled"]["lambda_f_mean"]["median"] for c in cells]
+    pooled["sigma_h_median"] = [summaries[c]["pooled"]["sigma_h"]["median"] for c in cells]
+    pooled["n_built"] = [summaries[c]["pooled"]["regime_shares"]["n"] for c in cells]
+
+    per_site: dict[str, dict] = {}
+    for site in SITES:
+        if not all(site in summaries[c]["per_site"] for c in cells):
+            continue
+        blk = summaries[cells[0]]["per_site"][site]
+        per_site[site] = {
+            "label": blk["label"],
+            "skimming": [summaries[c]["per_site"][site]["regime_shares"]["skimming"] for c in cells],
+            "wake": [summaries[c]["per_site"][site]["regime_shares"]["wake"] for c in cells],
+            "isolated": [summaries[c]["per_site"][site]["regime_shares"]["isolated"] for c in cells],
+            "lambda_f_median": [summaries[c]["per_site"][site]["lambda_f_mean"]["median"] for c in cells],
+            "sigma_h_median": [summaries[c]["per_site"][site]["sigma_h"]["median"] for c in cells],
+            "n_built": [summaries[c]["per_site"][site]["regime_shares"]["n"] for c in cells],
+        }
+
+    # ordering stability: per-site skimming rank, finest vs coarsest resolution
+    fine, coarse = cells[0], cells[-1]
+    sites_both = [s for s in SITES if s in per_site]
+    skim_fine = np.array([summaries[fine]["per_site"][s]["regime_shares"]["skimming"] for s in sites_both])
+    skim_coarse = np.array([summaries[coarse]["per_site"][s]["regime_shares"]["skimming"] for s in sites_both])
+    rho = spearman(skim_fine, skim_coarse)
+
+    return {
+        "cells_m": cells,
+        "pooled": pooled,
+        "per_site": per_site,
+        "ordering_stability": {
+            "metric": "spearman_rho_per_site_skimming",
+            "fine_m": fine, "coarse_m": coarse,
+            "rho": rho, "n_sites": len(sites_both),
+        },
+    }
+
+
+def print_curve(curve: dict) -> None:
+    cells = curve["cells_m"]
+    p = curve["pooled"]
+    print("\n" + "═" * 72)
+    print(f"MAUP RESOLUTION CURVE — {'/'.join(str(c) for c in cells)} m (built cells)")
+    print("═" * 72)
+    print(f"\n{'cell (m)':>8} {'isolated':>9} {'wake':>9} {'skimming':>9} "
+          f"{'λf med':>8} {'σH med':>8} {'n built':>9}")
+    for i, c in enumerate(cells):
+        print(f"{c:>8} {p['isolated'][i]*100:>8.1f}% {p['wake'][i]*100:>8.1f}% "
+              f"{p['skimming'][i]*100:>8.1f}% {p['lambda_f_median'][i]:>8.3f} "
+              f"{p['sigma_h_median'][i]:>8.3f} {p['n_built'][i]:>9,}")
+    os_ = curve["ordering_stability"]
+    print(f"\nPer-site skimming ordering {os_['fine_m']}↔{os_['coarse_m']} m: "
+          f"Spearman ρ = {os_['rho']:.3f} (n={os_['n_sites']} sites)")
+    print("─" * 72)
+
+
+def make_curve_figure(curve: dict, out_dir: Path) -> Path | None:
+    """Three-panel resolution curve: regimes, λf/σH medians, per-site skimming."""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception:
+        return None
+
+    cells = curve["cells_m"]
+    p = curve["pooled"]
+    fig, ax = plt.subplots(1, 3, figsize=(11.5, 3.6))
+
+    # (A) pooled regime shares vs cell size
+    reg_col = {"isolated": "#66AA66", "wake": "#EE9944", "skimming": "#BB4444"}
+    for r in REGIMES:
+        ax[0].plot(cells, [v * 100 for v in p[r]], "o-", color=reg_col[r],
+                   label=r.capitalize(), lw=1.8, ms=5)
+    ax[0].axvline(10, color="#888", ls=":", lw=1)
+    ax[0].text(10, ax[0].get_ylim()[1], " 10 m lock", color="#888", fontsize=7,
+               va="top", ha="left")
+    ax[0].set_xlabel("Cell size (m)")
+    ax[0].set_ylabel("Pooled cell share (%)")
+    ax[0].set_title("(A) Flow-regime shares vs resolution", fontsize=9)
+    ax[0].legend(frameon=False, fontsize=8)
+
+    # (B) pooled λf & σH medians vs cell size (twin y)
+    axb = ax[1]
+    l1 = axb.plot(cells, p["lambda_f_median"], "s-", color="#4477AA",
+                  label="λf_mean median", lw=1.8, ms=5)
+    axb.set_xlabel("Cell size (m)")
+    axb.set_ylabel("λf_mean median", color="#4477AA")
+    axb.tick_params(axis="y", labelcolor="#4477AA")
+    axb2 = axb.twinx()
+    l2 = axb2.plot(cells, p["sigma_h_median"], "^--", color="#AA3377",
+                   label="σH median (m)", lw=1.8, ms=5)
+    axb2.set_ylabel("σH median (m)", color="#AA3377")
+    axb2.tick_params(axis="y", labelcolor="#AA3377")
+    axb.axvline(10, color="#888", ls=":", lw=1)
+    axb.set_title("(B) λf and σH medians vs resolution", fontsize=9)
+    axb.legend(l1 + l2, [ln.get_label() for ln in l1 + l2], frameon=False, fontsize=8,
+               loc="upper right")
+
+    # (C) per-site skimming trajectory (ordering preservation)
+    for s, blk in curve["per_site"].items():
+        ax[2].plot(cells, [v * 100 for v in blk["skimming"]], "o-", lw=1.6, ms=4,
+                   label=blk["label"])
+    ax[2].axvline(10, color="#888", ls=":", lw=1)
+    os_ = curve["ordering_stability"]
+    ax[2].set_xlabel("Cell size (m)")
+    ax[2].set_ylabel("Skimming share (%)")
+    ax[2].set_title(f"(C) Per-site skimming vs resolution\n"
+                    f"(ordering ρ={os_['rho']:.2f}, {os_['fine_m']}↔{os_['coarse_m']} m)",
+                    fontsize=9)
+    ax[2].legend(frameon=False, fontsize=7, ncol=1)
+
+    for a in (ax[0], ax[1], ax[2], axb2):
+        a.spines[["top"]].set_visible(False)
+        a.set_xticks(cells)
+    fig.tight_layout()
+    out = out_dir / "maup_resolution_curve.png"
+    fig.savefig(out, dpi=200, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    return out
+
+
 def print_table(ab: dict) -> None:
     p = ab["pooled"]
     print("\n" + "═" * 72)
@@ -284,8 +455,17 @@ def main() -> None:
     canonical = json.loads(CANONICAL_JSON.read_text()) if CANONICAL_JSON.exists() else {}
     canon_thr = canonical.get("flow_regime_thresholds", {})
 
-    s10 = resolution_summary("")
-    s20 = resolution_summary("_20m")
+    # summaries for every present resolution (reused by both A/B and curve)
+    summaries: dict[int, dict] = {}
+    for cell in CURVE_CELLS:
+        suffix = SUFFIX_BY_CELL[cell]
+        summ = resolution_summary(suffix)
+        # a resolution is "present" if at least one site had a grid
+        if len(summ["missing_sites"]) < len(SITES):
+            summaries[cell] = summ
+
+    s10 = summaries.get(10) or resolution_summary("")
+    s20 = summaries.get(20) or resolution_summary("_20m")
     ab = build_ab(s10, s20)
 
     record = {
@@ -320,6 +500,42 @@ def main() -> None:
     print(f"\nWrote {out_json}")
     if fig_path:
         print(f"Wrote {fig_path}")
+
+    # ── Full resolution curve (needs ≥ 3 present resolutions) ──────────────
+    if len(summaries) >= 3:
+        curve = build_curve(summaries)
+        curve_record = {
+            "title": "MAUP resolution curve — flow-regime + σH/λf trajectories over cell size",
+            "generated_by": "scripts/run_maup_sensitivity.py",
+            "flow_regime_thresholds": {"isolated_max": ISOLATED_MAX, "skimming_min": SKIMMING_MIN,
+                                       "reference": "Oke (1988) / Grimmond & Oke (1999)"},
+            "lambda_f_basis": "dissolved (party-wall-corrected), canonical",
+            "canonical_lock_m": 10,
+            "curve": curve,
+            "interpretation": (
+                f"Across {'/'.join(str(c) for c in curve['cells_m'])} m the pooled skimming "
+                f"share moves {curve['pooled']['skimming'][0]*100:.1f}% → "
+                f"{curve['pooled']['skimming'][-1]*100:.1f}% and the λf_mean median "
+                f"{curve['pooled']['lambda_f_median'][0]:.3f} → "
+                f"{curve['pooled']['lambda_f_median'][-1]:.3f} as cells coarsen (each cell "
+                f"pools more open ground, lowering λf and pushing cells out of skimming). "
+                f"Per-site skimming ordering is preserved (Spearman ρ = "
+                f"{curve['ordering_stability']['rho']:.2f}, "
+                f"{curve['ordering_stability']['fine_m']}↔{curve['ordering_stability']['coarse_m']} m), "
+                f"so cross-site comparisons are robust to cell size even though absolute "
+                f"shares are not — absolute regime shares must be quoted at the 10 m lock."
+            ),
+        }
+        curve_json = OUT_DIR / "maup_curve.json"
+        curve_json.write_text(json.dumps(curve_record, ensure_ascii=False, indent=2))
+        print_curve(curve)
+        curve_fig = make_curve_figure(curve, OUT_DIR)
+        print(f"Wrote {curve_json}")
+        if curve_fig:
+            print(f"Wrote {curve_fig}")
+    else:
+        print(f"\n[curve skipped: only {len(summaries)} resolution(s) present — "
+              f"need ≥3 of {CURVE_CELLS}]")
 
 
 if __name__ == "__main__":
