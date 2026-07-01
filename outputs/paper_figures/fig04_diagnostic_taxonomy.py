@@ -269,7 +269,7 @@ def draw_site_panel(
         bldg = gpd.read_file(bldg_path)
         if bldg.crs != grid.crs:
             bldg = bldg.to_crs(grid.crs)
-        bldg.boundary.plot(ax=ax, color="#000000", linewidth=0.10, alpha=0.35)
+        bldg.boundary.plot(ax=ax, color="#555555", linewidth=0.08, alpha=0.18)
     bbox = classified.total_bounds
     pad = 15.0
     ax.set_xlim(bbox[0] - pad, bbox[2] + pad)
@@ -371,6 +371,7 @@ def draw_moran_panel(ax, clustering: dict[str, dict]) -> None:
         )
     ax.set_yticks(y_pos)
     ax.set_yticklabels([SITE_LABELS[s] for s in sites], fontsize=6.5)
+    ax.yaxis.tick_right()  # keep site labels inside panel G, off panel F
     ax.invert_yaxis()
     ax.set_xlim(0, max(vals) * 1.35)
     ax.set_xlabel(
@@ -395,7 +396,7 @@ def draw_table_panel(ax, taxonomy: dict, clustering: dict[str, dict]) -> None:
     ax.axis("off")
     col_labels = [
         "site", "n", "adeq", "sun", "vent", "comp",
-        "Moran I", "z$_{BB}$", "max patch", "% in ≥500 m²",
+        "Moran I", "z$_{BB}$", "max upgrade unit", "% in ≥500 m²",
     ]
     cell_text = []
     cell_colors = []
@@ -456,8 +457,9 @@ def draw_table_panel(ax, taxonomy: dict, clustering: dict[str, dict]) -> None:
         0.0,
         -0.06,
         "shares from canonical taxonomy JSON · clustering on classified cells "
-        "(rook contiguity, 999 perm.) · patch = contiguous compound cells "
-        "(1 cell = 100 m²) · * Moran p < 0.05",
+        "(rook contiguity, 999 perm.) · * Moran p < 0.05\n"
+        "upgrade unit = largest contiguous compound patch (1 cell = 100 m²) · "
+        "investment units, never dwellings; sites not ranked; not a clearance basis",
         transform=ax.transAxes,
         fontsize=4.8,
         color="#666666",
@@ -493,9 +495,9 @@ def main() -> None:
     gs = fig.add_gridspec(
         nrows=5,
         ncols=4,
-        height_ratios=[1.0, 1.0, 1.0, 0.62, 0.72],
-        hspace=0.22,
-        wspace=0.10,
+        height_ratios=[1.0, 1.0, 1.0, 0.85, 0.95],
+        hspace=0.5,
+        wspace=0.28,
     )
     axes_layout = {
         "A": (gs[0, 0:2], "vidigal"),
