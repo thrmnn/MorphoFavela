@@ -80,6 +80,39 @@ DOC_SECTIONS = {
 
 GAL = "/outputs/cross_site/signature/figures_v2/index.html"
 
+# TR §5.6 anchor in the rendered technical-report HTML page.
+VENT_TR = "/outputs/_hub/docs/technical_report.html#56-geometric-ventilation-tendencies--gated-pre-cfd"
+VENT_EXPORTS = "/outputs/paper_figures/exports"
+# Geometry-only ventilation tendencies (§5.6) — each an image card that zooms
+# in a lightbox and links through to its captioned place in the report.
+VENT_FIGS = [
+    ("ventilation_index.png", "Multi-constraint index (0–3)",
+     "Count of geometry-only ventilation constraints triggered per cell "
+     "(skimming · deep · wind-aligned). 24.2 % triply constrained pooled; "
+     "flatland RdP 55 %/Maré 32 % ≫ hillside ~7 %. Checklist count, not a sum."),
+    ("ventilation_susceptibility.png", "Susceptibility (regime × depth)",
+     "λf flow regime crossed with lateral depth; worst class skimming ∩ deep "
+     "= 41.8 % pooled. Two axes kept separate, never summed."),
+    ("lateral_connectivity.png", "Lateral connectivity (depth)",
+     "Distance from each built cell to the nearest open edge; pooled median "
+     "31.6 m. ρ(depth, λf) = +0.487 → doubly constrained fabric."),
+    ("wind_exposure.png", "Effective wind exposure",
+     "Directional λf weighted by the measured wind rose; near-isotropic "
+     "(ratio median 1.007) → directional alignment is a 2nd-order effect."),
+]
+
+
+def ventilation_section(prov):
+    """Dedicated §5.6 gallery so the geometry-only ventilation tendencies are a
+    first-class hub item (image cards with lightbox, linking to the report)."""
+    cards = [
+        card(title, desc, VENT_TR, img=f"{VENT_EXPORTS}/{fn}",
+             meta="pre-CFD tendency · not adequacy (τ CFD-gated)", kind="ok")
+        for fn, title, desc in VENT_FIGS
+        if (ROOT / "outputs/paper_figures/exports" / fn).exists()
+    ]
+    return section("Geometric ventilation tendencies (§5.6)", cards, anchor="ventilation")
+
 
 def build_callout(prov):
     """Top panel: newest results (direct links) + the live work queue, so new
@@ -92,6 +125,10 @@ def build_callout(prov):
     tr = f"{hub}/docs/technical_report.html"
     # newest first — each lands on the EXACT figure / TR section it documents
     latest = [
+        ("Geometric ventilation tendencies (§5.6) — 4-figure gallery",
+         "#ventilation",
+         "lateral depth · regime×depth susceptibility · wind exposure · "
+         "multi-constraint index (0–3); geometry-only, τ-gated"),
         ("TR §6.6 roughness — invalidity caveat added",
          f"{tr}#66-aerodynamic-roughness-z0-zd",
          "the bulletproofing fix: per-cell z0/zd invalid 53–75%, envelope is the result"),
@@ -170,8 +207,8 @@ def main():
     DOCS.mkdir(parents=True, exist_ok=True)
     prov = git_provenance(ROOT, "scripts/build_project_hub.py")
 
-    blocks = [build_callout(prov), sites_section(prov)]
-    titles = ["Latest", "Sites"]
+    blocks = [build_callout(prov), ventilation_section(prov), sites_section(prov)]
+    titles = ["Latest", "Ventilation", "Sites"]
     for title, items in DOC_SECTIONS.items():
         cards = []
         for url, name, desc, kind in items:
