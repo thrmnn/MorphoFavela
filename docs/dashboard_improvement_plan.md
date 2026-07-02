@@ -1,12 +1,12 @@
 # Dashboard improvement plan — council audit + parallelizable execution
 
-> **Status 2026-07-02 — EXECUTED.** 21 of 23 backlog items shipped to `main`
-> (all P0 + all P1 + L1/L2/L3/L5/L6), each committed with tests. A 5-lens
-> re-review sweep validated the wave (verdict: no blocking critical); its residual
-> findings — gallery `file://` links, gallery lightbox a11y, `<html lang>`, a
-> masthead number slip — were then closed. 36 dashboard tests green; hub live.
-> **Remaining (both "L", deferred):** L4 route the gallery skin through hubkit
-> tokens, L7 downscaled card thumbnails / intrinsic image dimensions.
+> **Status 2026-07-02 — COMPLETE (23/23).** Every backlog item shipped to `main`,
+> each committed with tests. A 5-lens re-review sweep validated the wave (verdict:
+> no blocking critical); its residual findings — gallery `file://` links, gallery
+> lightbox a11y, `<html lang>`, a masthead number slip — were closed. L4 (gallery
+> skin → hubkit tokens) and L7 (card thumbnails: landing page **8.6 MB → 1.7 MB**,
+> intrinsic dimensions, full-res kept for the lightbox) landed last. 37 dashboard
+> tests green; hub live.
 > **Accepted as-is (design calls, not defects):** the "Latest" changelog callout
 > sits above the Headline hero (a thin band, hero is immediately below and before
 > any partner content); the per-site dashboards still load Google Fonts (that
