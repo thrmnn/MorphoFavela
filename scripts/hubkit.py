@@ -39,7 +39,7 @@ overflow:hidden;text-decoration:none;color:inherit;transition:.12s;box-shadow:0 
 .card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.08)}
 .card img{width:100%;display:block;border-bottom:1px solid #eee;cursor:zoom-in}
 .cap{padding:13px 15px}.cap h3{margin:6px 0 4px;font-size:15px}
-.cap p{margin:0;color:var(--mut);font-size:13px}.cap code{font-size:11px;color:#9aa}
+.cap p{margin:0;color:var(--mut);font-size:13px}.cap code{font-size:11px;color:var(--mut)}
 .pill{display:inline-block;padding:2px 8px;border-radius:11px;font-size:11px;font-weight:700;
 text-transform:uppercase;letter-spacing:.03em;border:1px solid transparent}
 .pill.ok{background:#e6f4ec;color:var(--ok);border-color:#bfe2cd}
