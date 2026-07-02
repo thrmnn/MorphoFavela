@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import glob
 import html
+import os
 import re
 import sys
 from pathlib import Path
@@ -304,6 +305,21 @@ def deliverables_section(prov):
     return section("Deliverables", cards, anchor="deliverables")
 
 
+def _relativize(html_str):
+    """Rewrite root-absolute URLs (and lightbox zoom() targets) to paths relative
+    to OUT (outputs/_hub), so the hub resolves both from the :8773 server and when
+    opened directly via file://."""
+    def rel(url):
+        base, _, frag = url.partition("#")
+        r = os.path.relpath(ROOT / base.lstrip("/"), OUT)
+        return r + (f"#{frag}" if frag else "")
+    html_str = re.sub(r'(href|src)="(/[^"]*)"',
+                      lambda m: f'{m.group(1)}="{rel(m.group(2))}"', html_str)
+    html_str = re.sub(r"zoom\('(/[^']*)'",
+                      lambda m: f"zoom('{rel(m.group(1))}'", html_str)
+    return html_str
+
+
 def main():
     DOCS.mkdir(parents=True, exist_ok=True)
     prov = git_provenance(ROOT, "scripts/build_project_hub.py")
@@ -339,9 +355,9 @@ def main():
     n_figs = len(glob.glob(str(ROOT / "outputs/cross_site/signature/figures_v2/*.png")))
     sub = (f'{badge("ok", f"{n_sites} site dashboards")} '
            f'{badge("info", f"{n_figs} figures")}')
-    (OUT / "index.html").write_text(
+    (OUT / "index.html").write_text(_relativize(
         page("MorphoFavela — project hub", sub, body,
-             provenance=prov, sidebar=sidebar))
+             provenance=prov, sidebar=sidebar)))
     print(f"hub written: {len(sections)} sections, {n_sites} site dashboards")
 
 

@@ -105,3 +105,18 @@ def test_generated_hub_blank_cards_all_have_noopener():
     html = _generated_hub()
     for a in re.findall(r'<a class="card"[^>]*target="_blank"[^>]*>', html):
         assert 'rel="noopener"' in a
+
+
+def test_generated_hub_has_no_root_absolute_urls():
+    # file:// portability: every href/src (and lightbox zoom target) is relative
+    html = _generated_hub()
+    assert not re.search(r'(href|src)="/[^"]*"', html)
+    assert "zoom('/" not in html
+
+
+def test_generated_hub_relative_targets_resolve_on_disk():
+    _generated_hub()
+    out = bph.OUT
+    text = (out / "index.html").read_text()
+    for url in re.findall(r'(?:href|src)="(\.\./[^"#]*)"', text):
+        assert (out / url).exists(), f"relative target {url} does not resolve"
