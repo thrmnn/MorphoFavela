@@ -499,6 +499,11 @@ GALLERY_GROUPS = [
     ]),
 ]
 
+# Results-first (BLUF): lead with the payoff/honesty group (the money figure), then
+# the method/signature groups that explain it.
+GALLERY_GROUPS = ([g for g in GALLERY_GROUPS if g[1] == "prioritization"]
+                  + [g for g in GALLERY_GROUPS if g[1] != "prioritization"])
+
 
 def write_gallery():
     blocks = []
