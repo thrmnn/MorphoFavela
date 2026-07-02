@@ -38,7 +38,7 @@ h2{font-family:var(--serif);font-size:19px;margin:30px 0 12px;padding-bottom:5px
 .card{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;
 overflow:hidden;text-decoration:none;color:inherit;transition:.12s;box-shadow:0 1px 3px rgba(0,0,0,.05)}
 .card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.08)}
-.card img{width:100%;display:block;border-bottom:1px solid #eee;cursor:zoom-in}
+.card img{width:100%;height:auto;display:block;border-bottom:1px solid #eee;cursor:zoom-in}
 .cap{padding:13px 15px}.cap h3{margin:6px 0 4px;font-size:15px}
 .cap p{margin:0;color:var(--mut);font-size:13px}.cap code{font-size:11px;color:var(--mut)}
 .pill{display:inline-block;padding:2px 8px;border-radius:11px;font-size:11px;font-weight:700;
