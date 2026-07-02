@@ -99,3 +99,9 @@ def test_generated_hub_has_no_enum_echo_pill():
     html = _generated_hub()
     for kind in ("ok", "info", "doc", "warn", "amber"):
         assert f'<span class="pill {kind}">{kind}</span>' not in html
+
+
+def test_generated_hub_blank_cards_all_have_noopener():
+    html = _generated_hub()
+    for a in re.findall(r'<a class="card"[^>]*target="_blank"[^>]*>', html):
+        assert 'rel="noopener"' in a

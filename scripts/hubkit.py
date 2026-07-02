@@ -112,10 +112,12 @@ def _js_attr(s: str) -> str:
 
 
 def card(title, desc, href, *, meta="", img=None, kind="doc", alt=None,
-         badge_label=None) -> str:
+         badge_label=None, new_tab=True) -> str:
     """A link card. `kind` selects the pill colour; the pill only renders when
     `badge_label` is given (a real status like 'Headline'/'Partner'/'Campaign') —
-    it never echoes the css class, so no meaningless OK/DOC/INFO pills appear."""
+    it never echoes the css class, so no meaningless OK/DOC/INFO pills appear.
+    `new_tab=True` opens in a new tab with rel=noopener; set False for pages that
+    carry a back-to-hub breadcrumb so it navigates in place."""
     if img:
         a = _html.escape(alt if alt is not None else title, quote=True)
         cap = _js_attr(alt if alt is not None else title)
@@ -125,7 +127,8 @@ def card(title, desc, href, *, meta="", img=None, kind="doc", alt=None,
         imgtag = ""
     pill = badge(kind, badge_label) if badge_label else ""
     metatag = f'<br><code>{_html.escape(meta)}</code>' if meta else ""
-    return (f'<a class="card" href="{href}" target="_blank">{imgtag}'
+    target = ' target="_blank" rel="noopener"' if new_tab else ""
+    return (f'<a class="card" href="{href}"{target}>{imgtag}'
             f'<div class="cap">{pill}<h3>{_html.escape(title)}</h3>'
             f'<p>{_html.escape(desc)}{metatag}</p></div></a>')
 

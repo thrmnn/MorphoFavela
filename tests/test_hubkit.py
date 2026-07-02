@@ -53,6 +53,16 @@ def test_card_badge_label_renders_status_not_kind():
     assert ">info</span>" not in html  # never echoes the css class as the label
 
 
+def test_card_new_tab_default_has_blank_and_noopener():
+    html = hubkit.card("t", "d", "/x.html")
+    assert 'target="_blank"' in html and 'rel="noopener"' in html
+
+
+def test_card_same_tab_has_no_target():
+    html = hubkit.card("t", "d", "/x.html", new_tab=False)
+    assert "target=" not in html and "rel=" not in html
+
+
 def test_section_with_no_cards_returns_empty():
     assert hubkit.section("Empty", []) == ""
 

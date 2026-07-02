@@ -187,7 +187,8 @@ def ventilation_section(prov):
     first-class hub item (image cards with lightbox, linking to the report)."""
     cards = [
         card(title, desc, VENT_TR, img=f"{VENT_EXPORTS}/{fn}",
-             meta="pre-CFD tendency · not adequacy (τ CFD-gated)", kind="ok")
+             meta="pre-CFD tendency · not adequacy (τ CFD-gated)", kind="ok",
+             new_tab=False)
         for fn, title, desc in VENT_FIGS
         if (ROOT / "outputs/paper_figures/exports" / fn).exists()
     ]
@@ -261,7 +262,8 @@ def _doc_card(url, name, desc, prov):
     src = ROOT / url.lstrip("/")
     back = breadcrumb([("← Project hub", "../index.html"), (src.stem, None)])
     render_doc_page(src, DOCS / f"{src.stem}.html", crumb=back, provenance=prov)
-    return card(name, desc, f"/outputs/_hub/docs/{src.stem}.html", meta=url, kind="doc")
+    return card(name, desc, f"/outputs/_hub/docs/{src.stem}.html", meta=url, kind="doc",
+                new_tab=False)
 
 
 def sites_section(prov):
@@ -292,7 +294,7 @@ def deliverables_section(prov):
                         provenance=prov, base="/docs/technical_report/")
         cards.append(card("Technical report", "Full report — fast HTML view, figures inline.",
                           "docs/technical_report.html", kind="ok",
-                          badge_label="Report"))
+                          badge_label="Report", new_tab=False))
     if tr_pdf.exists():
         mb = tr_pdf.stat().st_size // 1_000_000
         cards.append(card("Technical report — PDF",
