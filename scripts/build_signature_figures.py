@@ -2,8 +2,8 @@
 assemble a self-contained HTML review gallery.
 
 Outputs to outputs/cross_site/signature/figures_v2/ (v1 kept for comparison) and
-writes index.html — each figure paired with the decision it embodies and a
-keep/refine prompt, served locally for guided review.
+writes index.html — each figure paired with the decision it embodies, as a
+self-contained reviewable gallery.
 
     python scripts/build_signature_figures.py
 """
@@ -510,9 +510,8 @@ def write_gallery():
             cards.append(f"""
     <section class="card" id="{fid}">
       <h3>{title}</h3>
-      <img src="{name}" loading="lazy" onclick="zoom('{name}','{title}')">
+      <img src="{name}" alt="{title}" loading="lazy" onclick="zoom('{name}','{title}')">
       <p class="decision">{decision}</p>
-      <p class="prompt">Review: <b>✅ keep</b> &nbsp;|&nbsp; <b>✏️ refine</b></p>
     </section>""")
         if cards:
             toc.append(f'<a href="#{anchor}">{group}</a>')
@@ -537,7 +536,7 @@ def write_gallery():
  .card{{background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:16px}}
  .card h3{{margin:0 0 10px;font-size:15px}}
  .card img{{width:100%;height:auto;border:1px solid #eee;border-radius:6px;cursor:zoom-in}}
- .decision{{color:#444;font-size:13px}} .prompt{{color:#777;font-size:13px;border-top:1px dashed #ddd;padding-top:8px}}
+ .decision{{color:#444;font-size:13px}}
  html{{scroll-behavior:smooth}} :target{{scroll-margin-top:52px}}
  #lb{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;cursor:zoom-out;flex-direction:column;align-items:center;justify-content:center}}
  #lb img{{max-width:96vw;max-height:90vh}} #lb p{{color:#eee;margin:10px;font-size:15px}}
@@ -555,9 +554,9 @@ def write_gallery():
     <a href="/outputs/_hub/docs/roughness_decisions.html">roughness decisions</a></p>
  {''.join(blocks)}
 </main></div>
-<div id="lb" onclick="this.style.display='none'"><img id="lbimg"><p id="lbcap"></p></div>
+<div id="lb" onclick="this.style.display='none'"><img id="lbimg" alt=""><p id="lbcap"></p></div>
 <script>
- function zoom(src,cap){{lbimg.src=src;lbcap.textContent=cap;lb.style.display='flex'}}
+ function zoom(src,cap){{lbimg.src=src;lbimg.alt=cap||'';lbcap.textContent=cap;lb.style.display='flex'}}
  addEventListener('keydown',e=>{{if(e.key==='Escape')lb.style.display='none'}});
 </script>"""
     (OUT / "index.html").write_text(html)
