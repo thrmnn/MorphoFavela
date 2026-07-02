@@ -19,20 +19,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 CSS = """
-:root{--ink:#1a1d21;--mut:#5b6470;--line:#e3e7ec;--accent:#1a6fb5;--ok:#1a7f4b;
---warn:#b3261e;--amber:#9a5b00;--pend:#1f5fa8;--bg:#fbfcfd;--card:#fff;--lh:1.6}
+:root{--ink:#1a1d21;--mut:#5b6470;--line:#e3e7ec;--accent:#0f766e;--ok:#1a7f4b;
+--warn:#b3261e;--amber:#9a5b00;--pend:#1f5fa8;--bg:#fbfcfd;--card:#fff;--lh:1.6;
+--serif:"Source Serif 4","Iowan Old Style",Georgia,"Times New Roman",serif}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
 font:16px/var(--lh) -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
 .wrap{max-width:1040px;margin:0 auto;padding:20px 22px 80px}
 header.hd{border-bottom:2px solid var(--ink);padding-bottom:12px;margin-bottom:6px}
-header.hd h1{font-size:24px;margin:0 0 4px}
+header.hd h1{font-family:var(--serif);font-size:28px;margin:0 0 4px;letter-spacing:-.01em}
 .sub{color:var(--mut);font-size:13px}
 .crumb{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);
 margin:0 -22px 18px;padding:10px 22px;font-size:14px;font-weight:600}
 .crumb a{color:var(--accent);text-decoration:none}.crumb a:hover{text-decoration:underline}
 .crumb .sep{color:var(--mut);margin:0 8px;font-weight:400}.crumb .here{color:var(--mut)}
-h2{font-size:18px;margin:30px 0 12px;padding-bottom:5px;border-bottom:1px solid var(--line)}
+h2{font-family:var(--serif);font-size:19px;margin:30px 0 12px;padding-bottom:5px;border-bottom:1px solid var(--line)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
 .card{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;
 overflow:hidden;text-decoration:none;color:inherit;transition:.12s;box-shadow:0 1px 3px rgba(0,0,0,.05)}
@@ -67,9 +68,9 @@ border-radius:10px;padding:14px 18px}
 .doc pre code{background:none;color:inherit;padding:0}.doc blockquote{border-left:3px solid var(--line);
 margin:0;padding:2px 14px;color:var(--mut)}
 .doc{font-size:15.5px;color:#2a2d31}
-.doc h1{font-size:25px;line-height:1.2;margin:0 0 4px}
-.doc h2{margin:34px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--ink)}
-.doc h3{margin:22px 0 8px;color:var(--accent)}
+.doc h1{font-family:var(--serif);font-size:26px;line-height:1.2;margin:0 0 4px}
+.doc h2{font-family:var(--serif);margin:34px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--ink)}
+.doc h3{font-family:var(--serif);margin:22px 0 8px;color:var(--accent)}
 .doc>p:first-of-type{font-size:17px;color:#444;line-height:1.6}
 .doc img{max-width:100%;height:auto;display:block;margin:18px auto 4px;border:1px solid var(--line);
 border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.06)}
