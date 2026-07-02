@@ -380,13 +380,15 @@ GALLERY_GROUPS = [
          "detached formal blocks); flat types are fully party-walled, hillside types "
          "more stepped — a new configuration axis (council's top 'what's missing')."),
         ("fingerprint_heatmap.png", "Morphotype fingerprints",
-         "Type×character diverging heatmap (annotated z, dendrogram order, columns "
-         "grouped density|wind|terrain)."),
+         "Each morphotype carries a distinct multivariate signature — the diverging "
+         "z-score heatmap shows which density, wind and terrain characters separate "
+         "the six types (columns grouped by family, rows in dendrogram order)."),
         ("dendrogram.png", "Taxonomy dendrogram",
-         "Grey links (structure), leaf labels in the type palette, k=6 cut."),
+         "The six types emerge as well-separated clusters — the tree shows the merge "
+         "structure with the k=6 cut marked (leaf labels in the type palette)."),
         ("recurrence.png", "Cross-site recurrence",
-         "Single-hue Blues; the flatland-specific types (T1, T5) boxed red — the "
-         "validation as a figure."),
+         "The same morphotypes recur across favelas — share heatmap with the two "
+         "flatland-specific types (T1, T5) boxed; the cross-site validation as a figure."),
         ("type_site_fingerprint.png", "Morphotype × site fingerprint (P4/E2)",
          "Commonality-forward composition heatmap with full type names + a per-type "
          "count of how many favelas carry it (≥5%): the five favelas draw on one "
@@ -395,7 +397,9 @@ GALLERY_GROUPS = [
          "Per-site type centroids overlaid: same profile shape across sites = "
          "recurrence shown, not asserted."),
         ("maps_morphotypes.png", "Morphotype maps",
-         "Mode-filtered + dissolved to regions; Okabe–Ito, NULL=grey, scale bars."),
+         "Where each type sits on the ground — the fabric organises into coherent "
+         "regions, not noise (per-cell types mode-filtered and dissolved; Okabe–Ito "
+         "palette, unbuilt = grey, scale bars)."),
         ("stability.png", "k=6 stability",
          "Bootstrap ARI 0.90 over 20 refits — k=6 is robust."),
         ("k_selection_rigor.png", "k-selection rigor (honest)",
