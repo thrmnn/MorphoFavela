@@ -14,6 +14,8 @@ Serve the repo root and open / (lands on the hub via index.html redirect):
 from __future__ import annotations
 
 import glob
+import html
+import re
 import sys
 from pathlib import Path
 
@@ -156,6 +158,16 @@ def ventilation_section(prov):
     return section("Geometric ventilation tendencies (§5.6)", cards, anchor="ventilation")
 
 
+def _render_latest_item(n, u, d):
+    """One <li> for the Latest changelog: a trailing '— NEW' becomes a pill, and
+    both the label and gloss are HTML-escaped (no raw & reaches the page)."""
+    m = re.search(r"\s*[—-]\s*NEW\s*$", n)
+    label = n[:m.start()] if m else n
+    pill = (badge("info", "NEW") + " ") if m else ""
+    return (f'<li>{pill}<a href="{u}">{html.escape(label)}</a> '
+            f'<span class="gloss">— {html.escape(d)}</span></li>')
+
+
 def build_callout(prov):
     """Top panel: newest results (direct links) + the live work queue, so new
     figures are never hard to find."""
@@ -198,18 +210,14 @@ def build_callout(prov):
         ("Morphology overview (start here)", f"{hub}/docs/morphology_overview.html",
          "goal-first walkthrough, all figures + captions"),
     ]
-    items = "".join(
-        f'<li><a href="{u}" style="color:#0a5;font-weight:600;'
-        f'text-decoration:none">{n}</a> <span style="color:#888">— {d}</span></li>'
-        for n, u, d in latest)
-    return (f'<section><h2 id="latest">🆕 Latest &amp; work queue</h2>'
-            f'<div style="background:#fff;border:1px solid #e3e7ec;border-left:5px '
-            f'solid #1a7f4b;border-radius:10px;padding:14px 18px">'
-            f'<p style="margin:0 0 6px;font-weight:600">Newest results — click straight in:</p>'
-            f'<ul style="margin:0 0 10px;padding-left:18px;line-height:1.7">{items}</ul>'
-            f'<p style="margin:0"><a href="/outputs/_hub/docs/work_queue.html" '
-            f'style="font-weight:700">📋 Full work queue →</a> &nbsp; what is in '
-            f'progress, queued, and gated.</p>'
+    items = "".join(_render_latest_item(*t) for t in latest)
+    return (f'<section><h2 id="latest">Latest &amp; work queue</h2>'
+            f'<div class="callout">'
+            f'<p class="lead">Newest results — click straight in:</p>'
+            f'<ul>{items}</ul>'
+            f'<p class="more"><a href="/outputs/_hub/docs/work_queue.html">'
+            f'📋 Full work queue →</a> '
+            f'<span class="gloss">what is in progress, queued, and gated.</span></p>'
             f'</div></section>')
 
 

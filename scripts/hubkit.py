@@ -47,7 +47,17 @@ text-transform:uppercase;letter-spacing:.03em;border:1px solid transparent}
 .pill.amber{background:#fbf1e0;color:var(--amber);border-color:#ecd9b3}
 .pill.info{background:#e8f1fb;color:var(--pend);border-color:#c7ddf5}
 .pill.doc{background:#eef0f2;color:var(--mut);border-color:#dde1e5}
-footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#9aa;font-size:12px}
+footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--mut);font-size:12px}
+.callout{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--ok);
+border-radius:10px;padding:14px 18px}
+.callout .lead{margin:0 0 6px;font-weight:600}
+.callout ul{margin:0 0 10px;padding-left:18px;line-height:1.7}
+.callout li{margin:2px 0}
+.callout li a{color:var(--ok);font-weight:600;text-decoration:none}
+.callout li a:hover{text-decoration:underline}
+.callout .gloss{color:var(--mut)}
+.callout .more{margin:0}
+.callout .more a{font-weight:700;color:var(--accent);text-decoration:none}
 .doc{max-width:820px}.doc h1{font-size:24px}.doc h2{font-size:19px}.doc h3{font-size:16px}
 .doc table{border-collapse:collapse;margin:14px 0;font-size:14px;width:100%}
 .doc th,.doc td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
