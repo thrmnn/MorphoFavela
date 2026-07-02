@@ -54,8 +54,6 @@ DOC_SECTIONS = {
         ("/outputs/cross_site/signature/figures_v2/index.html",
          "Signature & roughness figures",
          "The full grouped gallery — click any figure to enlarge.", "live"),
-        ("/outputs/comparative/vidigal_vs_mingze/report/index.html",
-         "Mingze solar comparison", "Vidigal Ladybug-vs-raycast report.", "live"),
     ],
     "Plans & decisions": [
         ("/docs/autonomous_loop_plan.md", "Autonomous-loop plan + top blockers",
@@ -162,11 +160,19 @@ def facade_solar_section(prov):
     """Façade-level solar (independent Ladybug run) + our street cross-check."""
     cards = [
         card(title, desc, MZ_DIR + href, img=MZ_DIR + href,
-             meta="façade-level solar · WHO 2 h/day", kind="info",
+             meta="5-favela façade · WHO 2 h/day", kind="info",
              badge_label="Partner")
         for href, title, desc in FACADE_FIGS
         if (ROOT / (MZ_DIR + href).lstrip("/")).exists()
     ]
+    # the detailed single-site accuracy report belongs with the Mingze work, scoped
+    vdg = "/outputs/comparative/vidigal_vs_mingze/report/index.html"
+    if (ROOT / vdg.lstrip("/")).exists():
+        cards.append(card("Vidigal accuracy report (detailed)",
+                          "Vidigal only — our raycast vs Mingze's Ladybug: per-observer "
+                          "agreement + four ranked disagreement hypotheses.",
+                          vdg, meta="Vidigal only · Ladybug ↔ raycast",
+                          kind="info", badge_label="Partner"))
     return section("Solar access — façade & street (Mingze / Ladybug + our cross-check)",
                    cards, anchor="facade-solar")
 
