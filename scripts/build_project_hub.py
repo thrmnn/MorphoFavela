@@ -13,7 +13,6 @@ Serve the repo root and open / (lands on the hub via index.html redirect):
 
 from __future__ import annotations
 
-import glob
 import html
 import os
 import re
@@ -269,10 +268,18 @@ def build_callout(prov):
           'queued, and gated.</span></p>'
           if (ROOT / "docs/work_queue.md").exists() else "")
     heading = "Latest" if wq else "Latest results"
+    glossary = (
+        '<details class="glossary"><summary>Glossary</summary>'
+        '<span class="gloss">'
+        'WHO-2h ≥ 2 h direct sun/day floor · SVF sky-view factor · '
+        'λf frontal-area ratio · λp plan-area ratio · σH building-height s.d. · '
+        'z0/zd aerodynamic roughness length / displacement height · '
+        'τ wall shear stress (CFD-gated) · LOSO leave-one-site-out'
+        '</span></details>')
     return (f'<section><h2 id="latest">{heading}</h2>'
             f'<div class="callout">'
             f'<p class="lead">Newest results — click straight in:</p>'
-            f'<ul>{items}</ul>{wq}'
+            f'<ul>{items}</ul>{wq}{glossary}'
             f'</div></section>')
 
 
@@ -369,9 +376,9 @@ def main():
     sidebar = toc_sections([(a, lbl) for a, lbl, _ in sections])
 
     n_sites = sum((DASH / s / "index.html").exists() for s in SITE_NAMES)
-    n_figs = len(glob.glob(str(ROOT / "outputs/cross_site/signature/figures_v2/*.png")))
-    sub = (f'{badge("ok", f"{n_sites} site dashboards")} '
-           f'{badge("info", f"{n_figs} figures")}')
+    # a finding-bearing stat, not a raw glob count of a gitignored dir
+    sub = (f'{badge("ok", f"{n_sites} campaign favelas")} '
+           f'{badge("info", "morphotype → WHO-2h winter-sun failure 14–73 %")}')
     (OUT / "index.html").write_text(_relativize(
         page("MorphoFavela — project hub", sub, body,
              provenance=prov, sidebar=sidebar)))

@@ -60,6 +60,8 @@ border-radius:10px;padding:14px 18px}
 .callout .gloss{color:var(--mut)}
 .callout .more{margin:0}
 .callout .more a{font-weight:700;color:var(--accent);text-decoration:none}
+.callout .glossary{margin-top:10px;font-size:12.5px}
+.callout .glossary summary{cursor:pointer;color:var(--mut);font-weight:600}
 .doc{max-width:820px}.doc h1{font-size:24px}.doc h2{font-size:19px}.doc h3{font-size:16px}
 .doc table{border-collapse:collapse;margin:14px 0;font-size:14px;width:100%}
 .doc th,.doc td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
