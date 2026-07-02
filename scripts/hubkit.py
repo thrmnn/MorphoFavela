@@ -256,6 +256,7 @@ def md_to_html(md: str, base: str = "") -> str:
 
     lines = md.splitlines()
     out, i = [], 0
+    seen = {}  # slug -> count, so repeated headings get -2/-3 (unique ids)
     while i < len(lines):
         ln = lines[i]
         if ln.startswith("```"):
@@ -269,6 +270,10 @@ def md_to_html(md: str, base: str = "") -> str:
             n = len(ln) - len(ln.lstrip("#"))
             txt = ln[n:].strip()
             hid = _slug(txt)
+            k = seen.get(hid, 0)
+            seen[hid] = k + 1
+            if k:
+                hid = f"{hid}-{k + 1}"
             out.append(f'<h{n} id="{hid}">{inl(txt)}</h{n}>')
         elif _UL.match(ln):
             buf = []
@@ -296,6 +301,13 @@ def md_to_html(md: str, base: str = "") -> str:
             th = "".join(f"<th>{inl(c)}</th>" for c in head)
             trs = "".join("<tr>" + "".join(f"<td>{inl(c)}</td>" for c in r) + "</tr>" for r in body)
             out.append(f"<table><thead><tr>{th}</tr></thead><tbody>{trs}</tbody></table>")
+            continue
+        elif ln.lstrip().startswith(">"):
+            buf = []
+            while i < len(lines) and lines[i].lstrip().startswith(">"):
+                buf.append(re.sub(r"^\s*>\s?", "", lines[i]))
+                i += 1
+            out.append("<blockquote>" + inl(" ".join(buf)) + "</blockquote>")
             continue
         elif re.match(r"^\s*---+\s*$", ln):
             out.append("<hr>")

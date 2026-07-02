@@ -83,6 +83,16 @@ def test_js_attr_escapes_backslash_and_quote():
     assert hubkit._js_attr("a\\b") == "a\\\\b"
 
 
+def test_md_repeated_headings_get_unique_ids():
+    out = hubkit.md_to_html("## Notes\n\ntext\n\n## Notes\n\nmore\n\n## Notes\n")
+    assert 'id="notes"' in out and 'id="notes-2"' in out and 'id="notes-3"' in out
+
+
+def test_md_blockquote_is_emitted():
+    out = hubkit.md_to_html("> quoted line\n> continued")
+    assert "<blockquote>" in out and "quoted line continued" in out
+
+
 def test_lightbox_is_an_accessible_dialog():
     out = hubkit.page("T", "sub", "<p>x</p>")
     assert "role=dialog" in out and "aria-modal=true" in out
