@@ -1,5 +1,18 @@
 # Dashboard improvement plan — council audit + parallelizable execution
 
+> **Status 2026-07-02 — EXECUTED.** 21 of 23 backlog items shipped to `main`
+> (all P0 + all P1 + L1/L2/L3/L5/L6), each committed with tests. A 5-lens
+> re-review sweep validated the wave (verdict: no blocking critical); its residual
+> findings — gallery `file://` links, gallery lightbox a11y, `<html lang>`, a
+> masthead number slip — were then closed. 36 dashboard tests green; hub live.
+> **Remaining (both "L", deferred):** L4 route the gallery skin through hubkit
+> tokens, L7 downscaled card thumbnails / intrinsic image dimensions.
+> **Accepted as-is (design calls, not defects):** the "Latest" changelog callout
+> sits above the Headline hero (a thin band, hero is immediately below and before
+> any partner content); the per-site dashboards still load Google Fonts (that
+> builder's identity — hub itself is offline-safe).
+
+
 *Source: 6-lens design + research-management council (workflow `dashboard-council-audit`,
 2026-07-02). Reviewers: information architecture, visual/graphic design,
 data-viz/scicomm, UX/interaction, front-end/accessibility, research-management
