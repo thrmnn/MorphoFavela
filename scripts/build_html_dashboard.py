@@ -2039,6 +2039,7 @@ __INLINE_CSS__
   <p>
     <a href="#top" class="back-to-top">↑ back to top</a> ·
     <a href="../index.html">← all sites</a> ·
+    <a href="../../../_hub/index.html">⌂ project hub</a> ·
     MorphoFavela · <a href="https://github.com/thrmnn/MorphoFavela">repo</a>
   </p>
   <p class="muted" style="margin-top:0.6rem; font-size:0.78rem;">
@@ -2129,7 +2130,8 @@ LANDING_HTML = r"""<!DOCTYPE html>
   <p class="measure">Earlier site means averaged segment values without weighting them by physical length. Rocinha's narrow canyons were over-counted; a 1 m alley stub counted the same as a 60 m boulevard. The corrected length-weighted mean moves Rocinha's headline SVF by +0.088 — large enough to invert the Rocinha vs Vidigal comparison.</p>
 </section>
 <footer>
-  <p>MorphoFavela · <a href="https://github.com/thrmnn/MorphoFavela">repo</a></p>
+  <p><a href="../../_hub/index.html">⌂ project hub</a> ·
+     MorphoFavela · <a href="https://github.com/thrmnn/MorphoFavela">repo</a></p>
 </footer>
 </body>
 </html>
