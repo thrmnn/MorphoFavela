@@ -63,6 +63,14 @@ def test_card_same_tab_has_no_target():
     assert "target=" not in html and "rel=" not in html
 
 
+def test_card_thumb_displays_thumb_but_lightboxes_full_res():
+    html = hubkit.card("t", "d", "/x.html", img="/full.png", thumb="/t.png",
+                       width=880, height=500)
+    assert 'src="/t.png"' in html          # display uses the thumbnail
+    assert "zoom('/full.png'" in html       # lightbox opens the full-res image
+    assert 'width="880" height="500"' in html  # intrinsic dims → no layout shift
+
+
 def test_section_with_no_cards_returns_empty():
     assert hubkit.section("Empty", []) == ""
 

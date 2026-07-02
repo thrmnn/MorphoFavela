@@ -121,6 +121,51 @@ FACADE_FIGS = [
 ]
 
 
+THUMB_W = 880  # display width cap for landing-page card thumbnails
+
+
+def _png_size(path):
+    """(width, height) from a PNG IHDR chunk — stdlib only, no Pillow."""
+    import struct
+    with open(path, "rb") as f:
+        head = f.read(24)
+    if head[:8] == b"\x89PNG\r\n\x1a\n" and head[12:16] == b"IHDR":
+        return struct.unpack(">II", head[16:24])
+    return None
+
+
+def _make_thumb(src: Path, img_url: str):
+    """Write an ≤THUMB_W-wide thumbnail into outputs/_hub/thumbs/ and return its
+    hub URL. Requires Pillow; returns None if unavailable so the hub degrades to
+    full-res + intrinsic dimensions with no hard dependency."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    thumbs = OUT / "thumbs"
+    thumbs.mkdir(parents=True, exist_ok=True)
+    name = img_url.lstrip("/").replace("/", "__")
+    out = thumbs / name
+    if not out.exists() or out.stat().st_mtime < src.stat().st_mtime:
+        with Image.open(src) as im:
+            im.thumbnail((THUMB_W, THUMB_W * 20))  # cap width, preserve aspect
+            im.save(out)
+    return f"/outputs/_hub/thumbs/{name}"
+
+
+def _img_attrs(img_url: str) -> dict:
+    """{thumb,width,height} for a hub figure: intrinsic dimensions (stops layout
+    shift) plus a downscaled thumbnail when the source is wide and Pillow exists."""
+    src = ROOT / img_url.lstrip("/")
+    size = _png_size(src) if src.exists() else None
+    if not size:
+        return {}
+    w, h = size
+    if w > THUMB_W and (thumb := _make_thumb(src, img_url)):
+        return {"thumb": thumb, "width": THUMB_W, "height": round(h * THUMB_W / w)}
+    return {"width": w, "height": h}
+
+
 SIG_DIR = "/outputs/cross_site/signature/figures_v2"
 SIG_GAL = f"{SIG_DIR}/index.html"
 # The project's own headline result — promoted to a first-class hero section so a
@@ -148,7 +193,7 @@ def headline_section(prov):
     cards = [
         card(title, desc, f"{SIG_GAL}#{anchor}", img=f"{SIG_DIR}/{fn}",
              meta="headline result · WHO 2 h/day winter floor", kind="ok",
-             badge_label="Headline")
+             badge_label="Headline", **_img_attrs(f"{SIG_DIR}/{fn}"))
         for fn, anchor, title, desc in HEADLINE_FIGS
         if (ROOT / f"{SIG_DIR}/{fn}".lstrip("/")).exists()
     ]
@@ -161,7 +206,7 @@ def facade_solar_section(prov):
     cards = [
         card(title, desc, MZ_DIR + href, img=MZ_DIR + href,
              meta="5-favela façade · WHO 2 h/day", kind="info",
-             badge_label="Partner")
+             badge_label="Partner", **_img_attrs(MZ_DIR + href))
         for href, title, desc in FACADE_FIGS
         if (ROOT / (MZ_DIR + href).lstrip("/")).exists()
     ]
@@ -186,7 +231,8 @@ def maup_section(prov):
              "Flow-regime shares, λf/σH medians, and per-site skimming vs cell "
              "size. Monotonic drift; cross-site ordering preserved (Spearman "
              "ρ = 0.90). Absolute shares must be quoted at the 10 m lock.",
-             fig, img=fig, meta="TR §10.9 · dissolved λf", kind="info")
+             fig, img=fig, meta="TR §10.9 · dissolved λf", kind="info",
+             **_img_attrs(fig))
     return section("Grid-resolution sensitivity (MAUP)", [c], anchor="maup")
 
 
@@ -196,7 +242,7 @@ def ventilation_section(prov):
     cards = [
         card(title, desc, VENT_TR, img=f"{VENT_EXPORTS}/{fn}",
              meta="pre-CFD tendency · not adequacy (τ CFD-gated)", kind="ok",
-             new_tab=False)
+             new_tab=False, **_img_attrs(f"{VENT_EXPORTS}/{fn}"))
         for fn, title, desc in VENT_FIGS
         if (ROOT / "outputs/paper_figures/exports" / fn).exists()
     ]

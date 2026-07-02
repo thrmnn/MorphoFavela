@@ -134,16 +134,19 @@ def _js_attr(s: str) -> str:
 
 
 def card(title, desc, href, *, meta="", img=None, kind="doc", alt=None,
-         badge_label=None, new_tab=True) -> str:
+         badge_label=None, new_tab=True, thumb=None, width=None, height=None) -> str:
     """A link card. `kind` selects the pill colour; the pill only renders when
     `badge_label` is given (a real status like 'Headline'/'Partner'/'Campaign') —
     it never echoes the css class, so no meaningless OK/DOC/INFO pills appear.
     `new_tab=True` opens in a new tab with rel=noopener; set False for pages that
-    carry a back-to-hub breadcrumb so it navigates in place."""
+    carry a back-to-hub breadcrumb so it navigates in place. `thumb` sets the
+    display src while the lightbox still opens the full-res `img`; `width`/`height`
+    give the browser an aspect ratio to reserve (no layout shift)."""
     if img:
         a = _html.escape(alt if alt is not None else title, quote=True)
         cap = _js_attr(alt if alt is not None else title)
-        imgtag = (f'<img src="{img}" alt="{a}" loading="lazy" '
+        dim = f' width="{width}" height="{height}"' if width and height else ""
+        imgtag = (f'<img src="{thumb or img}"{dim} alt="{a}" loading="lazy" '
                   f'onclick="event.preventDefault();zoom(\'{img}\',\'{cap}\')">')
     else:
         imgtag = ""
