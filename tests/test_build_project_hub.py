@@ -5,6 +5,7 @@ Locks the 'Latest' callout guarantees the council flagged: HTML-escaped text
 and no hand-inlined style= (all styling flows through the hubkit token system).
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -58,3 +59,37 @@ def test_headline_figs_reference_real_gallery_anchors():
     for fn, anchor, _title, _desc in bph.HEADLINE_FIGS:
         if (bph.ROOT / f"outputs/cross_site/signature/figures_v2/{fn}").exists():
             assert f'id="{anchor}"' in text, f"{anchor} missing from gallery"
+
+
+# ── golden: regenerate the whole hub and assert page-level invariants (M11) ──
+def _generated_hub():
+    bph.main()
+    return (bph.OUT / "index.html").read_text()
+
+
+def test_generated_hub_has_no_raw_ampersand():
+    assert " & " not in _generated_hub()
+
+
+def test_generated_hub_all_images_have_alt():
+    for img in re.findall(r"<img[^>]*>", _generated_hub()):
+        assert "alt=" in img
+
+
+def test_generated_hub_sidebar_labels_are_human_not_slugs():
+    html = _generated_hub()
+    labels = re.findall(r'<a class="t2" href="#[a-z-]+">([^<]+)</a>', html)
+    assert labels
+    for slug in ("Maup", "Facade-solar", "Figure", "Headline"):
+        assert slug not in labels, f"machine slug {slug!r} leaked into the sidebar"
+
+
+def test_generated_hub_every_sidebar_anchor_resolves():
+    html = _generated_hub()
+    for anchor in re.findall(r'<a class="t2" href="#([a-z-]+)">', html):
+        assert f'id="{anchor}"' in html, f"sidebar #{anchor} has no section"
+
+
+def test_generated_hub_headline_precedes_facade_solar():
+    html = _generated_hub()
+    assert 0 < html.find('id="headline"') < html.find('id="facade-solar"')

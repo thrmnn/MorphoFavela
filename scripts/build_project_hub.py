@@ -299,9 +299,19 @@ def main():
     DOCS.mkdir(parents=True, exist_ok=True)
     prov = git_provenance(ROOT, "scripts/build_project_hub.py")
 
-    blocks = [build_callout(prov), headline_section(prov), facade_solar_section(prov),
-              ventilation_section(prov), maup_section(prov), sites_section(prov)]
-    titles = ["Latest", "Headline", "Facade-solar", "Ventilation", "Maup", "Sites"]
+    # Single ordered source of truth: (anchor, sidebar_label, html). The anchor
+    # matches the id the section builder emits; the label is a human heading, so the
+    # sidebar never shows a machine slug. Project-owned contribution (headline, TR)
+    # precedes the partner façade cross-check.
+    sections = [
+        ("latest", "Latest & work queue", build_callout(prov)),
+        ("headline", "Headline result", headline_section(prov)),
+        ("deliverables", "Deliverables", deliverables_section(prov)),
+        ("ventilation", "Ventilation tendencies (§5.6)", ventilation_section(prov)),
+        ("maup", "Grid sensitivity (MAUP)", maup_section(prov)),
+        ("facade-solar", "Solar access — façade & street", facade_solar_section(prov)),
+        ("sites", "Sites", sites_section(prov)),
+    ]
     for title, items in DOC_SECTIONS.items():
         cards = []
         for url, name, desc, kind in items:
@@ -309,20 +319,21 @@ def main():
                 continue
             cards.append(_doc_card(url, name, desc, prov) if kind == "doc"
                          else card(name, desc, url, meta=url, kind="ok"))
-        blocks.append(section(title, cards, anchor=title.split()[0].lower()))
-        titles.append(title)
-    blocks.insert(2, deliverables_section(prov))
-    titles.insert(2, "Deliverables")
+        anchor = title.split()[0].lower()
+        sections.append((anchor, title, section(title, cards, anchor=anchor)))
+
+    sections = [(a, lbl, h) for a, lbl, h in sections if h]  # degrade-by-existence
+    body = "".join(h for _, _, h in sections)
+    sidebar = toc_sections([(a, lbl) for a, lbl, _ in sections])
 
     n_sites = sum((DASH / s / "index.html").exists() for s in SITE_NAMES)
     n_figs = len(glob.glob(str(ROOT / "outputs/cross_site/signature/figures_v2/*.png")))
     sub = (f'{badge("ok", f"{n_sites} site dashboards")} '
            f'{badge("info", f"{n_figs} figures")}')
-    sidebar = toc_sections([(t.split()[0].lower(), t) for t in titles])
     (OUT / "index.html").write_text(
-        page("MorphoFavela — project hub", sub, "".join(blocks),
+        page("MorphoFavela — project hub", sub, body,
              provenance=prov, sidebar=sidebar))
-    print(f"hub written: {len(titles)} sections, {n_sites} site dashboards")
+    print(f"hub written: {len(sections)} sections, {n_sites} site dashboards")
 
 
 if __name__ == "__main__":
