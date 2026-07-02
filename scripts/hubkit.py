@@ -79,7 +79,13 @@ color:var(--mut);margin:0 auto 18px;max-width:80%;font-style:italic}
 .doc tr:nth-child(even) td{background:#fafbfc}
 .doc strong{color:var(--ink)}
 #lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;cursor:zoom-out;
-align-items:center;justify-content:center}#lb img{max-width:96vw;max-height:94vh}
+flex-direction:column;align-items:center;justify-content:center}
+#lb:not([hidden]){display:flex}
+#lb img{max-width:96vw;max-height:88vh}
+#lb #lbcap{color:#eee;margin:10px 16px;font-size:14px;max-width:80vw;text-align:center}
+#lb #lbx{position:absolute;top:12px;right:18px;background:none;border:0;color:#fff;
+font-size:34px;line-height:1;cursor:pointer;padding:2px 12px}
+#lb #lbx:hover,#lb #lbx:focus{color:#bcd;outline:2px solid #bcd}
 .layout{display:flex;align-items:flex-start;max-width:1320px;margin:0 auto}
 .layout aside{position:sticky;top:0;flex:0 0 240px;max-height:100vh;overflow:auto;
 padding:22px 10px 22px 22px}
@@ -96,9 +102,21 @@ flex-basis:auto;padding:14px 22px 0}.toc{border-left:none;border-bottom:1px soli
 padding:0 0 10px}.toc a{display:inline-block;margin-right:14px}}
 """
 
-_LB = ("<div id=lb onclick=\"this.style.display='none'\"><img id=lbi alt=\"\"></div>"
-       "<script>function zoom(s,c){lbi.src=s;lbi.alt=c||'';lb.style.display='flex'}"
-       "addEventListener('keydown',e=>{if(e.key=='Escape')lb.style.display='none'})</script>")
+_LB = (
+    "<div id=lb role=dialog aria-modal=true aria-label=\"Enlarged figure\" hidden>"
+    "<button id=lbx aria-label=\"Close (Esc)\">&times;</button>"
+    "<img id=lbi alt=\"\"><p id=lbcap></p></div>"
+    "<script>"
+    "let _lbprev=null;"
+    "function zoom(s,c){_lbprev=document.activeElement;lbi.src=s;lbi.alt=c||'';"
+    "lbcap.textContent=c||'';lb.hidden=false;lbx.focus()}"
+    "function _lbclose(){lb.hidden=true;if(_lbprev&&_lbprev.focus)_lbprev.focus()}"
+    "lb.addEventListener('click',_lbclose);"
+    "lbx.addEventListener('click',e=>{e.stopPropagation();_lbclose()});"
+    "addEventListener('keydown',e=>{if(lb.hidden)return;"
+    "if(e.key=='Escape')_lbclose();"
+    "else if(e.key=='Tab'){e.preventDefault();lbx.focus()}});"
+    "</script>")
 
 
 def badge(kind: str, label: str) -> str:

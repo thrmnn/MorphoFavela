@@ -81,3 +81,12 @@ def test_page_emits_lang_charset_viewport():
 def test_js_attr_escapes_backslash_and_quote():
     assert hubkit._js_attr("a'b") == "a\\&#x27;b"
     assert hubkit._js_attr("a\\b") == "a\\\\b"
+
+
+def test_lightbox_is_an_accessible_dialog():
+    out = hubkit.page("T", "sub", "<p>x</p>")
+    assert "role=dialog" in out and "aria-modal=true" in out
+    assert 'aria-label="Enlarged figure"' in out
+    assert 'id=lbx aria-label="Close (Esc)"' in out  # visible close control
+    assert "<p id=lbcap>" in out  # caption node
+    assert "_lbprev" in out  # focus is remembered/restored
