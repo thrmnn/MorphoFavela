@@ -93,3 +93,9 @@ def test_generated_hub_every_sidebar_anchor_resolves():
 def test_generated_hub_headline_precedes_facade_solar():
     html = _generated_hub()
     assert 0 < html.find('id="headline"') < html.find('id="facade-solar"')
+
+
+def test_generated_hub_has_no_enum_echo_pill():
+    html = _generated_hub()
+    for kind in ("ok", "info", "doc", "warn", "amber"):
+        assert f'<span class="pill {kind}">{kind}</span>' not in html

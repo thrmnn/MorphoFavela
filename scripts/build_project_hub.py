@@ -147,7 +147,8 @@ def headline_section(prov):
     captioned place in the signature gallery."""
     cards = [
         card(title, desc, f"{SIG_GAL}#{anchor}", img=f"{SIG_DIR}/{fn}",
-             meta="headline result · WHO 2 h/day winter floor", kind="ok")
+             meta="headline result · WHO 2 h/day winter floor", kind="ok",
+             badge_label="Headline")
         for fn, anchor, title, desc in HEADLINE_FIGS
         if (ROOT / f"{SIG_DIR}/{fn}".lstrip("/")).exists()
     ]
@@ -159,7 +160,8 @@ def facade_solar_section(prov):
     """Façade-level solar (independent Ladybug run) + our street cross-check."""
     cards = [
         card(title, desc, MZ_DIR + href, img=MZ_DIR + href,
-             meta="façade-level solar · WHO 2 h/day", kind="ok")
+             meta="façade-level solar · WHO 2 h/day", kind="info",
+             badge_label="Partner")
         for href, title, desc in FACADE_FIGS
         if (ROOT / (MZ_DIR + href).lstrip("/")).exists()
     ]
@@ -267,9 +269,12 @@ def sites_section(prov):
     for s in CAMPAIGN + [s for s in SITE_NAMES if s not in CAMPAIGN]:
         idx = DASH / s / "index.html"
         if idx.exists():
-            tag = "campaign site" if s in CAMPAIGN else "calibration site"
+            camp = s in CAMPAIGN
+            tag = "campaign site" if camp else "calibration site"
             cards.append(card(SITE_NAMES[s], f"Interactive per-favela dashboard — {tag}.",
-                              "/" + str(idx.relative_to(ROOT)), kind="ok"))
+                              "/" + str(idx.relative_to(ROOT)),
+                              kind="ok" if camp else "info",
+                              badge_label="Campaign" if camp else "Calibration"))
     if (DASH / "index.html").exists():
         cards.append(card("All sites — interactive index",
                           "Combined dashboard index for every favela.",
@@ -286,12 +291,14 @@ def deliverables_section(prov):
         render_doc_page(tr_md, DOCS / "technical_report.html", crumb=back,
                         provenance=prov, base="/docs/technical_report/")
         cards.append(card("Technical report", "Full report — fast HTML view, figures inline.",
-                          "docs/technical_report.html", kind="ok"))
+                          "docs/technical_report.html", kind="ok",
+                          badge_label="Report"))
     if tr_pdf.exists():
         mb = tr_pdf.stat().st_size // 1_000_000
-        cards.append(card(f"Technical report — PDF ({mb} MB)",
+        cards.append(card("Technical report — PDF",
                           "Canonical typeset PDF; large file, opens in a new tab.",
-                          "/docs/technical_report/technical_report.pdf", kind="info"))
+                          "/docs/technical_report/technical_report.pdf", kind="info",
+                          badge_label=f"PDF · {mb} MB"))
     return section("Deliverables", cards, anchor="deliverables")
 
 

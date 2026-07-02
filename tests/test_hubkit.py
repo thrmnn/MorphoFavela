@@ -41,6 +41,18 @@ def test_card_without_image_emits_no_img_tag():
     assert "<img" not in hubkit.card("t", "d", "/x.html")
 
 
+def test_card_without_badge_label_emits_no_pill():
+    # the enum-echo badge(kind, kind) is gone: a card with no explicit status
+    # carries no pill at all
+    assert "pill" not in hubkit.card("t", "d", "/x.html", kind="ok")
+
+
+def test_card_badge_label_renders_status_not_kind():
+    html = hubkit.card("t", "d", "/x.html", kind="info", badge_label="Partner")
+    assert '<span class="pill info">Partner</span>' in html
+    assert ">info</span>" not in html  # never echoes the css class as the label
+
+
 def test_section_with_no_cards_returns_empty():
     assert hubkit.section("Empty", []) == ""
 

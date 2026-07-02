@@ -111,7 +111,11 @@ def _js_attr(s: str) -> str:
     return _html.escape(s.replace("\\", "\\\\").replace("'", "\\'"), quote=True)
 
 
-def card(title, desc, href, *, meta="", img=None, kind="doc", alt=None) -> str:
+def card(title, desc, href, *, meta="", img=None, kind="doc", alt=None,
+         badge_label=None) -> str:
+    """A link card. `kind` selects the pill colour; the pill only renders when
+    `badge_label` is given (a real status like 'Headline'/'Partner'/'Campaign') —
+    it never echoes the css class, so no meaningless OK/DOC/INFO pills appear."""
     if img:
         a = _html.escape(alt if alt is not None else title, quote=True)
         cap = _js_attr(alt if alt is not None else title)
@@ -119,9 +123,10 @@ def card(title, desc, href, *, meta="", img=None, kind="doc", alt=None) -> str:
                   f'onclick="event.preventDefault();zoom(\'{img}\',\'{cap}\')">')
     else:
         imgtag = ""
+    pill = badge(kind, badge_label) if badge_label else ""
     metatag = f'<br><code>{_html.escape(meta)}</code>' if meta else ""
     return (f'<a class="card" href="{href}" target="_blank">{imgtag}'
-            f'<div class="cap">{badge(kind, kind)}<h3>{_html.escape(title)}</h3>'
+            f'<div class="cap">{pill}<h3>{_html.escape(title)}</h3>'
             f'<p>{_html.escape(desc)}{metatag}</p></div></a>')
 
 
