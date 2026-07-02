@@ -535,18 +535,20 @@ def write_gallery():
     doc = f"""<!doctype html><html lang=en><meta charset=utf-8>
 <title>Morpho-signature figures — review</title>
 <style>
- body{{font:15px/1.5 system-ui,sans-serif;margin:0;background:#fafafa;color:#222}}
- .top{{position:sticky;top:0;background:#fffd;backdrop-filter:blur(6px);padding:10px 24px;border-bottom:1px solid #e5e5e5;font-weight:600;font-size:14px;z-index:30}}
- .top a{{color:#1a6fb5;text-decoration:none}}
+ :root{{--ink:#1a1d21;--mut:#5b6470;--line:#e3e7ec;--accent:#0f766e;--bg:#fbfcfd;--card:#fff;
+ --serif:"Source Serif 4","Iowan Old Style",Georgia,"Times New Roman",serif}}
+ body{{font:15px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:var(--bg);color:var(--ink)}}
+ .top{{position:sticky;top:0;background:#fffd;backdrop-filter:blur(6px);padding:10px 24px;border-bottom:1px solid var(--line);font-weight:600;font-size:14px;z-index:30}}
+ .top a{{color:var(--accent);text-decoration:none}}
  .layout{{display:flex;align-items:flex-start;max-width:1400px;margin:0 auto}}
  .layout aside{{position:sticky;top:42px;flex:0 0 220px;max-height:calc(100vh - 42px);overflow:auto;padding:20px 8px 20px 24px}}
- .toc{{font-size:13px;border-left:2px solid #e5e5e5;padding-left:12px}}
- .toc-h{{font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;font-size:11px;margin-bottom:8px}}
- .toc a{{display:block;color:#666;text-decoration:none;padding:4px 0}} .toc a:hover{{color:#1a6fb5}}
+ .toc{{font-size:13px;border-left:2px solid var(--line);padding-left:12px}}
+ .toc-h{{font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;font-size:11px;margin-bottom:8px}}
+ .toc a{{display:block;color:var(--mut);text-decoration:none;padding:4px 0}} .toc a:hover{{color:var(--accent)}}
  main{{flex:1 1 auto;min-width:0;padding:18px 24px 60px}}
- h1{{font-size:20px;margin:8px 0}} main>h2{{font-size:16px;border-bottom:1px solid #e5e5e5;padding-bottom:5px;margin:26px 0 12px}}
+ h1{{font-family:var(--serif);font-size:24px;margin:8px 0}} main>h2{{font-family:var(--serif);font-size:17px;border-bottom:1px solid var(--line);padding-bottom:5px;margin:26px 0 12px}}
  .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:18px}}
- .card{{background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:16px}}
+ .card{{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05)}}
  .card h3{{margin:0 0 10px;font-size:15px}}
  .card img{{width:100%;height:auto;border:1px solid #eee;border-radius:6px;cursor:zoom-in}}
  .decision{{color:#444;font-size:13px}}
