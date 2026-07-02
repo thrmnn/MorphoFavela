@@ -86,8 +86,8 @@ flex-basis:auto;padding:14px 22px 0}.toc{border-left:none;border-bottom:1px soli
 padding:0 0 10px}.toc a{display:inline-block;margin-right:14px}}
 """
 
-_LB = ("<div id=lb onclick=\"this.style.display='none'\"><img id=lbi></div>"
-       "<script>function zoom(s){lbi.src=s;lb.style.display='flex'}"
+_LB = ("<div id=lb onclick=\"this.style.display='none'\"><img id=lbi alt=\"\"></div>"
+       "<script>function zoom(s,c){lbi.src=s;lbi.alt=c||'';lb.style.display='flex'}"
        "addEventListener('keydown',e=>{if(e.key=='Escape')lb.style.display='none'})</script>")
 
 
@@ -95,8 +95,20 @@ def badge(kind: str, label: str) -> str:
     return f'<span class="pill {kind}">{_html.escape(label)}</span>'
 
 
-def card(title, desc, href, *, meta="", img=None, kind="doc") -> str:
-    imgtag = f'<img src="{img}" loading="lazy" onclick="event.preventDefault();zoom(\'{img}\')">' if img else ""
+def _js_attr(s: str) -> str:
+    """Escape a string for a JS single-quoted literal that itself lives inside a
+    double-quoted HTML attribute (so an apostrophe like "Mingze's" is safe)."""
+    return _html.escape(s.replace("\\", "\\\\").replace("'", "\\'"), quote=True)
+
+
+def card(title, desc, href, *, meta="", img=None, kind="doc", alt=None) -> str:
+    if img:
+        a = _html.escape(alt if alt is not None else title, quote=True)
+        cap = _js_attr(alt if alt is not None else title)
+        imgtag = (f'<img src="{img}" alt="{a}" loading="lazy" '
+                  f'onclick="event.preventDefault();zoom(\'{img}\',\'{cap}\')">')
+    else:
+        imgtag = ""
     metatag = f'<br><code>{_html.escape(meta)}</code>' if meta else ""
     return (f'<a class="card" href="{href}" target="_blank">{imgtag}'
             f'<div class="cap">{badge(kind, kind)}<h3>{_html.escape(title)}</h3>'
