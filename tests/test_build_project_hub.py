@@ -120,3 +120,16 @@ def test_generated_hub_relative_targets_resolve_on_disk():
     text = (out / "index.html").read_text()
     for url in re.findall(r'(?:href|src)="(\.\./[^"#]*)"', text):
         assert (out / url).exists(), f"relative target {url} does not resolve"
+
+
+def test_generated_hub_latest_has_no_onpage_section_duplicate_links():
+    html = _generated_hub()
+    m = re.search(r'<div class="callout">.*?</ul>', html, re.DOTALL)
+    assert m, "callout not found"
+    # the changelog must not re-navigate to a section that sits on the same page
+    assert not re.search(r'href="#[a-z-]+"', m.group(0))
+
+
+def test_latest_item_renders_date_prefix():
+    li = bph._render_latest_item("X", "#x", "d", date="2026-07-02")
+    assert '<span class="date">2026-07-02</span>' in li

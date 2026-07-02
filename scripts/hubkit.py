@@ -53,6 +53,7 @@ border-radius:10px;padding:14px 18px}
 .callout .lead{margin:0 0 6px;font-weight:600}
 .callout ul{margin:0 0 10px;padding-left:18px;line-height:1.7}
 .callout li{margin:2px 0}
+.callout li .date{color:var(--mut);font-variant-numeric:tabular-nums;font-size:12px;margin-right:6px}
 .callout li a{color:var(--ok);font-weight:600;text-decoration:none}
 .callout li a:hover{text-decoration:underline}
 .callout .gloss{color:var(--mut)}

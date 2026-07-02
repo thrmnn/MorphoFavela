@@ -63,6 +63,8 @@ DOC_SECTIONS = {
          "Ranked blockers to remove for a multi-hour parallel-agent loop.", "doc"),
         ("/docs/tr_audit.md", "TR coherence audit",
          "Bulletproofing punch list — criticals done, medium queued.", "doc"),
+        ("/docs/dashboard_improvement_plan.md", "Dashboard improvement plan",
+         "Council audit + prioritised backlog for the hub itself (this page).", "doc"),
         ("/docs/typology_predictor_plan.md", "Typology-as-predictor plan",
          "Use the morphotype/morphotope typology to predict environmental failure; "
          "LOSO transfer, variance decomposition, blind risk map.", "doc"),
@@ -196,14 +198,28 @@ def ventilation_section(prov):
     return section("Geometric ventilation tendencies (§5.6)", cards, anchor="ventilation")
 
 
-def _render_latest_item(n, u, d):
-    """One <li> for the Latest changelog: a trailing '— NEW' becomes a pill, and
-    both the label and gloss are HTML-escaped (no raw & reaches the page)."""
+def _render_latest_item(n, u, d, date=""):
+    """One <li> for the Latest changelog: an optional date prefix, a trailing
+    '— NEW' becomes a pill, and both label and gloss are HTML-escaped."""
     m = re.search(r"\s*[—-]\s*NEW\s*$", n)
     label = n[:m.start()] if m else n
     pill = (badge("info", "NEW") + " ") if m else ""
-    return (f'<li>{pill}<a href="{u}">{html.escape(label)}</a> '
+    ds = f'<span class="date">{html.escape(date)}</span>' if date else ""
+    return (f'<li>{ds}{pill}<a href="{u}">{html.escape(label)}</a> '
             f'<span class="gloss">— {html.escape(d)}</span></li>')
+
+
+def _latest_target_exists(url):
+    """True if a Latest changelog target resolves. Hub-rendered doc pages are
+    produced later in the same run, so gate them on their source markdown."""
+    file = url.split("#", 1)[0]
+    hub_src = {
+        "/outputs/_hub/docs/technical_report.html": "docs/technical_report/technical_report.md",
+        "/outputs/_hub/docs/tr_audit.html": "docs/tr_audit.md",
+        "/outputs/_hub/docs/morphology_overview.html": "docs/morphology_overview.md",
+        "/outputs/_hub/docs/dashboard_improvement_plan.html": "docs/dashboard_improvement_plan.md",
+    }.get(file)
+    return (ROOT / (hub_src or file.lstrip("/"))).exists()
 
 
 def build_callout(prov):
@@ -215,47 +231,48 @@ def build_callout(prov):
                                           ("Work queue", None)]), provenance=prov)
     hub = "/outputs/_hub"
     tr = f"{hub}/docs/technical_report.html"
-    # newest first — each lands on the EXACT figure / TR section it documents
+    # A dated changelog of new/updated results. Each lands on the EXACT figure or
+    # TR section it documents — never a bare on-page anchor that duplicates a
+    # section below. (date, label, url, gloss); existence-gated at render.
     latest = [
-        ("Façade-level solar + Ladybug cross-check (§5.4.1) — NEW",
-         "#facade-solar",
+        ("2026-07-02", "Dashboard credibility pass (council audit)",
+         f"{hub}/docs/dashboard_improvement_plan.html",
+         "hero money-figure, human contents, accessibility + HTML-validity fixes — "
+         "see the plan and prioritised backlog"),
+        ("2026-07-01", "Façade-level solar + Ladybug cross-check (§5.4.1)",
+         f"{tr}#541-faade-level-extension-and-street-level-cross-check-indep",
          "Mingze's façade run (50–72 % WHO-2h deprivation) + our street cross-check: "
          "ordering agrees, Maré least deprived, Rocinha façade outlier 72 %"),
-        ("MAUP resolution curve 5–30 m (§10.9) — NEW",
-         "#maup",
+        ("2026-07-01", "MAUP resolution curve 5–30 m (§10.9)",
+         f"{tr}#109-sensitivity-to-grid-resolution-maup",
          "full grid-size sweep; monotonic regime drift, cross-site ordering "
          "preserved (Spearman ρ = 0.90)"),
-        ("Geometric ventilation tendencies (§5.6) — 4-figure gallery",
-         "#ventilation",
+        ("2026-06-28", "Geometric ventilation tendencies (§5.6)",
+         f"{tr}#56-geometric-ventilation-tendencies--gated-pre-cfd",
          "lateral depth · regime×depth susceptibility · wind exposure · "
          "multi-constraint index (0–3); geometry-only, τ-gated"),
-        ("TR §6.6 roughness — invalidity caveat added",
+        ("2026-06-27", "TR §6.6 roughness — invalidity caveat",
          f"{tr}#66-aerodynamic-roughness-z0-zd",
-         "the bulletproofing fix: per-cell z0/zd invalid 53–75%, envelope is the result"),
-        ("TR §5.5 Morphological Typology & Signature",
-         f"{tr}#55-morphological-typology-signature",
-         "the signature in the report; morphotype (cell) vs morphotope (tissue)"),
-        ("Typology → environmental failure (money figure)",
+         "per-cell z0/zd invalid 53–75 %; the method envelope is the result"),
+        ("2026-06-25", "Typology → environmental failure (headline)",
          f"{GAL}#fig-typology_failure_lookup",
-         "type predicts WHO-2h sun failure 14%→73%, transfers leave-one-site-out"),
-        ("Variance: type vs site vs interaction",
-         f"{GAL}#fig-typology_variance",
-         "morphotype 17% vs site 2% vs 0.7% interaction → the mapping transfers"),
-        ("Block-scale morphotope (tissue) maps", f"{GAL}#fig-morphotope_maps",
-         "5 tissues, distinct from the cell types; 4/5 recur"),
-        ("TR coherence audit (punch list)", f"{hub}/docs/tr_audit.html",
-         "the weaknesses being bulletproofed — criticals done, medium queued"),
-        ("Morphology overview (start here)", f"{hub}/docs/morphology_overview.html",
-         "goal-first walkthrough, all figures + captions"),
+         "morphotype predicts WHO-2h sun failure 14 % → 73 %, transfers "
+         "leave-one-site-out"),
+        ("2026-06-25", "Blind cross-site risk map (8 favelas)",
+         f"{GAL}#fig-typology_blind_riskmap",
+         "one continuous fabric-vector model; beats the morphotype-rate blind map"),
     ]
-    items = "".join(_render_latest_item(*t) for t in latest)
-    return (f'<section><h2 id="latest">Latest &amp; work queue</h2>'
+    items = "".join(_render_latest_item(n, u, d, date=date)
+                    for date, n, u, d in latest if _latest_target_exists(u))
+    wq = ('<p class="more"><a href="/outputs/_hub/docs/work_queue.html">'
+          '📋 Full work queue →</a> <span class="gloss">what is in progress, '
+          'queued, and gated.</span></p>'
+          if (ROOT / "docs/work_queue.md").exists() else "")
+    heading = "Latest" if wq else "Latest results"
+    return (f'<section><h2 id="latest">{heading}</h2>'
             f'<div class="callout">'
             f'<p class="lead">Newest results — click straight in:</p>'
-            f'<ul>{items}</ul>'
-            f'<p class="more"><a href="/outputs/_hub/docs/work_queue.html">'
-            f'📋 Full work queue →</a> '
-            f'<span class="gloss">what is in progress, queued, and gated.</span></p>'
+            f'<ul>{items}</ul>{wq}'
             f'</div></section>')
 
 
