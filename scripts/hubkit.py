@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 CSS = """
-:root{--ink:#1a1d21;--mut:#5b6470;--line:#e3e7ec;--accent:#0f766e;--ok:#1a7f4b;
+:root{--ink:#1a1d21;--mut:#5b6470;--line:#e3e7ec;--accent:#0f766e;--ok:#177243;
 --warn:#b3261e;--amber:#9a5b00;--pend:#1f5fa8;--bg:#fbfcfd;--card:#fff;--lh:1.6;
 --serif:"Source Serif 4","Iowan Old Style",Georgia,"Times New Roman",serif}
 *{box-sizing:border-box}

@@ -236,8 +236,8 @@ def build_callout(prov):
     latest = [
         ("2026-07-02", "Dashboard credibility pass (council audit)",
          f"{hub}/docs/dashboard_improvement_plan.html",
-         "hero money-figure, human contents, accessibility + HTML-validity fixes — "
-         "see the plan and prioritised backlog"),
+         "hero headline figure, human contents, accessibility + HTML-validity fixes "
+         "— see the plan and prioritised backlog"),
         ("2026-07-01", "Façade-level solar + Ladybug cross-check (§5.4.1)",
          f"{tr}#541-faade-level-extension-and-street-level-cross-check-indep",
          "Mingze's façade run (50–72 % WHO-2h deprivation) + our street cross-check: "
@@ -378,7 +378,7 @@ def main():
     n_sites = sum((DASH / s / "index.html").exists() for s in SITE_NAMES)
     # a finding-bearing stat, not a raw glob count of a gitignored dir
     sub = (f'{badge("ok", f"{n_sites} campaign favelas")} '
-           f'{badge("info", "morphotype → WHO-2h winter-sun failure 14–73 %")}')
+           f'{badge("info", "morphotype → WHO-2h winter-sun failure 14 % → 73 %")}')
     (OUT / "index.html").write_text(_relativize(
         page("MorphoFavela — project hub", sub, body,
              provenance=prov, sidebar=sidebar)))

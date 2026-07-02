@@ -11,6 +11,7 @@ self-contained reviewable gallery.
 from __future__ import annotations
 
 import glob
+import html
 import json
 import sys
 from pathlib import Path
@@ -511,16 +512,18 @@ def write_gallery():
             cards.append(f"""
     <section class="card" id="{fid}">
       <h3>{title}</h3>
-      <img src="{name}" alt="{title}" loading="lazy" onclick="zoom('{name}','{title}')">
+      <img src="{name}" alt="{title}" loading="lazy" tabindex="0" role="button"
+           onclick="zoom('{name}','{title}')"
+           onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();zoom('{name}','{title}')}}">
       <p class="decision">{decision}</p>
     </section>""")
         if cards:
-            toc.append(f'<a href="#{anchor}">{group}</a>')
-            blocks.append(f'<h2 id="{anchor}">{group}</h2>'
+            toc.append(f'<a href="#{anchor}">{html.escape(group)}</a>')
+            blocks.append(f'<h2 id="{anchor}">{html.escape(group)}</h2>'
                           f'<div class="grid">{"".join(cards)}</div>')
     sidebar = ('<nav class="toc"><div class="toc-h">Sections</div>'
                + "".join(toc) + "</nav>")
-    html = f"""<!doctype html><meta charset=utf-8>
+    doc = f"""<!doctype html><html lang=en><meta charset=utf-8>
 <title>Morpho-signature figures — review</title>
 <style>
  body{{font:15px/1.5 system-ui,sans-serif;margin:0;background:#fafafa;color:#222}}
@@ -540,27 +543,38 @@ def write_gallery():
  .decision{{color:#444;font-size:13px}}
  html{{scroll-behavior:smooth}} :target{{scroll-margin-top:52px}}
  #lb{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;cursor:zoom-out;flex-direction:column;align-items:center;justify-content:center}}
- #lb img{{max-width:96vw;max-height:90vh}} #lb p{{color:#eee;margin:10px;font-size:15px}}
+ #lb:not([hidden]){{display:flex}}
+ #lb img{{max-width:96vw;max-height:88vh}} #lb p{{color:#eee;margin:10px;font-size:15px}}
+ #lb #lbx{{position:absolute;top:12px;right:18px;background:none;border:0;color:#fff;font-size:34px;line-height:1;cursor:pointer;padding:2px 12px}}
+ #lb #lbx:hover,#lb #lbx:focus{{color:#bcd;outline:2px solid #bcd}}
  @media(max-width:820px){{.layout{{display:block}}.layout aside{{position:static;max-height:none;flex-basis:auto;padding:12px 24px 0}}.toc{{border-left:none}}.toc a{{display:inline-block;margin-right:14px}}}}
 </style>
-<div class="top"><a href="/outputs/_hub/index.html">← Project hub</a>
+<div class="top"><a href="../../../_hub/index.html">← Project hub</a>
  <span style="color:#999;margin:0 8px">›</span><span style="color:#666">Signature &amp; roughness figures</span></div>
 <div class="layout">
 <aside>{sidebar}</aside>
 <main>
  <h1>Favela morpho-signature &amp; roughness — figure review</h1>
  <p style="color:#666;margin:0 0 6px">Click any figure to enlarge. Rationale:
-    <a href="/outputs/_hub/docs/visualization_plan.html">visualization plan</a> ·
-    <a href="/outputs/_hub/docs/morpho_signature_decisions.html">signature decisions</a> ·
-    <a href="/outputs/_hub/docs/roughness_decisions.html">roughness decisions</a></p>
+    <a href="../../../_hub/docs/visualization_plan.html">visualization plan</a> ·
+    <a href="../../../_hub/docs/morpho_signature_decisions.html">signature decisions</a> ·
+    <a href="../../../_hub/docs/roughness_decisions.html">roughness decisions</a></p>
  {''.join(blocks)}
 </main></div>
-<div id="lb" onclick="this.style.display='none'"><img id="lbimg" alt=""><p id="lbcap"></p></div>
+<div id="lb" role="dialog" aria-modal="true" aria-label="Enlarged figure" hidden>
+ <button id="lbx" aria-label="Close (Esc)">&times;</button>
+ <img id="lbimg" alt=""><p id="lbcap"></p></div>
 <script>
- function zoom(src,cap){{lbimg.src=src;lbimg.alt=cap||'';lbcap.textContent=cap;lb.style.display='flex'}}
- addEventListener('keydown',e=>{{if(e.key==='Escape')lb.style.display='none'}});
-</script>"""
-    (OUT / "index.html").write_text(html)
+ let _lbprev=null;
+ function zoom(src,cap){{_lbprev=document.activeElement;lbimg.src=src;lbimg.alt=cap||'';
+   lbcap.textContent=cap;lb.hidden=false;lbx.focus()}}
+ function _lbclose(){{lb.hidden=true;if(_lbprev&&_lbprev.focus)_lbprev.focus()}}
+ lb.addEventListener('click',_lbclose);
+ lbx.addEventListener('click',e=>{{e.stopPropagation();_lbclose()}});
+ addEventListener('keydown',e=>{{if(lb.hidden)return;
+   if(e.key==='Escape')_lbclose();else if(e.key==='Tab'){{e.preventDefault();lbx.focus()}}}});
+</script></html>"""
+    (OUT / "index.html").write_text(doc)
 
 
 def main():
