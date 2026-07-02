@@ -146,7 +146,7 @@ HEADLINE_FIGS = [
 
 
 def headline_section(prov):
-    """Hero: the money figure(s) as zoomable image cards, deep-linked to their
+    """Hero: the headline figure(s) as zoomable image cards, deep-linked to their
     captioned place in the signature gallery."""
     cards = [
         card(title, desc, f"{SIG_GAL}#{anchor}", img=f"{SIG_DIR}/{fn}",

@@ -457,9 +457,10 @@ GALLERY_GROUPS = [
     ]),
     ("Prioritization & honesty", "prioritization", [
         ("typology_failure_lookup.png", "Typology → environmental failure",
-         "The money figure: per-type WHO-2h winter-sun failure rate (held-out, "
-         "ray-cast). Monotone with a regime jump at T3→T4, saturating at T4/T5 "
-         "(71–73%); tight per-favela dots at T4/T5 = good transfer."),
+         "The headline result: per-type WHO-2h winter-sun failure rate (held-out, "
+         "ray-cast) rises 14 % → 73 % across the six types — monotone with a regime "
+         "jump at T3→T4, saturating at T4/T5; tight per-favela dots at T4/T5 = good "
+         "transfer."),
         ("typology_parsimony.png", "Parsimony (LOSO)",
          "Type-only transfers out-of-site at AUC-PR 0.77 (vs 0.85 full vector, 0.64 "
          "baseline) — the discrete code keeps most of the signal at far lower "
