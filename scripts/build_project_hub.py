@@ -121,6 +121,40 @@ FACADE_FIGS = [
 ]
 
 
+SIG_DIR = "/outputs/cross_site/signature/figures_v2"
+SIG_GAL = f"{SIG_DIR}/index.html"
+# The project's own headline result — promoted to a first-class hero section so a
+# first-time reviewer meets the contribution before any partner cross-check.
+HEADLINE_FIGS = [
+    ("typology_failure_lookup.png", "fig-typology_failure_lookup",
+     "Morphotype predicts winter-sun failure (14 % → 73 %)",
+     "The headline result: cell morphotype alone predicts the share of street "
+     "observers below the WHO 2 h/day winter-sun floor, rising 14 % → 73 % across "
+     "the six types and transferring leave-one-site-out."),
+    ("typology_blind_riskmap.png", "fig-typology_blind_riskmap",
+     "Blind cross-site winter-sun risk map (8 favelas)",
+     "One continuous fabric-vector model maps WHO-2h failure risk across 5 campaign "
+     "+ 3 calibration favelas; beats the morphotype-rate blind map."),
+    ("typology_variance.png", "fig-typology_variance",
+     "Why it transfers: morphotype 17 % ≫ site 2 %",
+     "Morphotype explains 17 % of the winter-sun-failure variance vs 2 % for site "
+     "and 0.7 % for their interaction — so the type→failure mapping is portable."),
+]
+
+
+def headline_section(prov):
+    """Hero: the money figure(s) as zoomable image cards, deep-linked to their
+    captioned place in the signature gallery."""
+    cards = [
+        card(title, desc, f"{SIG_GAL}#{anchor}", img=f"{SIG_DIR}/{fn}",
+             meta="headline result · WHO 2 h/day winter floor", kind="ok")
+        for fn, anchor, title, desc in HEADLINE_FIGS
+        if (ROOT / f"{SIG_DIR}/{fn}".lstrip("/")).exists()
+    ]
+    return section("Headline result — morphotype predicts winter-sun failure",
+                   cards, anchor="headline")
+
+
 def facade_solar_section(prov):
     """Façade-level solar (independent Ladybug run) + our street cross-check."""
     cards = [
@@ -265,9 +299,9 @@ def main():
     DOCS.mkdir(parents=True, exist_ok=True)
     prov = git_provenance(ROOT, "scripts/build_project_hub.py")
 
-    blocks = [build_callout(prov), facade_solar_section(prov), ventilation_section(prov),
-              maup_section(prov), sites_section(prov)]
-    titles = ["Latest", "Facade-solar", "Ventilation", "Maup", "Sites"]
+    blocks = [build_callout(prov), headline_section(prov), facade_solar_section(prov),
+              ventilation_section(prov), maup_section(prov), sites_section(prov)]
+    titles = ["Latest", "Headline", "Facade-solar", "Ventilation", "Maup", "Sites"]
     for title, items in DOC_SECTIONS.items():
         cards = []
         for url, name, desc, kind in items:
