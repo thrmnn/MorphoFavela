@@ -55,6 +55,16 @@ DOC_SECTIONS = {
          "Signature & roughness figures",
          "The full grouped gallery — click any figure to enlarge.", "live"),
     ],
+    "CFD hand-off (exports)": [
+        ("/docs/cfd_parameter_estimation_plan.md", "CFD parameter-estimation plan + hand-off spec",
+         "The morphometric→CFD inlet/wall spec: NaN-safe floored z0 + provenance "
+         "(shipped), the MAR-P07 pilot request, F/I deferred-gated on it. "
+         "/autoplan-reviewed, validate-first.", "doc"),
+        ("/outputs/cross_site/roughness/patch_roughness.csv",
+         "patch_roughness.csv — the CFD-inlet export (119 patches)",
+         "The artifact the CFD repo consumes: z0_kan(θ) + NaN-safe floored z0 + "
+         "flag_z0_floored + kanda_precfd_v1 provenance stamp, one row per patch.", "live"),
+    ],
     "Plans & decisions": [
         ("/docs/autonomous_loop_plan.md", "Autonomous-loop plan + top blockers",
          "Ranked blockers to remove for a multi-hour parallel-agent loop.", "doc"),
@@ -269,6 +279,7 @@ def _latest_target_exists(url):
         "/outputs/_hub/docs/tr_audit.html": "docs/tr_audit.md",
         "/outputs/_hub/docs/morphology_overview.html": "docs/morphology_overview.md",
         "/outputs/_hub/docs/dashboard_improvement_plan.html": "docs/dashboard_improvement_plan.md",
+        "/outputs/_hub/docs/cfd_parameter_estimation_plan.html": "docs/cfd_parameter_estimation_plan.md",
     }.get(file)
     return (ROOT / (hub_src or file.lstrip("/"))).exists()
 
@@ -286,6 +297,11 @@ def build_callout(prov):
     # TR section it documents — never a bare on-page anchor that duplicates a
     # section below. (date, label, url, gloss); existence-gated at render.
     latest = [
+        ("2026-07-03", "CFD hand-off: floored z0 + provenance, pilot requested",
+         f"{hub}/docs/cfd_parameter_estimation_plan.html",
+         "/autoplan-reviewed, validate-first: shipped NaN-safe floored z0 + "
+         "kanda_precfd_v1 stamp on patch_roughness.csv; requested the MAR-P07 pilot "
+         "as the R-C anchor; F/I deferred-gated on it"),
         ("2026-07-02", "Dashboard credibility pass (council audit)",
          f"{hub}/docs/dashboard_improvement_plan.html",
          "hero headline figure, human contents, accessibility + HTML-validity fixes "
