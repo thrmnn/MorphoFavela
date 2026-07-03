@@ -120,3 +120,24 @@ def test_texture_tile_is_watertight():
     assert mesh.is_watertight
     assert mesh.volume > 0
     assert max(stats.model_mm[0], stats.model_mm[1]) == pytest.approx(150.0, abs=1.0)
+
+
+# --- airflow (ventilation) texture field (needs RDP-P20 CFD returns) -----------
+
+_HAS_RDP_CFD = (ROOT / "data/riodaspedras/cfd_results/RDP-P20/N/sample_points.csv").exists()
+_vent = pytest.mark.skipif(not _HAS_RDP_CFD, reason="RDP-P20 CFD returns (gitignored) not present")
+
+
+@_vent
+def test_ventilation_field_quartiles_balanced_and_ground_only():
+    """Wind-rose-weighted |U| classifies into 4 near-balanced quartiles over ground,
+    and the airflow tile builds watertight."""
+    from src.print3d.texture import build_tile, sample_tile
+
+    tile = sample_tile("riodaspedras", "RDP-P20", tile_mm=150, model_cell_mm=1.0,
+                       field="ventilation")
+    assert tile.field == "ventilation"
+    counts = [(tile.shade == s).sum() for s in range(4)]
+    assert min(counts) > 0 and max(counts) / min(counts) < 1.6  # quartiles ≈ balanced
+    mesh, stats, _ = build_tile(tile, "hatch")
+    assert mesh.is_watertight and stats.watertight

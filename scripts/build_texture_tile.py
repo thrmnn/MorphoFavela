@@ -28,10 +28,17 @@ from matplotlib.colors import LightSource, ListedColormap
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.print3d.model import ROOT
-from src.print3d.texture import VARIANTS, build_tile, sample_tile
+from src.print3d.texture import FIELD_LEGEND, VARIANTS, build_tile, sample_tile
 
-CLASS_COLORS = ["#f4c430", "#f5deb3", "#8aa1b4", "#334155"]  # Class1 sun … Class4 shade
-CLASS_LABELS = ["Class 1 · >6 h", "Class 2 · 4–6 h", "Class 3 · 2–4 h", "Class 4 · <2 h"]
+# smooth (class 0) → densest (class 3)
+FIELD_COLORS = {
+    "sunlight": ["#f4c430", "#f5deb3", "#8aa1b4", "#334155"],      # sun → shade
+    "ventilation": ["#2c7fb8", "#7fcdbb", "#fdae61", "#d7301f"],   # ventilated → stagnant
+}
+FIELD_TITLE = {
+    "sunlight": "sunlight-texture tile · winter sun-hours on ground only",
+    "ventilation": "airflow-texture tile · pedestrian ventilation (CFD |U|/U_ref) on ground only",
+}
 VARIANT_TITLE = {"stipple": "V1 · stippling", "contour": "V2 · contour bands", "hatch": "V3 · hatching"}
 
 
@@ -53,24 +60,24 @@ def _detail(disp, ground_mask, ax, title, crop):
 
 
 def review_figure(tile, results, out_png):
+    colors = FIELD_COLORS[tile.field]
+    legend_tag, labels = FIELD_LEGEND[tile.field]
     fig = plt.figure(figsize=(15, 8))
     fig.suptitle(
-        f"Version A — realistic sunlight-texture tile · {tile.site}/{tile.patch} · "
-        f"150 mm · winter sun-hours on ground only",
+        f"Version A — realistic {FIELD_TITLE[tile.field]} · {tile.site}/{tile.patch} · {tile.tile_mm:.0f} mm",
         fontsize=14, fontweight="bold", x=0.01, ha="left",
     )
 
-    # input sun-class map
+    # input class map
     ax = fig.add_subplot(2, 4, 1)
-    cmap = ListedColormap(CLASS_COLORS)
-    sc = np.where(tile.ground_mask, tile.shade, np.nan)  # 0..3 = Class1..4
-    ax.imshow(sc, origin="upper", cmap=cmap, vmin=0, vmax=3)
+    sc = np.where(tile.ground_mask, tile.shade, np.nan)  # 0..3 = smooth..densest
+    ax.imshow(sc, origin="upper", cmap=ListedColormap(colors), vmin=0, vmax=3)
     bld = np.ma.masked_where(tile.ground_mask, np.ones_like(tile.shade))
     ax.imshow(bld, origin="upper", cmap=ListedColormap(["#9c6f52"]))
-    ax.set_title("input · winter sun-hours class", fontsize=9)
+    ax.set_title(f"input · {legend_tag}", fontsize=9)
     ax.set_xticks([]); ax.set_yticks([])
-    handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in CLASS_COLORS]
-    ax.legend(handles, CLASS_LABELS, fontsize=6, loc="lower left", framealpha=0.9)
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in colors]
+    ax.legend(handles, labels, fontsize=6, loc="lower left", framealpha=0.9)
 
     # a mixed-shade crop window (center third) for the detail row
     n = tile.shade.shape[0]
@@ -106,7 +113,7 @@ def print_time_hours(height_mm, footprint_mm2, layer=0.2):
 NOTES = {
     "stipple": (
         "Pits are 1.0 mm⌀ × 0.5 mm hemispheres on a jittered grid (spacing 4.0/2.5/1.5 mm "
-        "for Class 2/3/4). At a 0.4 mm nozzle a 1 mm pit is ~2.5 nozzle-widths and 0.5 mm is "
+        "for the three textured classes). At a 0.4 mm nozzle a 1 mm pit is ~2.5 nozzle-widths and 0.5 mm is "
         "2–3 layers — it will register but rounds off; the density gradient survives even when "
         "individual pits blur. Robust: pits are isolated concavities, no thin standing walls. "
         "Resin renders each pit crisply."),
@@ -129,24 +136,26 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--site", default="vidigal")
     ap.add_argument("--patch", default="VDG-P07")
+    ap.add_argument("--field", default="sunlight", choices=["sunlight", "ventilation"])
     ap.add_argument("--tile-mm", type=float, default=150.0)
     ap.add_argument("--cell", type=float, default=0.30, help="print grid cell, mm")
     args = ap.parse_args()
 
-    tile = sample_tile(args.site, args.patch, tile_mm=args.tile_mm, model_cell_mm=args.cell)
+    tile = sample_tile(args.site, args.patch, tile_mm=args.tile_mm,
+                       model_cell_mm=args.cell, field=args.field)
     out = ROOT / "outputs" / args.site / "print" / "texture_tile"
     out.mkdir(parents=True, exist_ok=True)
 
-    dist = {CLASS_LABELS[3 - s].split(" ·")[0]: int((tile.shade == s).sum())
-            for s in range(4)}
-    print(f"\n  tile {args.site}/{args.patch}  {args.tile_mm:.0f} mm  1:{int(round(1000/tile.mm_per_m))}  "
-          f"grid {tile.shade.shape[1]}×{tile.shade.shape[0]} @ {tile.world_cell:.2f} m")
-    print(f"  ground sun-class cells: {dist}")
+    labels = FIELD_LEGEND[args.field][1]
+    dist = {labels[3 - s].split(" ·")[0]: int((tile.shade == s).sum()) for s in range(4)}
+    print(f"\n  tile {args.site}/{args.patch}  {args.field}  {args.tile_mm:.0f} mm  "
+          f"1:{int(round(1000/tile.mm_per_m))}  grid {tile.shade.shape[1]}×{tile.shade.shape[0]} @ {tile.world_cell:.2f} m")
+    print(f"  ground class cells: {dist}")
 
     results = {}
     for variant in VARIANTS:
         mesh, stats, disp = build_tile(tile, variant)
-        stem = f"{args.patch}_texture_{variant}"
+        stem = f"{args.patch}_texture_{args.field}_{variant}"
         mesh.export(out / f"{stem}.stl")
         (out / f"{stem}.json").write_text(json.dumps(asdict(stats), indent=2))
         results[variant] = (mesh, stats, disp)
@@ -159,7 +168,7 @@ def main():
         print(f"    est. FDM print (0.2 mm, rough): {lo:.0f}–{hi:.0f} h")
         print(f"    note: {NOTES[variant]}")
 
-    fig = review_figure(tile, results, out / f"{args.patch}_texture_review.png")
+    fig = review_figure(tile, results, out / f"{args.patch}_texture_{args.field}_review.png")
     print(f"\n  review figure -> {fig.relative_to(ROOT)}")
     print("\n  RECOMMENDATION for FDM at this scale: V1 stippling. Isolated concave "
           "pits have no thin standing walls or single-layer floors to lose, so the "

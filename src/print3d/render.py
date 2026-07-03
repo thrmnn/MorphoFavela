@@ -30,16 +30,17 @@ def _downsample(arr: np.ndarray, target: int = 160):
 
 
 def render_site(dsm, title: str, subtitle: str, out_png: Path, exaggerate: float = 1.0) -> Path:
-    """Hillshade plan (left) + honest-aspect axonometric (right) of the composed
-    site artifact — framed base, engraved nameplate, recessed water."""
+    """Hillshade plan + two honest-aspect axonometric angles of the composed site
+    artifact — framed base, engraved nameplate, recessed water — so the reviewer
+    can read the fabric before downloading the STL."""
     comp = dsm.composed
     surf = comp.surf
-    fig = plt.figure(figsize=(11, 5.4))
+    fig = plt.figure(figsize=(15, 5.2))
     fig.suptitle(title, fontsize=15, fontweight="bold", x=0.02, ha="left")
-    fig.text(0.02, 0.92, subtitle, fontsize=9, color="#555", ha="left")
+    fig.text(0.02, 0.93, subtitle, fontsize=9, color="#555", ha="left")
 
     # plan: hillshade of the composed surface; water + massing tinted, nameplate shows
-    ax = fig.add_subplot(1, 2, 1)
+    ax = fig.add_subplot(1, 3, 1)
     ls = LightSource(azdeg=315, altdeg=45)
     rgb = ls.shade(surf, cmap=plt.cm.gray, vert_exag=2.0, blend_mode="soft")
     ax.imshow(rgb, origin="upper", aspect="equal")
@@ -52,8 +53,7 @@ def render_site(dsm, title: str, subtitle: str, out_png: Path, exaggerate: float
     ax.set_title("plan · framed base, engraved nameplate, water", fontsize=9)
     ax.set_xticks([]); ax.set_yticks([])
 
-    # axonometric surface — TRUE aspect ratio (label if exaggerated)
-    ax2 = fig.add_subplot(1, 2, 2, projection="3d")
+    # two axonometric angles — TRUE aspect ratio (label if exaggerated)
     (X, _), (Y, _), (Z, step) = (_downsample(comp.X), _downsample(comp.Y), _downsample(surf))
     built_d, water_d, frame_d = comp.built[::step, ::step], comp.water[::step, ::step], comp.frame[::step, ::step]
     fc = np.empty(Z.shape + (4,))
@@ -61,13 +61,16 @@ def render_site(dsm, title: str, subtitle: str, out_png: Path, exaggerate: float
     fc[frame_d] = matplotlib.colors.to_rgba(FRAME)
     fc[built_d] = matplotlib.colors.to_rgba(BUILT)
     fc[water_d] = matplotlib.colors.to_rgba(WATER)
-    ax2.plot_surface(X, Y, Z * exaggerate, facecolors=fc, rstride=1, cstride=1,
-                     linewidth=0, antialiased=False, shade=True)
-    ax2.set_box_aspect((np.ptp(X), np.ptp(Y), max(np.ptp(Z) * exaggerate, 1e-6)))
-    ax2.view_init(elev=32, azim=-58)
-    ax2.set_axis_off()
-    ax2.set_title("axonometric · true aspect" if exaggerate == 1
-                  else f"axonometric · relief ×{exaggerate:g}", fontsize=9, y=0.96)
+    aspect_note = "true aspect" if exaggerate == 1 else f"relief ×{exaggerate:g}"
+    for k, azim in enumerate((-58, 128)):
+        ax2 = fig.add_subplot(1, 3, 2 + k, projection="3d")
+        ax2.plot_surface(X, Y, Z * exaggerate, facecolors=fc, rstride=1, cstride=1,
+                         linewidth=0, antialiased=False, shade=True)
+        ax2.set_box_aspect((np.ptp(X), np.ptp(Y), max(np.ptp(Z) * exaggerate, 1e-6)))
+        ax2.view_init(elev=32, azim=azim)
+        ax2.set_axis_off()
+        ax2.set_title(f"axonometric · {aspect_note}" + (" · reverse" if k else ""),
+                      fontsize=9, y=0.96)
 
     out_png.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout(rect=(0, 0, 1, 0.9))

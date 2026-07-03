@@ -46,6 +46,15 @@ GROOVE_W_MM, GROOVE_D_MM, GROOVE_STEP_MM = 0.6, 0.4, 0.2
 HATCH_W_MM, HATCH_D_MM = 0.5, 0.3
 
 
+# Legend metadata per field: (tile-title tag, 4 class labels smooth→densest).
+FIELD_LEGEND = {
+    "sunlight": ("winter sun-hours", [
+        "Class 1 · >6 h", "Class 2 · 4–6 h", "Class 3 · 2–4 h", "Class 4 · <2 h"]),
+    "ventilation": ("pedestrian ventilation (|U|/U_ref quartiles)", [
+        "Q1 · best-ventilated", "Q2", "Q3", "Q4 · most stagnant"]),
+}
+
+
 @dataclass
 class Tile:
     site: str
@@ -57,8 +66,9 @@ class Tile:
     Y: np.ndarray
     ground: np.ndarray       # terrain elevation, m
     bld_h: np.ndarray        # building height above ground, m (0 = open ground)
-    shade: np.ndarray        # 0 full-sun … 3 deep-shade on ground; -1 under buildings
-    azimuth_deg: float       # dominant winter-shadow azimuth for hatching
+    shade: np.ndarray        # 0 smooth (best) … 3 densest (worst) on ground; -1 under buildings
+    azimuth_deg: float       # groove direction for hatching (shadow / prevailing wind)
+    field: str = "sunlight"
 
     @property
     def ground_mask(self) -> np.ndarray:
@@ -79,6 +89,7 @@ def sample_tile(
     tile_mm: float = 150.0,
     model_cell_mm: float = 0.30,
     sampling: str = "campaign_sampling",
+    field: str = "sunlight",
 ) -> Tile:
     pdir = _patch_dir(site, patch, sampling)
     meta = json.loads((pdir / "patch_meta.json").read_text())
@@ -119,19 +130,27 @@ def sample_tile(
     ys = y1 - cols * world_cell
     X, Y = np.meshgrid(xs, ys)
 
-    # nearest street-solar winter sun-hours → shade class, ground cells only
-    sp = gpd.read_file(f"outputs/{site}/morphometrics/svf/svf_streets_solar.gpkg")
-    sp_xy = np.column_stack([sp.geometry.x.values, sp.geometry.y.values])
-    tree = cKDTree(sp_xy)
-    _, nn = tree.query(np.column_stack([X.ravel(), Y.ravel()]))
-    hours = sp["solar_hours_winter"].values[nn].reshape(n, n)
-    shade = (3 - np.digitize(hours, CLASS_EDGES)).astype(int)  # 0 full-sun … 3 deep
+    ground_mask = bld_h <= 0
+    if field == "sunlight":
+        # nearest street-solar winter sun-hours → fixed sun-hour classes
+        sp = gpd.read_file(f"outputs/{site}/morphometrics/svf/svf_streets_solar.gpkg")
+        sp_xy = np.column_stack([sp.geometry.x.values, sp.geometry.y.values])
+        _, nn = cKDTree(sp_xy).query(np.column_stack([X.ravel(), Y.ravel()]))
+        value = sp["solar_hours_winter"].values[nn].reshape(n, n)
+        shade = (3 - np.digitize(value, CLASS_EDGES)).astype(int)  # 0 full-sun … 3 deep
+        azimuth = float(meta.get("winter_shadow_azimuth_deg", 340.0))
+    elif field == "ventilation":
+        # wind-rose-weighted pedestrian |U|/U_ref → quartile classes (relative,
+        # because the 8-direction mean is spatially flat in absolute terms)
+        from src.print3d.airflow import dominant_wind_azimuth, ventilation_grid
+        value = ventilation_grid(site, patch, X, Y)
+        edges = np.quantile(value[ground_mask], [0.25, 0.5, 0.75])
+        shade = (3 - np.digitize(value, edges)).astype(int)  # 0 best-vent … 3 stagnant
+        azimuth = dominant_wind_azimuth(site)  # grooves along prevailing wind
+    else:
+        raise ValueError(f"unknown field {field!r}")
     shade[bld_h > 0] = -1
-
-    # dominant winter-shadow azimuth: shadows fall S→N-ish in the S hemisphere at
-    # local winter; use the mean solar azimuth proxy from the site (fallback 340°).
-    azimuth = float(meta.get("winter_shadow_azimuth_deg", 340.0))
-    return Tile(site, patch, tile_mm, mm_per_m, world_cell, X, Y, ground, bld_h, shade, azimuth)
+    return Tile(site, patch, tile_mm, mm_per_m, world_cell, X, Y, ground, bld_h, shade, azimuth, field)
 
 
 # --------------------------------------------------------------------------- #

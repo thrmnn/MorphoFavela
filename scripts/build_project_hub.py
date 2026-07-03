@@ -416,55 +416,125 @@ def _print_card(json_path: Path, preview: Path, kind: str, badge_label: str) -> 
                 badge_label=badge_label, **attrs)
 
 
-def prints_section(prov):
-    """Physical-twin 3D prints: 5 full-site massing boxes + the CFD patch prints."""
-    cards = []
-    for site in CAMPAIGN:
-        pdir = ROOT / "outputs" / site / "print"
-        for js in sorted(pdir.glob(f"{site}_site_1to*.json")):
-            cards.append(_print_card(js, pdir / f"{site}_site_preview.png",
-                                     "ok", "Site model"))
-    for site, patch in PRINT_PATCHES:
-        js = ROOT / "outputs" / site / "print" / f"{patch}_1to1000.json"
-        if js.exists():
-            cards.append(_print_card(js, js.parent / f"{patch}_preview.png",
-                                     "info", "Patch · 1:1000"))
-    cards += _texture_tile_cards(prov)
-    return section("Physical twins — 3D prints", cards, anchor="prints")
+# Version-A texture tiles surfaced on the Textures page: (field, site, patch, blurb).
+TEXTURE_TILES = [
+    ("sunlight", "vidigal", "VDG-P07",
+     "Winter sun-hours (4 classes) as ground-only relief on a steep patch — "
+     "the slope stress-test. Higher shade → denser texture."),
+    ("ventilation", "riodaspedras", "RDP-P20",
+     "Pedestrian ventilation from the RDP-P20 CFD return (8-direction simpleFoam, "
+     "wind-rose-weighted |U|/U_ref, quartiles). More stagnant → denser texture. "
+     "Proxy for local mean age of air; a true LMA field needs a scalar-transport run."),
+]
 
 
-def _texture_tile_cards(prov):
-    """Version A sunlight-texture tile: the review figure + the 3 STL variants."""
-    tdir = ROOT / "outputs/vidigal/print/texture_tile"
-    review = tdir / "VDG-P07_texture_review.png"
+def _tile_cards(field, site, patch):
+    """Review-figure card + 3 STL download cards for one texture tile."""
+    tdir = ROOT / "outputs" / site / "print" / "texture_tile"
+    review = tdir / f"{patch}_texture_{field}_review.png"
     if not review.exists():
         return []
-    notes = ROOT / "docs/print_texture_notes.md"
-    lead = [_doc_card("/docs/print_texture_notes.md",
-                      "Sunlight-texture tile — variants, print risk, recommendation",
-                      "Per-variant print-risk notes + the FDM recommendation (stippling).",
-                      prov)] if notes.exists() else []
     rurl = "/" + str(review.relative_to(ROOT))
-    cards = lead + [card(
-        "Version A — sunlight-texture tile (VDG-P07)",
-        "A 150 mm realistic tile: true terrain + smooth buildings, winter sun-hours "
-        "(4 classes) encoded as ground-only relief. Three treatments compared — "
-        "stippling / contour bands / directional hatching. FDM pick: stippling.",
-        rurl, img=rurl, meta="Version A · winter sun-hours · ground-only texture",
-        kind="ok", badge_label="Texture · review", **_img_attrs(rurl))]
-    labels = {"stipple": "V1 stipple", "contour": "V2 contour", "hatch": "V3 hatch"}
-    for variant, lbl in labels.items():
-        js = tdir / f"VDG-P07_texture_{variant}.json"
+    tag = "winter sun-hours" if field == "sunlight" else "CFD ventilation |U|/U_ref"
+    cards = [card(
+        f"{patch} — {field} texture (review)",
+        f"Three ground-only treatments compared: stippling / contour bands / "
+        f"directional hatching. FDM pick: stippling. Field: {tag}.",
+        rurl, img=rurl, meta=f"{field} · {patch} · 150 mm tile", kind="ok",
+        badge_label="Review", **_img_attrs(rurl))]
+    for variant, lbl in (("stipple", "V1 stipple"), ("contour", "V2 contour"), ("hatch", "V3 hatch")):
+        js = tdir / f"{patch}_texture_{field}_{variant}.json"
         if not js.exists():
             continue
         st = json.loads(js.read_text())
         w, d, h = st["model_mm"]
         cards.append(card(
-            f"{lbl} — STL", f"Watertight variant · texture {st['texture_depth_mm']} mm deep.",
+            f"{lbl} — {patch} {field} STL",
+            f"Watertight variant · texture {st['texture_depth_mm']} mm deep · download.",
             "/" + str(js.with_suffix(".stl").relative_to(ROOT)),
             meta=f"{w:.0f}×{d:.0f}×{h:.0f} mm · 1:{st['scale_denom']}",
             kind="info", badge_label="STL"))
     return cards
+
+
+def write_prints_pages(prov):
+    """Write two standalone gallery pages (all sites; texture treatments) and
+    return {name: (url, thumb)} so the hub can link them with a preview."""
+    pages = {}
+
+    # --- Page 1: all five site artifacts + the CFD patch prints, one page ---
+    site_cards = []
+    for site in CAMPAIGN:
+        pdir = ROOT / "outputs" / site / "print"
+        for js in sorted(pdir.glob(f"{site}_site_1to*.json")):
+            site_cards.append(_print_card(js, pdir / f"{site}_site_preview.png",
+                                          "ok", "Site model"))
+    patch_cards = []
+    for site, patch in PRINT_PATCHES:
+        js = ROOT / "outputs" / site / "print" / f"{patch}_1to1000.json"
+        if js.exists():
+            patch_cards.append(_print_card(js, js.parent / f"{patch}_preview.png",
+                                           "info", "Patch · 1:1000"))
+    crumb = breadcrumb([("← Project hub", "index.html"), ("Physical twins — sites", None)])
+    body = (section("Full-site models — 5 cm framed artifacts", site_cards, anchor="sites-print")
+            + section("CFD analysis-patch prints (1:1000)", patch_cards, anchor="patch-print"))
+    sub = f'{badge("ok", f"{len(site_cards)} site models")} {badge("info", "premium framed base · engraved · water")}'
+    (OUT / "prints_sites.html").write_text(_relativize(page(
+        "Physical twins — full-site 3D prints", sub, body, crumb=crumb, provenance=prov)))
+    first = next((ROOT / "outputs" / s / "print" / f"{s}_site_preview.png"
+                  for s in CAMPAIGN if (ROOT / "outputs" / s / "print" / f"{s}_site_preview.png").exists()), None)
+    pages["sites"] = ("/outputs/_hub/prints_sites.html",
+                      "/" + str(first.relative_to(ROOT)) if first else None)
+
+    # --- Page 2: texture treatments (sunlight + airflow) ---
+    tcards = []
+    for field, site, patch, blurb in TEXTURE_TILES:
+        cc = _tile_cards(field, site, patch)
+        if cc:
+            tcards.append(("Sunlight — winter sun-hours" if field == "sunlight"
+                           else "Airflow — pedestrian ventilation (CFD)", field, cc, blurb))
+    tbody = ""
+    for heading, field, cc, blurb in tcards:
+        tbody += f'<p class="lead">{html.escape(blurb)}</p>' + section(heading, cc, anchor=f"tex-{field}")
+    if (notes := ROOT / "docs/print_texture_notes.md").exists():
+        tbody = section("Notes & recommendation",
+                        [_doc_card("/docs/print_texture_notes.md",
+                                   "Print-risk notes + FDM recommendation",
+                                   "Per-variant risk + why stippling wins on FDM.", prov)],
+                        anchor="tex-notes") + tbody
+    crumb2 = breadcrumb([("← Project hub", "index.html"), ("Physical twins — textures", None)])
+    sub2 = f'{badge("ok", "Version A · realistic")} {badge("info", "sunlight + airflow · 3 treatments each")}'
+    (OUT / "prints_textures.html").write_text(_relativize(page(
+        "Physical twins — performance-texture tiles", sub2, tbody, crumb=crumb2, provenance=prov)))
+    sun = ROOT / "outputs/vidigal/print/texture_tile/VDG-P07_texture_sunlight_review.png"
+    pages["textures"] = ("/outputs/_hub/prints_textures.html",
+                         "/" + str(sun.relative_to(ROOT)) if sun.exists() else None)
+    return pages
+
+
+def prints_section(prov):
+    """Two nav cards → the standalone sites page and the textures page."""
+    pages = write_prints_pages(prov)
+    cards = []
+    su, sthumb = pages.get("sites", (None, None))
+    if su:
+        cards.append(card(
+            "Full-site 3D prints — all 5 favelas",
+            "Premium framed artifacts (5 cm box): engraved nameplate, scale bar, "
+            "north arrow, recessed water. Plan + true-aspect axonometric per site, "
+            "then download the STL.",
+            su, img=sthumb, meta="Rocinha · Maré · Rio das Pedras · Vidigal · Complexo",
+            kind="ok", badge_label="Sites", new_tab=False, **(_img_attrs(sthumb) if sthumb else {})))
+    tu, tthumb = pages.get("textures", (None, None))
+    if tu:
+        cards.append(card(
+            "Performance-texture tiles — sunlight & airflow",
+            "Version A: winter sun-hours (VDG-P07) and CFD pedestrian ventilation "
+            "(RDP-P20) as ground-only relief; three treatments each, with print-risk "
+            "notes and the FDM recommendation.",
+            tu, img=tthumb, meta="sunlight + airflow · stipple / contour / hatch",
+            kind="ok", badge_label="Textures", new_tab=False, **(_img_attrs(tthumb) if tthumb else {})))
+    return section("Physical twins — 3D prints", cards, anchor="prints")
 
 
 def deliverables_section(prov):

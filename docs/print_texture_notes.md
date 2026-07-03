@@ -1,26 +1,39 @@
-# Version A — sunlight-texture tile: variants, print risk, recommendation
+# Version A — performance-texture tiles: variants, print risk, recommendation
 
-A 150 × 150 mm realistic tile of one CFD analysis patch (default **Vidigal
-VDG-P07** — chosen because it is the only patch with a balanced spread across all
-four winter sun-hour classes *and* it is steep, so it stress-tests texture on
-slopes). True terrain, buildings extruded at real height with **smooth roofs**,
-and street-level **winter sun-hours** classified into four classes encoded as a
-**ground-only** relief texture. Three treatments are produced as separate
-watertight STL variants from one shared base.
+A 150 × 150 mm realistic tile of one CFD analysis patch: true terrain, buildings
+extruded at real height with **smooth roofs**, and a performance field classified
+into four classes encoded as a **ground-only** relief texture. Three treatments
+are produced as separate watertight STL variants from one shared base. Two fields
+are wired:
 
-Build: `python scripts/build_texture_tile.py` → `outputs/{site}/print/texture_tile/`.
+- **Sunlight** (`--field sunlight`, default **Vidigal VDG-P07**) — street-level
+  **winter sun-hours**. VDG-P07 is the only patch with a balanced spread across all
+  four sun-hour classes *and* it is steep, so it stress-tests texture on slopes.
+- **Airflow** (`--field ventilation`, **Rio das Pedras RDP-P20**) — pedestrian
+  ventilation from the RDP-P20 CFD return (8-direction steady simpleFoam / kΩSST,
+  ~15 k points/direction), wind-rose-weighted **|U|/U_ref**, split into quartiles.
+  This is a **proxy** for local mean age of air (LMA): low speed = stagnant = old
+  air. **LMA proper is not in this steady set** — it needs a passive-scalar
+  transient run — so the tile is labelled ventilation, not LMA. The 8-direction
+  mean is spatially flat in absolute terms (all ~0.28–0.39 |U|/U_ref), so classes
+  are *relative quartiles* within the patch, not absolute comfort bands.
 
-## Sun-hour classes (winter, from `svf_streets_solar.gpkg`)
+Build: `python scripts/build_texture_tile.py [--field sunlight|ventilation --site … --patch …]`
+→ `outputs/{site}/print/texture_tile/`.
 
-| Class | Winter sun-hours | Texture |
-|-------|------------------|---------|
-| 1 | > 6 h (full sun) | smooth |
-| 2 | 4–6 h | lightest |
-| 3 | 2–4 h | medium |
-| 4 | < 2 h (deep shade) | densest |
+## Classes (smooth → densest)
 
-Each ground cell takes the nearest street-observer's `solar_hours_winter`.
-Building cells are never textured.
+| Class | Sunlight (winter sun-hours) | Airflow (U/U_ref quartile) | Texture |
+|-------|-----------------------------|------------------------------|---------|
+| 1 | > 6 h (full sun) | Q1 · best-ventilated | smooth |
+| 2 | 4–6 h | Q2 | lightest |
+| 3 | 2–4 h | Q3 | medium |
+| 4 | < 2 h (deep shade) | Q4 · most stagnant | densest |
+
+Sunlight: each ground cell takes the nearest street-observer's
+`solar_hours_winter`. Airflow: nearest CFD sample-point |U|/U_ref, wind-rose
+averaged over the 8 directions, then quartile-binned. Building cells are never
+textured in either field.
 
 ## Shared design rule
 
