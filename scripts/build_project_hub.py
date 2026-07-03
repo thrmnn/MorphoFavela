@@ -457,6 +457,40 @@ def _tile_cards(field, site, patch):
     return cards
 
 
+def _print_job_section():
+    """The one-plate Ender-3 print job: bed layout + sliced G-code + plate STL."""
+    pdir = ROOT / "outputs/_hub/print_plate"
+    js = pdir / "favelas_plate.json"
+    if not js.exists():
+        return ""
+    st = json.loads(js.read_text())
+    layout = "/outputs/_hub/print_plate/favelas_plate_layout.png"
+    t = f"{st['print_time_h']} h" if st.get("print_time_h") else "slice pending"
+    fil = f" · {st['filament_g']} g PLA" if st.get("filament_g") else ""
+    cards = [card(
+        f"Bed layout — all 5 sites on one Ender-3 plate ({t}{fil})",
+        f"{st['n_sites']} sites shelf-packed on a {st['bed_mm']:.0f}×{st['bed_mm']:.0f} mm bed, "
+        f"footprint {st['footprint_mm'][0]:.0f}×{st['footprint_mm'][1]:.0f} mm, "
+        f"{st['layer_mm']} mm layers, {st['material']}, no supports.",
+        layout, img=layout, meta=f"{st['printer']} · {st['nozzle_mm']} mm nozzle",
+        kind="ok", badge_label="Print job", **_img_attrs(layout))]
+    gc = pdir / "favelas_plate_ender3.gcode"
+    if gc.exists():
+        cards.append(card("Sliced G-code — favelas_plate_ender3.gcode",
+                          f"Ready-to-print, {gc.stat().st_size/1e6:.1f} MB. Estimated {t}{fil}. "
+                          "Re-slice with scripts/build_print_plate.py if you change the profile.",
+                          "/outputs/_hub/print_plate/favelas_plate_ender3.gcode",
+                          meta="Marlin · Ender-3 · PLA 0.2 mm", kind="info", badge_label="G-code"))
+    stl = pdir / "favelas_plate_ender3.stl"
+    if stl.exists():
+        cards.append(card("Combined plate STL (all 5, arranged)",
+                          "The origin-centred multi-object plate if you'd rather slice it "
+                          "yourself in Creality Print / PrusaSlicer.",
+                          "/outputs/_hub/print_plate/favelas_plate_ender3.stl",
+                          meta=f"{st['triangles']:,} triangles", kind="info", badge_label="STL"))
+    return section("One-plate print job (Ender-3)", cards, anchor="print-job")
+
+
 def write_prints_pages(prov):
     """Write two standalone gallery pages (all sites; texture treatments) and
     return {name: (url, thumb)} so the hub can link them with a preview."""
@@ -476,7 +510,8 @@ def write_prints_pages(prov):
             patch_cards.append(_print_card(js, js.parent / f"{patch}_preview.png",
                                            "info", "Patch · 1:1000"))
     crumb = breadcrumb([("← Project hub", "index.html"), ("Physical twins — sites", None)])
-    body = (section("Full-site models — 5 cm framed artifacts", site_cards, anchor="sites-print")
+    body = (_print_job_section()
+            + section("Full-site models — 5 cm framed artifacts", site_cards, anchor="sites-print")
             + section("CFD analysis-patch prints (1:1000)", patch_cards, anchor="patch-print"))
     sub = f'{badge("ok", f"{len(site_cards)} site models")} {badge("info", "premium framed base · engraved · water")}'
     (OUT / "prints_sites.html").write_text(_relativize(page(
