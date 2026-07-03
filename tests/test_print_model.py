@@ -85,3 +85,38 @@ def test_site_model_is_watertight_and_fits_box():
     assert mesh.is_watertight
     assert mesh.volume > 0
     assert max(stats.model_mm[0], stats.model_mm[1]) == pytest.approx(50.0, abs=0.2)
+
+
+# --- Version A sunlight-texture tile (needs the gitignored patch outputs) ------
+
+_HAS_VDG_PATCH = (
+    ROOT / "outputs/vidigal/sampling_cfd/campaign_sampling/patches/VDG-P07/terrain.tif"
+).exists()
+_tile = pytest.mark.skipif(not _HAS_VDG_PATCH, reason="patch outputs (gitignored) not present")
+
+
+@_tile
+def test_texture_is_ground_only_and_correct_depth():
+    """Each treatment displaces ground cells only, never under buildings, and the
+    max depth honours the spec (pit 0.5mm, contour step+groove ~1.0mm, hatch 0.3mm)."""
+    from src.print3d.texture import VARIANTS, sample_tile
+
+    tile = sample_tile("vidigal", "VDG-P07", tile_mm=150.0, model_cell_mm=1.0)  # coarse=fast
+    for name, fn in VARIANTS.items():
+        disp = fn(tile)
+        assert (disp[~tile.ground_mask] == 0).all(), f"{name} textured a building cell"
+        assert disp.min() >= 0
+        assert disp.max() > 0
+        depth_mm = disp.max() * tile.mm_per_m
+        assert depth_mm <= 1.2, f"{name} exceeds spec depth: {depth_mm:.2f} mm"
+
+
+@_tile
+def test_texture_tile_is_watertight():
+    from src.print3d.texture import build_tile, sample_tile
+
+    tile = sample_tile("vidigal", "VDG-P07", tile_mm=150.0, model_cell_mm=1.0)
+    mesh, stats, _ = build_tile(tile, "stipple")
+    assert mesh.is_watertight
+    assert mesh.volume > 0
+    assert max(stats.model_mm[0], stats.model_mm[1]) == pytest.approx(150.0, abs=1.0)

@@ -429,7 +429,42 @@ def prints_section(prov):
         if js.exists():
             cards.append(_print_card(js, js.parent / f"{patch}_preview.png",
                                      "info", "Patch · 1:1000"))
+    cards += _texture_tile_cards(prov)
     return section("Physical twins — 3D prints", cards, anchor="prints")
+
+
+def _texture_tile_cards(prov):
+    """Version A sunlight-texture tile: the review figure + the 3 STL variants."""
+    tdir = ROOT / "outputs/vidigal/print/texture_tile"
+    review = tdir / "VDG-P07_texture_review.png"
+    if not review.exists():
+        return []
+    notes = ROOT / "docs/print_texture_notes.md"
+    lead = [_doc_card("/docs/print_texture_notes.md",
+                      "Sunlight-texture tile — variants, print risk, recommendation",
+                      "Per-variant print-risk notes + the FDM recommendation (stippling).",
+                      prov)] if notes.exists() else []
+    rurl = "/" + str(review.relative_to(ROOT))
+    cards = lead + [card(
+        "Version A — sunlight-texture tile (VDG-P07)",
+        "A 150 mm realistic tile: true terrain + smooth buildings, winter sun-hours "
+        "(4 classes) encoded as ground-only relief. Three treatments compared — "
+        "stippling / contour bands / directional hatching. FDM pick: stippling.",
+        rurl, img=rurl, meta="Version A · winter sun-hours · ground-only texture",
+        kind="ok", badge_label="Texture · review", **_img_attrs(rurl))]
+    labels = {"stipple": "V1 stipple", "contour": "V2 contour", "hatch": "V3 hatch"}
+    for variant, lbl in labels.items():
+        js = tdir / f"VDG-P07_texture_{variant}.json"
+        if not js.exists():
+            continue
+        st = json.loads(js.read_text())
+        w, d, h = st["model_mm"]
+        cards.append(card(
+            f"{lbl} — STL", f"Watertight variant · texture {st['texture_depth_mm']} mm deep.",
+            "/" + str(js.with_suffix(".stl").relative_to(ROOT)),
+            meta=f"{w:.0f}×{d:.0f}×{h:.0f} mm · 1:{st['scale_denom']}",
+            kind="info", badge_label="STL"))
+    return cards
 
 
 def deliverables_section(prov):
