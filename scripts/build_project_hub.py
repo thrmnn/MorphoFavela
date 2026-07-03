@@ -14,6 +14,7 @@ Serve the repo root and open / (lands on the hub via index.html redirect):
 from __future__ import annotations
 
 import html
+import json
 import os
 import re
 import sys
@@ -386,6 +387,51 @@ def sites_section(prov):
     return section("Sites", cards, anchor="sites")
 
 
+# Two print scales: the whole favela as a 5 cm massing box (DSM heightfield) and
+# the CFD analysis patch at 1:1000 (individual buildings — the physical ↔ digital
+# twin). Cards link the downloadable STL and lightbox the axonometric preview.
+PRINT_PATCHES = [
+    ("rocinha", "ROC-P18"), ("maré", "MAR-P20"),
+    ("riodaspedras", "RDP-P20"), ("vidigal", "VDG-P07"),
+]
+
+
+def _print_card(json_path: Path, preview: Path, kind: str, badge_label: str) -> str:
+    st = json.loads(json_path.read_text())
+    stl = "/" + str(json_path.with_suffix(".stl").relative_to(ROOT))
+    w, d, h = st["model_mm"]
+    if "grid" in st:  # site DSM model
+        title = f"{SITE_NAMES.get(st['site'], st['site'])} — full site"
+        desc = (f"Whole favela as a single watertight massing solid (draped DSM). "
+                f"{st['n_buildings']:,} buildings on a {st['cell_m']:.0f} m grid.")
+        meta = f"1:{st['scale_denom']} · {w:.0f}×{d:.0f}×{h:.0f} mm · relief {st['relief_mm']:.0f} mm"
+    else:  # patch model
+        title = f"{st['patch_id']} — CFD analysis patch"
+        desc = (f"The 100 m patch at 1:1000 — individual buildings on terrain. "
+                f"Print the pilot patch to pair the physical twin with its CFD run.")
+        meta = f"{SITE_NAMES.get(st['site'], st['site'])} · 1:{st['scale_denom']} · {w:.0f}×{d:.0f}×{h:.0f} mm · {st['n_buildings']} buildings"
+    img = "/" + str(preview.relative_to(ROOT)) if preview.exists() else None
+    attrs = _img_attrs(img) if img else {}
+    return card(title, desc, stl, img=img, meta=meta, kind=kind,
+                badge_label=badge_label, **attrs)
+
+
+def prints_section(prov):
+    """Physical-twin 3D prints: 5 full-site massing boxes + the CFD patch prints."""
+    cards = []
+    for site in CAMPAIGN:
+        pdir = ROOT / "outputs" / site / "print"
+        for js in sorted(pdir.glob(f"{site}_site_1to*.json")):
+            cards.append(_print_card(js, pdir / f"{site}_site_preview.png",
+                                     "ok", "Site model"))
+    for site, patch in PRINT_PATCHES:
+        js = ROOT / "outputs" / site / "print" / f"{patch}_1to1000.json"
+        if js.exists():
+            cards.append(_print_card(js, js.parent / f"{patch}_preview.png",
+                                     "info", "Patch · 1:1000"))
+    return section("Physical twins — 3D prints", cards, anchor="prints")
+
+
 def deliverables_section(prov):
     cards = []
     tr_md = ROOT / "docs/technical_report/technical_report.md"
@@ -436,6 +482,7 @@ def main():
         ("ventilation", "Ventilation tendencies (§5.6)", ventilation_section(prov)),
         ("maup", "Grid sensitivity (MAUP)", maup_section(prov)),
         ("facade-solar", "Solar access — façade & street", facade_solar_section(prov)),
+        ("prints", "Physical twins (3D prints)", prints_section(prov)),
         ("sites", "Sites", sites_section(prov)),
     ]
     for title, items in DOC_SECTIONS.items():
