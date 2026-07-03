@@ -21,6 +21,10 @@ import geopandas as gpd
 import numpy as np
 import rasterio
 import trimesh
+from rasterio.enums import MergeAlg, Resampling
+from rasterio.features import rasterize
+from rasterio.transform import from_origin
+from rasterio.warp import reproject
 from rasterio.windows import from_bounds
 from shapely import force_2d
 from shapely.geometry import box
@@ -191,6 +195,165 @@ def build_print_model(
 def save_model(mesh: trimesh.Trimesh, stats: PrintStats, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     stem = f"{stats.patch_id}_1to{stats.scale_denom}"
+    path = out_dir / f"{stem}.stl"
+    mesh.export(path)
+    (out_dir / f"{stem}.json").write_text(json.dumps(asdict(stats), indent=2))
+    return path
+
+
+# --------------------------------------------------------------------------- #
+# Full-site DSM heightfield print
+#
+# A whole favela at a 5 cm box lives at 1:35 000-1:110 000. There a 10 m building
+# is 0.08-0.13 mm — below any print resolution — and boolean-unioning tens of
+# thousands of prisms is infeasible. So the site model is a *digital surface
+# model*: rasterize building heights onto a coarsened terrain grid and drape one
+# watertight solid. O(grid) not O(buildings), always single-manifold, and at this
+# scale the fabric reads as massing. The same sampler feeds the sunlight-texture
+# variants (ground = cells with zero building height).
+# --------------------------------------------------------------------------- #
+
+EXTENDED_DTM = "dtm_extended_300m.tif"
+EXTENDED_BUILDINGS = "buildings_extended_300m.gpkg"
+
+
+@dataclass
+class DSM:
+    """A draped digital surface model over a favela, on a print-scale grid."""
+
+    X: np.ndarray
+    Y: np.ndarray
+    ground: np.ndarray       # terrain elevation, m
+    height: np.ndarray       # building height above ground per cell, m (0 = open ground)
+    transform: object        # affine grid transform (for rasterising other layers)
+    scale_denom: int
+    cell_m: float
+    origin: tuple[float, float]  # (x0, y0) world coords of grid corner
+    n_buildings: int
+
+    @property
+    def surface(self) -> np.ndarray:
+        return self.ground + self.height
+
+
+@dataclass
+class SiteStats:
+    site: str
+    scale_denom: int
+    n_buildings: int
+    grid: tuple[int, int]
+    cell_m: float
+    model_mm: tuple[float, float, float]
+    relief_mm: float
+    triangles: int
+    watertight: bool
+
+
+def _site_data_dir(site: str) -> Path:
+    return ROOT / "data" / site
+
+
+def sample_site_dsm(
+    site: str,
+    target_mm: float = 50.0,
+    model_cell_mm: float = 0.25,
+    margin_m: float = 40.0,
+) -> DSM:
+    """Sample a favela into a print-scale draped surface.
+
+    Terrain is clipped to the *building* bounding box (+ margin) — the extended
+    raster overshoots into bare mountain that would dominate the model. The grid
+    is sized so the longest side is ``target_mm`` and each cell is about
+    ``model_cell_mm`` on the print (~0.25 mm ≈ resin XY resolution), which caps
+    the triangle count regardless of how large the favela is.
+    """
+    ddir = _site_data_dir(site)
+    b = gpd.read_file(ddir / EXTENDED_BUILDINGS)
+    b = b[(b["altura"].notna()) & (b["altura"] > 0) & b.geometry.notna() & ~b.geometry.is_empty]
+
+    x0, y0, x1, y1 = b.total_bounds
+    x0, y0, x1, y1 = x0 - margin_m, y0 - margin_m, x1 + margin_m, y1 + margin_m
+    w, h = x1 - x0, y1 - y0
+    longest = max(w, h)
+
+    scale_denom = int(round(1000.0 * longest / target_mm))
+    cell_m = model_cell_mm * scale_denom / 1000.0
+    nx = max(2, int(round(w / cell_m)))
+    ny = max(2, int(round(h / cell_m)))
+    cell_x, cell_y = w / nx, h / ny
+    transform = from_origin(x0, y1, cell_x, cell_y)  # north-up
+
+    ground = np.empty((ny, nx), dtype="float32")
+    with rasterio.open(ddir / EXTENDED_DTM) as r:
+        src_nodata = r.nodata if r.nodata is not None else 3.4e38
+        reproject(
+            source=rasterio.band(r, 1),
+            destination=ground,
+            src_transform=r.transform, src_crs=r.crs,
+            dst_transform=transform, dst_crs=r.crs,
+            src_nodata=src_nodata, dst_nodata=np.nan,
+            resampling=Resampling.bilinear,
+        )
+    ground = ground.astype(float)
+    ground[ground > NODATA_GUARD] = np.nan
+    if np.isnan(ground).any():
+        ground[np.isnan(ground)] = np.nanmin(ground)
+
+    # Rasterise building height per cell; sort ascending so the tallest wins each cell.
+    b = b.sort_values("altura")
+    shapes = ((geom, float(a)) for geom, a in zip(b.geometry, b["altura"]))
+    height = rasterize(
+        shapes, out_shape=(ny, nx), transform=transform,
+        fill=0.0, merge_alg=MergeAlg.replace, dtype="float32",
+    ).astype(float)
+
+    cols = np.arange(nx) + 0.5
+    rows = np.arange(ny) + 0.5
+    xs = x0 + cols * cell_x
+    ys = y1 - rows * cell_y
+    X, Y = np.meshgrid(xs, ys)
+    return DSM(
+        X=X, Y=Y, ground=ground, height=height, transform=transform,
+        scale_denom=scale_denom, cell_m=(cell_x + cell_y) / 2.0,
+        origin=(x0, y0), n_buildings=int(len(b)),
+    )
+
+
+def build_site_model(
+    site: str,
+    target_mm: float = 50.0,
+    model_cell_mm: float = 0.25,
+    margin_m: float = 40.0,
+    base_thickness: float = 3.0,
+) -> tuple[trimesh.Trimesh, SiteStats, DSM]:
+    """Assemble a watertight full-favela print mesh scaled to a ``target_mm`` box."""
+    dsm = sample_site_dsm(site, target_mm, model_cell_mm, margin_m)
+    surf = dsm.surface
+    mm_per_m = target_mm / max(np.ptp(dsm.X), np.ptp(dsm.Y))
+    floor_z = float(np.min(dsm.ground)) - base_thickness / mm_per_m
+
+    mesh = heightmap_to_solid(dsm.X, dsm.Y, surf, floor_z)
+    mesh.apply_translation([-dsm.origin[0], -dsm.origin[1], -floor_z])
+    mesh.apply_scale(mm_per_m)
+
+    ext = mesh.extents
+    stats = SiteStats(
+        site=site,
+        scale_denom=dsm.scale_denom,
+        n_buildings=dsm.n_buildings,
+        grid=(int(surf.shape[1]), int(surf.shape[0])),
+        cell_m=round(dsm.cell_m, 1),
+        model_mm=(round(ext[0], 1), round(ext[1], 1), round(ext[2], 1)),
+        relief_mm=round(float(np.ptp(dsm.ground)) * mm_per_m, 1),
+        triangles=int(len(mesh.faces)),
+        watertight=bool(mesh.is_watertight),
+    )
+    return mesh, stats, dsm
+
+
+def save_site_model(mesh: trimesh.Trimesh, stats: SiteStats, out_dir: Path) -> Path:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stem = f"{stats.site}_site_1to{stats.scale_denom}"
     path = out_dir / f"{stem}.stl"
     mesh.export(path)
     (out_dir / f"{stem}.json").write_text(json.dumps(asdict(stats), indent=2))

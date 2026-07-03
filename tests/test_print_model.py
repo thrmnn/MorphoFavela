@@ -1,11 +1,15 @@
 """Print-model geometry: the plinth must be a watertight solid and scaling exact."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 trimesh = pytest.importorskip("trimesh")
 
 from src.print3d.model import _building_prisms, heightmap_to_solid
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _flat_grid(n=5, z=10.0):
@@ -51,3 +55,33 @@ def test_building_prism_from_3d_footprint():
     assert len(prisms) == 1
     assert prisms[0].is_watertight
     assert prisms[0].volume == pytest.approx(4 * 3 * (9.0 + 2.0), rel=1e-6)
+
+
+# --- full-site DSM heightfield (needs the gitignored data/ tree) --------------
+
+_HAS_VIDIGAL = (ROOT / "data" / "vidigal" / "dtm_extended_300m.tif").exists()
+_site = pytest.mark.skipif(not _HAS_VIDIGAL, reason="site data (gitignored) not present")
+
+
+@_site
+def test_site_dsm_grid_is_bounded_and_has_massing():
+    """The print grid caps its long side near target/cell regardless of favela
+    size, and building rasterisation produces a non-trivial massing layer that
+    never sinks the ground."""
+    from src.print3d.model import sample_site_dsm
+
+    dsm = sample_site_dsm("vidigal", target_mm=50.0, model_cell_mm=0.25)
+    assert max(dsm.height.shape) <= 210  # ~50mm / 0.25mm, plus rounding
+    assert (dsm.height > 0).any() and (dsm.height == 0).any()  # both built + open ground
+    assert dsm.height.min() == 0.0  # heights are above-ground; never negative
+    assert np.isfinite(dsm.surface).all()
+
+
+@_site
+def test_site_model_is_watertight_and_fits_box():
+    from src.print3d.model import build_site_model
+
+    mesh, stats, _ = build_site_model("vidigal", target_mm=50.0)
+    assert mesh.is_watertight
+    assert mesh.volume > 0
+    assert max(stats.model_mm[0], stats.model_mm[1]) == pytest.approx(50.0, abs=0.2)
