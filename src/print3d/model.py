@@ -230,10 +230,41 @@ class DSM:
     cell_m: float
     origin: tuple[float, float]  # (x0, y0) world coords of grid corner
     n_buildings: int
+    water: np.ndarray = None     # bool: cells at/below sea level
 
     @property
     def surface(self) -> np.ndarray:
         return self.ground + self.height
+
+
+def heightfield_solid(X, Y, Z, floor_z) -> "trimesh.Trimesh":
+    """Vectorised watertight solid under a heightfield — fast for fine grids
+    (the per-cell Python loop in heightmap_to_solid is too slow past ~10⁵ cells)."""
+    ny, nx = Z.shape
+    top = np.stack([X, Y, Z], -1).reshape(-1, 3)
+    bot = top.copy()
+    bot[:, 2] = floor_z
+    verts = np.vstack([top, bot])
+    m = ny * nx
+    idx = np.arange(m).reshape(ny, nx)
+    a = idx[:-1, :-1].ravel(); b = idx[:-1, 1:].ravel()
+    c = idx[1:, 1:].ravel();   d = idx[1:, :-1].ravel()
+    top_f = np.column_stack([a, b, c, a, c, d]).reshape(-1, 3)
+    bot_f = np.column_stack([m + a, m + c, m + b, m + a, m + d, m + c]).reshape(-1, 3)
+    walls = []
+    for row, outer in ((0, True), (ny - 1, False)):
+        a0 = idx[row, :-1]; b0 = idx[row, 1:]
+        q = ([a0, b0, m + b0, a0, m + b0, m + a0] if outer
+             else [a0, m + b0, b0, a0, m + a0, m + b0])
+        walls.append(np.column_stack(q).reshape(-1, 3))
+    for col, outer in ((0, False), (nx - 1, True)):
+        a0 = idx[:-1, col]; b0 = idx[1:, col]
+        q = ([a0, b0, m + b0, a0, m + b0, m + a0] if outer
+             else [a0, m + b0, b0, a0, m + a0, m + b0])
+        walls.append(np.column_stack(q).reshape(-1, 3))
+    mesh = trimesh.Trimesh(vertices=verts, faces=np.vstack([top_f, bot_f, *walls]), process=True)
+    mesh.fix_normals()
+    return mesh
 
 
 @dataclass
@@ -247,6 +278,7 @@ class SiteStats:
     relief_mm: float
     triangles: int
     watertight: bool
+    has_water: bool = False
 
 
 def _site_data_dir(site: str) -> Path:
@@ -258,14 +290,15 @@ def sample_site_dsm(
     target_mm: float = 50.0,
     model_cell_mm: float = 0.25,
     margin_m: float = 40.0,
+    sea_level_m: float = 0.5,
 ) -> DSM:
-    """Sample a favela into a print-scale draped surface.
+    """Sample a favela into a print-scale draped surface with **square cells**.
 
     Terrain is clipped to the *building* bounding box (+ margin) — the extended
     raster overshoots into bare mountain that would dominate the model. The grid
-    is sized so the longest side is ``target_mm`` and each cell is about
-    ``model_cell_mm`` on the print (~0.25 mm ≈ resin XY resolution), which caps
-    the triangle count regardless of how large the favela is.
+    is sized so the longest side is ``target_mm`` at square cells (so X and Y scale
+    identically — correct aspect ratio) and each cell is about ``model_cell_mm`` on
+    the print, which caps the triangle count regardless of favela size.
     """
     ddir = _site_data_dir(site)
     b = gpd.read_file(ddir / EXTENDED_BUILDINGS)
@@ -277,11 +310,11 @@ def sample_site_dsm(
     longest = max(w, h)
 
     scale_denom = int(round(1000.0 * longest / target_mm))
-    cell_m = model_cell_mm * scale_denom / 1000.0
+    cell_m = model_cell_mm * scale_denom / 1000.0  # single square cell size
     nx = max(2, int(round(w / cell_m)))
     ny = max(2, int(round(h / cell_m)))
-    cell_x, cell_y = w / nx, h / ny
-    transform = from_origin(x0, y1, cell_x, cell_y)  # north-up
+    x1, y1 = x0 + nx * cell_m, y0 + ny * cell_m  # snap extent to whole square cells
+    transform = from_origin(x0, y1, cell_m, cell_m)
 
     ground = np.empty((ny, nx), dtype="float32")
     with rasterio.open(ddir / EXTENDED_DTM) as r:
@@ -309,14 +342,22 @@ def sample_site_dsm(
 
     cols = np.arange(nx) + 0.5
     rows = np.arange(ny) + 0.5
-    xs = x0 + cols * cell_x
-    ys = y1 - rows * cell_y
+    xs = x0 + cols * cell_m
+    ys = y1 - rows * cell_m
     X, Y = np.meshgrid(xs, ys)
+    water = (height <= 0) & (ground <= sea_level_m)
     return DSM(
         X=X, Y=Y, ground=ground, height=height, transform=transform,
-        scale_denom=scale_denom, cell_m=(cell_x + cell_y) / 2.0,
-        origin=(x0, y0), n_buildings=int(len(b)),
+        scale_denom=scale_denom, cell_m=cell_m,
+        origin=(x0, y0), n_buildings=int(len(b)), water=water,
     )
+
+
+# Pretty site labels for the engraved nameplate.
+SITE_LABELS = {
+    "rocinha": "Rocinha", "maré": "Maré", "riodaspedras": "Rio das Pedras",
+    "vidigal": "Vidigal", "complexo_do_alemao": "Complexo do Alemão",
+}
 
 
 def build_site_model(
@@ -325,28 +366,41 @@ def build_site_model(
     model_cell_mm: float = 0.25,
     margin_m: float = 40.0,
     base_thickness: float = 3.0,
+    border_mm: float = 6.0,
+    sea_level_m: float = 0.5,
 ) -> tuple[trimesh.Trimesh, SiteStats, DSM]:
-    """Assemble a watertight full-favela print mesh scaled to a ``target_mm`` box."""
-    dsm = sample_site_dsm(site, target_mm, model_cell_mm, margin_m)
-    surf = dsm.surface
-    mm_per_m = target_mm / max(np.ptp(dsm.X), np.ptp(dsm.Y))
-    floor_z = float(np.min(dsm.ground)) - base_thickness / mm_per_m
+    """Assemble a watertight full-favela print artifact (framed base, engraved
+    nameplate, recessed water) fitting a ``target_mm`` box including the border."""
+    from src.print3d.compose import compose
 
-    mesh = heightmap_to_solid(dsm.X, dsm.Y, surf, floor_z)
-    mesh.apply_translation([-dsm.origin[0], -dsm.origin[1], -floor_z])
+    # scale so terrain + both borders == target_mm (the whole artifact fits the box)
+    dsm = sample_site_dsm(site, target_mm, model_cell_mm, margin_m, sea_level_m)
+    longest = max(np.ptp(dsm.X) + dsm.cell_m, np.ptp(dsm.Y) + dsm.cell_m)
+    mm_per_m = (target_mm - 2 * border_mm) / longest
+
+    comp = compose(
+        dsm.ground, dsm.height,
+        x0=float(dsm.X.min()), y0=float(dsm.Y.min()), world_cell=dsm.cell_m,
+        mm_per_m=mm_per_m, label=SITE_LABELS.get(site, site), scale_denom=int(round(1000 / mm_per_m)),
+        sea_level_m=sea_level_m, border_mm=border_mm,
+    )
+    floor_z = float(np.min(comp.surf)) - base_thickness / mm_per_m
+    mesh = heightfield_solid(comp.X, comp.Y, comp.surf, floor_z)
+    mesh.apply_translation([-comp.X.min(), -comp.Y.min(), -floor_z])
     mesh.apply_scale(mm_per_m)
 
+    dsm.composed = comp  # stash for the renderer
     ext = mesh.extents
     stats = SiteStats(
-        site=site,
-        scale_denom=dsm.scale_denom,
+        site=site, scale_denom=int(round(1000 / mm_per_m)),
         n_buildings=dsm.n_buildings,
-        grid=(int(surf.shape[1]), int(surf.shape[0])),
+        grid=(int(comp.surf.shape[1]), int(comp.surf.shape[0])),
         cell_m=round(dsm.cell_m, 1),
         model_mm=(round(ext[0], 1), round(ext[1], 1), round(ext[2], 1)),
         relief_mm=round(float(np.ptp(dsm.ground)) * mm_per_m, 1),
         triangles=int(len(mesh.faces)),
         watertight=bool(mesh.is_watertight),
+        has_water=bool(dsm.water.any()),
     )
     return mesh, stats, dsm
 

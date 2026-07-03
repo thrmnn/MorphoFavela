@@ -19,48 +19,55 @@ from matplotlib.colors import LightSource
 
 TERRAIN = "#d8cdbf"   # bare ground
 BUILT = "#9c6f52"     # massing
+FRAME = "#efe9df"     # base frame / mat
+WATER = "#5b86a6"     # sea / lagoon
 TEAL = "#0f766e"
 
 
-def _downsample(arr: np.ndarray, target: int = 140) -> np.ndarray:
+def _downsample(arr: np.ndarray, target: int = 160):
     step = max(1, max(arr.shape) // target)
-    return arr[::step, ::step]
+    return arr[::step, ::step], step
 
 
-def render_site(dsm, title: str, subtitle: str, out_png: Path) -> Path:
-    """Hillshade plan (left) + axonometric massing (right) of a site DSM."""
-    surf, ground, height = dsm.surface, dsm.ground, dsm.height
-    fig = plt.figure(figsize=(11, 5.2))
+def render_site(dsm, title: str, subtitle: str, out_png: Path, exaggerate: float = 1.0) -> Path:
+    """Hillshade plan (left) + honest-aspect axonometric (right) of the composed
+    site artifact — framed base, engraved nameplate, recessed water."""
+    comp = dsm.composed
+    surf = comp.surf
+    fig = plt.figure(figsize=(11, 5.4))
     fig.suptitle(title, fontsize=15, fontweight="bold", x=0.02, ha="left")
     fig.text(0.02, 0.92, subtitle, fontsize=9, color="#555", ha="left")
 
-    # plan: hillshade of the surface, buildings tinted over bare ground
+    # plan: hillshade of the composed surface; water + massing tinted, nameplate shows
     ax = fig.add_subplot(1, 2, 1)
     ls = LightSource(azdeg=315, altdeg=45)
     rgb = ls.shade(surf, cmap=plt.cm.gray, vert_exag=2.0, blend_mode="soft")
-    ax.imshow(rgb, origin="upper")
-    built = np.ma.masked_where(height <= 0, height)
-    ax.imshow(built, origin="upper", cmap="copper", alpha=0.55)
-    ax.set_title("hillshade plan · built massing tinted", fontsize=9)
+    ax.imshow(rgb, origin="upper", aspect="equal")
+    built = np.ma.masked_where(~comp.built, np.ones_like(surf))
+    ax.imshow(built, origin="upper", cmap=matplotlib.colors.ListedColormap([BUILT]),
+              alpha=0.5, aspect="equal")
+    wat = np.ma.masked_where(~comp.water, np.ones_like(surf))
+    ax.imshow(wat, origin="upper", cmap=matplotlib.colors.ListedColormap([WATER]),
+              alpha=0.6, aspect="equal")
+    ax.set_title("plan · framed base, engraved nameplate, water", fontsize=9)
     ax.set_xticks([]); ax.set_yticks([])
 
-    # axonometric surface
+    # axonometric surface — TRUE aspect ratio (label if exaggerated)
     ax2 = fig.add_subplot(1, 2, 2, projection="3d")
-    X, Y, Z = _downsample(dsm.X), _downsample(dsm.Y), _downsample(surf)
-    Hd = _downsample(height)
-    built_rgb = matplotlib.colors.to_rgba(BUILT)
-    ground_rgb = matplotlib.colors.to_rgba(TERRAIN)
-    facecolors = np.where(
-        (Hd > 0.5)[..., None], np.array(built_rgb), np.array(ground_rgb)
-    )
-    ax2.plot_surface(
-        X, Y, Z, facecolors=facecolors,
-        rstride=1, cstride=1, linewidth=0, antialiased=False, shade=True,
-    )
-    ax2.set_box_aspect((np.ptp(X), np.ptp(Y), max(np.ptp(Z) * 3, 1)))
-    ax2.view_init(elev=38, azim=-60)
+    (X, _), (Y, _), (Z, step) = (_downsample(comp.X), _downsample(comp.Y), _downsample(surf))
+    built_d, water_d, frame_d = comp.built[::step, ::step], comp.water[::step, ::step], comp.frame[::step, ::step]
+    fc = np.empty(Z.shape + (4,))
+    fc[:] = matplotlib.colors.to_rgba(TERRAIN)
+    fc[frame_d] = matplotlib.colors.to_rgba(FRAME)
+    fc[built_d] = matplotlib.colors.to_rgba(BUILT)
+    fc[water_d] = matplotlib.colors.to_rgba(WATER)
+    ax2.plot_surface(X, Y, Z * exaggerate, facecolors=fc, rstride=1, cstride=1,
+                     linewidth=0, antialiased=False, shade=True)
+    ax2.set_box_aspect((np.ptp(X), np.ptp(Y), max(np.ptp(Z) * exaggerate, 1e-6)))
+    ax2.view_init(elev=32, azim=-58)
     ax2.set_axis_off()
-    ax2.set_title("draped surface (relief ×3)", fontsize=9, y=0.96)
+    ax2.set_title("axonometric · true aspect" if exaggerate == 1
+                  else f"axonometric · relief ×{exaggerate:g}", fontsize=9, y=0.96)
 
     out_png.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout(rect=(0, 0, 1, 0.9))

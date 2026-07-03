@@ -35,7 +35,7 @@ from rasterio.transform import from_origin
 from rasterio.warp import reproject
 from scipy.spatial import cKDTree
 
-from src.print3d.model import NODATA_GUARD, ROOT
+from src.print3d.model import NODATA_GUARD, ROOT, heightfield_solid
 
 # Winter sun-hours class edges → shade level. Class 1 (>6 h, full sun) = smooth;
 # shade rises to Class 4 (<2 h, deep shade) which carries the densest texture.
@@ -206,42 +206,6 @@ def hatch_displacement(tile: Tile) -> np.ndarray:
 
 # --------------------------------------------------------------------------- #
 
-def _heightfield_solid(X, Y, Z, floor_z) -> trimesh.Trimesh:
-    """Vectorised watertight solid under a heightfield (fast for fine grids)."""
-    ny, nx = Z.shape
-    top = np.stack([X, Y, Z], -1).reshape(-1, 3)
-    bot = top.copy()
-    bot[:, 2] = floor_z
-    verts = np.vstack([top, bot])
-    m = ny * nx
-    idx = np.arange(m).reshape(ny, nx)
-    a = idx[:-1, :-1].ravel(); b = idx[:-1, 1:].ravel()
-    c = idx[1:, 1:].ravel();   d = idx[1:, :-1].ravel()
-    top_f = np.column_stack([a, b, c, a, c, d]).reshape(-1, 3)
-    bot_f = np.column_stack([m + a, m + c, m + b, m + a, m + d, m + c]).reshape(-1, 3)
-
-    walls = []
-    # north/south borders (rows 0 and ny-1), quads across columns
-    for row in (0, ny - 1):
-        a0 = idx[row, :-1]; b0 = idx[row, 1:]
-        outer_first = row == 0
-        q = ([a0, b0, m + b0, a0, m + b0, m + a0] if outer_first
-             else [a0, m + b0, b0, a0, m + a0, m + b0])
-        walls.append(np.column_stack(q).reshape(-1, 3))
-    # west/east borders (cols 0 and nx-1), quads across rows
-    for col in (0, nx - 1):
-        a0 = idx[:-1, col]; b0 = idx[1:, col]
-        outer_first = col == nx - 1
-        q = ([a0, b0, m + b0, a0, m + b0, m + a0] if outer_first
-             else [a0, m + b0, b0, a0, m + a0, m + b0])
-        walls.append(np.column_stack(q).reshape(-1, 3))
-
-    faces = np.vstack([top_f, bot_f, *walls])
-    mesh = trimesh.Trimesh(vertices=verts, faces=faces, process=True)
-    mesh.fix_normals()
-    return mesh
-
-
 VARIANTS = {
     "stipple": stipple_displacement,
     "contour": contour_displacement,
@@ -268,7 +232,7 @@ def build_tile(tile: Tile, variant: str, base_thickness: float = 4.0):
     surf = tile.base_surface - disp  # displacement is downward (into ground)
     floor_z = float(np.min(surf)) - base_thickness / tile.mm_per_m
 
-    mesh = _heightfield_solid(tile.X, tile.Y, surf, floor_z)
+    mesh = heightfield_solid(tile.X, tile.Y, surf, floor_z)
     mesh.apply_translation([-tile.X.min(), -tile.Y.min(), -floor_z])
     mesh.apply_scale(tile.mm_per_m)
 
