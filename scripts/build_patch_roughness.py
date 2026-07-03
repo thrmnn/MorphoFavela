@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import glob
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -27,14 +28,28 @@ sys.path.insert(0, str(ROOT))
 
 from src.morphometry.roughness import (
     DIRS,
+    ROUGHNESS_CALIBRATION,
+    Z0_FLOOR_M,
+    floor_z0,
     patch_mean_lambda_f,
     roughness,
+    z0_was_floored,
 )
+
+
+def _source_commit() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
+            text=True).strip()
+    except Exception:
+        return "unknown"
 
 OUT = ROOT / "outputs" / "cross_site" / "roughness"
 
 
 def main():
+    commit = _source_commit()
     rows = []
     for gridp in sorted(glob.glob(str(ROOT / "outputs/*/features/features_grid.parquet"))):
         site = Path(gridp).parents[1].name
@@ -56,11 +71,18 @@ def main():
             zd_kan, z0_kan = roughness("Kan", zH, fai_mean, pai, zMax, zSdev)
             row = {"site": site, "patch_id": m.get("patch_id"),
                    "z0_kan": z0_kan, "zd_kan": zd_kan,
+                   "z0_kan_floored": floor_z0(z0_kan),
+                   "flag_z0_floored": z0_was_floored(z0_kan),
                    "lambda_p": pai, "H_mean": zH, "sigma_h": zSdev, "H_max": zMax,
                    "slope_deg": m.get("slope_deg"), "n_cells": laf["n_cells"],
-                   "flag_pai_over_envelope": bool(pai is not None and pai > 0.5)}
+                   "flag_pai_over_envelope": bool(pai is not None and pai > 0.5),
+                   "z0_floor_m": Z0_FLOOR_M,
+                   "roughness_calibration": ROUGHNESS_CALIBRATION,
+                   "source_commit": commit}
             for d in DIRS:
-                row[f"z0_kan_{d}"] = roughness("Kan", zH, laf[d], pai, zMax, zSdev)[1]
+                z0d = roughness("Kan", zH, laf[d], pai, zMax, zSdev)[1]
+                row[f"z0_kan_{d}"] = z0d
+                row[f"z0_kan_floored_{d}"] = floor_z0(z0d)
             rows.append(row)
 
     df = pd.DataFrame(rows)
@@ -76,7 +98,9 @@ def main():
             sub.to_csv(dst, index=False)
     ok = df["z0_kan"].notna()
     print(f"{len(df)} patches, {int(ok.sum())} with z0; "
-          f"{int(df['flag_pai_over_envelope'].sum())} flagged λp>0.5")
+          f"{int(df['flag_pai_over_envelope'].sum())} flagged λp>0.5; "
+          f"{int(df['flag_z0_floored'].sum())} floored to {Z0_FLOOR_M} m "
+          f"(calibration {ROUGHNESS_CALIBRATION}, src {commit})")
     print(df.groupby("site")["z0_kan"].agg(["count", "median"]).round(3).to_string())
 
 

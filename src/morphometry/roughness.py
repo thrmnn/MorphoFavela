@@ -27,6 +27,30 @@ from RoughnessCalcFunctionV2 import RoughnessCalc
 DIRS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 METHODS = ("Kan", "Mho", "Mac", "Rau")  # Kanda primary; Macdonald = σH-free baseline
 PAI_ENVELOPE_MAX = 0.5  # all methods calibrated below ~0.5
+Z0_FLOOR_M = 0.03  # suburban ground class; log-profile denominator floor
+ROUGHNESS_CALIBRATION = "kanda_precfd_v1"  # provenance token; moved only by CFD R-C
+
+
+def floor_z0(z0, floor: float = Z0_FLOOR_M):
+    """NaN-safe roughness floor for use as a log-profile denominator.
+
+    Morphometric z0 collapses toward 0 in the skimming limit (λp>0.5) and is NaN
+    where the estimator has no valid fabric — both are unusable as the denominator
+    of ln((z+z0)/z0). Return ``floor`` wherever z0 is non-finite or below it.
+    ``np.maximum`` is deliberately avoided: np.maximum(np.nan, f) is nan, which
+    silently fails exactly in the empty case the floor exists to rescue. Scalar in
+    → scalar out; array in → array out.
+    """
+    arr = np.asarray(z0, dtype=float)
+    floored = np.where(np.isfinite(arr) & (arr >= floor), arr, floor)
+    return floored if arr.ndim else float(floored)
+
+
+def z0_was_floored(z0, floor: float = Z0_FLOOR_M):
+    """True where floor_z0 replaces the raw value (non-finite or < floor)."""
+    arr = np.asarray(z0, dtype=float)
+    flagged = ~(np.isfinite(arr) & (arr >= floor))
+    return flagged if arr.ndim else bool(flagged)
 
 
 def roughness(method: str, zH, fai, pai, zMax, zSdev) -> tuple[float, float]:

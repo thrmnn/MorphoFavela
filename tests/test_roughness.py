@@ -5,10 +5,13 @@ import pandas as pd
 
 from src.morphometry.roughness import (
     DIRS,
+    Z0_FLOOR_M,
     extrapolation_flags,
+    floor_z0,
     patch_mean_lambda_f,
     roughness,
     roughness_vec,
+    z0_was_floored,
 )
 
 
@@ -61,3 +64,32 @@ def test_extrapolation_flags():
                             zMax=np.array([15.0, 15.0]), zSdev=np.array([2.0, 2.0]))
     assert bool(f["flag_pai_over_envelope"][0]) and not bool(f["flag_pai_over_envelope"][1])
     assert np.isfinite(f["kanda_X"]).all()
+
+
+# --- z0 floor (validate-first CFD-inlet core) ---
+# The floor must be NaN-safe: it exists to rescue the empty/skimming case where the
+# raw estimate is NaN or ~0, and np.maximum(nan, floor) would silently return nan.
+
+def test_floor_rescues_nan():
+    assert floor_z0(np.nan) == Z0_FLOOR_M          # the np.maximum trap
+    assert z0_was_floored(np.nan) is True
+
+
+def test_floor_rescues_skimming_collapse():
+    assert floor_z0(0.0) == Z0_FLOOR_M             # z0→0 at λp>0.5
+    assert floor_z0(0.001) == Z0_FLOOR_M
+    assert z0_was_floored(0.001) is True
+
+
+def test_floor_passes_through_valid_z0():
+    assert floor_z0(0.25) == 0.25                  # a rough, valid patch is untouched
+    assert z0_was_floored(0.25) is False
+
+
+def test_floor_is_scalar_in_scalar_out_array_in_array_out():
+    assert isinstance(floor_z0(0.5), float)
+    out = floor_z0(np.array([np.nan, 0.0, 0.25]))
+    assert out.shape == (3,)
+    assert list(out) == [Z0_FLOOR_M, Z0_FLOOR_M, 0.25]
+    flags = z0_was_floored(np.array([np.nan, 0.0, 0.25]))
+    assert list(flags) == [True, True, False]
