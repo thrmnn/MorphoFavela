@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.print3d.model import ROOT, build_print_model, save_model
+from src.print3d.render import render_patch_mesh
 
 
 def main() -> None:
@@ -29,6 +30,7 @@ def main() -> None:
     ap.add_argument("--base-thickness", type=float, default=3.0,
                     help="solid plinth thickness in model mm")
     ap.add_argument("--sampling", default="campaign_sampling")
+    ap.add_argument("--no-preview", action="store_true")
     args = ap.parse_args()
 
     mesh, stats = build_print_model(
@@ -43,6 +45,14 @@ def main() -> None:
     print(f"  triangles    : {stats.triangles:,}")
     print(f"  manifold     : {stats.single_manifold} (single watertight solid: {stats.watertight})")
     print(f"  -> {out.relative_to(ROOT)}")
+    if not args.no_preview:
+        png = render_patch_mesh(
+            mesh,
+            f"{args.patch} — analysis patch",
+            f"{args.site} · 1:{args.scale} · {w:.0f}×{d:.0f}×{h:.0f} mm · {stats.n_buildings} buildings",
+            ROOT / "outputs" / args.site / "print" / f"{args.patch}_preview.png",
+        )
+        print(f"  -> {png.relative_to(ROOT)}")
     if not stats.single_manifold:
         print("  NOTE: manifold3d unavailable — exported as a union of individually closed "
               "solids. Resin slicers (Chitubox/Lychee) handle this; install manifold3d for "
