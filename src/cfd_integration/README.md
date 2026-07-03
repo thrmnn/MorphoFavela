@@ -369,6 +369,46 @@ profile**:
 With those, R-C fits `⟨U⟩(z)=(u*/κ)·ln((z−zd)/z0)` and reports whether κ held at
 0.40. Absent them, R-C cannot run and roughness stays morphometric-only.
 
+## Pilot request (do this ONE case first) — MAR-P07 × N, the R-C anchor
+
+**This is the single highest-priority CFD return.** A 2026-07-03 review
+(`docs/cfd_parameter_estimation_plan.md`, `/autoplan`) established that every
+further morphometric CFD-inlet parameter (upstream-fetch `z0_inlet`, inlet ABL
+turbulence fields) is propagation of the *same* Kanda estimator the roughness
+council already flagged as ~1.5 orders uncertain and physically invalid in 53–75 %
+of cells. Building more of those before one real return exists is the wrong order.
+**So this repo deliberately holds F/I and asks the CFD side for one anchor instead.**
+
+**Run:** `MAR-P07` (Maré, flat terrain, ~1,200 buildings — the simplest patch),
+**wind direction N only**, at the `rectangular_domain_v1` extents. One case.
+
+**Deliver** the standard inbound contract (`sample_points.csv` + `summary.json`)
+**plus** the R-C return above:
+- horizontally-averaged `⟨U⟩(z)` from ~`H_max` to ~`H_max + H_mean` (a `profile.csv`
+  or a `summary.json` array), and
+- the integrated surface drag (form + skin) or wall shear over the patch plan area,
+  giving `u*² = τ_total/ρ`.
+
+**Gate before the return may recalibrate Kanda** (council refinements, binding):
+(a) empty-domain **horizontal homogeneity** sustained to the patch (±few %);
+(b) **grid-convergence index** on the *extracted* z0/zd across ≥3 grids;
+(c) convergence tied to the **drag-integral plateau**, not just residuals
+(AIJ Tominaga 2008 / COST 732). MAR-P07 being flat, the Jackson log-fit is valid
+here (reserve the drag-integral estimator for the ≥10° slope patches).
+
+**What R-C does with it:** back out the CFD z0/zd, compare against this patch's
+morphometric `z0_kan_floored` (currently floored to 0.03 m; MAR-P07 sits in the
+λp>0.5 skimming regime where the raw estimate collapses), and decide whether the
+`kanda_precfd_v1` calibration token moves. Only then do Tracks F and I get built.
+
+**Guard:** validate only against a return carrying `"synthetic": false`. The
+`data/{site}/cfd_results/` tree has historically held unmarked synthetic data — a
+synthetic MAR-P07 return must NOT be mistaken for the anchor (see
+`generate_synthetic_cfd_results.py`, which writes to a separate root).
+
+Execution happens in the CFD repo (`~/Airflow`), not here — this section is the
+request + the return contract, not a runnable job.
+
 ## Roughness→CFD coupling — refinements from the expert council (2026-06-19)
 
 A 3-expert review (urban-climate · morphometrics · CFD/wind-engineering) hardened
