@@ -56,6 +56,10 @@ DOC_SECTIONS = {
          "The full grouped gallery — click any figure to enlarge.", "live"),
     ],
     "CFD hand-off (exports)": [
+        ("/docs/roughness_wall_treatment_explainer.md",
+         "▶ Roughness & wall treatment — plain-language guide (start here)",
+         "What z₀/z_d mean, the two-roles rule, why favela density breaks the estimate, and "
+         "how z₀ becomes a wall boundary condition — with urban-physics schematics.", "doc"),
         ("/docs/cfd_parameter_estimation_plan.md", "CFD parameter-estimation plan + hand-off spec",
          "The morphometric→CFD inlet/wall spec: NaN-safe floored z0 + provenance "
          "(shipped), the MAR-P07 pilot request, F/I deferred-gated on it. "
@@ -280,6 +284,7 @@ def _latest_target_exists(url):
         "/outputs/_hub/docs/morphology_overview.html": "docs/morphology_overview.md",
         "/outputs/_hub/docs/dashboard_improvement_plan.html": "docs/dashboard_improvement_plan.md",
         "/outputs/_hub/docs/cfd_parameter_estimation_plan.html": "docs/cfd_parameter_estimation_plan.md",
+        "/outputs/_hub/docs/roughness_wall_treatment_explainer.html": "docs/roughness_wall_treatment_explainer.md",
     }.get(file)
     return (ROOT / (hub_src or file.lstrip("/"))).exists()
 
@@ -297,6 +302,10 @@ def build_callout(prov):
     # TR section it documents — never a bare on-page anchor that duplicates a
     # section below. (date, label, url, gloss); existence-gated at render.
     latest = [
+        ("2026-07-03", "Roughness & wall treatment — plain-language guide",
+         f"{hub}/docs/roughness_wall_treatment_explainer.html",
+         "review-friendly walkthrough with urban-physics schematics: z₀/z_d, the "
+         "two-roles rule, the skimming-regime break, and z₀→wall-BC (k_s < y_P)"),
         ("2026-07-03", "CFD hand-off: floored z0 + provenance, pilot requested",
          f"{hub}/docs/cfd_parameter_estimation_plan.html",
          "/autoplan-reviewed, validate-first: shipped NaN-safe floored z0 + "
