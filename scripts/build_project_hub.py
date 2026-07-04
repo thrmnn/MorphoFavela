@@ -286,6 +286,7 @@ def _latest_target_exists(url):
         "/outputs/_hub/docs/dashboard_improvement_plan.html": "docs/dashboard_improvement_plan.md",
         "/outputs/_hub/docs/cfd_parameter_estimation_plan.html": "docs/cfd_parameter_estimation_plan.md",
         "/outputs/_hub/docs/roughness_wall_treatment_explainer.html": "docs/roughness_wall_treatment_explainer.md",
+        "/outputs/_hub/health.html": "outputs/paper_figures/cross_site_stats.json",
     }.get(file)
     return (ROOT / (hub_src or file.lstrip("/"))).exists()
 
@@ -303,6 +304,11 @@ def build_callout(prov):
     # TR section it documents — never a bare on-page anchor that duplicates a
     # section below. (date, label, url, gloss); existence-gated at render.
     latest = [
+        ("2026-07-04", "Planetary-health exposure pathways (panel-graded)",
+         f"{hub}/health.html",
+         "a Lancet-style panel maps built form to WHO-referenced exposure — winter-"
+         "sun deprivation (Grade A, AUC 0.90), equity, airborne, heat — each "
+         "evidence-graded A–D; modelled exposure, not measured health"),
         ("2026-07-03", "Roughness & wall treatment — plain-language guide",
          f"{hub}/docs/roughness_wall_treatment_explainer.html",
          "review-friendly walkthrough with urban-physics schematics: z₀/z_d, the "
@@ -572,6 +578,271 @@ def prints_section(prov):
     return section("Physical twins — 3D prints", cards, anchor="prints")
 
 
+# ── Planetary-health section ──────────────────────────────────────────────────
+# Synthesised from a Lancet Planetary Health-style expert panel: advocates for the
+# heat, respiratory/infectious, healthy-housing and equity pathways, plus a
+# methods-editor skeptic who fixed the A–D evidence grades and banned causal verbs
+# and invented incidence numbers. Every claim here is a modelled environmental
+# EXPOSURE surface, never a measured health outcome — the page leads with that
+# disclaimer. Bound to real artifacts: cross_site_stats.json (4-state taxonomy),
+# the sun-deficit surface, the cross-site risk map, the geometric ventilation index.
+
+HEALTH_DISCLAIMER = (
+    "These are modelled environmental <em>exposure</em> surfaces, not measured "
+    "health outcomes. This pipeline holds no temperature, air-exchange, mortality, "
+    "morbidity or clinical data. Every health endpoint below — heat morbidity, "
+    "respiratory transmission, damp / vitamin-D / mental health — is a mechanism "
+    "drawn from the published literature, not a finding of this study. What we "
+    "contribute is <em>where the built fabric produces unequal, WHO-referenced "
+    "exposure</em>; the health consequences are hypothesised pathways for "
+    "prioritisation and would need epidemiological data to confirm."
+)
+
+HEALTH_GRADES = [
+    ("A", "ok", "Modelled exposure, independently cross-checked"),
+    ("B", "amber", "Modelled exposure, single model"),
+    ("C", "amber", "Geometric proxy — weak / partial physical signal"),
+    ("D", "warn", "Inferred from literature — no matching field in the repo"),
+]
+
+# (grade, pill-kind, grade-note, title, mechanism, evidence, caveat) — strongest first.
+HEALTH_PATHWAYS = [
+    ("A", "ok", "Modelled exposure, cross-checked",
+     "Winter-sun deprivation → damp, mould, vitamin-D, mood",
+     "Dwellings that never clear the WHO ≥2 h/day winter-sun floor cannot dry "
+     "passively, so surfaces stay damp and mould and dust-mite antigen accumulate — "
+     "the most direct link, tied in the literature to asthma and wheeze. Chronically "
+     "shaded façades also cut the UVB reaching skin (cutaneous vitamin-D synthesis), "
+     "and low winter daylight is associated with mood and sleep disturbance.",
+     "The best-evidenced exposure in the project: the sun-deficit surface is "
+     "physically modelled, sun_fail logistic AUC 0.90 with a coherent structure "
+     "(SVF protective β −1.62; slope worsening β +0.40; north-facing protective "
+     "β −0.67, correct for the southern hemisphere). Cell morphotype moves the share "
+     "of street observers below the floor from 14% to 73%, transferring "
+     "leave-one-site-out (morphotype 17% of variance vs site 2%). An independent "
+     "Ladybug façade run agrees on ordering — 50–72% of façade area below the floor, "
+     "Rocinha worst.",
+     "A modelled sun-availability surface, not measured damp, serum vitamin-D or "
+     "diagnosed mood disorder; the 2 h floor is a healthy-housing daylight "
+     "reference, not a clinical threshold."),
+    ("B", "amber", "Distributional claim modelled; link to persons inferred (D)",
+     "Unequal distribution of exposure — who bears it",
+     "Environmental deprivation is not shared evenly. Within one favela, street-sun "
+     "access is steeply unequal, so a mean hours-per-observer figure hides the "
+     "deprived tail that carries the burden. Across favelas, because failure tracks "
+     "morphotype not place, the same worst-exposed fabric recurs everywhere — which "
+     "turns a blind cross-site map into a screening tool that finds the most "
+     "deprived fabric wherever it sits, an equity lever as heat extremes intensify.",
+     "Street-sun inequality reaches Gini 0.70 (Rocinha, most unequal) — measured, "
+     "not assumed. Risk is a property of the fabric type (morphotype 17% of failure "
+     "variance vs site 2%), backing a blind 8-favela risk map.",
+     "We measure that exposure is unequal within the built fabric; with no "
+     "observer-level socio-economic microdata linked, we cannot claim the poorest "
+     "individuals occupy the worst cells — that step is external inference."),
+    ("B–C", "amber", "Sunlight leg modelled (B); ventilation leg geometric proxy (C)",
+     "Airborne-pathogen conditions — respiratory, tuberculosis",
+     "Two distinct routes converge on the same compact fabric. Direct sun is "
+     "germicidal (M. tuberculosis is sunlight-sensitive) and dries the interiors "
+     "where respiratory pathogens persist — the sunlight route inherits the Grade-A "
+     "solar surface. Separately, low outdoor ventilation weakens street-level "
+     "dilution of exhaled aerosols; by Wells-Riley logic transmission risk rises as "
+     "air exchange falls.",
+     "The sunlight route is as strong as the solar pathway above. The ventilation "
+     "route is weak: the vent_fail logistic is only AUC 0.69 with density (λp, "
+     "β +0.32) the driver and SVF non-significant; a changepoint model puts a "
+     "ventilation collapse near SVF ≈ 0.12. Note the repo's per-patch CFD returns "
+     "are synthetic placeholders (real OpenFOAM results pending), so the ventilation "
+     "route rests on geometry plus one illustrative field, not measured airflow.",
+     "Outdoor canyon ventilation is not indoor air-change rate — pedestrian "
+     "|U|/U_ref describes the street, not the ACH inside dwellings where "
+     "transmission happens; treat it as a fabric-level susceptibility flag."),
+    ("D", "warn", "Inferred — no thermal field in the repo",
+     "Heat retention — the SVF double-edge",
+     "SVF cuts both ways for heat. Deep, low-SVF canyons cut the daytime shortwave "
+     "dose (protective shade in a tropical heatwave — the same geometry that starves "
+     "streets of winter sun), but at night a low sky view traps outgoing longwave "
+     "against warm masonry and metal and suppresses the ventilation that would flush "
+     "accumulated heat. Because heatwave mortality is driven disproportionately by "
+     "warm nights, the trapping-and-stagnation face likely dominates.",
+     "Geometry only — SVF, λp, σH and heights locate where nocturnal trapping and "
+     "low ventilation co-occur; the share of cells below SVF ≈ 0.12 flags "
+     "stagnation-prone fabric. The repo holds no air temperature, UTCI or PET "
+     "field, so the entire thermal link is imported from external physics.",
+     "We measure form, not heat; every thermal claim is a geometric inference, and "
+     "low SVF is genuinely double-edged, not unidirectionally harmful."),
+]
+
+# Honest anchor surfaces (real, non-synthetic): (rel-path-under-exports, title, desc).
+HEALTH_SURFACES = [
+    ("fig04_diagnostic_taxonomy.png",
+     "Compound environmental constraint — 4-state taxonomy",
+     "Every built cell classified adequate / sun-constrained / ventilation-"
+     "constrained / both. The compound (both) share reaches 72% of built cells in "
+     "Rocinha. This is the section's anchor exposure surface."),
+    ("fig_solar_deficit.png",
+     "Winter sun-deficit surface (WHO 2 h/day floor)",
+     "Physically-modelled winter direct-sun hours per street observer against the "
+     "≥2 h healthy-housing floor — the Grade-A exposure map."),
+    ("cross_site_riskmap.png",
+     "Cross-site risk map — equity screening tool (8 favelas)",
+     "One continuous fabric-vector model flags the worst-exposed morphotypes across "
+     "campaign + calibration favelas; reframed here as an equity-prioritisation "
+     "instrument, not a descriptive overview."),
+    ("ventilation_index.png",
+     "Geometric ventilation constraint (0–3, pre-CFD)",
+     "Strictly geometric ventilation tendency (skimming / depth / wind-alignment "
+     "flags) — independent of the synthetic CFD returns. A susceptibility flag, not "
+     "an air-exchange measurement."),
+]
+
+
+def _health_pathways_html():
+    blocks = []
+    for grade, kind, note, title, mech, ev, cav in HEALTH_PATHWAYS:
+        g = grade.replace("–", "").replace("-", "")[:1]  # left-border colour by lead grade
+        blocks.append(
+            f'<div class="hx-path hx-{g}">'
+            f'{badge(kind, "Grade " + grade)} '
+            f'<span class="lab">{html.escape(note)}</span>'
+            f'<h3>{html.escape(title)}</h3>'
+            f'<p><b>Mechanism.</b> {html.escape(mech)}</p>'
+            f'<p><b>What our data show.</b> {html.escape(ev)}</p>'
+            f'<p class="cav"><b>Caveat.</b> {html.escape(cav)}</p>'
+            f'</div>')
+    rubric = '<div class="hx-rubric">' + "".join(
+        f'<span class="r">{badge(kind, "Grade " + g)} {html.escape(defn)}</span>'
+        for g, kind, defn in HEALTH_GRADES) + '</div>'
+    return rubric + "".join(blocks)
+
+
+def _health_table_html():
+    """Per-site compound-deprivation table from the real 4-state taxonomy shares."""
+    js = ROOT / "outputs/paper_figures/cross_site_stats.json"
+    if not js.exists():
+        return ""
+    per = json.loads(js.read_text()).get("per_site", [])
+    rows = []
+    for v in sorted(per, key=lambda r: -r.get("shares", {}).get("compound_constraint", 0)):
+        s = v.get("shares", {})
+        rows.append((
+            SITE_NAMES.get(v.get("site"), v.get("site", "?")),
+            v.get("typology", ""),
+            s.get("adequate", 0), s.get("sunlight_constraint", 0),
+            s.get("ventilation_constraint", 0), s.get("compound_constraint", 0),
+            v.get("pct_sun_below_2h", 0)))
+    if not rows:
+        return ""
+    body = "".join(
+        f'<tr><td>{html.escape(name)}</td><td>{html.escape(typ)}</td>'
+        f'<td>{adq*100:.0f}%</td><td>{sun*100:.0f}%</td><td>{vent*100:.0f}%</td>'
+        f'<td class="hot">{comp*100:.0f}%</td><td>{s2*100:.0f}%</td></tr>'
+        for name, typ, adq, sun, vent, comp, s2 in rows)
+    return (
+        '<table class="hx-tbl"><thead><tr>'
+        '<th>Favela</th><th>Type</th><th>Adequate</th><th>Sun-only</th>'
+        '<th>Vent-only</th><th>Both (compound)</th><th>Sun&lt;2 h</th>'
+        '</tr></thead><tbody>' + body + '</tbody></table>'
+        '<p class="sub">Share of built 10 m cells in each exposure state (4-state '
+        'diagnostic taxonomy; ≥2 h winter-sun floor, λf&gt;0.35 ventilation flag). '
+        '“Both” = sun- <em>and</em> ventilation-constrained — the compound-'
+        'deprivation fabric an intervention would target first.</p>')
+
+
+HEALTH_STYLE = (
+    '<style>'
+    '.hx-rubric{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 16px}'
+    '.hx-rubric .r{font-size:12.5px;color:var(--mut);border:1px solid var(--line);'
+    'border-radius:8px;padding:6px 10px;background:var(--card)}'
+    '.hx-path{background:var(--card);border:1px solid var(--line);'
+    'border-left:5px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0}'
+    '.hx-path h3{margin:6px 0;font-size:16px}.hx-path p{margin:6px 0;font-size:14px;line-height:1.6}'
+    '.hx-path .lab{color:var(--mut);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.03em}'
+    '.hx-path .cav{color:var(--mut)}'
+    '.hx-A{border-left-color:var(--ok)}.hx-B{border-left-color:var(--amber)}'
+    '.hx-C{border-left-color:var(--amber)}.hx-D{border-left-color:var(--warn)}'
+    '.hx-tbl{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0 4px}'
+    '.hx-tbl th,.hx-tbl td{border:1px solid var(--line);padding:6px 9px;text-align:right}'
+    '.hx-tbl th:first-child,.hx-tbl td:first-child,.hx-tbl th:nth-child(2),'
+    '.hx-tbl td:nth-child(2){text-align:left}'
+    '.hx-tbl th{background:#eef1f4}.hx-tbl .hot{font-weight:700;color:var(--warn)}'
+    '</style>')
+
+
+def write_health_page(prov):
+    """Standalone planetary-health page: panel-synthesised form → exposure → literature
+    health pathways, evidence-graded and bound to the real exposure surfaces. Returns
+    (url, thumb) so the hub can link it with a preview."""
+    exports = "/outputs/paper_figures/exports"
+    surf_cards = [
+        card(title, desc, f"{exports}/{fn}", img=f"{exports}/{fn}",
+             meta="modelled exposure surface", kind="ok", badge_label="Exposure",
+             new_tab=False, **_img_attrs(f"{exports}/{fn}"))
+        for fn, title, desc in HEALTH_SURFACES
+        if (ROOT / exports.lstrip("/") / fn).exists()]
+    site_maps = []
+    for s in CAMPAIGN:
+        fn = f"/outputs/{s}/paper_figures/fig_{s}_diagnostic_map.png"
+        if (ROOT / fn.lstrip("/")).exists():
+            site_maps.append(card(
+                f"{SITE_NAMES.get(s, s)} — diagnostic map",
+                "Per-cell exposure state across the settlement (adequate / sun / "
+                "ventilation / compound).", fn, img=fn,
+                meta="4-state taxonomy", kind="info", badge_label="Per-site",
+                new_tab=False, **_img_attrs(fn)))
+
+    disclaimer = (
+        '<div class="callout" style="border-left-color:var(--warn)">'
+        f'<p class="lead">Read first — what this is (and is not)</p>'
+        f'<p>{HEALTH_DISCLAIMER}</p></div>')
+    panel_note = (
+        '<div class="callout"><p class="lead">How this section was built — a '
+        'Planetary Health panel</p><p>Four advocates argued distinct pathways '
+        '(urban-heat, respiratory/infectious, healthy-housing, health-equity) '
+        'against a methods-editor skeptic who fixed the A–D evidence grades, banned '
+        'causal verbs and any invented incidence numbers, and required the '
+        'disclaimer above. Every pathway carries its grade; the solar pathway '
+        '(Grade A) is the only one strong enough to anchor the section — the rest '
+        'are prioritisation hypotheses, ranked by how much of the chain we actually '
+        'measured.</p></div>')
+
+    body = (
+        HEALTH_STYLE
+        + disclaimer
+        + '<section><h2 id="health-pathways">Four exposure → health pathways '
+          '(strongest first)</h2>' + _health_pathways_html() + '</section>'
+        + section("Exposure surfaces (modelled, non-synthetic)", surf_cards,
+                  anchor="health-surfaces")
+        + '<section><h2 id="health-table">Compound deprivation by favela</h2>'
+        + _health_table_html() + '</section>'
+        + section("Per-site diagnostic maps", site_maps, anchor="health-sites")
+        + panel_note)
+
+    crumb = breadcrumb([("← Project hub", "index.html"), ("Planetary health", None)])
+    sub = (f'{badge("ok", "solar pathway Grade A")} '
+           f'{badge("amber", "exposure surfaces, not health outcomes")}')
+    (OUT / "health.html").write_text(_relativize(page(
+        "Planetary health — environmental exposure pathways", sub, body,
+        crumb=crumb, provenance=prov)))
+    thumb = f"{exports}/fig04_diagnostic_taxonomy.png"
+    return ("/outputs/_hub/health.html",
+            thumb if (ROOT / thumb.lstrip("/")).exists() else None)
+
+
+def health_section(prov):
+    """Nav card → the standalone planetary-health page."""
+    url, thumb = write_health_page(prov)
+    c = card(
+        "Planetary health — exposure pathways",
+        "A Lancet-style panel maps built form to WHO-referenced environmental "
+        "exposure (winter-sun deprivation, ventilation, heat, equity), each "
+        "evidence-graded A–D. Modelled exposure surfaces, not measured health "
+        "outcomes — the solar pathway (AUC 0.90, Grade A) anchors it.",
+        url, img=thumb, meta="4 pathways · compound deprivation to 72% · Gini 0.70",
+        kind="ok", badge_label="Health", new_tab=False,
+        **(_img_attrs(thumb) if thumb else {}))
+    return section("Planetary health — exposure pathways", [c], anchor="health")
+
+
 def deliverables_section(prov):
     cards = []
     tr_md = ROOT / "docs/technical_report/technical_report.md"
@@ -622,6 +893,7 @@ def main():
         ("ventilation", "Ventilation tendencies (§5.6)", ventilation_section(prov)),
         ("maup", "Grid sensitivity (MAUP)", maup_section(prov)),
         ("facade-solar", "Solar access — façade & street", facade_solar_section(prov)),
+        ("health", "Planetary health (exposure pathways)", health_section(prov)),
         ("prints", "Physical twins (3D prints)", prints_section(prov)),
         ("sites", "Sites", sites_section(prov)),
     ]

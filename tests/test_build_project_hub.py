@@ -133,3 +133,47 @@ def test_generated_hub_latest_has_no_onpage_section_duplicate_links():
 def test_latest_item_renders_date_prefix():
     li = bph._render_latest_item("X", "#x", "d", date="2026-07-02")
     assert '<span class="date">2026-07-02</span>' in li
+
+
+# ── planetary-health section: exposure-not-outcome discipline is load-bearing ──
+def _health_page():
+    bph.main()
+    return (bph.OUT / "health.html").read_text()
+
+
+def test_health_page_leads_with_exposure_not_outcome_disclaimer():
+    html = _health_page()
+    # the skeptic's disclaimer must head the page and disclaim measured outcomes
+    assert "not measured" in html and "health outcomes" in html
+    assert html.find("not measured") < html.find('id="health-pathways"')
+
+
+def test_health_page_carries_all_four_evidence_grades():
+    html = _health_page()
+    for g in ("Grade A", "Grade B", "Grade C", "Grade D"):
+        assert g in html, f"{g} missing — pathways must be evidence-graded"
+
+
+def test_health_table_binds_to_real_cross_site_shares():
+    """The compound-deprivation table is read from cross_site_stats.json, not
+    hardcoded, so it can never silently drift from the taxonomy it summarises."""
+    import json
+    js = bph.ROOT / "outputs/paper_figures/cross_site_stats.json"
+    if not js.exists():
+        return  # gitignored data absent in this checkout; page degrades gracefully
+    per = json.loads(js.read_text())["per_site"]
+    worst = max(r["shares"]["compound_constraint"] for r in per)
+    assert f'{worst*100:.0f}%' in _health_page()
+
+
+def test_health_page_has_no_root_absolute_urls():
+    # same file:// portability contract as the index page
+    html = _health_page()
+    assert not re.search(r'(href|src)="/[^"]*"', html)
+
+
+def test_hub_index_exposes_health_section():
+    html = (bph.OUT / "index.html").read_text() if (bph.OUT / "index.html").exists() \
+        else bph.main() or (bph.OUT / "index.html").read_text()
+    assert 'id="health"' in html
+    assert 0 < html.find('id="facade-solar"') < html.find('id="health"')
