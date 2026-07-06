@@ -77,6 +77,10 @@ DOC_SECTIONS = {
          "Bulletproofing punch list — criticals done, medium queued.", "doc"),
         ("/docs/dashboard_improvement_plan.md", "Dashboard improvement plan",
          "Council audit + prioritised backlog for the hub itself (this page).", "doc"),
+        ("/docs/planetary_health_plan.md", "Planetary-health living plan",
+         "Orchestrator + expert-panel track: the council of experts, the "
+         "vitamin-D→TB pivot, the first real health number (TB×sun-deficit "
+         "ρ=+0.80), and the append-only cycle log.", "doc"),
         ("/docs/typology_predictor_plan.md", "Typology-as-predictor plan",
          "Use the morphotype/morphotope typology to predict environmental failure; "
          "LOSO transfer, variance decomposition, blind risk map.", "doc"),
@@ -287,6 +291,7 @@ def _latest_target_exists(url):
         "/outputs/_hub/docs/cfd_parameter_estimation_plan.html": "docs/cfd_parameter_estimation_plan.md",
         "/outputs/_hub/docs/roughness_wall_treatment_explainer.html": "docs/roughness_wall_treatment_explainer.md",
         "/outputs/_hub/health.html": "outputs/paper_figures/cross_site_stats.json",
+        "/outputs/_hub/docs/planetary_health_plan.html": "docs/planetary_health_plan.md",
     }.get(file)
     return (ROOT / (hub_src or file.lstrip("/"))).exists()
 
@@ -304,6 +309,11 @@ def build_callout(prov):
     # TR section it documents — never a bare on-page anchor that duplicates a
     # section below. (date, label, url, gloss); existence-gated at render.
     latest = [
+        ("2026-07-06", "First real health number — TB × sun-deficit + council plan",
+         f"{hub}/docs/planetary_health_plan.html",
+         "orchestrator + expert-panel track: real Rio TB incidence rank-tracks our "
+         "winter sun-deficit (ρ=+0.80, n=4, not sig; washes out at AP scale), "
+         "vitamin-D as sourced mechanism, airflow parked — full council + cycle log"),
         ("2026-07-04", "Planetary-health exposure pathways (panel-graded)",
          f"{hub}/health.html",
          "a Lancet-style panel maps built form to WHO-referenced exposure — winter-"

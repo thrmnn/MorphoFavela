@@ -44,6 +44,43 @@ publishable upgrade gated on ethics approval.
 
 ---
 
+## Council of experts — who set these priorities
+
+The priorities above are not ad-hoc: they are the output of successive **expert panels**,
+each run as a subagent team and each grounded only in what the repo actually measures.
+Three have convened.
+
+**Panel 1 — Lancet Planetary Health panel** *(built `health.html`; Cycle 0).* Four
+disciplinary advocates argued distinct pathways against one skeptic:
+- **Urban-heat / climatology** — the SVF double-edge (daytime shade vs nocturnal trapping).
+- **Respiratory / infectious-disease epidemiology** — ventilation + germicidal sunlight → TB / respiratory.
+- **Healthy-housing / solar deprivation** — winter-sun deficit → damp, mould, vitamin D, mood (the strongest).
+- **Health equity / environmental justice** — distribution of exposure (Gini), transferable risk.
+- **Methods-editor skeptic (chair)** — fixed the **A–D evidence rubric**, banned causal verbs
+  and any invented incidence, and wrote the mandatory **exposure-not-outcome disclaimer**.
+
+Output → the four graded pathways on the section (solar = Grade A anchor; equity B/D;
+airborne B/C; heat D). *This is why the section is defensible: no pathway claims more than
+its grade.*
+
+**Panel 2 — RJ health-data scout** *(set the P0 pivot; Cycles 1–2).* Five scouts (SINAN/TB,
+vitamin-D, mortality/heat, respiratory/damp, geo-join+access) + a high-effort synthesis;
+ranked 48 datasets by relevance × joinability × access. Output → the **vitamin-D → TB pivot**
+and the ranked dataset table below.
+
+**Panel 3 — Cycle-3 execution pair.** One agent retrieved real TB-by-bairro (SMS-Rio TabNet);
+one built the vitamin-D mechanism from real Rio priors. Output → the first real health number
++ the sourced mechanism.
+
+**How the council sets priorities.** A track is P0 only if it clears the skeptic's grade *and*
+the scout's join test — it must (a) map to a real exposure surface we own, (b) resolve to
+favela fabric, and (c) be accessible. That triple is why **TB is P0** (open, favela-resolvable,
+matches our surfaces), why **vitamin-D-as-outcome is not** (no favela-scale serum data → it is
+mechanism only), and why **airflow is parked** (CFD synthetic + gated). The Priorities table at
+the top *is* the council's current ranking; each Cycle-log entry records how it moved.
+
+---
+
 ## Track P0 — real RJ health data (scouted 2026-07-05)
 
 > From `rj-health-data-scout` (6 agents, 48 candidate datasets, 0 errors; fan-out over
