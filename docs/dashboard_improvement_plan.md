@@ -11,6 +11,12 @@
 > sits above the Headline hero (a thin band, hero is immediately below and before
 > any partner content); the per-site dashboards still load Google Fonts (that
 > builder's identity — hub itself is offline-safe).
+>
+> **Post-completion extensions (2026-07-03 → ):** the hub grew two new first-class
+> parts on the same generators-only contract — the **Physical twins (3D prints)**
+> track (site + patch models, texture tiles, one-plate G-code) and the **Planetary
+> health** exposure-pathway section. Both are tracked in the new section at the foot
+> of this doc; the original 23-item backlog stays closed.
 
 
 *Source: 6-lens design + research-management council (workflow `dashboard-council-audit`,
@@ -154,3 +160,49 @@ critical/high findings. P2 items continue opportunistically but do not gate the 
 7. **PDF-sync** — if a change touches `technical_report.md`, rebuild the PDF and commit
    both together. (This plan touches generators, not the TR markdown, so it should rarely
    fire.)
+
+## Post-completion extensions (2026-07-03 → )
+
+The original 23-item backlog is closed. These are new hub parts built afterward on the
+same contract (generators only, degrade-by-existence, test-staged, `file://`-portable).
+
+### Physical twins — 3D prints — **SHIPPED** (commits `5b9061e` → `e1a85a1`)
+
+Two standalone pages (`prints_sites.html`, `prints_textures.html`) + a hub nav section:
+5 full-site DSM massing models (premium framed base, engraved nameplate, recessed
+water), the CFD analysis-patch prints, Version-A performance-texture tiles (winter
+sun-hours + CFD ventilation, 3 treatments each), and a one-plate Ender-3 **G-code**
+(5 sites shelf-packed, ~4.1 h · 12 g PLA). Details in
+[[project-physical-twin-3dprint]]. **Open (user-driven, do not start unprompted):**
+Version B (abstract/data-driven texture counterpart); optional airflow companion-plate.
+
+### Planetary health — exposure pathways — **SHIPPED 2026-07-04** (commit `a141ab5`)
+
+Standalone `health.html` + hub section `id="health"` (after Solar access, before
+Prints). Built by a Lancet Planetary Health-style panel (heat / respiratory-infectious
+/ healthy-housing / equity advocates + a methods-editor skeptic) and synthesised under a
+strict **exposure-not-outcome** discipline. Load-bearing invariants (do not weaken):
+
+- **Top-of-page disclaimer** — repo holds no temperature / air-exchange / mortality /
+  clinical data; every endpoint is a literature mechanism, not a finding.
+- **Four pathways, each carrying an A–D evidence grade** — solar deprivation **A**
+  (AUC 0.90, Ladybug-cross-checked, the anchor); equity **B**, link-to-persons **D**;
+  airborne **B** (sun leg) / **C** (vent leg); heat **D** (no thermal field).
+- **Compound-deprivation table reads `cross_site_stats.json` at build time** (never
+  hardcoded) — Rocinha 72% / Rio das Pedras 65% / Vidigal 53% / Complexo 40% / Maré 34%.
+- **Synthetic-CFD caveat is explicit** — per-patch CFD returns are synthetic, so the
+  ventilation leg is capped at Grade C and the section surfaces the *geometric* (pre-CFD)
+  ventilation index, not the synthetic field.
+
+Tests in `tests/test_build_project_hub.py` (disclaimer precedes pathways, all four
+grades present, table binds to real shares, no root-absolute URLs, index exposes the
+section). Full record in [[project-health-dashboard]].
+
+**Open follow-ups (backlog, none blocking):**
+
+| id | P | eff | title | acceptance (short) |
+|----|---|-----|-------|--------------------|
+| **HE1** | P1 | M | Upgrade ventilation leg **C → B** when the MAR-P07 CFD pilot returns | real CFD `annual_U_mean` replaces synthetic in the SVF≈0.12 changepoint; grade + caveat updated; gated on [[project-cfd-param-estimation]] / Airflow#10 |
+| **HE2** | P2 | S | Dedicated intra-favela **inequality strip** (Gini distribution figure) | the equity pathway cites Gini 0.70 but has no own figure — add a per-site sub-floor-share distribution so the equity claim is *shown*, not only stated |
+| **HE3** | P2 | M | Heat pathway (**Grade D**) → wire a real thermal proxy | when a UTCI / velocity-ratio field exists (future work noted in `morpho_signature_plan.md`), promote heat off literature-only; until then it stays D and honest |
+| **HE4** | P3 | S | Cross-link health ↔ TR §5.6 / §5.4.1 | deep-link each pathway card to its TR section so the exposure surfaces trace to the report |
