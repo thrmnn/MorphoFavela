@@ -16,10 +16,12 @@ anchor it to **real Rio de Janeiro health data**.*
 
 | # | Track | Status | Note |
 |---|-------|--------|------|
-| **P0** | **TB×sun-deficit open ecological screen** — first REAL health number | **NEXT** | scout's recommended first experiment; SMS-Rio TabNet TB by bairro × our winter-sun surface, favela-setor down-weighted. Zero approval. |
-| **P0-fabric** | **IBGE favela-flagged setores GeoPackage** (#3) — the join key | **NEXT** | free, downloadable; substrate for every join. Prereq for P0. |
-| **P0-mech** | **Vitamin-D mechanism narrative** (Pró-Saúde + lab priors) | **FAVORED** | user's favorite — kept, but reframed: vitamin D is the *why*, TB the *measurable* (no favela-scale serum-D exists) |
-| P1 | **CEP-CONEP protocol** for address-level SINAN-TB/SIM microdata (#2/#7) | queued | the publishable point-join; long pole → file early, in parallel |
+| **P0** | **TB×sun-deficit open ecological screen** — first REAL health number | **DONE (Cycle 3)** | ρ=+0.80 at favela scale (n=4, p=0.20, NOT sig); washes out at AP scale (ρ=−0.50). `scripts/health/tb_sun_deficit_screen.py`. |
+| **P0-mech** | **Vitamin-D mechanism narrative** (Pró-Saúde + lab priors) | **DONE (Cycle 3)** | sourced: Pró-Saúde β=+0.49 nmol/L per sun-unit, +20.1 summer swing; TB bridge OR 3.23. Ready to drop into health.html. |
+| **P0-next** | **Power the screen: n=4 is the bottleneck** | **NEXT** | model sun-deficit for more favela-bairros (n→20+) so the ecological screen has power; setor/point join is ethics-gated (parked) |
+| **P0-fabric** | IBGE favela-flagged setores GeoPackage (#3) — the join key | queued | needed for setor down-weighting + covariate adjustment |
+| P1 | Surface the TB probe + vitamin-D mechanism on `health.html` | queued | new honesty tier: "outcome probe (ecological)", below Grade A |
+| P1 | **CEP-CONEP protocol** for address-level SINAN-TB/SIM microdata (#2/#7) | queued (user-parked) | the publishable point-join; long pole |
 | P1 | Equity **inequality-strip** figure (Gini shown, not just cited) | queued | HE2 |
 | P2 | Heat pathway (**Grade D**) → real thermal proxy; TR cross-links | queued | HE3/HE4 |
 | **PARKED** | Airflow / CFD ventilation leg C→B (HE1) | **WAIT** | out of scope — gated on MAR-P07; do not chase |
@@ -103,6 +105,44 @@ reversal is the in-house proof) · privacy suppression (public data stops at mun
 the densest fabric we model) · confounding (TB co-varies with income/crowding/HIV) · temporal
 mismatch (static exposure vs dated notifications) · **vitamin-D unfalsifiable at favela scale**.
 
+### RESULT — first real health number (Cycle 3, 2026-07-06)
+
+`scripts/health/tb_sun_deficit_screen.py` → `outputs/comparative/health/tb_sun_deficit_screen.{png,json}`.
+Real TB new-case counts (SMS-Rio SINAN TabNet, 2022–23) ÷ IBGE-2022 population, paired with
+our modelled winter sun-deficit, for the favela≈bairro sites:
+
+| favela | sun-deficit (% <2 h) | TB incidence /100k (22–23) | note |
+|---|---|---|---|
+| Rocinha | 72.4 | ≈489 | 447/100k in 2004–06 (PMC4544397) → persisted + intensified |
+| Jacarezinho | 70.2 | ≈357 | historic TB epicentre; independent calibration favela |
+| Vidigal | 55.5 | ≈380 | small pop → noisy rate |
+| Maré | 27.8 | ≈191 | most open fabric, lowest TB |
+| C. do Alemão | 44.1 | ≈49 ⚠ | **excluded** — bairro count is a notification artefact (16→37) |
+
+- **Bairro≈favela: Spearman ρ = +0.80** (n=4 reliable, p=0.20; n=5 incl. Alemão, p=0.10) —
+  a strong positive rank association, **NOT statistically significant** (tiny n). The
+  sun-starved favelas carry 2–3× the TB of the open Maré.
+- **AP-level: ρ = −0.50** — the signal **washes out (even reverses) when pooled to Área de
+  Planejamento**, because AP mixes favela + asfalto and pools low-deficit Maré with others.
+  A live, real-data instance of the change-of-support caveat (mirrors our §10.9).
+- **Framing:** ecological, hypothesis-generating, consistent with the vitamin-D/germicidal
+  mechanism — **not** a causal or validated claim. n is the bottleneck.
+
+### Vitamin-D mechanism (Cycle 3 — sourced, ready for health.html)
+
+The *why* behind the TB probe (vitamin D is not measurable at favela scale, so it is
+mechanism, not outcome):
+
+- **Pró-Saúde** (UERJ cohort, n=491; *Cad. Saúde Pública* 2022;38(1):e00287820):
+  serum 25(OH)D **+0.49 nmol/L per unit sun-exposure index** (CI 0.22–0.75), **+20.14 nmol/L
+  summer vs winter** (CI 14.38–25.90); 55% deficient. The direct Rio sun→25(OH)D quantum.
+- **Leão et al.** *Clinics* 2021;76:e2571 (n=24,074, summer-only): 50.6–53.2% of seniors
+  <30 ng/mL even at the seasonal peak → the winter trough is worse.
+- **Bridge to TB:** vitamin-D deficiency ↔ active TB, pooled **OR 3.23** (CI 1.91–5.45;
+  Cureus 2021;13(9):e17883, *external*). WHO Housing and Health Guidelines 2018 (*external*).
+- *Caveat:* both Rio cohorts are non-favela and ungeocoded → mechanism anchor, not a joinable
+  layer. One author byline (Pró-Saúde) to verify against SciELO before publishing.
+
 ---
 
 ## Orchestration protocol (how each cycle runs)
@@ -127,6 +167,18 @@ mismatch (static exposure vs dated notifications) · **vitamin-D unfalsifiable a
 ---
 
 ## Cycle log (append-only — newest first)
+
+### Cycle 3 — 2026-07-06 · first REAL health number + sourced vitamin-D mechanism
+- Ran both user-chosen tracks in parallel via subagents: pulled real TB-by-bairro from
+  SMS-Rio TabNet (working scrape recipe) + built the vitamin-D mechanism from real Rio priors.
+- Assembled the **TB × sun-deficit ecological screen** myself over n=8 favela sun-deficit
+  values (extended to include Jacarezinho, the TB epicentre): **ρ=+0.80 at favela scale
+  (n=4, NOT sig), washes out at AP scale (ρ=−0.50)**. First real health number in the project.
+- **Most important item added:** **the finding is real but underpowered (n=4) and confounded**
+  — the binding constraint is now *sample size*, not data access. Since the setor/point join
+  is ethics-gated (user-parked), the next lever is **modelling sun-deficit for more Rio
+  favela-bairros** to power the ecological screen. Also logged: the AP-scale washout is a
+  publishable methodological point (change-of-support), not a failure.
 
 ### Cycle 2 — 2026-07-05 · scout returned → the TB pivot
 - `rj-health-data-scout` returned: 6 agents, 48 datasets, 0 errors. Ranked table + vitamin-D
