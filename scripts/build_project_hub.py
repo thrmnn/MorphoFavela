@@ -309,11 +309,12 @@ def build_callout(prov):
     # TR section it documents — never a bare on-page anchor that duplicates a
     # section below. (date, label, url, gloss); existence-gated at render.
     latest = [
-        ("2026-07-06", "First real health number — TB × sun-deficit + council plan",
-         f"{hub}/docs/planetary_health_plan.html",
-         "orchestrator + expert-panel track: real Rio TB incidence rank-tracks our "
-         "winter sun-deficit (ρ=+0.80, n=4, not sig; washes out at AP scale), "
-         "vitamin-D as sourced mechanism, airflow parked — full council + cycle log"),
+        ("2026-07-06", "Health outcome probe — TB × sun-deficit (Grade C, audit-gated)",
+         f"{hub}/health.html#health-probe",
+         "orchestrator + expert-panel loop: real Rio TB rank-tracks our winter "
+         "sun-deficit (ρ≈+0.80, n=5, exact p≈0.13, NOT significant; reverses at AP "
+         "scale) — an adversarial audit caught + fixed a denominator error before it "
+         "shipped; vitamin-D the sourced mechanism; see the living plan for the cycle log"),
         ("2026-07-04", "Planetary-health exposure pathways (panel-graded)",
          f"{hub}/health.html",
          "a Lancet-style panel maps built form to WHO-referenced exposure — winter-"
@@ -800,6 +801,48 @@ def write_health_page(prov):
                 meta="4-state taxonomy", kind="info", badge_label="Per-site",
                 new_tab=False, **_img_attrs(fn)))
 
+    # --- Outcome probe (Grade C): the exposure vs a REAL disease, with every hedge ---
+    probe = ""
+    pf = "/outputs/comparative/health/tb_sun_deficit_screen.png"
+    if (ROOT / pf.lstrip("/")).exists():
+        pc = card(
+            "TB incidence vs winter sun-deficit — 5 favelas, 2015–23",
+            "Exploratory ecological probe: real tuberculosis incidence (SMS-Rio SINAN, "
+            "9-year mean) and our modelled winter sun-deficit rank in the same direction "
+            "(Spearman ρ ≈ +0.80, n=5). Direction-only.",
+            pf, img=pf, meta="ecological probe · Grade C · not significant",
+            kind="amber", badge_label="Outcome probe · Grade C", new_tab=False,
+            **_img_attrs(pf))
+        hedges = (
+            '<div class="callout" style="border-left-color:var(--amber)">'
+            '<p class="lead">How to read this probe — Grade C, strictly below the Grade-A surface</p>'
+            '<ul>'
+            '<li>Real TB and modelled sun-deficit <b>rank in the same direction</b> across 5 '
+            'favelas (Spearman ρ ≈ +0.80, n=5, exact two-tailed p ≈ 0.13 — <b>not statistically '
+            'significant</b>). The bootstrap interval supports only the sign, not a magnitude.</li>'
+            '<li>It <b>cannot be separated from a generic deprivation gradient</b>: sun-deficit is '
+            'collinear with density, poverty and crowding, all established TB drivers. At n=5 no '
+            'adjustment is possible, so this is not evidence of a sun-specific mechanism.</li>'
+            '<li>It <b>reverses sign at the coarser AP scale</b> (ρ ≈ −0.50) — a change-of-support '
+            '(MAUP) effect, shown here rather than hidden.</li>'
+            '<li>An <b>independent audit caught and corrected a population error</b> (Jacarezinho) '
+            'before this shipped; a leptospirosis placebo is directionally supportive but far too '
+            'sparse, so <b>specificity is not established</b>.</li>'
+            '<li>Ecological (bairro ≈ favela): it says nothing about whether sun-deprived '
+            '<em>individuals</em> develop TB — that needs an individual-level follow-up.</li>'
+            '</ul></div>')
+        vitd = (
+            '<div class="callout"><p class="lead">Why sun-deficit could matter for TB — '
+            'the vitamin-D mechanism</p><p>Vitamin D is not measurable at favela scale, so it is '
+            'the plausible <em>why</em>, narrated from real Rio priors: winter sun-deficit lowers '
+            'the UVB dose and hence cutaneous 25(OH)D synthesis. In Rio’s Pró-Saúde cohort serum '
+            '25(OH)D rose about +0.49 nmol/L per unit of sun-exposure and ran roughly +20 nmol/L '
+            'higher in summer than winter; vitamin-D deficiency is a replicated tuberculosis '
+            'susceptibility factor (pooled odds ratio 3.23). Vitamin D is the mechanism; TB is the '
+            'measurable endpoint the probe above tests.</p></div>')
+        probe = ('<section><h2 id="health-probe">Outcome probe — does the exposure track a '
+                 'real disease?</h2><div class="grid">' + pc + '</div>' + hedges + vitd + '</section>')
+
     disclaimer = (
         '<div class="callout" style="border-left-color:var(--warn)">'
         f'<p class="lead">Read first — what this is (and is not)</p>'
@@ -824,6 +867,7 @@ def write_health_page(prov):
                   anchor="health-surfaces")
         + '<section><h2 id="health-table">Compound deprivation by favela</h2>'
         + _health_table_html() + '</section>'
+        + probe
         + section("Per-site diagnostic maps", site_maps, anchor="health-sites")
         + panel_note)
 

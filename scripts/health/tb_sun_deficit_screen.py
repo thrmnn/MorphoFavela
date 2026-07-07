@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import json
 import warnings
+from itertools import permutations
 from pathlib import Path
 
 import matplotlib
@@ -72,8 +73,16 @@ SITES = {
     "vidigal":            ("Vidigal", 15112, "favela", "AP2.1"),
     "maré":               ("Maré", 124832, "favela", "AP3.1"),
     "complexo_do_alemao": ("C. do Alemão", 54202, "favela⚠", "AP3.1"),
-    "jacarezinho":        ("Jacarezinho", 37839, "2010-census", "AP3.1"),
+    # CORRECTED 2026-07-06 (adversarial audit): was 37,839 = the 2010 *bairro* census,
+    # mislabelled IBGE-2022. Correct IBGE-2022 Favelas e Comunidades Urbanas = 29,766.
+    # The stale figure inflated Jacarezinho's rank and produced a spurious ρ=1.0.
+    "jacarezinho":        ("Jacarezinho", 29766, "IBGE-2022-FCU", "AP3.1"),
 }
+# Leptospirosis (flood/rodent-driven, NOT sun) — the SPECIFICITY PLACEBO. Confirmed
+# cases 2015–23 by bairro, SMS-Rio TabNet leptospirose.def (Incremento=Casos_confirmados).
+# Sparse (27 cases / 9 yr across the 5) → direction-only, underpowered. Do NOT ship a
+# specificity claim on this alone (G5 stays OPEN until a powered placebo).
+LEPTO_9YR = {"rocinha": 17, "jacarezinho": 0, "vidigal": 1, "complexo_do_alemao": 2, "maré": 7}
 # Alemão bairro TB is systematically under-ascribed (bairro split from Ramos → cases
 # mis-attributed); keep it OFF the primary fit but report the ±Alemão sensitivity.
 UNRELIABLE = {"complexo_do_alemao"}
@@ -95,6 +104,20 @@ def incidence(site: str, years) -> float:
     idx = [YEARS.index(y) for y in years]
     mean_cases = np.mean([TB_YEARLY[site][i] for i in idx])
     return mean_cases / SITES[site][1] * 1e5
+
+
+def exact_perm_p(x, y):
+    """Exact TWO-TAILED permutation p for Spearman ρ (admissible at tiny n, unlike the
+    parametric t-approx which divides by 1−ρ²). Enumerates all n! relabellings."""
+    r0, _ = spearmanr(x, y)
+    xr = np.argsort(np.argsort(x)); yr = np.argsort(np.argsort(y))
+    hit = tot = 0
+    for pm in permutations(range(len(y))):
+        r, _ = spearmanr(xr, yr[list(pm)])
+        tot += 1
+        if abs(r) >= abs(r0) - 1e-9:
+            hit += 1
+    return hit / tot
 
 
 def boot_ci(x, y, n=5000):
@@ -123,58 +146,58 @@ def main():
         print(f"  {SITES[s][0]:14s} sun<2h={sun[s]:5.1f}%  TB={inc9[s]:5.0f}/100k "
               f"(pop {SITES[s][1]:,} {SITES[s][2]}){'' if s not in UNRELIABLE else '  [excl.]'}")
 
-    # ---- G4 robustness: ρ across window × ±Alemão × sun-threshold × leave-one-out ----
-    specs, rob = [], []
-    windows = {"2yr": [2022, 2023], "5yr": [2019, 2020, 2021, 2022, 2023], "9yr": YEARS}
-    for wname, ws in windows.items():
-        for excl in (True, False):
-            sset = [s for s in SITES if not (excl and s in UNRELIABLE)]
-            x = np.array([sun[s] for s in sset]); y = np.array([incidence(s, ws) for s in sset])
-            r, pv = spearmanr(x, y)
-            tag = f"{wname}/{'exclAlemão' if excl else 'inclAlemão'}"
-            specs.append((tag, r, pv, len(sset))); rob.append(r)
-    for floor in (1.0, 2.0, 3.0):  # sun-threshold sensitivity (excl Alemão, 9yr)
-        sset = [s for s in SITES if s not in UNRELIABLE]
-        x = np.array([sun_deficit(s, floor) for s in sset])
-        y = np.array([incidence(s, YEARS) for s in sset])
-        r, _ = spearmanr(x, y)
-        specs.append((f"9yr/excl/<{floor:.0f}h", r, None, len(sset))); rob.append(r)
-    # leave-one-out (9yr, incl Alemão, n=5)
-    alls = list(SITES); loo = []
-    for drop in alls:
-        sset = [s for s in alls if s != drop]
-        x = np.array([sun[s] for s in sset]); y = np.array([inc9[s] for s in sset])
-        r, _ = spearmanr(x, y); loo.append((drop, r)); rob.append(r)
-
-    frac_pos = np.mean([r > 0 for r in rob])
-
-    # headline specs + bootstrap CI
+    # ---- headline: n=5 is the DEFENSIBLE PRIMARY (do not headline the post-exclusion n=4) ----
     se = [s for s in SITES if s not in UNRELIABLE]
     xe = np.array([sun[s] for s in se]); ye = np.array([inc9[s] for s in se])
-    rho_e, p_e = spearmanr(xe, ye)
     xa = np.array([sun[s] for s in SITES]); ya = np.array([inc9[s] for s in SITES])
-    rho_a, p_a = spearmanr(xa, ya)
+    rho_e, _ = spearmanr(xe, ye)
+    rho_a, _ = spearmanr(xa, ya)
+    # exact TWO-TAILED permutation p (the parametric p is inadmissible at n=5)
+    pperm_a = exact_perm_p(xa, ya)
+    pperm_e = exact_perm_p(xe, ye)
     ci_lo, ci_hi, ci_med = boot_ci(xa, ya)
 
+    # internal-consistency scan (NOT independent robustness — same 5 pts, ~1 effective test)
+    consist = []
+    for ws in ([2022, 2023], [2019, 2020, 2021, 2022, 2023], YEARS):
+        for excl in (True, False):
+            sset = [s for s in SITES if not (excl and s in UNRELIABLE)]
+            r, _ = spearmanr([sun[s] for s in sset], [incidence(s, ws) for s in sset])
+            consist.append(r)
+    for floor in (1.0, 2.0, 3.0):
+        r, _ = spearmanr([sun_deficit(s, floor) for s in se], [incidence(s, YEARS) for s in se])
+        consist.append(r)
+    loo = {d: spearmanr([sun[s] for s in SITES if s != d],
+                        [inc9[s] for s in SITES if s != d])[0] for d in SITES}
+    frac_pos = float(np.mean([r > 0 for r in consist]))
+
+    # AP-scale (genuinely different support) — the one perturbation that FLIPS the sign
     ap_pts = [(ap, np.mean([sun_deficit(s) for s in mem]), float(np.mean(AP_TB[ap])))
               for ap, mem in AP_MEMBERS.items()]
     rho_ap, _ = spearmanr([a[1] for a in ap_pts], [a[2] for a in ap_pts])
 
-    print(f"\n=== SCORECARD ===")
-    print(f"  G1 window .......... 9-yr (2015–23)  ✅")
-    print(f"  G2 n ............... {len(SITES)} (incl Alemão) / {len(se)} (excl)  ✅")
-    print(f"  headline ρ ......... excl Alemão n={len(se)}: {rho_e:+.2f} (p={p_e:.2f}) | "
-          f"incl n={len(SITES)}: {rho_a:+.2f} (p={p_a:.2f})")
-    print(f"  G3 bootstrap 95% CI (incl, n={len(SITES)}) ρ ∈ [{ci_lo:+.2f}, {ci_hi:+.2f}] (median {ci_med:+.2f})")
-    print(f"  G4 robustness ...... ρ>0 in {frac_pos*100:.0f}% of {len(rob)} specs "
-          f"(target ≥90%)  {'✅' if frac_pos >= 0.9 else '⚠'}")
-    print(f"     spec range ρ ∈ [{min(rob):+.2f}, {max(rob):+.2f}];  "
-          f"LOO ρ ∈ [{min(r for _, r in loo):+.2f}, {max(r for _, r in loo):+.2f}]")
-    print(f"  AP washout ......... ρ={rho_ap:+.2f} (n=3 APs) — signal collapses when pooled")
-    print(f"  G5 specificity ..... PENDING (leptospirosis placebo — verification cycle)")
+    # ---- G5 SPECIFICITY placebo: leptospirosis (flood-not-sun); direction-only, underpowered ----
+    lep_inc = {s: LEPTO_9YR[s] / SITES[s][1] * 1e5 for s in SITES}
+    rho_lep_a, _ = spearmanr([sun[s] for s in SITES], [lep_inc[s] for s in SITES])
+    rho_lep_e, _ = spearmanr([sun[s] for s in se], [lep_inc[s] for s in se])
+    n_lep = sum(LEPTO_9YR.values())
 
-    # ---- figure (multi-year) ----
-    fig, ax = plt.subplots(figsize=(7.4, 5.6))
+    print(f"\n=== SCORECARD (corrected — Jacarezinho pop 29,766 IBGE-2022 FCU) ===")
+    print(f"  G1 window .......... 9-yr (2015–23)  ✅")
+    print(f"  G2 n ............... {len(SITES)} primary (incl Alemão) / {len(se)} sensitivity  ✅")
+    print(f"  HEADLINE (n={len(SITES)}) ρ = {rho_a:+.2f}  exact two-tailed permutation p = {pperm_a:.3f}"
+          f"  → {'NOT significant' if pperm_a > 0.05 else 'sig'}")
+    print(f"    sensitivity (n={len(se)}, excl Alemão) ρ = {rho_e:+.2f}, perm p = {pperm_e:.3f} "
+          f"(result-improving exclusion — not headlined)")
+    print(f"  G3 bootstrap 95% CI ρ ∈ [{ci_lo:+.2f}, {ci_hi:+.2f}] — SIGN-ONLY (tie-dominated at n=5)")
+    print(f"  G4 internal consistency: ρ>0 in {frac_pos*100:.0f}% of {len(consist)} specs — "
+          f"NOT robustness (≈1 effective test); LOO ρ ∈ [{min(loo.values()):+.2f},{max(loo.values()):+.2f}]")
+    print(f"  MAUP: AP-scale ρ = {rho_ap:+.2f} — sign REVERSES at coarser support (shown alongside)")
+    print(f"  G5 specificity ..... ρ(TB)={rho_a:+.2f} vs ρ(leptospirosis placebo)={rho_lep_a:+.2f} "
+          f"(n_lepto={n_lep} cases/9yr) → direction-supportive, UNDERPOWERED → OPEN")
+
+    # ---- figure ----
+    fig, ax = plt.subplots(figsize=(7.4, 5.8))
     for s in SITES:
         rel = s not in UNRELIABLE
         c = "#b5651d" if rel else "#bbb"
@@ -182,18 +205,18 @@ def main():
         ax.annotate(SITES[s][0] + ("" if rel else " ⚠"), (sun[s], inc9[s]),
                     xytext=(6, 4), textcoords="offset points", fontsize=9,
                     color="#333" if rel else "#999")
-    b, a = np.polyfit(xe, ye, 1)
+    b, a = np.polyfit(xa, ya, 1)
     xx = np.linspace(min(xa) - 3, max(xa) + 3, 50)
-    ax.plot(xx, a + b * xx, "--", c="#b5651d", lw=1.2, alpha=0.7, zorder=2)
+    ax.plot(xx, a + b * xx, "--", c="#b5651d", lw=1.2, alpha=0.6, zorder=2)
     ax.set_xlabel("Modelled winter sun-deficit  (% of street below WHO 2 h/day)")
     ax.set_ylabel("Tuberculosis incidence  (new cases /100k, 2015–23 mean)")
-    ax.set_title("TB incidence vs winter sun-deficit — Rio favelas (bairro≈favela)",
+    ax.set_title("TB incidence vs winter sun-deficit — Rio favelas (exploratory probe)",
                  fontsize=12, fontweight="bold")
     ax.text(0.02, 0.97,
-            f"Spearman ρ = {rho_e:+.2f} (n={len(se)} excl. Alemão) · {rho_a:+.2f} (n={len(SITES)} incl.)\n"
-            f"bootstrap 95% CI [{ci_lo:+.2f}, {ci_hi:+.2f}] · ρ>0 in {frac_pos*100:.0f}% of specs\n"
-            f"ecological · hypothesis-generating · washes out at AP scale (ρ={rho_ap:+.2f})",
-            transform=ax.transAxes, va="top", fontsize=8.5, color="#555",
+            f"Spearman ρ = {rho_a:+.2f}  (n={len(SITES)}, exact two-tailed p = {pperm_a:.2f}, NOT significant)\n"
+            f"ecological · direction-only · cannot be separated from a deprivation gradient\n"
+            f"reverses sign at coarser AP scale (ρ = {rho_ap:+.2f}) · placebo lepto ρ = {rho_lep_a:+.2f}",
+            transform=ax.transAxes, va="top", fontsize=8.3, color="#555",
             bbox=dict(boxstyle="round,pad=0.4", fc="#f6f2ec", ec="#e0d6c8"))
     ax.grid(alpha=0.25)
     fig.tight_layout()
@@ -204,18 +227,22 @@ def main():
 
     (OUT / "tb_sun_deficit_screen.json").write_text(json.dumps({
         "window_years": [YEARS[0], YEARS[-1]],
+        "framing": "exploratory ecological probe; direction-only; NOT causal; NOT significant; "
+                   "cannot be separated from a generic deprivation gradient; MAUP sign-flip at AP scale",
         "rows": [{"site": s, "label": SITES[s][0], "sun_pct_below_2h": round(sun[s], 1),
                   "tb_incidence_9yr": round(inc9[s], 1), "pop": SITES[s][1],
-                  "reliable": s not in UNRELIABLE} for s in order],
-        "headline": {"rho_excl_alemao": rho_e, "p_excl": p_e, "n_excl": len(se),
-                     "rho_incl_alemao": rho_a, "p_incl": p_a, "n_incl": len(SITES),
-                     "bootstrap_ci95": [ci_lo, ci_hi], "bootstrap_median": ci_med},
-        "robustness": {"frac_specs_positive": frac_pos, "n_specs": len(rob),
-                       "rho_range": [min(rob), max(rob)],
-                       "leave_one_out": {d: r for d, r in loo}},
-        "ap_washout_rho": rho_ap,
-        "specificity_placebo": "pending",
-        "framing": "ecological, hypothesis-generating; NOT causal; support-dependent",
+                  "primary": s not in UNRELIABLE} for s in order],
+        "primary_n5": {"rho": rho_a, "perm_p_two_tailed": pperm_a, "n": len(SITES),
+                       "bootstrap_ci95_sign_only": [ci_lo, ci_hi]},
+        "sensitivity_n4_excl_alemao": {"rho": rho_e, "perm_p_two_tailed": pperm_e, "n": len(se),
+                                       "note": "result-improving exclusion; not headlined"},
+        "internal_consistency": {"frac_specs_positive": frac_pos, "n_specs": len(consist),
+                                 "effective_independent_tests": 1, "leave_one_out": loo,
+                                 "note": "NOT independent robustness — same 5 points"},
+        "maup_ap_scale_rho": rho_ap,
+        "specificity_G5": {"rho_tb": rho_a, "rho_leptospirosis_placebo": rho_lep_a,
+                           "n_lepto_cases_9yr": n_lep, "status": "OPEN",
+                           "note": "direction-supportive but underpowered; needs a powered placebo (dengue / SIH violence)"},
     }, indent=2, ensure_ascii=False))
 
 

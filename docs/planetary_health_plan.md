@@ -54,17 +54,18 @@ metric is a number a script prints or a test asserts, so "done" is not a matter 
 |----|------|--------|--------|-------------------|
 | **G1** | Kill small-count noise | TB averaging window | ≥5-yr mean | **9-yr (2015–23)** ✅ |
 | **G2** | Sample size (achievable) | n favela≈bairro points | n ≥ 5 | **5** ✅ |
-| **G3** | Report uncertainty | bootstrap 95% CI on ρ | CI printed | **[+0.11, +1.00]** ✅ |
-| **G4** | Robustness | sign of ρ across specs (window × ±Alemão × sun-threshold × leave-one-out) | ρ > 0 in ≥ 90% of specs | **100% of 14 specs; range [+0.80,+1.00]** ✅ |
-| **G5** | Specificity | ρ(TB) − ρ(placebo: leptospirosis, flood-not-sun) | > 0 | _verify workflow in flight_ |
-| **G6** | Independent verification | adversarial audit of every number vs source | 0 unverified / 0 mismatches | _verify workflow in flight_ |
-| **G7** | Surface honestly | TB probe + vitamin-D mechanism on `health.html` as an "ecological probe" tier below Grade A; tests green | shipped | gated on G5/G6 |
+| **G3** | Report uncertainty | bootstrap 95% CI on ρ | CI printed | **[+0.11,+1.00], sign-only** ✅ |
+| **G4** | Robustness | direction of ρ vs perturbations | honest framing | **internal consistency (≈1 eff. test), NOT robustness; AP-scale reverses to −0.50** ✅ |
+| **G5** | Specificity | ρ(TB) − ρ(placebo: leptospirosis) | > 0 | **+0.80 vs +0.30 — direction-supportive but underpowered (27 cases) → OPEN** 🟠 |
+| **G6** | Independent verification | adversarial audit of every number vs source | 0 mismatches | **PASS after correction** — audit caught Jacarezinho pop error (37,839→29,766); 15/15 TB counts + 4/4 other pops verified ✅ |
+| **G7** | Surface honestly | TB probe + vitamin-D mechanism on `health.html` as an ecological-probe tier below Grade A; tests green | shipped | **SHIPPED** — `health.html#health-probe`, Grade C, all hedges, 23 tests green ✅ |
 
-**Cycle-4 headline (multi-year hardening):** ρ = **+1.00** (n=4, excl. Alemão) / **+0.90**
-(n=5, incl.); bootstrap 95% CI **[+0.11, +1.00]**; positive in **100% of 14 specs** and every
-leave-one-out; still **−0.50 at AP scale**. *Honest stats note:* at n=5 the parametric p is
-unreliable (t-approx → p≈0 for ρ=1) — the CI and permutation-robustness are the evidence, not
-"p=0.04". This is the number the adversarial-verify + specificity workflow is now stress-testing.
+**Corrected headline (post-audit, THE number):** ρ = **+0.80** (n=5, exact two-tailed
+permutation p ≈ **0.13**, **not statistically significant**); direction-only; **cannot be
+separated from a generic deprivation gradient**; **reverses sign at the coarser AP scale**
+(ρ ≈ −0.50). The earlier ρ=1.00/0.90 was inflated by a wrong Jacarezinho denominator the
+adversarial audit caught — the loop worked exactly as designed. The parametric p is retired
+(inadmissible at n=5); only the exact permutation p and sign-only bootstrap are reported.
 
 **Honest ceiling (data-gated, NOT autonomously closable):** the ecological screen is
 capped near **n ≈ 8** — the favelas for which we have a modelled sun-deficit surface. Going
@@ -234,6 +235,26 @@ mechanism, not outcome):
 ---
 
 ## Cycle log (append-only — newest first)
+
+### Cycle 5 — 2026-07-06 · adversarial verify caught a real error → corrected + shipped honestly
+- Ran `tb-screen-adversarial-verify` (independent number audit ∥ leptospirosis specificity ∥
+  stats+confounding red-team → skeptic adjudication).
+- **The loop paid for itself:** the audit caught a **blocking denominator error** — Jacarezinho
+  used 37,839 (a 2010 *bairro* census) mislabelled IBGE-2022; correct FCU = **29,766**. Fixing
+  it flipped Jacarezinho to the highest incidence and **collapsed ρ from 1.00/0.90 → +0.80**,
+  losing significance. 15/15 TB counts and the other 4 populations verified clean.
+- Applied every required correction: dropped the parametric p (inadmissible at n=5) for the
+  **exact two-tailed permutation p = 0.13**; reframed the 14-spec scan as internal consistency
+  (~1 effective test, NOT robustness); kept the AP-scale sign reversal visible; n=5 is the
+  primary (no headlining the post-exclusion n=4). Leptospirosis placebo ρ=+0.30 vs TB +0.80 →
+  specificity direction-supportive but **underpowered → G5 OPEN**.
+- **Shipped G7:** `health.html#health-probe` — an evidence-graded **Grade-C ecological outcome
+  probe** below the Grade-A surface, carrying all hedges and passing the banned-wording bar
+  (no causal verbs, no "significant", no ρ=1.00). 23 hub tests green.
+- **Most important item added:** **the honest result is a direction-only, non-significant,
+  deprivation-confounded probe** — and that is exactly what shipped. The next real lever remains
+  the powered placebo (dengue / SIH-violence) for G5, and n (data-gated). Adversarial
+  verification is now a mandatory gate before any health number goes public.
 
 ### Cycle 4 — 2026-07-06 · define the scorecard + multi-year hardening (self-improving loop begins)
 - Pushed + consolidated (main @ 83de939 → this cycle). Defined the **verifiable scorecard**
