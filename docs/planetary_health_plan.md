@@ -44,6 +44,36 @@ publishable upgrade gated on ethics approval.
 
 ---
 
+## Goals — verifiable scorecard (self-improving loop targets)
+
+Each execution cycle must move a metric here; the loop stops when the achievable
+targets are green (the n-ceiling is data-gated — see the honest cap below). Every
+metric is a number a script prints or a test asserts, so "done" is not a matter of opinion.
+
+| id | Goal | Metric | Target | Current (Cycle 4) |
+|----|------|--------|--------|-------------------|
+| **G1** | Kill small-count noise | TB averaging window | ≥5-yr mean | **9-yr (2015–23)** ✅ |
+| **G2** | Sample size (achievable) | n favela≈bairro points | n ≥ 5 | **5** ✅ |
+| **G3** | Report uncertainty | bootstrap 95% CI on ρ | CI printed | **[+0.11, +1.00]** ✅ |
+| **G4** | Robustness | sign of ρ across specs (window × ±Alemão × sun-threshold × leave-one-out) | ρ > 0 in ≥ 90% of specs | **100% of 14 specs; range [+0.80,+1.00]** ✅ |
+| **G5** | Specificity | ρ(TB) − ρ(placebo: leptospirosis, flood-not-sun) | > 0 | _verify workflow in flight_ |
+| **G6** | Independent verification | adversarial audit of every number vs source | 0 unverified / 0 mismatches | _verify workflow in flight_ |
+| **G7** | Surface honestly | TB probe + vitamin-D mechanism on `health.html` as an "ecological probe" tier below Grade A; tests green | shipped | gated on G5/G6 |
+
+**Cycle-4 headline (multi-year hardening):** ρ = **+1.00** (n=4, excl. Alemão) / **+0.90**
+(n=5, incl.); bootstrap 95% CI **[+0.11, +1.00]**; positive in **100% of 14 specs** and every
+leave-one-out; still **−0.50 at AP scale**. *Honest stats note:* at n=5 the parametric p is
+unreliable (t-approx → p≈0 for ρ=1) — the CI and permutation-robustness are the evidence, not
+"p=0.04". This is the number the adversarial-verify + specificity workflow is now stress-testing.
+
+**Honest ceiling (data-gated, NOT autonomously closable):** the ecological screen is
+capped near **n ≈ 8** — the favelas for which we have a modelled sun-deficit surface. Going
+to **n ≥ 20** requires onboarding more favelas, whose DTMs are **manually clipped** (project
+policy, [[feedback-dtm-workflow]]) → needs the user, not the loop. The loop therefore
+maximises *rigor at fixed n* (G1–G6), not n itself. A separate epic (P0-onboard) tracks n.
+
+---
+
 ## Council of experts — who set these priorities
 
 The priorities above are not ad-hoc: they are the output of successive **expert panels**,
@@ -204,6 +234,21 @@ mechanism, not outcome):
 ---
 
 ## Cycle log (append-only — newest first)
+
+### Cycle 4 — 2026-07-06 · define the scorecard + multi-year hardening (self-improving loop begins)
+- Pushed + consolidated (main @ 83de939 → this cycle). Defined the **verifiable scorecard**
+  (G1–G7) with numeric targets; established the honest **n≈8 data-gated ceiling** (more favelas
+  need manual DTM onboarding → user, not loop). Loop maximises rigor at fixed n.
+- Pulled **9 years of TB** (2015–23) from TabNet and rebuilt the screen: ρ = **+1.00** (n=4)
+  / **+0.90** (n=5); bootstrap 95% CI **[+0.11,+1.00]**; **100% of 14 specs positive**; LOO
+  [+0.80,+1.00]; AP washout −0.50 holds. G1–G4 ✅.
+- Launched `tb-screen-adversarial-verify` (independent number audit ∥ leptospirosis
+  specificity/placebo ∥ stats+confounding red-team → skeptic adjudication) to settle G5/G6 and
+  gate G7 (surfacing on health.html).
+- **Most important item added:** **rigor, not n, is the achievable lever** — the multi-year
+  mean turned a suggestive n=4 (ρ=0.80) into a rank-monotone, spec-robust result, but the honest
+  bar is the bootstrap CI + a passed specificity test, NOT an n=5 p-value. Surfacing is gated on
+  the adversarial panel, by design.
 
 ### Cycle 3 — 2026-07-06 · first REAL health number + sourced vitamin-D mechanism
 - Ran both user-chosen tracks in parallel via subagents: pulled real TB-by-bairro from

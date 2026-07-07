@@ -14,9 +14,13 @@ bairro≈favela scale and WASHES OUT at the coarser Área-de-Planejamento (AP) s
 (the change-of-support / MAUP caveat, live).
 
 PROVENANCE (every number sourced; retrieved 2026-07-06):
-- TB new-case counts by bairro de residência: SMS-Rio SINAN TabNet, tuberc2007.def,
-  tube22.dbf / tube23.dbf (semicolon 'prn' export). Rocinha 351/354, Vidigal 52/63,
-  Maré 222/254, Complexo do Alemão 16/37, Jacarezinho 146/124 (2022/2023).
+- TB new-case counts by bairro de residência, FULL 2015–2023 series (tubeYY.dbf):
+  SMS-Rio SINAN TabNet, tuberc2007.def, semicolon 'prn' export. See TB_YEARLY below;
+  the 9-yr mean is the headline (kills small-count noise, esp. Vidigal 24–63/yr and the
+  Alemão bairro-split artefact). Recipe (scripts cleanly): POST cgi-bin/tabnet?…tuberc2007.def
+  with latin-1 params (Coluna=--N%E3o-Ativa--), strip NUL bytes, parse 5-dot bairro rows.
+- STATS CAVEAT: at n=4–5 the parametric Spearman p is unreliable (t-approximation → p≈0 for
+  ρ=1). The honest evidence is the bootstrap 95% CI and the fraction-of-specs-positive, NOT p.
 - IBGE Censo 2022 favela/comunidade populations (bairro ≈ favela for these sites):
   Rocinha 72,021 · Vidigal 15,112 · Maré 124,832 · Alemão 54,202. Jacarezinho: 2010
   census bairro 37,839 (2022 not separately confirmed this pass — flagged; Spearman
@@ -35,6 +39,7 @@ excluded from the primary correlation; its AP3.1 rate (~108) is the safer figure
 
 from __future__ import annotations
 
+import json
 import warnings
 from pathlib import Path
 
@@ -47,90 +52,147 @@ import numpy as np
 from scipy.stats import spearmanr
 
 warnings.filterwarnings("ignore")
+rng = np.random.default_rng(20260706)  # deterministic bootstrap
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "outputs" / "comparative" / "health"
 
-# site -> (label, TB cases 2022, TB cases 2023, IBGE pop, pop_flag, AP)
-SITES = {
-    "rocinha":            ("Rocinha", 351, 354, 72021, "favela", "AP2.1"),
-    "vidigal":            ("Vidigal", 52, 63, 15112, "favela", "AP2.1"),
-    "maré":               ("Maré", 222, 254, 124832, "favela", "AP3.1"),
-    "complexo_do_alemao": ("C. do Alemão", 16, 37, 54202, "favela⚠", "AP3.1"),
-    "jacarezinho":        ("Jacarezinho", 146, 124, 37839, "2010-census", "AP3.1"),
+YEARS = list(range(2015, 2024))
+# TB new cases by bairro de residência, 2015–2023 — SMS-Rio SINAN TabNet
+# (tuberc2007.def, tubeYY.dbf; retrieved 2026-07-06, provenance in module docstring).
+TB_YEARLY = {
+    "rocinha":            [337, 273, 274, 255, 207, 253, 292, 351, 354],
+    "vidigal":            [33, 31, 24, 27, 36, 38, 46, 52, 63],
+    "maré":               [198, 236, 175, 168, 202, 172, 192, 222, 254],
+    "complexo_do_alemao": [49, 74, 46, 55, 86, 76, 18, 16, 37],
+    "jacarezinho":        [121, 140, 117, 126, 109, 128, 133, 146, 124],
 }
-# Alemão bairro TB is an artefact; keep it off the primary fit.
+# site -> (label, IBGE-2022 pop, pop_flag, AP)
+SITES = {
+    "rocinha":            ("Rocinha", 72021, "favela", "AP2.1"),
+    "vidigal":            ("Vidigal", 15112, "favela", "AP2.1"),
+    "maré":               ("Maré", 124832, "favela", "AP3.1"),
+    "complexo_do_alemao": ("C. do Alemão", 54202, "favela⚠", "AP3.1"),
+    "jacarezinho":        ("Jacarezinho", 37839, "2010-census", "AP3.1"),
+}
+# Alemão bairro TB is systematically under-ascribed (bairro split from Ramos → cases
+# mis-attributed); keep it OFF the primary fit but report the ±Alemão sensitivity.
 UNRELIABLE = {"complexo_do_alemao"}
 
 AP_TB = {"AP2.1": (98.0, 108.9), "AP3.1": (103.9, 113.4), "AP4.0": (67.6, 72.5)}
-# Rio das Pedras has no standalone bairro (splits across Jacarepaguá/Itanhangá),
-# so it only contributes at AP4.0; its sun-deficit is carried for the AP view.
 AP_MEMBERS = {"AP2.1": ["rocinha", "vidigal"], "AP3.1": ["maré", "complexo_do_alemao"],
               "AP4.0": ["riodaspedras"]}
 
 
-def sun_deficit(site: str) -> float:
+def sun_deficit(site: str, floor_h: float = 2.0) -> float:
     g = gpd.read_file(ROOT / f"outputs/{site}/morphometrics/svf/svf_streets_solar.gpkg")
     col = "solar_hours_winter" if "solar_hours_winter" in g else "solar_hours"
     v = g[col].dropna()
-    return float((v < 2.0).mean() * 100.0)
+    return float((v < floor_h).mean() * 100.0)
+
+
+def incidence(site: str, years) -> float:
+    """Mean annual TB incidence /100k over the given calendar years."""
+    idx = [YEARS.index(y) for y in years]
+    mean_cases = np.mean([TB_YEARLY[site][i] for i in idx])
+    return mean_cases / SITES[site][1] * 1e5
+
+
+def boot_ci(x, y, n=5000):
+    """Bootstrap 95% CI of Spearman ρ by resampling the (x,y) points."""
+    vals = []
+    k = len(x)
+    for _ in range(n):
+        s = rng.integers(0, k, k)
+        if len(set(x[s])) < 3 or len(set(y[s])) < 3:
+            continue
+        r, _ = spearmanr(x[s], y[s])
+        if np.isfinite(r):
+            vals.append(r)
+    return (float(np.percentile(vals, 2.5)), float(np.percentile(vals, 97.5)),
+            float(np.median(vals)))
 
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    rows = []
-    for site, (label, c22, c23, pop, flag, ap) in SITES.items():
-        inc = (np.mean([c22, c23]) / pop) * 1e5
-        rows.append(dict(site=site, label=label, sun=sun_deficit(site), inc=inc,
-                         pop=pop, flag=flag, ap=ap,
-                         reliable=site not in UNRELIABLE))
+    sun = {s: sun_deficit(s) for s in SITES}
+    inc9 = {s: incidence(s, YEARS) for s in SITES}          # 9-yr headline
+    order = sorted(SITES, key=lambda s: -sun[s])
 
-    prim = [r for r in rows if r["reliable"]]
-    xs = np.array([r["sun"] for r in prim]); ys = np.array([r["inc"] for r in prim])
-    rho, p = spearmanr(xs, ys)
-    xa = np.array([r["sun"] for r in rows]); ya = np.array([r["inc"] for r in rows])
-    rho_all, p_all = spearmanr(xa, ya)
+    print("=== TB incidence (9-yr mean 2015–23) vs winter sun-deficit ===")
+    for s in order:
+        print(f"  {SITES[s][0]:14s} sun<2h={sun[s]:5.1f}%  TB={inc9[s]:5.0f}/100k "
+              f"(pop {SITES[s][1]:,} {SITES[s][2]}){'' if s not in UNRELIABLE else '  [excl.]'}")
 
-    # AP-level (the MAUP washout): mean member sun-deficit vs published AP rate
-    ap_pts = []
-    for ap, sites in AP_MEMBERS.items():
-        sd = np.mean([sun_deficit(s) for s in sites])
-        ap_pts.append((ap, sd, float(np.mean(AP_TB[ap]))))
+    # ---- G4 robustness: ρ across window × ±Alemão × sun-threshold × leave-one-out ----
+    specs, rob = [], []
+    windows = {"2yr": [2022, 2023], "5yr": [2019, 2020, 2021, 2022, 2023], "9yr": YEARS}
+    for wname, ws in windows.items():
+        for excl in (True, False):
+            sset = [s for s in SITES if not (excl and s in UNRELIABLE)]
+            x = np.array([sun[s] for s in sset]); y = np.array([incidence(s, ws) for s in sset])
+            r, pv = spearmanr(x, y)
+            tag = f"{wname}/{'exclAlemão' if excl else 'inclAlemão'}"
+            specs.append((tag, r, pv, len(sset))); rob.append(r)
+    for floor in (1.0, 2.0, 3.0):  # sun-threshold sensitivity (excl Alemão, 9yr)
+        sset = [s for s in SITES if s not in UNRELIABLE]
+        x = np.array([sun_deficit(s, floor) for s in sset])
+        y = np.array([incidence(s, YEARS) for s in sset])
+        r, _ = spearmanr(x, y)
+        specs.append((f"9yr/excl/<{floor:.0f}h", r, None, len(sset))); rob.append(r)
+    # leave-one-out (9yr, incl Alemão, n=5)
+    alls = list(SITES); loo = []
+    for drop in alls:
+        sset = [s for s in alls if s != drop]
+        x = np.array([sun[s] for s in sset]); y = np.array([inc9[s] for s in sset])
+        r, _ = spearmanr(x, y); loo.append((drop, r)); rob.append(r)
+
+    frac_pos = np.mean([r > 0 for r in rob])
+
+    # headline specs + bootstrap CI
+    se = [s for s in SITES if s not in UNRELIABLE]
+    xe = np.array([sun[s] for s in se]); ye = np.array([inc9[s] for s in se])
+    rho_e, p_e = spearmanr(xe, ye)
+    xa = np.array([sun[s] for s in SITES]); ya = np.array([inc9[s] for s in SITES])
+    rho_a, p_a = spearmanr(xa, ya)
+    ci_lo, ci_hi, ci_med = boot_ci(xa, ya)
+
+    ap_pts = [(ap, np.mean([sun_deficit(s) for s in mem]), float(np.mean(AP_TB[ap])))
+              for ap, mem in AP_MEMBERS.items()]
     rho_ap, _ = spearmanr([a[1] for a in ap_pts], [a[2] for a in ap_pts])
 
-    print("=== TB incidence vs winter sun-deficit (favela≈bairro) ===")
-    for r in sorted(rows, key=lambda r: -r["sun"]):
-        print(f"  {r['label']:14s} sun<2h={r['sun']:5.1f}%  TB≈{r['inc']:5.0f}/100k "
-              f"(pop {r['pop']:,} {r['flag']})  {'' if r['reliable'] else '[excluded]'}")
-    print(f"\n  Spearman ρ (n={len(prim)}, reliable) = {rho:+.2f}  (p={p:.2f})")
-    print(f"  Spearman ρ (n={len(rows)}, incl. Alemão) = {rho_all:+.2f} (p={p_all:.2f})")
-    print(f"\n=== AP-level washout (change-of-support) ===")
-    for ap, sd, tb in ap_pts:
-        print(f"  {ap}: sun<2h={sd:5.1f}%  TB={tb:5.1f}/100k")
-    print(f"  Spearman ρ (n={len(ap_pts)} APs) = {rho_ap:+.2f}  "
-          f"→ the bairro-scale signal collapses when pooled to AP")
+    print(f"\n=== SCORECARD ===")
+    print(f"  G1 window .......... 9-yr (2015–23)  ✅")
+    print(f"  G2 n ............... {len(SITES)} (incl Alemão) / {len(se)} (excl)  ✅")
+    print(f"  headline ρ ......... excl Alemão n={len(se)}: {rho_e:+.2f} (p={p_e:.2f}) | "
+          f"incl n={len(SITES)}: {rho_a:+.2f} (p={p_a:.2f})")
+    print(f"  G3 bootstrap 95% CI (incl, n={len(SITES)}) ρ ∈ [{ci_lo:+.2f}, {ci_hi:+.2f}] (median {ci_med:+.2f})")
+    print(f"  G4 robustness ...... ρ>0 in {frac_pos*100:.0f}% of {len(rob)} specs "
+          f"(target ≥90%)  {'✅' if frac_pos >= 0.9 else '⚠'}")
+    print(f"     spec range ρ ∈ [{min(rob):+.2f}, {max(rob):+.2f}];  "
+          f"LOO ρ ∈ [{min(r for _, r in loo):+.2f}, {max(r for _, r in loo):+.2f}]")
+    print(f"  AP washout ......... ρ={rho_ap:+.2f} (n=3 APs) — signal collapses when pooled")
+    print(f"  G5 specificity ..... PENDING (leptospirosis placebo — verification cycle)")
 
-    # figure
+    # ---- figure (multi-year) ----
     fig, ax = plt.subplots(figsize=(7.4, 5.6))
-    for r in rows:
-        c = "#b5651d" if r["reliable"] else "#bbb"
-        ax.scatter(r["sun"], r["inc"], s=90, c=c, zorder=3,
-                   edgecolor="#333", linewidth=0.6)
-        ax.annotate(r["label"] + ("" if r["reliable"] else " ⚠"),
-                    (r["sun"], r["inc"]), xytext=(6, 4),
-                    textcoords="offset points", fontsize=9,
-                    color="#333" if r["reliable"] else "#999")
-    # trend on reliable points
-    if len(prim) >= 2:
-        b, a = np.polyfit(xs, ys, 1)
-        xx = np.linspace(min(xa) - 3, max(xa) + 3, 50)
-        ax.plot(xx, a + b * xx, "--", c="#b5651d", lw=1.2, alpha=0.7, zorder=2)
+    for s in SITES:
+        rel = s not in UNRELIABLE
+        c = "#b5651d" if rel else "#bbb"
+        ax.scatter(sun[s], inc9[s], s=95, c=c, zorder=3, edgecolor="#333", linewidth=0.6)
+        ax.annotate(SITES[s][0] + ("" if rel else " ⚠"), (sun[s], inc9[s]),
+                    xytext=(6, 4), textcoords="offset points", fontsize=9,
+                    color="#333" if rel else "#999")
+    b, a = np.polyfit(xe, ye, 1)
+    xx = np.linspace(min(xa) - 3, max(xa) + 3, 50)
+    ax.plot(xx, a + b * xx, "--", c="#b5651d", lw=1.2, alpha=0.7, zorder=2)
     ax.set_xlabel("Modelled winter sun-deficit  (% of street below WHO 2 h/day)")
-    ax.set_ylabel("Tuberculosis incidence  (new cases /100k, 2022–23 mean)")
+    ax.set_ylabel("Tuberculosis incidence  (new cases /100k, 2015–23 mean)")
     ax.set_title("TB incidence vs winter sun-deficit — Rio favelas (bairro≈favela)",
                  fontsize=12, fontweight="bold")
     ax.text(0.02, 0.97,
-            f"Spearman ρ = {rho:+.2f} (n={len(prim)}, p={p:.2f}, NOT significant)\n"
-            f"ecological · hypothesis-generating · signal washes out at AP scale (ρ={rho_ap:+.2f})",
+            f"Spearman ρ = {rho_e:+.2f} (n={len(se)} excl. Alemão) · {rho_a:+.2f} (n={len(SITES)} incl.)\n"
+            f"bootstrap 95% CI [{ci_lo:+.2f}, {ci_hi:+.2f}] · ρ>0 in {frac_pos*100:.0f}% of specs\n"
+            f"ecological · hypothesis-generating · washes out at AP scale (ρ={rho_ap:+.2f})",
             transform=ax.transAxes, va="top", fontsize=8.5, color="#555",
             bbox=dict(boxstyle="round,pad=0.4", fc="#f6f2ec", ec="#e0d6c8"))
     ax.grid(alpha=0.25)
@@ -140,13 +202,19 @@ def main():
     plt.close(fig)
     print(f"\n  figure → {png.relative_to(ROOT)}")
 
-    import json
     (OUT / "tb_sun_deficit_screen.json").write_text(json.dumps({
-        "rows": [{k: r[k] for k in ("site", "label", "sun", "inc", "pop", "flag", "reliable")}
-                 for r in rows],
-        "spearman_bairro_reliable": {"rho": rho, "p": p, "n": len(prim)},
-        "spearman_bairro_all": {"rho": rho_all, "p": p_all, "n": len(rows)},
-        "spearman_ap": {"rho": rho_ap, "n": len(ap_pts)},
+        "window_years": [YEARS[0], YEARS[-1]],
+        "rows": [{"site": s, "label": SITES[s][0], "sun_pct_below_2h": round(sun[s], 1),
+                  "tb_incidence_9yr": round(inc9[s], 1), "pop": SITES[s][1],
+                  "reliable": s not in UNRELIABLE} for s in order],
+        "headline": {"rho_excl_alemao": rho_e, "p_excl": p_e, "n_excl": len(se),
+                     "rho_incl_alemao": rho_a, "p_incl": p_a, "n_incl": len(SITES),
+                     "bootstrap_ci95": [ci_lo, ci_hi], "bootstrap_median": ci_med},
+        "robustness": {"frac_specs_positive": frac_pos, "n_specs": len(rob),
+                       "rho_range": [min(rob), max(rob)],
+                       "leave_one_out": {d: r for d, r in loo}},
+        "ap_washout_rho": rho_ap,
+        "specificity_placebo": "pending",
         "framing": "ecological, hypothesis-generating; NOT causal; support-dependent",
     }, indent=2, ensure_ascii=False))
 
