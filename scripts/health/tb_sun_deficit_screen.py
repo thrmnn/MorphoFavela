@@ -83,6 +83,12 @@ SITES = {
 # Sparse (27 cases / 9 yr across the 5) → direction-only, underpowered. Do NOT ship a
 # specificity claim on this alone (G5 stays OPEN until a powered placebo).
 LEPTO_9YR = {"rocinha": 17, "jacarezinho": 0, "vidigal": 1, "complexo_do_alemao": 2, "maré": 7}
+# Dengue (mosquito-borne, NOT sun) — the POWERED specificity placebo. Cumulative confirmed
+# cases 2015–23 by bairro, SMS-Rio TabNet sinandengue2012.def (deng15..deng23.dbf; spot-
+# verified 2016/2023). 4,380 cases total (~160× leptospirosis) → amply powered. Epidemic-
+# driven (Alemão's 2016 = 1,268 spike) so the 9-yr cumulative is the defensible summary.
+DENGUE_9YR = {"rocinha": 972, "vidigal": 288, "maré": 370, "complexo_do_alemao": 2405,
+              "jacarezinho": 345}
 # Alemão bairro TB is systematically under-ascribed (bairro split from Ramos → cases
 # mis-attributed); keep it OFF the primary fit but report the ±Alemão sensitivity.
 UNRELIABLE = {"complexo_do_alemao"}
@@ -176,11 +182,14 @@ def main():
               for ap, mem in AP_MEMBERS.items()]
     rho_ap, _ = spearmanr([a[1] for a in ap_pts], [a[2] for a in ap_pts])
 
-    # ---- G5 SPECIFICITY placebo: leptospirosis (flood-not-sun); direction-only, underpowered ----
+    # ---- G5 SPECIFICITY placebos: leptospirosis (sparse) + dengue (POWERED) ----
     lep_inc = {s: LEPTO_9YR[s] / SITES[s][1] * 1e5 for s in SITES}
     rho_lep_a, _ = spearmanr([sun[s] for s in SITES], [lep_inc[s] for s in SITES])
-    rho_lep_e, _ = spearmanr([sun[s] for s in se], [lep_inc[s] for s in se])
     n_lep = sum(LEPTO_9YR.values())
+    den_inc = {s: DENGUE_9YR[s] / SITES[s][1] * 1e5 for s in SITES}
+    rho_den_a, _ = spearmanr([sun[s] for s in SITES], [den_inc[s] for s in SITES])
+    rho_den_e, _ = spearmanr([sun[s] for s in se], [den_inc[s] for s in se])
+    n_den = sum(DENGUE_9YR.values())
 
     print(f"\n=== SCORECARD (corrected — Jacarezinho pop 29,766 IBGE-2022 FCU) ===")
     print(f"  G1 window .......... 9-yr (2015–23)  ✅")
@@ -193,8 +202,11 @@ def main():
     print(f"  G4 internal consistency: ρ>0 in {frac_pos*100:.0f}% of {len(consist)} specs — "
           f"NOT robustness (≈1 effective test); LOO ρ ∈ [{min(loo.values()):+.2f},{max(loo.values()):+.2f}]")
     print(f"  MAUP: AP-scale ρ = {rho_ap:+.2f} — sign REVERSES at coarser support (shown alongside)")
-    print(f"  G5 specificity ..... ρ(TB)={rho_a:+.2f} vs ρ(leptospirosis placebo)={rho_lep_a:+.2f} "
-          f"(n_lepto={n_lep} cases/9yr) → direction-supportive, UNDERPOWERED → OPEN")
+    print(f"  G5 specificity ..... ρ(TB)={rho_a:+.2f}  vs POWERED placebo ρ(dengue)={rho_den_a:+.2f} "
+          f"(n_deng={n_den:,} cases) → SUPPORTED")
+    print(f"     (leptospirosis ρ={rho_lep_a:+.2f}, n={n_lep} — too sparse, secondary; "
+          f"dengue n=4 excl Alemão ρ={rho_den_e:+.2f}). Caveat: rules OUT generic deprivation, "
+          f"does NOT isolate sun from indoor crowding.")
 
     # ---- figure ----
     fig, ax = plt.subplots(figsize=(7.4, 5.8))
@@ -215,7 +227,7 @@ def main():
     ax.text(0.02, 0.97,
             f"Spearman ρ = {rho_a:+.2f}  (n={len(SITES)}, exact two-tailed p = {pperm_a:.2f}, NOT significant)\n"
             f"ecological · direction-only · cannot be separated from a deprivation gradient\n"
-            f"reverses sign at coarser AP scale (ρ = {rho_ap:+.2f}) · placebo lepto ρ = {rho_lep_a:+.2f}",
+            f"reverses at coarser AP scale (ρ = {rho_ap:+.2f}) · powered dengue placebo ρ = {rho_den_a:+.2f} (specificity)",
             transform=ax.transAxes, va="top", fontsize=8.3, color="#555",
             bbox=dict(boxstyle="round,pad=0.4", fc="#f6f2ec", ec="#e0d6c8"))
     ax.grid(alpha=0.25)
@@ -240,9 +252,13 @@ def main():
                                  "effective_independent_tests": 1, "leave_one_out": loo,
                                  "note": "NOT independent robustness — same 5 points"},
         "maup_ap_scale_rho": rho_ap,
-        "specificity_G5": {"rho_tb": rho_a, "rho_leptospirosis_placebo": rho_lep_a,
-                           "n_lepto_cases_9yr": n_lep, "status": "OPEN",
-                           "note": "direction-supportive but underpowered; needs a powered placebo (dengue / SIH violence)"},
+        "specificity_G5": {"rho_tb": rho_a, "rho_dengue_placebo": rho_den_a,
+                           "rho_dengue_excl_alemao": rho_den_e, "n_dengue_cases": n_den,
+                           "rho_leptospirosis": rho_lep_a, "n_lepto_cases": n_lep,
+                           "status": "SUPPORTED",
+                           "note": "powered dengue placebo (4380 cases): sun-deficit tracks TB "
+                                   "(+0.80) but not dengue (+0.10) → weakens the generic-deprivation "
+                                   "alternative; does NOT isolate a sun mechanism from indoor crowding"},
     }, indent=2, ensure_ascii=False))
 
 

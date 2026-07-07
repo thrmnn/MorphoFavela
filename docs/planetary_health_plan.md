@@ -56,7 +56,7 @@ metric is a number a script prints or a test asserts, so "done" is not a matter 
 | **G2** | Sample size (achievable) | n favela≈bairro points | n ≥ 5 | **5** ✅ |
 | **G3** | Report uncertainty | bootstrap 95% CI on ρ | CI printed | **[+0.11,+1.00], sign-only** ✅ |
 | **G4** | Robustness | direction of ρ vs perturbations | honest framing | **internal consistency (≈1 eff. test), NOT robustness; AP-scale reverses to −0.50** ✅ |
-| **G5** | Specificity | ρ(TB) − ρ(placebo: leptospirosis) | > 0 | **+0.80 vs +0.30 — direction-supportive but underpowered (27 cases) → OPEN** 🟠 |
+| **G5** | Specificity | ρ(TB) − ρ(powered placebo) | > 0 | **SUPPORTED — ρ(TB)+0.80 vs ρ(dengue)+0.10 (4,380 cases); rules out generic deprivation, not indoor crowding** ✅ |
 | **G6** | Independent verification | adversarial audit of every number vs source | 0 mismatches | **PASS after correction** — audit caught Jacarezinho pop error (37,839→29,766); 15/15 TB counts + 4/4 other pops verified ✅ |
 | **G7** | Surface honestly | TB probe + vitamin-D mechanism on `health.html` as an ecological-probe tier below Grade A; tests green | shipped | **SHIPPED** — `health.html#health-probe`, Grade C, all hedges, 23 tests green ✅ |
 
@@ -235,6 +235,20 @@ mechanism, not outcome):
 ---
 
 ## Cycle log (append-only — newest first)
+
+### Cycle 6 — 2026-07-07 · powered specificity placebo (dengue) → G5 closed; dashboard served
+- Served the hub (loopback `127.0.0.1:8773`, verified 200) — root redirects to the hub;
+  health probe at `/outputs/_hub/health.html#health-probe`.
+- Ran the **powered placebo**: pulled **dengue** by bairro 2015–23 (SMS-Rio `sinandengue2012.def`,
+  4,380 cases — ~160× the leptospirosis) and spot-verified 2016/2023 counts myself.
+  **ρ(sun, dengue) = +0.10 (n=5)** vs **ρ(TB) = +0.80**. G5 = **SUPPORTED**.
+- **Most important item added:** **the specificity contrast is the strongest evidence yet** —
+  sun-deficit tracks TB but not a same-confounded, well-powered mosquito-borne disease, which
+  *weakens the "it's just generic deprivation" alternative*. But it honestly does **NOT isolate a
+  sun mechanism from indoor crowding** (both co-locate with sun-deficit); that boundary is now
+  stated on the probe. G5 ✅; the remaining open levers are n (data-gated onboarding) and an
+  individual-level design (ethics-gated).
+- Updated `health.html#health-probe` (specificity hedge), scorecard, and screen; committed.
 
 ### Cycle 5 — 2026-07-06 · adversarial verify caught a real error → corrected + shipped honestly
 - Ran `tb-screen-adversarial-verify` (independent number audit ∥ leptospirosis specificity ∥

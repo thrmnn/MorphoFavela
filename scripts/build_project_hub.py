@@ -826,8 +826,11 @@ def write_health_page(prov):
             '<li>It <b>reverses sign at the coarser AP scale</b> (ρ ≈ −0.50) — a change-of-support '
             '(MAUP) effect, shown here rather than hidden.</li>'
             '<li>An <b>independent audit caught and corrected a population error</b> (Jacarezinho) '
-            'before this shipped; a leptospirosis placebo is directionally supportive but far too '
-            'sparse, so <b>specificity is not established</b>.</li>'
+            'before this shipped.</li>'
+            '<li><b>Specificity check (powered):</b> sun-deficit tracks TB (ρ ≈ +0.80) but not '
+            'dengue — a mosquito-borne disease with the same poverty gradient (ρ ≈ +0.10, 4,380 '
+            'cases). This weakens a generic-deprivation explanation, but does <b>not</b> isolate a '
+            'sun mechanism from indoor crowding, which co-locates with sun-deficit.</li>'
             '<li>Ecological (bairro ≈ favela): it says nothing about whether sun-deprived '
             '<em>individuals</em> develop TB — that needs an individual-level follow-up.</li>'
             '</ul></div>')
