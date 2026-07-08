@@ -41,6 +41,42 @@ anchor it to **real Rio de Janeiro health data**.*
 
 ---
 
+## ▶ NEXT ACTION — T7 execution spec (the keystone)
+
+**Goal:** any polygon — a `Favelas_Limit_2019` favela by name/code, or an arbitrary user
+polygon (e.g. a formal hillside mask) — flows end-to-end (scene → SVF → sun-deficit) with **no
+per-site `data/{area}/` dir**. Unblocks **T5** (screen power, n 8→20+) *and* the P1 **D3**
+formal-fabric comparison. Everything needed is already on disk in `data/RJ/`.
+
+Three fallbacks, in `src/svf_v2/paths.py` + `scripts/build_extended_context.py` (the pipeline
+currently hard-requires an `AREA_FILES` registry entry or a `data/{area}/` glob):
+
+1. **Boundary from the municipal favela layer** — `resolve_boundary(area)`: if `area` is not a
+   registered/globbed site, look it up in `data/RJ/Favelas_Limit_2019.shp` (1,074 polygons) by
+   name/code and return that single feature; also accept an explicit `--polygon <path>` for
+   arbitrary extents.
+2. **DTM optional → clip RJ alone** — `build_extended_dtm` (line ~225): make `site_dtm_path`
+   optional; when `resolve_paths` finds no per-site DTM, skip `rio_merge` and window-clip
+   `RJ_DTM` (5 m) to `buffer_bounds` directly (it already opens `RJ_DTM`; just guard the
+   site branch — mirror how `build_extended_buildings` already degrades when `site_bld` is empty).
+3. **Footprints from the municipal buildings** — when no per-site footprints, clip
+   `data/RJ/buildings_RJ_2019.shp` (2.36 M, carries `altura` height + `tipo` = A101 formal /
+   A102 favela) to `buffer_bounds`. Favela run → keep the polygon interior; D3 comparator →
+   filter `tipo=='A101'` + slope > 15° *outside* favela polygons.
+
+**Acceptance:** `build_extended_context.py --area <any-favela>` (or `--polygon x.gpkg`) produces
+extended DTM + buildings + scene with zero per-site files; sun-deficit computes for ≥3 new
+favela-bairros that also have TabNet TB (→ feeds the T5 power run); a test clips an arbitrary
+in-coverage polygon with no registry entry. Guardrails unchanged: 5 m DTM (honest resolution),
+ecological-only, and every new health number still clears the **G6 adversarial gate**.
+
+*After T7:* **T3** (terrain- vs morphology-driven exposure split), **T4** (compound
+sun×ventilation exposure via the morphometric index, not the gated CFD), **T5** (permutation
+power curve + ranked onboarding list). Optional, separate: re-source native **1 m IPP LiDAR MDT**
+(data-quality upgrade, not a bug — the current 5 m is correct as reported).
+
+---
+
 ## Priorities — redefined 2026-07-05 (with the user)
 
 | # | Track | Status | Note |
