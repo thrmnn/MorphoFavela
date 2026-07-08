@@ -16,6 +16,7 @@ anchor it to **real Rio de Janeiro health data**.*
 
 | # | Track | Status | Note |
 |---|-------|--------|------|
+| **P0-council** | **P1-council handoff → ranked tasks (T0–T6)** — [`docs/p1_council_handoff.md`](p1_council_handoff.md) | **NEW (2026-07-08)** | Ship T0 (firewall-justification handback to P1) + T1 (cross-repo exposure reconciliation: Maré 27.8 street-obs vs 35 built-cell) + T2 (crowding covariate — the confound frontier) first. Encodes: the screen does NOT enter P1; it seeds a separate health-linkage output. |
 | **P0** | **TB×sun-deficit open ecological screen** — first REAL health number | **DONE (Cycle 3)** | ρ=+0.80 at favela scale (n=4, p=0.20, NOT sig); washes out at AP scale (ρ=−0.50). `scripts/health/tb_sun_deficit_screen.py`. |
 | **P0-mech** | **Vitamin-D mechanism narrative** (Pró-Saúde + lab priors) | **DONE (Cycle 3)** | sourced: Pró-Saúde β=+0.49 nmol/L per sun-unit, +20.1 summer swing; TB bridge OR 3.23. Ready to drop into health.html. |
 | **P0-next** | **Power the screen: n=4 is the bottleneck** | **NEXT** | model sun-deficit for more favela-bairros (n→20+) so the ecological screen has power; setor/point join is ethics-gated (parked) |
@@ -235,6 +236,26 @@ mechanism, not outcome):
 ---
 
 ## Cycle log (append-only — newest first)
+
+### Cycle 7 — 2026-07-08 · P1-council handoff → T0 shipped, T1 verified, T2 in flight
+- Folded the brisaverse P1-council handoff ([`p1_council_handoff.md`](p1_council_handoff.md))
+  into priorities. Strategic lock: **the n=5 screen does NOT enter the P1 flagship** — it
+  justifies P1's outcome-free design and seeds a separate health-linkage output.
+- **T0 SHIPPED:** `docs/p1_firewall_justification.md` — the citable "we ran the linkage, here
+  is why we stop at the adequacy surface" block for P1 Methods/SI (ρ+0.80, n=5, p≈0.13 n.s.,
+  MAUP −0.50, dengue-specificity +0.10, crowding-inseparable). External citations flagged for
+  human re-check.
+- **T1 VERIFIED (rank-robust):** re-ran ρ under the **canonical built-cell** exposure
+  (`brisaverse/shared/facts/solar_canonical.json`: Rocinha 74 · Vidigal 55 · Alemão 42 · Maré 35).
+  ρ = **+0.80 observer → +0.90 built-cell** (n=5); the 4 shared favelas keep identical ranks;
+  Maré's observer-vs-cell delta (27.8→34.5, +6.7pt) does not change its rank. Sign + n.s. status
+  unchanged. `health.html` keeps the observer +0.80 (the built-cell +0.90 leans on an
+  observer→cell approximation for Jacarezinho — robustness, not headline).
+- **T2 IN FLIGHT:** pulling IBGE-2022 favela crowding (persons/household) to compute the partial
+  ρ(sun, TB | crowding) — the confound frontier.
+- **Most important item added:** **the screen's job changed** — it is no longer chasing
+  significance (impossible at n=5) but *earning its place as P1's firewall justification* (T0) and
+  *stress-testing the crowding confound* (T2). Rigor and honest framing, not a bigger ρ.
 
 ### Cycle 6 — 2026-07-07 · powered specificity placebo (dengue) → G5 closed; dashboard served
 - Served the hub (loopback `127.0.0.1:8773`, verified 200) — root redirects to the hub;
