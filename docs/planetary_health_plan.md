@@ -12,6 +12,31 @@ anchor it to **real Rio de Janeiro health data**.*
 
 ---
 
+## ▶ START HERE (fresh-session boot — status 2026-07-08)
+
+- **HEAD** on `main`, everything pushed. Health track = **loop cycles 1–7 done**; scorecard
+  **G1–G7 green**; P1-council handoff **T0/T1/T2 shipped** (all adversarial-gated).
+- **The result (honest, final):** TB × winter-sun-deficit ecological probe, **ρ ≈ +0.80,
+  n=5, exact two-tailed p ≈ 0.13 (not significant)**, AP-scale sign reversal, dengue-specificity
+  +0.10, crowding-adjusted +0.69–0.76. Lives at `health.html#health-probe` as a **Grade-C**
+  probe; it does **NOT** enter the P1 flagship (it justifies P1's outcome-free design instead).
+- **Dashboard is live** over Tailscale: `http://100.104.205.62:8773/` (health probe at
+  `/outputs/_hub/health.html#health-probe`). Restart if down:
+  `cd ~/MorphoFavela && setsid nohup python -m http.server 8773 --bind 0.0.0.0 >/tmp/hub.log 2>&1 &`
+- **Next open tasks (P1 handoff):** **T7** (pipeline accepts an arbitrary polygon — now the
+  keystone, it unblocks n-onboarding), then **T3** (terrain-vs-morphology exposure split),
+  **T4** (compound sun×ventilation exposure), **T5** (power curve + onboarding list). T6 parked.
+- **⚠ The big change (2026-07-08):** the **n-ceiling is no longer user-gated** — `data/RJ/`
+  has the municipal DTM + buildings (formal/informal flag) + favela polygons, so T7 can lift
+  n to 20+ programmatically. Also flag: repo DTM is **5 m, not the 1 m** claimed in
+  `technical_report.md` — needs correcting.
+- **Pre-existing WIP NOT from this track** (leave alone): `outputs/paper_figures/fig0{1,4,5,8}*.py`,
+  `fig_solar_deficit.py`, `scripts/brisa_ventilation/05_*.py`, `scripts/pooled_vs_stratified.py`
+  are **brisaverse P1 figure/analysis WIP** sitting uncommitted — review/commit under the P1
+  track, not here.
+
+---
+
 ## Priorities — redefined 2026-07-05 (with the user)
 
 | # | Track | Status | Note |
@@ -68,11 +93,13 @@ separated from a generic deprivation gradient**; **reverses sign at the coarser 
 adversarial audit caught — the loop worked exactly as designed. The parametric p is retired
 (inadmissible at n=5); only the exact permutation p and sign-only bootstrap are reported.
 
-**Honest ceiling (data-gated, NOT autonomously closable):** the ecological screen is
-capped near **n ≈ 8** — the favelas for which we have a modelled sun-deficit surface. Going
-to **n ≥ 20** requires onboarding more favelas, whose DTMs are **manually clipped** (project
-policy, [[feedback-dtm-workflow]]) → needs the user, not the loop. The loop therefore
-maximises *rigor at fixed n* (G1–G6), not n itself. A separate epic (P0-onboard) tracks n.
+**Ceiling — UPDATED 2026-07-08 (now liftable):** the screen is at **n ≈ 8** today. This was
+believed data-gated (manual DTM clip), but the P1 handoff confirmed **`data/RJ/`** holds the
+municipal DTM + buildings (formal/informal flag) + 1,074 favela polygons — so **T7** (make
+`build_extended_context.py` accept an arbitrary polygon / window-clip `DTM_RJ.tif`) lifts n to
+**20+ programmatically**, no manual clip. T7 is therefore the keystone that unblocks both the
+health-screen power (T5) and the P1 D3 formal comparison. The old "manual clip, needs the user"
+framing ([[feedback-dtm-workflow]]) is **superseded** for this purpose.
 
 ---
 
@@ -236,6 +263,18 @@ mechanism, not outcome):
 ---
 
 ## Cycle log (append-only — newest first)
+
+### Cycle 8 — 2026-07-08 · consolidate + reconcile the T7/municipal-data update (session wrap)
+- Session cleanup before a fresh start: added the START-HERE boot block; committed the P1-council
+  handoff update (municipal `data/RJ/` confirmed → n-ceiling liftable, **T7** added, 5m-vs-1m DTM
+  flag); updated the ceiling section (no longer user-gated); left the brisaverse P1 figure WIP
+  (`fig0{1,4,5,8}*.py`, `fig_solar_deficit.py`, `brisa_ventilation/05_*.py`, `pooled_vs_stratified.py`)
+  untouched + documented (not this track); refreshed memory + the hub.
+- **Most important item added:** **T7 is the new keystone** — the n-ceiling flipped from
+  "data-gated, needs the user" to "one pipeline change away," because the municipal DTM +
+  formal/informal buildings + favela polygons are already on disk. The next session's highest-
+  leverage move is T7, which simultaneously unblocks health-screen power (T5) and the P1 D3
+  formal-fabric comparison.
 
 ### Cycle 7 — 2026-07-08 · P1-council handoff → T0 shipped, T1 verified, T2 in flight
 - Folded the brisaverse P1-council handoff ([`p1_council_handoff.md`](p1_council_handoff.md))
