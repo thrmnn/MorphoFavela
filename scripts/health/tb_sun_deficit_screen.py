@@ -89,6 +89,14 @@ LEPTO_9YR = {"rocinha": 17, "jacarezinho": 0, "vidigal": 1, "complexo_do_alemao"
 # driven (Alemão's 2016 = 1,268 spike) so the 9-yr cumulative is the defensible summary.
 DENGUE_9YR = {"rocinha": 972, "vidigal": 288, "maré": 370, "complexo_do_alemao": 2405,
               "jacarezinho": 345}
+# T2 CONFOUND FRONTIER: crowding covariate, IBGE Censo 2022 via IPP/data.rio (bairro level,
+# one source for pop + households — internally consistent). persons/household = the classic
+# indoor-crowding proxy for TB. NOTE: sun-deficit and crowding are NOT collinear here (Rocinha
+# = highest sun-deficit but LOWEST persons/hh) — the test the P1 council asked for.
+CROWD_PPH = {"rocinha": 2.375, "vidigal": 2.514, "maré": 2.653,
+             "complexo_do_alemao": 2.725, "jacarezinho": 2.701}
+DENSITY_PPKM2 = {"rocinha": 49328, "vidigal": 9320, "maré": 29243,
+                 "complexo_do_alemao": 18306, "jacarezinho": 37450}
 # Alemão bairro TB is systematically under-ascribed (bairro split from Ramos → cases
 # mis-attributed); keep it OFF the primary fit but report the ±Alemão sensitivity.
 UNRELIABLE = {"complexo_do_alemao"}
@@ -110,6 +118,17 @@ def incidence(site: str, years) -> float:
     idx = [YEARS.index(y) for y in years]
     mean_cases = np.mean([TB_YEARLY[site][i] for i in idx])
     return mean_cases / SITES[site][1] * 1e5
+
+
+def partial_spearman(x, y, z):
+    """Partial rank (Spearman) correlation of x,y controlling for z. Ranks then applies
+    the first-order partial-correlation formula. At n=5 with one covariate this leaves ~2
+    residual df — report as suggestive only, never as establishing independence."""
+    rx, ry, rz = (np.argsort(np.argsort(v)).astype(float) for v in (x, y, z))
+    def r(a, b): return np.corrcoef(a, b)[0, 1]
+    rxy, rxz, ryz = r(rx, ry), r(rx, rz), r(ry, rz)
+    denom = np.sqrt((1 - rxz**2) * (1 - ryz**2))
+    return (rxy - rxz * ryz) / denom if denom > 1e-9 else float("nan"), rxz, ryz
 
 
 def exact_perm_p(x, y):
@@ -202,6 +221,21 @@ def main():
     print(f"  G4 internal consistency: ρ>0 in {frac_pos*100:.0f}% of {len(consist)} specs — "
           f"NOT robustness (≈1 effective test); LOO ρ ∈ [{min(loo.values()):+.2f},{max(loo.values()):+.2f}]")
     print(f"  MAUP: AP-scale ρ = {rho_ap:+.2f} — sign REVERSES at coarser support (shown alongside)")
+    # ---- T2 CONFOUND FRONTIER: partial ρ(sun, TB | crowding) ----
+    ks = list(SITES)
+    sv = [sun[s] for s in ks]; tv = [inc9[s] for s in ks]
+    pph = [CROWD_PPH[s] for s in ks]; den = [DENSITY_PPKM2[s] for s in ks]
+    pr_pph, rsc_pph, rtc_pph = partial_spearman(sv, tv, pph)
+    pr_den, rsc_den, rtc_den = partial_spearman(sv, tv, den)
+    print(f"  T2 confound (n=5, ~2 residual df — CANNOT establish independence):")
+    print(f"     raw ρ(sun,TB)={rho_a:+.2f} (p≈0.10, n.s.)")
+    print(f"     | density (the FAIRER confound; sun IS collinear ρ={rsc_den:+.2f}): "
+          f"PARTIAL ρ={pr_den:+.2f} — the cautious read")
+    print(f"     | persons/hh (anti-corr w/ sun ρ={rsc_pph:+.2f}, so can't subtract much — "
+          f"NOT robustness): PARTIAL ρ={pr_pph:+.2f}")
+    print(f"     ⚠ ρ(TB,persons/hh)={rtc_pph:+.2f} is n=5 NOISE not a protective effect; "
+          f"crowding on bairro support vs TB on FCU pop (rank-robust, declared)")
+
     print(f"  G5 specificity ..... ρ(TB)={rho_a:+.2f}  vs POWERED placebo ρ(dengue)={rho_den_a:+.2f} "
           f"(n_deng={n_den:,} cases) → SUPPORTED")
     print(f"     (leptospirosis ρ={rho_lep_a:+.2f}, n={n_lep} — too sparse, secondary; "
@@ -252,6 +286,23 @@ def main():
                                  "effective_independent_tests": 1, "leave_one_out": loo,
                                  "note": "NOT independent robustness — same 5 points"},
         "maup_ap_scale_rho": rho_ap,
+        "T2_confound_partial": {
+            "raw_rho_sun_tb": rho_a,
+            "persons_per_household": {"rho_sun_crowd": rsc_pph, "rho_tb_crowd": rtc_pph,
+                                       "partial_rho_sun_tb_given_crowd": pr_pph},
+            "population_density": {"rho_sun_dens": rsc_den, "rho_tb_dens": rtc_den,
+                                    "partial_rho_sun_tb_given_dens": pr_den},
+            "verdict": "CONDITIONAL GO (Grade C) — report BOTH partials, lead with density",
+            "honest_reading": "whichever proxy, the association weakens but does not vanish "
+                    "(+0.69 density / +0.76 persons-hh); n=5 ~2 residual df CANNOT establish "
+                    "independence; density is the fairer confound (sun-deficit is a built-form "
+                    "proxy collinear with density, so adjustment cannot separate it from denser "
+                    "morphology); persons/hh is anti-correlated with the exposure so controlling "
+                    "for it mechanically subtracts little (NOT robustness); rho(TB,persons/hh) "
+                    "-0.4 is n=5 noise, not a protective effect",
+            "support_caveat": "crowding = bairro-level persons/household; TB denominator = FCU "
+                    "population — different supports (rank-robust, declared, not reconciled)",
+            "crowding_source": "IBGE Censo 2022 via IPP/data.rio (bairro) + FCU cross-check"},
         "specificity_G5": {"rho_tb": rho_a, "rho_dengue_placebo": rho_den_a,
                            "rho_dengue_excl_alemao": rho_den_e, "n_dengue_cases": n_den,
                            "rho_leptospirosis": rho_lep_a, "n_lepto_cases": n_lep,

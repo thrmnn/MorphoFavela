@@ -251,11 +251,19 @@ mechanism, not outcome):
   Maré's observer-vs-cell delta (27.8→34.5, +6.7pt) does not change its rank. Sign + n.s. status
   unchanged. `health.html` keeps the observer +0.80 (the built-cell +0.90 leans on an
   observer→cell approximation for Jacarezinho — robustness, not headline).
-- **T2 IN FLIGHT:** pulling IBGE-2022 favela crowding (persons/household) to compute the partial
-  ρ(sun, TB | crowding) — the confound frontier.
-- **Most important item added:** **the screen's job changed** — it is no longer chasing
-  significance (impossible at n=5) but *earning its place as P1's firewall justification* (T0) and
-  *stress-testing the crowding confound* (T2). Rigor and honest framing, not a bigger ρ.
+- **T2 SHIPPED (adversarial-gated):** IBGE-2022 crowding pulled; partial ρ(sun, TB | crowding)
+  computed and **passed the G6 skeptic as a CONDITIONAL GO**. Result: raw +0.80 → **+0.69**
+  (density, the *fairer* confound — sun-deficit is a built-form proxy collinear with density) /
+  **+0.76** (persons/household, but that is *anti-correlated* with the exposure ρ=−0.50, so
+  controlling for it can't subtract much — NOT robustness). n=5 (~2 residual df) **cannot establish
+  independence**; ρ(TB, persons/hh)=−0.40 flagged as noise not a protective effect; crowding on
+  bairro support vs TB on FCU pop (declared). Honest reading on `health.html#health-probe`:
+  *suggestive that crowding alone does not explain the ranking — not more.*
+- **Most important item added:** **the confound frontier held, cautiously** — whichever crowding
+  proxy, the association attenuates but does not vanish (+0.69–0.76), and the skeptic forced the
+  honest version (density-led, both partials, support caveat) over the flattering persons/hh-only
+  read. The screen's job is now firewall-justification (T0) + a stress-tested confound story (T2),
+  not a bigger ρ. Next: T3/T4 (align exposure to P1's terrain-aspect + compound taxonomy).
 
 ### Cycle 6 — 2026-07-07 · powered specificity placebo (dengue) → G5 closed; dashboard served
 - Served the hub (loopback `127.0.0.1:8773`, verified 200) — root redirects to the hub;
