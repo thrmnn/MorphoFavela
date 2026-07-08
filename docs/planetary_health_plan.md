@@ -28,8 +28,12 @@ anchor it to **real Rio de Janeiro health data**.*
   **T4** (compound sun×ventilation exposure), **T5** (power curve + onboarding list). T6 parked.
 - **⚠ The big change (2026-07-08):** the **n-ceiling is no longer user-gated** — `data/RJ/`
   has the municipal DTM + buildings (formal/informal flag) + favela polygons, so T7 can lift
-  n to 20+ programmatically. Also flag: repo DTM is **5 m, not the 1 m** claimed in
-  `technical_report.md` — needs correcting.
+  n to 20+ programmatically.
+- **DTM-resolution flag RETRACTED (verified 2026-07-08):** every DTM in `data/` (raw,
+  extended, city-wide) measures **5 m**; no sub-2 m raster exists anywhere. The TR is
+  *consistent* — it states the DTM is 5 m (§208/222/378); the **"1 m" is the DSM rasterised
+  from building footprints** (§423), a derived SVF-input grid, NOT the terrain. No report error.
+  (Open, if desired: re-source native 1 m IPP LiDAR MDT — a data-quality upgrade, not a bug.)
 - **Pre-existing WIP NOT from this track** (leave alone): `outputs/paper_figures/fig0{1,4,5,8}*.py`,
   `fig_solar_deficit.py`, `scripts/brisa_ventilation/05_*.py`, `scripts/pooled_vs_stratified.py`
   are **brisaverse P1 figure/analysis WIP** sitting uncommitted — review/commit under the P1
