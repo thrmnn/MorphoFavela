@@ -108,3 +108,16 @@ onboarding list. **T6** parallel/parked.
 
 Every new health number still passes the existing G6 adversarial-verify gate before it reaches
 `health.html`, and the exposure-not-outcome + ecological-fallacy hedges stay load-bearing.
+
+---
+
+## Update 2026-07-08 — municipal data confirmed → Q2 resolved, n-ceiling liftable
+
+Verified in `data/RJ/`: **`DTM_RJ.tif`** (full municipality, **5 m**, EPSG:31983), **`buildings_RJ_2019.shp`** (2,362,806 footprints with `altura` height + a **`tipo` formal/informal flag** — `A101 - EDIFICACAO` formal vs `A102 - EDIFICACAO_FAVELA`), and **`Favelas_Limit_2019.shp`** (1,074 favela polygons). So the whole 2.5D scene is reconstructable for *any* city polygon from these files alone.
+
+- **Q2 (D3 terrain-matched formal comparison) is DATA-FEASIBLE** — derive slope/aspect from `DTM_RJ`, select steep (>15°) `A101` formal fabric outside favela polygons (Santa Teresa / Laranjeiras / Tijuca flanks all in coverage) → genuinely steep, non-São-Conrado comparators. Minor gap: no local bairro polygon layer to delimit the formal extent (use a slope+non-favela mask or fetch the IPP bairro layer).
+- **n-ceiling is liftable to 20+** — the "manual QGIS clip" is already superseded by `scripts/build_extended_context.py` (`--area --buffer`). Only blocker: `build_extended_dtm()` requires a per-site DTM from a hardcoded `AREA_FILES` registry.
+- **⚠ FLAG for P1:** repo DTM rasters are **5 m, not the "1 m" `technical_report.md` and the manuscript state** — confirm source-vs-processed and correct. (Flagged in `main_ph.tex` with a `\TODO`.)
+
+### T7 — make the pipeline accept an arbitrary polygon *(MEDIUM · unblocks Q2 + n-onboarding)*
+In `scripts/build_extended_context.py` + `src/svf_v2/paths.py`: (1) make the per-site DTM optional — if `resolve_paths(area)` finds none, window-read/clip `DTM_RJ.tif` to the buffer bounds directly (mirror how `build_extended_buildings()` already degrades when `site_bld` is empty); (2) let `resolve_boundary(area)` accept a `Favelas_Limit_2019` polygon by name/code, or an arbitrary user polygon (a formal-area extent). Then any favela — or a formal hillside mask (`tipo='A101'` + slope>15°) — flows end-to-end through scene → SVF/sun-deficit. This one change serves BOTH the D3 companion feasibility and the health-screen n-onboarding (T5).
