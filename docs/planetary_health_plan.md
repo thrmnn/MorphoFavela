@@ -102,7 +102,7 @@ A (T7 polygon-agnostic pipeline)  ──unblocks──▶  B2 (onboard new favel
 | **B1** | **T5a** — permutation power curve | **✅ DONE (60e3c17)** | **G10 ✅:** min **n=11** for 80% power at ρ=0.8, α=0.05 (family: 0.6→21, 0.7→15, 0.9→8); screen n=5 → power ≈0.13 | — |
 | **B2** | **T5b** — onboard new favela-bairros → built-cell sun-deficit → pair with TabNet TB → re-run screen | **◑ PILOT DONE** | **G9 (partial):** metric settled (built-cell = observer, ρ+0.80 p=0.133); scrape de-risked; **n stays 5** — clean next add = Cidade de Deus (→n=6). Blocker = bairro↔favela mapping | A + TabNet |
 | **C** | **T3** — terrain-driven vs morphology-driven exposure split (slope/aspect from DTM) | **✅ DONE (7384efc)** | **G12 ✅:** all 5 sites decomposed via a calibration-free solar-horizon ray-march; **morphology dominates 59–86%**; terrain never crosses the 2 h floor alone; natural-experiment design note written | — |
-| **D** | **T4** — compound sun×(morphometric ventilation index) exposure vs TB | **Yes** | **G11:** Δ(ρ or AUC) of compound vs sun-alone reported; no CFD touched | — |
+| **D** | **T4** — compound sun×(morphometric ventilation index) exposure vs TB | **◑ CODE DONE (af6c949), number GATED** | **G11:** built-cell 4-state conjunction: sun-alone +0.80 / **ventilation-alone +1.00 (p=0.017)** / compound +0.90; Δρ(compound−sun)=+0.10 **not** bootstrap-confirmed. ρ=+1.00 is UNDER G6 adversarial audit (saturated 82–97% proxy, collinearity, LOO) — not surfaced until it clears | — |
 | **E** | **T6** protocol draft + external-citation re-verification | **✅ DONE (791b0f1)** | **G13 ✅:** all 5 cites resolve to real articles (no fabrications); fixed 3 labels — PMC4544397 is *bairro*- not setor-level, PMC8009065 = Leão et al. (dup), OR 3.23 is a pulmonary-TB meta-analysis. Protocol draft + `health_citation_verification.md` shipped. | — |
 
 ### Recommended autonomous sequence
@@ -376,6 +376,16 @@ mechanism, not outcome):
 - Drafted the **autonomous execution plan** (tracks A–E, dependency graph, blockers by hardness);
   launched all four health tracks as parallel background agents and a new satellite-reconstruction
   **council workflow** (planning-only, IPP = test set).
+- **D (T4/G11) CODE LANDED (af6c949) — number GATED under G6:** built-cell 4-state conjunction
+  (P1 taxonomy). ρ vs 9-yr TB: sun-alone **+0.80** (p=0.133), **ventilation-alone +1.00 (p=0.017)**,
+  compound **+0.90**; Δρ(compound−sun)=+0.10, but bootstrap P[Δ>0]=0.45 → **not** confirmed. The
+  eye-catching bit — ventilation-deficit perfectly rank-matching TB — is **exactly the "too good"
+  shape the G6 gate exists for** (the Jacarezinho-pop error once faked ρ=1.00). Flagged by the
+  author itself: the λf>0.35 share is **saturated 82–97%** across sites (so ranks turn on tiny
+  differences), collinear with sun-deficit + density, and p=0.017 is merely the n=5 exact-permutation
+  floor (a perfect match), not strong evidence. **Launched a G6 adversarial audit** (saturation
+  rank-flip sensitivity · LOO · collinearity/partial vs density · dengue-specificity) before this
+  number is described anywhere as a finding. Nothing to health.html until it clears.
 - **B2 (T5b) PILOT RETURNED — n stays at 5, but three durable results:** (1) **the built-cell
   metric equals the observer metric** (ρ=+0.80, p=0.133; corrects the phantom "+0.90"); (2) the
   **TabNet scrape is fully de-risked** — reproduced all 45 committed TB values exactly, and the
