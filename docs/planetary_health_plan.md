@@ -101,7 +101,7 @@ A (T7 polygon-agnostic pipeline)  ──unblocks──▶  B2 (onboard new favel
 | **A** | **T7** — pipeline accepts any `Favelas_Limit_2019` polygon or `--polygon x.gpkg`; window-clips `DTM_RJ`/`buildings_RJ` when no per-site dir | **✅ DONE (1728ae3)** | **G8 ✅:** `--polygon`/`--area <favela>` yields 5 m DTM + municipal buildings (`altura`/`tipo`) with **zero** per-site files; 6 tests green. **Gap surfaced:** no *roads* fallback → new-favela exposure must go the **built-cell** route (DTM+buildings only), not street-observer | — |
 | **B1** | **T5a** — permutation power curve | **✅ DONE (60e3c17)** | **G10 ✅:** min **n=11** for 80% power at ρ=0.8, α=0.05 (family: 0.6→21, 0.7→15, 0.9→8); screen n=5 → power ≈0.13 | — |
 | **B2** | **T5b** — onboard ≥3 new favela-bairros → sun-deficit → pair with TabNet TB → re-run screen | Semi (TabNet scrape) | **G9:** screen re-run at **n≥8** with real TB, ρ + exact-perm-p reported | A + TabNet |
-| **C** | **T3** — terrain-driven vs morphology-driven exposure split (slope/aspect from DTM) | **Yes** | **G12:** per-site decomposed exposure written for all 5 sites + a natural-experiment design note | — |
+| **C** | **T3** — terrain-driven vs morphology-driven exposure split (slope/aspect from DTM) | **✅ DONE (7384efc)** | **G12 ✅:** all 5 sites decomposed via a calibration-free solar-horizon ray-march; **morphology dominates 59–86%**; terrain never crosses the 2 h floor alone; natural-experiment design note written | — |
 | **D** | **T4** — compound sun×(morphometric ventilation index) exposure vs TB | **Yes** | **G11:** Δ(ρ or AUC) of compound vs sun-alone reported; no CFD touched | — |
 | **E** | **T6** protocol draft + external-citation re-verification | **✅ DONE (791b0f1)** | **G13 ✅:** all 5 cites resolve to real articles (no fabrications); fixed 3 labels — PMC4544397 is *bairro*- not setor-level, PMC8009065 = Leão et al. (dup), OR 3.23 is a pulmonary-TB meta-analysis. Protocol draft + `health_citation_verification.md` shipped. | — |
 
@@ -369,6 +369,17 @@ mechanism, not outcome):
 - Drafted the **autonomous execution plan** (tracks A–E, dependency graph, blockers by hardness);
   launched all four health tracks as parallel background agents and a new satellite-reconstruction
   **council workflow** (planning-only, IPP = test set).
+- **C (T3/G12) LANDED (7384efc):** terrain- vs morphology-driven winter sun-deficit split for all
+  5 sites, via a calibration-free bare-earth **solar-horizon ray-march** (June-solstice sun marched
+  over the buildings-free extended DTM per street observer) — not a degenerate pooled regression
+  (that option was tried and documented as structurally broken here). Result: terrain's continuous
+  share rises monotonically with slope (Vidigal 24°→0.41 … Maré 2°→0.15) but **morphology dominates
+  everywhere (59–86%)**, and under the 2 h clinical floor terrain alone essentially never crosses
+  the line (share ≈0) — the massif dims the street, buildings push it into clinical darkness.
+  Pooled morphology-loss ↔ street-SVF ρ=−0.78. n=5 blocks the health test → ships as the
+  decomposition + a terrain-and-class-matched south-vs-north natural-experiment design for when n
+  grows. **Why it matters:** the intervention lever is morphology (in-situ fixable), not terrain
+  (immutable) — which is the health-relevant half of P1's terrain-aspect finding.
 - **A (T7) LANDED (1728ae3):** `build_extended_context.py` now accepts an arbitrary `--polygon`
   or an unregistered favela `--area <name>`, window-clipping the 5 m `DTM_RJ` and clipping
   `buildings_RJ_2019` (preserving `altura`/`tipo`) with zero per-site files. Piloted on a Vidigal
