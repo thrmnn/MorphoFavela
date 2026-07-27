@@ -77,6 +77,58 @@ power curve + ranked onboarding list). Optional, separate: re-source native **1 
 
 ---
 
+## Autonomous execution plan — 2026-07-27
+
+> **Purpose.** Everything below is scoped so an orchestrator + subagent workflows can run it
+> **without the user in the loop**, with a quantifiable acceptance gate per track. Audit state
+> at draft time: HEAD clean + pushed (0/0 vs `origin/main`); scorecard G1–G7 green; T0/T1/T2
+> shipped; all T7 municipal prerequisites verified on disk (`DTM_RJ.tif` 405 MB,
+> `buildings_RJ_2019.shp` 742 MB, `Favelas_Limit_2019.shp`, 1,074 polygons). Only dirty files
+> are brisaverse-P1 WIP — **not this track, leave alone.**
+
+### Dependency graph (what unblocks what)
+
+```
+A (T7 polygon-agnostic pipeline)  ──unblocks──▶  B2 (onboard new favelas → sun-deficit)  ──▶  G9 n:5→≥8
+        │                                                                                        ▲
+        └── independent of A, run in parallel: B1 (power curve) · C (terrain split) · E (citations/protocol) · D (compound exposure)
+```
+
+### Parallel tracks (each has a numeric done-gate)
+
+| Track | Task | Autonomous? | New goal (quantifiable) | Depends on |
+|---|---|---|---|---|
+| **A** | **T7** — pipeline accepts any `Favelas_Limit_2019` polygon or `--polygon x.gpkg`; window-clips `DTM_RJ`/`buildings_RJ` when no per-site dir | **Yes — no blockers** | **G8:** `build_extended_context.py --polygon <in-coverage>` yields DTM+buildings+scene with **zero** per-site files; a test clips an unregistered polygon | — |
+| **B1** | **T5a** — permutation power curve | **Yes, now** | **G10:** printed "n to detect ρ≈0.8 at p<0.05" + a power-vs-n curve figure | — |
+| **B2** | **T5b** — onboard ≥3 new favela-bairros → sun-deficit → pair with TabNet TB → re-run screen | Semi (TabNet scrape) | **G9:** screen re-run at **n≥8** with real TB, ρ + exact-perm-p reported | A + TabNet |
+| **C** | **T3** — terrain-driven vs morphology-driven exposure split (slope/aspect from DTM) | **Yes** | **G12:** per-site decomposed exposure written for all 5 sites + a natural-experiment design note | — |
+| **D** | **T4** — compound sun×(morphometric ventilation index) exposure vs TB | **Yes** | **G11:** Δ(ρ or AUC) of compound vs sun-alone reported; no CFD touched | — |
+| **E** | **T6** protocol draft + external-citation re-verification | Draft yes / file no | **G13:** every external cite (Pró-Saúde byline, OR 3.23, all PMC IDs) marked VERIFIED/UNVERIFIED vs PubMed/PMC/SciELO | — |
+
+### Recommended autonomous sequence
+
+1. **Launch A (T7) first** — the keystone; it is the only thing that scales the exposure side. Fully autonomous, acceptance test defined.
+2. **In parallel with A** (all independent of it): **B1** power curve, **C** terrain split, **E** citation re-verification. These need no new data.
+3. **After A lands:** **B2** (onboard new favelas, then the TabNet TB pull → re-run the screen at n≥8) and **D** (compound exposure).
+4. **Every new health number clears the G6 adversarial gate before it reaches `health.html`.** Non-negotiable.
+
+### Blockers — by hardness
+
+**Hard (external / user-only — cannot be closed autonomously):**
+- **CEP-CONEP ethics approval** — the sole path to individual/address-level SINAN-TB/SIM linkage. Blocks the *publishable* point-join, the full T2 confound isolation, and T6 *filing*. Agent can draft; user must file. **Parked.**
+- **CFD / airflow (MAR-P07 pilot, `~/Airflow`)** — blocks upgrading the ventilation leg C→B. Out of scope until the pilot returns. Do not chase.
+
+**Semi (autonomous but fragile — flag, don't trust):**
+- **TabNet TB-by-bairro scrape for NEW favelas** — recipe works but the SMS-Rio server drops large single-IP transfers, and the favela→bairro name map is partly manual. Gates B2's n-increase.
+- **External citation verification** — recurring agent-fabrication hazard; nothing external prints until re-checked vs PubMed/PMC/SciELO (G13).
+- **IBGE favela-fraction weights (dataset #3)** for new bairros — open, but needs download + setor join before B2 can down-weight.
+
+**Soft (not real blockers):**
+- **n-ceiling** — Track A lifts the *exposure* side programmatically; residual is the TB side (the TabNet semi-blocker above).
+- **Native 1 m IPP LiDAR MDT** — optional data-quality upgrade, not a bug; the 5 m is correct as reported.
+
+---
+
 ## Priorities — redefined 2026-07-05 (with the user)
 
 | # | Track | Status | Note |
