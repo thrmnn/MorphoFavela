@@ -102,7 +102,7 @@ A (T7 polygon-agnostic pipeline)  ──unblocks──▶  B2 (onboard new favel
 | **B1** | **T5a** — permutation power curve | **✅ DONE (60e3c17)** | **G10 ✅:** min **n=11** for 80% power at ρ=0.8, α=0.05 (family: 0.6→21, 0.7→15, 0.9→8); screen n=5 → power ≈0.13 | — |
 | **B2** | **T5b** — onboard new favela-bairros → built-cell sun-deficit → pair with TabNet TB → re-run screen | **◑ PILOT DONE** | **G9 (partial):** metric settled (built-cell = observer, ρ+0.80 p=0.133); scrape de-risked; **n stays 5** — clean next add = Cidade de Deus (→n=6). Blocker = bairro↔favela mapping | A + TabNet |
 | **C** | **T3** — terrain-driven vs morphology-driven exposure split (slope/aspect from DTM) | **✅ DONE (7384efc)** | **G12 ✅:** all 5 sites decomposed via a calibration-free solar-horizon ray-march; **morphology dominates 59–86%**; terrain never crosses the 2 h floor alone; natural-experiment design note written | — |
-| **D** | **T4** — compound sun×(morphometric ventilation index) exposure vs TB | **◑ CODE DONE (af6c949), number GATED** | **G11:** built-cell 4-state conjunction: sun-alone +0.80 / **ventilation-alone +1.00 (p=0.017)** / compound +0.90; Δρ(compound−sun)=+0.10 **not** bootstrap-confirmed. ρ=+1.00 is UNDER G6 adversarial audit (saturated 82–97% proxy, collinearity, LOO) — not surfaced until it clears | — |
+| **D** | **T4** — compound sun×(morphometric ventilation index) exposure vs TB | **✅ DONE + GATED (af6c949; audit)** | **G11 ✅:** sun-alone +0.80 / ventilation-alone +1.00 / compound +0.90; Δρ(compound−sun)=+0.10 not confirmed. **G6 audit verdict = (b) fragile+collinear:** +1.00 flips to +0.90/p=0.083 on a 0.78 pp swap; LOO & partials are *algebraically vacuous* at a perfect rank-match → ventilation is **less** verified than sun. May appear only as a hedged sub-line of the sun probe, never standalone, never before n≥8 | — |
 | **E** | **T6** protocol draft + external-citation re-verification | **✅ DONE (791b0f1)** | **G13 ✅:** all 5 cites resolve to real articles (no fabrications); fixed 3 labels — PMC4544397 is *bairro*- not setor-level, PMC8009065 = Leão et al. (dup), OR 3.23 is a pulmonary-TB meta-analysis. Protocol draft + `health_citation_verification.md` shipped. | — |
 
 ### Recommended autonomous sequence
@@ -383,9 +383,17 @@ mechanism, not outcome):
   shape the G6 gate exists for** (the Jacarezinho-pop error once faked ρ=1.00). Flagged by the
   author itself: the λf>0.35 share is **saturated 82–97%** across sites (so ranks turn on tiny
   differences), collinear with sun-deficit + density, and p=0.017 is merely the n=5 exact-permutation
-  floor (a perfect match), not strong evidence. **Launched a G6 adversarial audit** (saturation
-  rank-flip sensitivity · LOO · collinearity/partial vs density · dengue-specificity) before this
-  number is described anywhere as a finding. Nothing to health.html until it clears.
+  floor (a perfect match), not strong evidence.
+- **G6 audit VERDICT (`docs/health_ventilation_audit.md`) = (b) direction-suggestive but fragile +
+  collinear — the gate paid off again.** Three sharp findings: (1) the +1.00 hangs on ONE 0.78 pp
+  gap (Maré→Vidigal); swap it → +0.90, p=0.083 (knife-edge; the spread is a real 14.8 pp ordering,
+  not a flat band). (2) **LOO is vacuous** — any 4-subset of a monotone n=5 set is monotone, so
+  "+1.00 survives LOO" is algebra, not evidence. (3) **The partials are vacuous** — ventilation and
+  TB share an identical rank vector, so every covariate correlates equally with both, forcing
+  partial ρ = 1.0 for density/crowding/sun regardless; *mathematically incapable* of refuting
+  confounding (contrast the sun-deficit, whose partial DOES move to +0.69/+0.76 → informative).
+  Net: **ventilation is LESS verified than the sun-deficit**, not more. Permitted use: a hedged
+  sub-line of the Grade-C sun probe only, never the standalone "+1.00/p=0.017", never before n≥8.
 - **B2 (T5b) PILOT RETURNED — n stays at 5, but three durable results:** (1) **the built-cell
   metric equals the observer metric** (ρ=+0.80, p=0.133; corrects the phantom "+0.90"); (2) the
   **TabNet scrape is fully de-risked** — reproduced all 45 committed TB values exactly, and the
