@@ -6,7 +6,13 @@ Explicit registry of file names per area, with a glob fallback for unknown areas
 
 from pathlib import Path
 
-from src.config import get_area_data_dir
+from src.config import DATA_DIR, get_area_data_dir
+
+# City-wide municipal fallback layers (data/RJ/), used when an area has no
+# per-site directory. Favelas_Limit_2019.shp holds 1,074 favela polygons.
+RJ_DATA_DIR = DATA_DIR / "RJ"
+FAVELAS_LIMIT = RJ_DATA_DIR / "Favelas_Limit_2019.shp"
+SELECTED_FAVELAS_DIR = RJ_DATA_DIR / "selected_favelas"
 
 # Known file names per area (verified against data/ directory)
 AREA_FILES = {
@@ -107,9 +113,16 @@ def resolve_paths(area: str) -> tuple[Path, Path, Path]:
 def resolve_boundary(area: str) -> Path | None:
     """Resolve boundary shapefile path for a given area.
 
-    Returns None (non-fatal) if no boundary file is registered or found.
+    For registered/globbable sites, returns the per-site boundary file
+    (or None if none is registered or found). For any other identifier,
+    falls back to the municipal favela-limits layer, matching ``area``
+    against ``nome`` (case-insensitive) or ``cod_favela`` and materialising
+    the single matched polygon so callers get a one-feature file.
     """
-    data_dir = get_area_data_dir(area)
+    try:
+        data_dir = get_area_data_dir(area)
+    except ValueError:
+        return _resolve_municipal_boundary(area)
 
     if area in AREA_FILES and "boundary" in AREA_FILES[area]:
         path = data_dir / AREA_FILES[area]["boundary"]
@@ -126,6 +139,43 @@ def resolve_boundary(area: str) -> Path | None:
             return matches[0]
 
     return None
+
+
+def _resolve_municipal_boundary(area: str) -> Path:
+    """Look up a single favela in the municipal limits layer by name or code.
+
+    Writes the matched polygon to ``data/RJ/selected_favelas/{slug}.gpkg`` and
+    returns that path, so the returned file carries exactly one feature.
+    """
+    import geopandas as gpd
+
+    if not FAVELAS_LIMIT.exists():
+        raise FileNotFoundError(f"Municipal favela layer not found: {FAVELAS_LIMIT}")
+
+    gdf = gpd.read_file(FAVELAS_LIMIT)
+    key = area.strip().lower()
+    if key.isdigit():
+        match = gdf[gdf["cod_favela"] == int(key)]
+    else:
+        match = gdf[gdf["nome"].str.strip().str.lower() == key]
+    if match.empty:
+        raise FileNotFoundError(
+            f"No favela matching '{area}' (by nome or cod_favela) in {FAVELAS_LIMIT.name}"
+        )
+
+    slug = _slugify(area)
+    SELECTED_FAVELAS_DIR.mkdir(parents=True, exist_ok=True)
+    out = SELECTED_FAVELAS_DIR / f"{slug}.gpkg"
+    match.iloc[[0]].to_file(out, driver="GPKG")
+    return out
+
+
+def _slugify(name: str) -> str:
+    import re
+    import unicodedata
+
+    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_") or "favela"
 
 
 def _find_file(directory: Path, pattern: str, suffix: str, label: str) -> Path:

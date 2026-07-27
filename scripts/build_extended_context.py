@@ -21,6 +21,7 @@ import argparse
 import logging
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 import geopandas as gpd
@@ -29,11 +30,12 @@ import numpy as np
 import pandas as pd
 import rasterio
 from rasterio.merge import merge as rio_merge
+from rasterio.windows import from_bounds as window_from_bounds
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.config import EXPECTED_CRS, get_area_data_dir  # noqa: E402
+from src.config import EXPECTED_CRS, get_area_data_dir, get_area_output_dir  # noqa: E402
 from src.morphometry.invariants import phantom_mask  # noqa: E402
 from src.svf_v2.paths import resolve_boundary, resolve_paths  # noqa: E402
 
@@ -50,44 +52,98 @@ RJ_DTM = RJ_DATA_DIR / "DTM_RJ.tif"
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  0. Context resolution (registered site, municipal favela, or polygon)
+# ═══════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class Context:
+    """Everything the builders need, resolved once from --area or --polygon.
+
+    ``site_dtm_path`` / ``site_fp_path`` are None when there is no per-site
+    directory — the builders then fall back to the municipal RJ layers.
+    """
+
+    name: str
+    boundary: gpd.GeoDataFrame
+    site_dtm_path: Path | None
+    site_fp_path: Path | None
+    output_dir: Path
+    fig_dir: Path
+
+
+def resolve_context(area: str | None = None, polygon: str | Path | None = None) -> Context:
+    if (area is None) == (polygon is None):
+        raise ValueError("Provide exactly one of --area or --polygon.")
+
+    if polygon is not None:
+        boundary = gpd.read_file(polygon)
+        if boundary.crs is not None and boundary.crs.to_string() != EXPECTED_CRS:
+            raise ValueError(f"Polygon must be {EXPECTED_CRS}, got {boundary.crs.to_string()}.")
+        name = Path(polygon).stem
+        output_dir = PROJECT_ROOT / "data" / name
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return Context(name, boundary, None, None, output_dir, PROJECT_ROOT / "outputs" / name / "cfd")
+
+    boundary_path = resolve_boundary(area)
+    if boundary_path is None:
+        raise FileNotFoundError(f"No boundary found for area: {area}")
+    boundary = gpd.read_file(boundary_path)
+
+    try:
+        dtm_path, fp_path, _ = resolve_paths(area)
+        output_dir = get_area_data_dir(area).parent
+        fig_dir = get_area_output_dir(area) / "cfd"
+        return Context(area, boundary, dtm_path, fp_path, output_dir, fig_dir)
+    except ValueError:
+        # Unregistered favela resolved via the municipal limits layer:
+        # no per-site DTM/footprints, so the builders read from data/RJ/.
+        from src.svf_v2.paths import _slugify
+
+        slug = _slugify(area)
+        output_dir = PROJECT_ROOT / "data" / slug
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return Context(area, boundary, None, None, output_dir, PROJECT_ROOT / "outputs" / slug / "cfd")
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  1. Extended buildings
 # ═══════════════════════════════════════════════════════════════════
 
 
 def build_extended_buildings(
-    area: str,
+    ctx: Context,
     buffer_m: float = 300.0,
 ) -> tuple[gpd.GeoDataFrame, Path, dict]:
     """Build extended building dataset for a site.
 
     Parameters
     ----------
-    area : str
-        Site identifier (e.g., 'vidigal', 'rocinha').
+    ctx : Context
+        Resolved boundary + per-site paths (or None → municipal fallback).
     buffer_m : float
         Buffer distance in metres around the site boundary.
 
     Returns
     -------
     extended : GeoDataFrame
-        Merged building footprints (site + context).
+        Merged building footprints (site + context), or municipal-only when
+        there is no per-site footprint file.
     output_path : Path
         Where the file was saved.
     stats : dict
         Summary statistics for reporting.
     """
-    # Load site boundary
-    boundary_path = resolve_boundary(area)
-    if boundary_path is None:
-        raise FileNotFoundError(f"No boundary found for area: {area}")
-    boundary = gpd.read_file(boundary_path)
-    boundary_geom = boundary.geometry.union_all()
+    boundary_geom = ctx.boundary.geometry.union_all()
     buffer_geom = boundary_geom.buffer(buffer_m)
 
-    # Load site buildings
-    _, fp_path, _ = resolve_paths(area)
-    site_bld = gpd.read_file(fp_path)
-    logger.info("Site buildings: %d features.", len(site_bld))
+    # Load site buildings (absent when falling back to municipal data)
+    if ctx.site_fp_path is not None:
+        site_bld = gpd.read_file(ctx.site_fp_path)
+        logger.info("Site buildings: %d features.", len(site_bld))
+    else:
+        site_bld = None
+        logger.info("No per-site footprints — using municipal buildings only.")
 
     # Load city-wide buildings — bbox filter for speed (avoids reading 2.4M rows)
     logger.info("Loading city-wide buildings (bbox filter, buffer=%dm)...", buffer_m)
@@ -106,7 +162,7 @@ def build_extended_buildings(
     # been refined (TLS-corrected heights, manual fixes).  Keep the
     # site version for any overlapping footprint.
     n_overlap = 0
-    if not site_bld.empty and not rj_bld.empty:
+    if site_bld is not None and not site_bld.empty and not rj_bld.empty:
         overlap_idx = gpd.sjoin(
             rj_bld,
             site_bld[["geometry"]],
@@ -124,25 +180,27 @@ def build_extended_buildings(
     )
 
     # Harmonize height columns
-    for df in [site_bld, rj_context]:
+    frames = [rj_context] if site_bld is None else [site_bld, rj_context]
+    for df in frames:
         if "altura" in df.columns and "height" not in df.columns:
             df["height"] = df["altura"]
         if "base" in df.columns and "base_height" not in df.columns:
             df["base_height"] = df["base"]
 
-    # Tag source
-    site_bld["_source"] = "site"
     rj_context["_source"] = "context"
 
-    # Merge on common columns
-    common_cols = sorted(set(site_bld.columns) & set(rj_context.columns))
-    if "geometry" not in common_cols:
-        common_cols.append("geometry")
-
-    extended = gpd.GeoDataFrame(
-        pd.concat([site_bld[common_cols], rj_context[common_cols]], ignore_index=True),
-        crs=site_bld.crs,
-    )
+    if site_bld is None:
+        # Municipal-only: keep all city columns (altura, tipo, topo, …)
+        extended = rj_context.copy()
+    else:
+        site_bld["_source"] = "site"
+        common_cols = sorted(set(site_bld.columns) & set(rj_context.columns))
+        if "geometry" not in common_cols:
+            common_cols.append("geometry")
+        extended = gpd.GeoDataFrame(
+            pd.concat([site_bld[common_cols], rj_context[common_cols]], ignore_index=True),
+            crs=rj_context.crs,
+        )
 
     # Repair invalid geometries
     invalid = ~extended.geometry.is_valid
@@ -173,20 +231,22 @@ def build_extended_buildings(
         extended = extended[~phantom].copy()
 
     # Save
-    data_dir = get_area_data_dir(area).parent  # data/{area}/
-    output_path = data_dir / f"buildings_extended_{int(buffer_m)}m.gpkg"
+    output_path = ctx.output_dir / f"buildings_extended_{int(buffer_m)}m.gpkg"
     extended.to_file(output_path, driver="GPKG")
     logger.info("Saved %s (%d features).", output_path, len(extended))
 
     # Statistics — use convex hull of centroids for robustness (avoids
     # TopologyException on sites like Rocinha with complex footprints)
-    try:
-        site_hull_area = site_bld.geometry.union_all().convex_hull.area
-    except Exception:
-        logger.warning("union_all failed for site buildings — using centroid hull.")
-        from shapely.geometry import MultiPoint
+    if site_bld is None or site_bld.empty:
+        site_hull_area = 0.0
+    else:
+        try:
+            site_hull_area = site_bld.geometry.union_all().convex_hull.area
+        except Exception:
+            logger.warning("union_all failed for site buildings — using centroid hull.")
+            from shapely.geometry import MultiPoint
 
-        site_hull_area = MultiPoint(site_bld.geometry.centroid.tolist()).convex_hull.area
+            site_hull_area = MultiPoint(site_bld.geometry.centroid.tolist()).convex_hull.area
 
     try:
         ext_hull_area = extended.geometry.union_all().convex_hull.area
@@ -195,15 +255,20 @@ def build_extended_buildings(
         from shapely.geometry import MultiPoint
 
         ext_hull_area = MultiPoint(extended.geometry.centroid.tolist()).convex_hull.area
+    gain_pct = (
+        float((ext_hull_area - site_hull_area) / site_hull_area * 100)
+        if site_hull_area > 0
+        else float("nan")
+    )
     stats = {
-        "site_buildings": len(site_bld),
+        "site_buildings": 0 if site_bld is None else len(site_bld),
         "context_buildings": len(rj_context),
         "overlap_removed": n_overlap,
         "total_buildings": len(extended),
         "site_coverage_m2": float(site_hull_area),
         "extended_coverage_m2": float(ext_hull_area),
         "coverage_gain_m2": float(ext_hull_area - site_hull_area),
-        "coverage_gain_pct": float((ext_hull_area - site_hull_area) / site_hull_area * 100),
+        "coverage_gain_pct": gain_pct,
         "buffer_m": buffer_m,
         "output_path": str(output_path),
     }
@@ -223,53 +288,60 @@ def build_extended_buildings(
 
 
 def build_extended_dtm(
-    area: str,
+    ctx: Context,
     buffer_m: float = 300.0,
 ) -> tuple[Path, dict]:
-    """Build extended DTM for a site by merging site DTM with city-wide DTM.
+    """Build extended DTM for a site.
 
-    The site-specific raster takes priority where it has data (may be
-    ALS-derived and more accurate).
+    With a per-site DTM, merges it over the 5 m city-wide raster
+    (site takes priority where it has data — it may be ALS-derived and
+    more accurate). Without one, window-clips the 5 m ``DTM_RJ.tif``
+    directly to the buffered bounds (no resampling — the 5 m grid is kept
+    honest).
 
     Returns
     -------
     output_path : Path
-        Where the merged raster was saved.
+        Where the raster was saved.
     stats : dict
         Summary statistics.
     """
-    # Load boundary + buffer
-    boundary_path = resolve_boundary(area)
-    boundary = gpd.read_file(boundary_path)
-    boundary_geom = boundary.geometry.union_all()
+    boundary_geom = ctx.boundary.geometry.union_all()
     buffer_geom = boundary_geom.buffer(buffer_m)
     buffer_bounds = buffer_geom.bounds  # (minx, miny, maxx, maxy)
-
-    # Site DTM
-    site_dtm_path, _, _ = resolve_paths(area)
 
     if not RJ_DTM.exists():
         raise FileNotFoundError(f"City-wide DTM not found: {RJ_DTM}")
 
-    logger.info("Merging DTM: site + city-wide (buffer=%dm)...", buffer_m)
+    if ctx.site_dtm_path is not None:
+        logger.info("Merging DTM: site + city-wide (buffer=%dm)...", buffer_m)
 
-    # rasterio.merge with site first → site takes priority ("first" method)
-    src_site = rasterio.open(site_dtm_path)
-    src_rj = rasterio.open(RJ_DTM)
+        # rasterio.merge with site first → site takes priority ("first" method)
+        src_site = rasterio.open(ctx.site_dtm_path)
+        src_rj = rasterio.open(RJ_DTM)
 
-    # Determine nodata from sources
-    nodata = src_site.nodata if src_site.nodata is not None else -9999.0
+        nodata = src_site.nodata if src_site.nodata is not None else -9999.0
+        res_m = src_site.res[0]
 
-    mosaic, out_transform = rio_merge(
-        [src_site, src_rj],
-        bounds=buffer_bounds,
-        res=src_site.res,
-        method="first",
-        nodata=nodata,
-    )
+        mosaic, out_transform = rio_merge(
+            [src_site, src_rj],
+            bounds=buffer_bounds,
+            res=src_site.res,
+            method="first",
+            nodata=nodata,
+        )
 
-    src_site.close()
-    src_rj.close()
+        src_site.close()
+        src_rj.close()
+    else:
+        logger.info("No per-site DTM — window-clipping 5 m DTM_RJ (buffer=%dm)...", buffer_m)
+        with rasterio.open(RJ_DTM) as src_rj:
+            window = window_from_bounds(*buffer_bounds, transform=src_rj.transform)
+            window = window.round_offsets().round_lengths()
+            mosaic = src_rj.read(window=window)
+            out_transform = src_rj.window_transform(window)
+            res_m = src_rj.res[0]
+        nodata = -9999.0  # DTM_RJ fills with a float32-max sentinel; normalise it
 
     # Sanitise: replace any residual float32-max sentinels with nodata
     sentinel_mask = np.abs(mosaic) > 1e10
@@ -282,8 +354,7 @@ def build_extended_dtm(
         mosaic[sentinel_mask] = nodata
 
     # Save
-    data_dir = get_area_data_dir(area).parent
-    output_path = data_dir / f"dtm_extended_{int(buffer_m)}m.tif"
+    output_path = ctx.output_dir / f"dtm_extended_{int(buffer_m)}m.tif"
 
     profile = {
         "driver": "GTiff",
@@ -305,7 +376,7 @@ def build_extended_dtm(
     stats = {
         "width": profile["width"],
         "height": profile["height"],
-        "res_m": src_site.res[0] if hasattr(src_site, "res") else 5.0,
+        "res_m": res_m,
         "output_path": str(output_path),
     }
     return output_path, stats
@@ -317,10 +388,9 @@ def build_extended_dtm(
 
 
 def generate_diagnostic_figure(
-    area: str,
+    ctx: Context,
     extended: gpd.GeoDataFrame,
     buffer_m: float,
-    output_dir: Path,
 ) -> Path:
     """Show favela boundary, original vs context buildings, buffer zone."""
     from src.cartography import (
@@ -332,8 +402,7 @@ def generate_diagnostic_figure(
 
     apply_publication_style()
 
-    boundary_path = resolve_boundary(area)
-    boundary = gpd.read_file(boundary_path)
+    boundary = ctx.boundary
     boundary_geom = boundary.geometry.union_all()
     buffer_geom = boundary_geom.buffer(buffer_m)
 
@@ -349,15 +418,15 @@ def generate_diagnostic_figure(
     )
 
     # Context buildings
-    ctx = extended[extended["_source"] == "context"]
-    if not ctx.empty:
-        ctx.plot(
+    ctx_bld = extended[extended["_source"] == "context"]
+    if not ctx_bld.empty:
+        ctx_bld.plot(
             ax=ax,
             facecolor="#ffcc80",
             edgecolor="#e65100",
             linewidth=0.2,
             alpha=0.7,
-            label=f"Context buildings ({len(ctx)})",
+            label=f"Context buildings ({len(ctx_bld)})",
             zorder=2,
         )
 
@@ -380,7 +449,7 @@ def generate_diagnostic_figure(
     )
 
     ax.legend(loc="upper left", fontsize=9, framealpha=0.9)
-    area_display = area.replace("_", " ").title()
+    area_display = ctx.name.replace("_", " ").title()
     ax.set_title(
         f"Extended Building Context \u2014 {area_display} ({int(buffer_m)}m buffer)",
         fontsize=14,
@@ -391,7 +460,7 @@ def generate_diagnostic_figure(
     add_north_arrow(ax)
     ax.set_aspect("equal")
 
-    fig_path = output_dir / f"extended_context_{int(buffer_m)}m.png"
+    fig_path = ctx.fig_dir / f"extended_context_{int(buffer_m)}m.png"
     fig_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(fig_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
@@ -405,32 +474,36 @@ def generate_diagnostic_figure(
 
 
 def build_extended_context(
-    area: str,
+    area: str | None = None,
     buffer_m: float = 300.0,
     skip_figure: bool = False,
+    polygon: str | Path | None = None,
 ) -> dict:
-    """Build extended buildings + DTM for a site.
+    """Build extended buildings + DTM for a site or an arbitrary polygon.
+
+    Pass either ``area`` (registered site or municipal favela name/code) or
+    ``polygon`` (path to a one-feature EPSG:31983 vector). When no per-site
+    directory exists, inputs fall back to the municipal ``data/RJ/`` layers.
 
     Returns a dict with paths to all generated files and summary stats.
     """
+    ctx = resolve_context(area=area, polygon=polygon)
+
     t0 = time.time()
     logger.info("=" * 60)
-    logger.info("BUILDING EXTENDED CONTEXT: %s (%dm buffer)", area.upper(), buffer_m)
+    logger.info("BUILDING EXTENDED CONTEXT: %s (%dm buffer)", ctx.name.upper(), buffer_m)
     logger.info("=" * 60)
 
     # Buildings
-    extended, bld_path, bld_stats = build_extended_buildings(area, buffer_m)
+    extended, bld_path, bld_stats = build_extended_buildings(ctx, buffer_m)
 
     # DTM
-    dtm_path, dtm_stats = build_extended_dtm(area, buffer_m)
+    dtm_path, dtm_stats = build_extended_dtm(ctx, buffer_m)
 
     # Diagnostic figure
     fig_path = None
     if not skip_figure:
-        from src.config import get_area_output_dir
-
-        fig_dir = get_area_output_dir(area) / "cfd"
-        fig_path = generate_diagnostic_figure(area, extended, buffer_m, fig_dir)
+        fig_path = generate_diagnostic_figure(ctx, extended, buffer_m)
 
     elapsed = time.time() - t0
     logger.info("=" * 60)
@@ -459,10 +532,14 @@ def main():
     parser = argparse.ArgumentParser(
         description="Build extended building + DTM context for CFD sampling",
     )
-    parser.add_argument(
+    src = parser.add_mutually_exclusive_group(required=True)
+    src.add_argument(
         "--area",
-        required=True,
-        help="Site name (e.g., vidigal, rocinha)",
+        help="Registered site (e.g., vidigal) or municipal favela name/cod_favela",
+    )
+    src.add_argument(
+        "--polygon",
+        help="Path to a one-feature EPSG:31983 boundary; bypasses the registry",
     )
     parser.add_argument(
         "--buffer",
@@ -477,7 +554,12 @@ def main():
     )
     args = parser.parse_args()
 
-    build_extended_context(args.area, buffer_m=args.buffer, skip_figure=args.skip_figure)
+    build_extended_context(
+        area=args.area,
+        polygon=args.polygon,
+        buffer_m=args.buffer,
+        skip_figure=args.skip_figure,
+    )
 
 
 if __name__ == "__main__":
