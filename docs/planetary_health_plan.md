@@ -100,7 +100,7 @@ A (T7 polygon-agnostic pipeline)  ──unblocks──▶  B2 (onboard new favel
 |---|---|---|---|---|
 | **A** | **T7** — pipeline accepts any `Favelas_Limit_2019` polygon or `--polygon x.gpkg`; window-clips `DTM_RJ`/`buildings_RJ` when no per-site dir | **✅ DONE (1728ae3)** | **G8 ✅:** `--polygon`/`--area <favela>` yields 5 m DTM + municipal buildings (`altura`/`tipo`) with **zero** per-site files; 6 tests green. **Gap surfaced:** no *roads* fallback → new-favela exposure must go the **built-cell** route (DTM+buildings only), not street-observer | — |
 | **B1** | **T5a** — permutation power curve | **✅ DONE (60e3c17)** | **G10 ✅:** min **n=11** for 80% power at ρ=0.8, α=0.05 (family: 0.6→21, 0.7→15, 0.9→8); screen n=5 → power ≈0.13 | — |
-| **B2** | **T5b** — onboard ≥3 new favela-bairros → sun-deficit → pair with TabNet TB → re-run screen | Semi (TabNet scrape) | **G9:** screen re-run at **n≥8** with real TB, ρ + exact-perm-p reported | A + TabNet |
+| **B2** | **T5b** — onboard new favela-bairros → built-cell sun-deficit → pair with TabNet TB → re-run screen | **◑ PILOT DONE** | **G9 (partial):** metric settled (built-cell = observer, ρ+0.80 p=0.133); scrape de-risked; **n stays 5** — clean next add = Cidade de Deus (→n=6). Blocker = bairro↔favela mapping | A + TabNet |
 | **C** | **T3** — terrain-driven vs morphology-driven exposure split (slope/aspect from DTM) | **✅ DONE (7384efc)** | **G12 ✅:** all 5 sites decomposed via a calibration-free solar-horizon ray-march; **morphology dominates 59–86%**; terrain never crosses the 2 h floor alone; natural-experiment design note written | — |
 | **D** | **T4** — compound sun×(morphometric ventilation index) exposure vs TB | **Yes** | **G11:** Δ(ρ or AUC) of compound vs sun-alone reported; no CFD touched | — |
 | **E** | **T6** protocol draft + external-citation re-verification | **✅ DONE (791b0f1)** | **G13 ✅:** all 5 cites resolve to real articles (no fabrications); fixed 3 labels — PMC4544397 is *bairro*- not setor-level, PMC8009065 = Leão et al. (dup), OR 3.23 is a pulmonary-TB meta-analysis. Protocol draft + `health_citation_verification.md` shipped. | — |
@@ -119,7 +119,14 @@ A (T7 polygon-agnostic pipeline)  ──unblocks──▶  B2 (onboard new favel
 - **CFD / airflow (MAR-P07 pilot, `~/Airflow`)** — blocks upgrading the ventilation leg C→B. Out of scope until the pilot returns. Do not chase.
 
 **Semi (autonomous but fragile — flag, don't trust):**
-- **TabNet TB-by-bairro scrape for NEW favelas** — recipe works but the SMS-Rio server drops large single-IP transfers, and the favela→bairro name map is partly manual. Gates B2's n-increase.
+- **Bairro↔favela mapping is the true binding constraint (B2 finding).** The screen's "bairro ≈ one
+  favela" premise holds for only a minority of Rio favelas: Rio das Pedras (no TabNet bairro), Borel
+  (inside Tijuca), Morro do Juramento (Vaz Lobo) all have exposure ready but **cannot isolate TB**.
+  Scaling n means picking favelas that ARE a clean single bairro (Manguinhos, Acari, Vigário Geral,
+  Costa Barros, Cidade de Deus) — not just any onboarded site. This matters more than compute.
+- **TabNet TB-by-bairro scrape** — **de-risked (B2):** exact params verified, reproduced all 45
+  committed values. Residual fragility: SMS-Rio drops large single-IP transfers; recent-year files
+  can be provisional/frozen (CdD 2021–23 = 178×3, flagged).
 - **External citation verification** — recurring agent-fabrication hazard; nothing external prints until re-checked vs PubMed/PMC/SciELO (G13).
 - **IBGE favela-fraction weights (dataset #3)** for new bairros — open, but needs download + setor join before B2 can down-weight.
 
@@ -369,6 +376,19 @@ mechanism, not outcome):
 - Drafted the **autonomous execution plan** (tracks A–E, dependency graph, blockers by hardness);
   launched all four health tracks as parallel background agents and a new satellite-reconstruction
   **council workflow** (planning-only, IPP = test set).
+- **B2 (T5b) PILOT RETURNED — n stays at 5, but three durable results:** (1) **the built-cell
+  metric equals the observer metric** (ρ=+0.80, p=0.133; corrects the phantom "+0.90"); (2) the
+  **TabNet scrape is fully de-risked** — reproduced all 45 committed TB values exactly, and the
+  exact params are now in the screen docstring; (3) **the binding constraint is the bairro↔favela
+  mapping, not compute.** The intended cheapest add (Rio das Pedras → n=6) is **blocked**: RdP has
+  no TabNet bairro (folds into Itanhangá), and Borel (→Tijuca) / Morro do Juramento (→Vaz Lobo)
+  fail the "bairro ≈ one favela" premise too — their exposure is ready but TB can't be isolated.
+  **Cidade de Deus** is the one clean next add (TB pulled + validated: 9-yr mean 139.7/yr, with a
+  flagged 178×3 recent-year freeze) but needs one built-cell solar run + IBGE pop → n=6.
+  **Ranked worklist to n=11 (need +6):** CdD (cheapest, on-disk data) → then T7-onboardable clean
+  single-favela bairros **Manguinhos, Acari, Vigário Geral, Costa Barros** (each: verify bairro →
+  T7 `--area` → grid-cell solar → TabNet → IBGE pop). Nothing ships to `health.html` without the
+  G6 gate. *Compute deliberately not launched (validate-first + resource courtesy).*
 - **C (T3/G12) LANDED (7384efc):** terrain- vs morphology-driven winter sun-deficit split for all
   5 sites, via a calibration-free bare-earth **solar-horizon ray-march** (June-solstice sun marched
   over the buildings-free extended DTM per street observer) — not a degenerate pooled regression
@@ -417,10 +437,13 @@ mechanism, not outcome):
   human re-check.
 - **T1 VERIFIED (rank-robust):** re-ran ρ under the **canonical built-cell** exposure
   (`brisaverse/shared/facts/solar_canonical.json`: Rocinha 74 · Vidigal 55 · Alemão 42 · Maré 35).
-  ρ = **+0.80 observer → +0.90 built-cell** (n=5); the 4 shared favelas keep identical ranks;
-  Maré's observer-vs-cell delta (27.8→34.5, +6.7pt) does not change its rank. Sign + n.s. status
-  unchanged. `health.html` keeps the observer +0.80 (the built-cell +0.90 leans on an
-  observer→cell approximation for Jacarezinho — robustness, not headline).
+  (`brisaverse/shared/facts/solar_canonical.json`: Rocinha 74 · Vidigal 55 · Alemão 42 · Maré 35).
+  The 4 shared favelas keep identical ranks; Maré's observer-vs-cell delta (27.8→34.5) does not
+  change its rank. **CORRECTED 2026-07-27 (Cycle 9, B2):** the earlier "+0.90 built-cell" was an
+  artifact of an **observer→cell approximation for Jacarezinho**. Recomputing all five properly on
+  the built-cell metric (`compute_cross_site_stats.py`, Jacarezinho = **73.4**) gives ρ = **+0.80,
+  exact permutation p = 0.133 — identical to the street-observer screen**. So observer and built-cell
+  agree exactly; there is no +0.90. `health.html` (which always kept +0.80) needs no change.
 - **T2 SHIPPED (adversarial-gated):** IBGE-2022 crowding pulled; partial ρ(sun, TB | crowding)
   computed and **passed the G6 skeptic as a CONDITIONAL GO**. Result: raw +0.80 → **+0.69**
   (density, the *fairer* confound — sun-deficit is a built-form proxy collinear with density) /

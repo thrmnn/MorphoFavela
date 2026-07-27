@@ -17,8 +17,11 @@ PROVENANCE (every number sourced; retrieved 2026-07-06):
 - TB new-case counts by bairro de residência, FULL 2015–2023 series (tubeYY.dbf):
   SMS-Rio SINAN TabNet, tuberc2007.def, semicolon 'prn' export. See TB_YEARLY below;
   the 9-yr mean is the headline (kills small-count noise, esp. Vidigal 24–63/yr and the
-  Alemão bairro-split artefact). Recipe (scripts cleanly): POST cgi-bin/tabnet?…tuberc2007.def
-  with latin-1 params (Coluna=--N%E3o-Ativa--), strip NUL bytes, parse 5-dot bairro rows.
+  Alemão bairro-split artefact). Recipe (verified 2026-07-27, reproduces all 45 values exactly):
+  POST cgi-bin/tabnet?sinan/definicoes/tuberc2007.def with latin-1 params — Linha option value
+  `AP_RA_e_Bairro_Resid` (NOT `S`-prefixed), Coluna=--N%E3o-Ativa--, Incremento=Qtd.casos, all 28
+  S* filters=TODAS_AS_CATEGORIAS__, one tubeYY.dbf per year, formato=prn; strip NUL bytes, parse
+  5-dot bairro rows as `"label";value` where value is UNQUOTED.
 - STATS CAVEAT: at n=4–5 the parametric Spearman p is unreliable (t-approximation → p≈0 for
   ρ=1). The honest evidence is the bootstrap 95% CI and the fraction-of-specs-positive, NOT p.
 - IBGE Censo 2022 favela/comunidade populations (bairro ≈ favela for these sites):
