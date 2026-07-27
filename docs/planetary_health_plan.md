@@ -99,7 +99,7 @@ A (T7 polygon-agnostic pipeline)  ──unblocks──▶  B2 (onboard new favel
 | Track | Task | Autonomous? | New goal (quantifiable) | Depends on |
 |---|---|---|---|---|
 | **A** | **T7** — pipeline accepts any `Favelas_Limit_2019` polygon or `--polygon x.gpkg`; window-clips `DTM_RJ`/`buildings_RJ` when no per-site dir | **Yes — no blockers** | **G8:** `build_extended_context.py --polygon <in-coverage>` yields DTM+buildings+scene with **zero** per-site files; a test clips an unregistered polygon | — |
-| **B1** | **T5a** — permutation power curve | **Yes, now** | **G10:** printed "n to detect ρ≈0.8 at p<0.05" + a power-vs-n curve figure | — |
+| **B1** | **T5a** — permutation power curve | **✅ DONE (60e3c17)** | **G10 ✅:** min **n=11** for 80% power at ρ=0.8, α=0.05 (family: 0.6→21, 0.7→15, 0.9→8); screen n=5 → power ≈0.13 | — |
 | **B2** | **T5b** — onboard ≥3 new favela-bairros → sun-deficit → pair with TabNet TB → re-run screen | Semi (TabNet scrape) | **G9:** screen re-run at **n≥8** with real TB, ρ + exact-perm-p reported | A + TabNet |
 | **C** | **T3** — terrain-driven vs morphology-driven exposure split (slope/aspect from DTM) | **Yes** | **G12:** per-site decomposed exposure written for all 5 sites + a natural-experiment design note | — |
 | **D** | **T4** — compound sun×(morphometric ventilation index) exposure vs TB | **Yes** | **G11:** Δ(ρ or AUC) of compound vs sun-alone reported; no CFD touched | — |
@@ -355,6 +355,19 @@ mechanism, not outcome):
 ---
 
 ## Cycle log (append-only — newest first)
+
+### Cycle 9 — 2026-07-27 · autonomous multi-track launch (A/B1/C/E) + satellite council
+- Drafted the **autonomous execution plan** (tracks A–E, dependency graph, blockers by hardness);
+  launched all four health tracks as parallel background agents and a new satellite-reconstruction
+  **council workflow** (planning-only, IPP = test set).
+- **B1 (T5a) LANDED (60e3c17):** permutation power curve. **Min n=11** for 80% power at ρ=0.8,
+  α=0.05; at the screen's n=5 power is only **≈0.13**. Confirms the screen is exploratory/
+  direction-only by design, not underpowered by accident — and quantifies exactly how much n
+  the onboarding push (T7→B2) must add. `scripts/health/tb_power_curve.py` + 5 tests green.
+- **Most important item added:** **the power deficit is now a number, not a hand-wave** — n must
+  roughly double (5→11) to make the screen inferential, which sets the T7/B2 onboarding target
+  (get to ≥11 favela-bairros with both TabNet TB and modelled sun-deficit). A/C/E + the satellite
+  council still running.
 
 ### Cycle 8 — 2026-07-08 · consolidate + reconcile the T7/municipal-data update (session wrap)
 - Session cleanup before a fresh start: added the START-HERE boot block; committed the P1-council
