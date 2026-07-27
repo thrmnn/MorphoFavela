@@ -309,6 +309,13 @@ def build_callout(prov):
     # TR section it documents — never a bare on-page anchor that duplicates a
     # section below. (date, label, url, gloss); existence-gated at render.
     latest = [
+        ("2026-07-28", "Health probe update — out-of-sample favela weakens TB × sun-deficit",
+         f"{hub}/health.html#health-probe",
+         "the first out-of-sample favela (Cidade de Deus) drops the rank correlation from "
+         "ρ≈+0.80 (n=5) to ρ≈+0.26 (n=6, p≈0.66) — consistent with a small-sample artefact; "
+         "the probe now says treat it as a hypothesis to test at larger n, not a finding. "
+         "A separate ventilation-vs-TB check (ρ=+1.00) was adversarially audited and held "
+         "back as fragile/collinear. See the living plan for the full cycle log"),
         ("2026-07-06", "Health outcome probe — TB × sun-deficit (Grade C, audit-gated)",
          f"{hub}/health.html#health-probe",
          "orchestrator + expert-panel loop: real Rio TB rank-tracks our winter "
@@ -820,6 +827,11 @@ def write_health_page(prov):
             '<li>Real TB and modelled sun-deficit <b>rank in the same direction</b> across 5 '
             'favelas (Spearman ρ ≈ +0.80, n=5, exact two-tailed p ≈ 0.13 — <b>not statistically '
             'significant</b>). The bootstrap interval supports only the sign, not a magnitude.</li>'
+            '<li><b>It does not survive the first out-of-sample test.</b> Onboarding a sixth favela '
+            '(Cidade de Deus — high TB, low sun-deficit) drops the rank correlation from ρ ≈ +0.80 '
+            'to <b>ρ ≈ +0.26 (n=6, p ≈ 0.66)</b>. A single new point breaks the gradient, which is '
+            'consistent with the n=5 result being a small-sample artefact. Treat this as a '
+            'hypothesis to test at larger n (≈11 needed for power), not a finding.</li>'
             '<li>It <b>cannot be separated from a generic deprivation gradient</b>: sun-deficit is '
             'collinear with density, poverty and crowding, all established TB drivers. At n=5 no '
             'adjustment is possible, so this is not evidence of a sun-specific mechanism.</li>'

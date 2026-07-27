@@ -100,7 +100,7 @@ A (T7 polygon-agnostic pipeline)  ──unblocks──▶  B2 (onboard new favel
 |---|---|---|---|---|
 | **A** | **T7** — pipeline accepts any `Favelas_Limit_2019` polygon or `--polygon x.gpkg`; window-clips `DTM_RJ`/`buildings_RJ` when no per-site dir | **✅ DONE (1728ae3)** | **G8 ✅:** `--polygon`/`--area <favela>` yields 5 m DTM + municipal buildings (`altura`/`tipo`) with **zero** per-site files; 6 tests green. **Gap surfaced:** no *roads* fallback → new-favela exposure must go the **built-cell** route (DTM+buildings only), not street-observer | — |
 | **B1** | **T5a** — permutation power curve | **✅ DONE (60e3c17)** | **G10 ✅:** min **n=11** for 80% power at ρ=0.8, α=0.05 (family: 0.6→21, 0.7→15, 0.9→8); screen n=5 → power ≈0.13 | — |
-| **B2** | **T5b** — onboard new favela-bairros → built-cell sun-deficit → pair with TabNet TB → re-run screen | **◑ PILOT DONE** | **G9 (partial):** metric settled (built-cell = observer, ρ+0.80 p=0.133); scrape de-risked; **n stays 5** — clean next add = Cidade de Deus (→n=6). Blocker = bairro↔favela mapping | A + TabNet |
+| **B2** | **T5b** — onboard new favela-bairros → built-cell sun-deficit → pair with TabNet TB → re-run screen | **✅ n=6 landed — NEGATIVE** | **G9:** Cidade de Deus onboarded (sun 30.2%, TB 457/100k) → **n=6 ρ=+0.26, p=0.66** (from +0.80). The out-of-sample point breaks the gradient → n=5 was likely an artefact. Surfaced on health.html. Further n now hard-blocked by the **TabNet WAF** | A + TabNet |
 | **C** | **T3** — terrain-driven vs morphology-driven exposure split (slope/aspect from DTM) | **✅ DONE (7384efc)** | **G12 ✅:** all 5 sites decomposed via a calibration-free solar-horizon ray-march; **morphology dominates 59–86%**; terrain never crosses the 2 h floor alone; natural-experiment design note written | — |
 | **D** | **T4** — compound sun×(morphometric ventilation index) exposure vs TB | **✅ DONE + GATED (af6c949; audit)** | **G11 ✅:** sun-alone +0.80 / ventilation-alone +1.00 / compound +0.90; Δρ(compound−sun)=+0.10 not confirmed. **G6 audit verdict = (b) fragile+collinear:** +1.00 flips to +0.90/p=0.083 on a 0.78 pp swap; LOO & partials are *algebraically vacuous* at a perfect rank-match → ventilation is **less** verified than sun. May appear only as a hedged sub-line of the sun probe, never standalone, never before n≥8 | — |
 | **E** | **T6** protocol draft + external-citation re-verification | **✅ DONE (791b0f1)** | **G13 ✅:** all 5 cites resolve to real articles (no fabrications); fixed 3 labels — PMC4544397 is *bairro*- not setor-level, PMC8009065 = Leão et al. (dup), OR 3.23 is a pulmonary-TB meta-analysis. Protocol draft + `health_citation_verification.md` shipped. | — |
@@ -124,9 +124,12 @@ A (T7 polygon-agnostic pipeline)  ──unblocks──▶  B2 (onboard new favel
   (inside Tijuca), Morro do Juramento (Vaz Lobo) all have exposure ready but **cannot isolate TB**.
   Scaling n means picking favelas that ARE a clean single bairro (Manguinhos, Acari, Vigário Geral,
   Costa Barros, Cidade de Deus) — not just any onboarded site. This matters more than compute.
-- **TabNet TB-by-bairro scrape** — **de-risked (B2):** exact params verified, reproduced all 45
-  committed values. Residual fragility: SMS-Rio drops large single-IP transfers; recent-year files
-  can be provisional/frozen (CdD 2021–23 = 178×3, flagged).
+- **TabNet TB-by-bairro scrape** — recipe de-risked (B2, reproduced all 45 values), **BUT now
+  hard-blocked (Cycle 9):** `tabnet.rio.rj.gov.br` sits behind an **F5 BIG-IP WAF** that rejects all
+  scripted access (curl/WebFetch → "The requested URL was rejected"). Automated TB pulls are
+  impossible from this environment; future pulls need a manual/browser route. Recent-year files can
+  also be provisional/frozen (CdD 2021–23 = 178×3, unconfirmed). **The TB side, not compute or
+  exposure, is now the binding constraint on n.**
 - **External citation verification** — recurring agent-fabrication hazard; nothing external prints until re-checked vs PubMed/PMC/SciELO (G13).
 - **IBGE favela-fraction weights (dataset #3)** for new bairros — open, but needs download + setor join before B2 can down-weight.
 
@@ -185,12 +188,16 @@ metric is a number a script prints or a test asserts, so "done" is not a matter 
 | **G6** | Independent verification | adversarial audit of every number vs source | 0 mismatches | **PASS after correction** — audit caught Jacarezinho pop error (37,839→29,766); 15/15 TB counts + 4/4 other pops verified ✅ |
 | **G7** | Surface honestly | TB probe + vitamin-D mechanism on `health.html` as an ecological-probe tier below Grade A; tests green | shipped | **SHIPPED** — `health.html#health-probe`, Grade C, all hedges, 23 tests green ✅ |
 
-**Corrected headline (post-audit, THE number):** ρ = **+0.80** (n=5, exact two-tailed
-permutation p ≈ **0.13**, **not statistically significant**); direction-only; **cannot be
-separated from a generic deprivation gradient**; **reverses sign at the coarser AP scale**
-(ρ ≈ −0.50). The earlier ρ=1.00/0.90 was inflated by a wrong Jacarezinho denominator the
-adversarial audit caught — the loop worked exactly as designed. The parametric p is retired
-(inadmissible at n=5); only the exact permutation p and sign-only bootstrap are reported.
+**Corrected headline (THE number, updated Cycle 9):** the n=5 screen is ρ = **+0.80** (exact
+two-tailed permutation p ≈ **0.13**, **not statistically significant**), direction-only, confound-
+inseparable, AP-scale sign-reversing (ρ ≈ −0.50). **But the first out-of-sample favela breaks it:**
+onboarding Cidade de Deus (n=6) drops ρ to **+0.26 (p ≈ 0.66)**, robustly. So the honest current
+statement is: *a suggestive n=5 rank-association that did not survive its first out-of-sample test —
+most likely a small-sample artefact, to be re-tested at n≈11, not a finding.* (History: the earlier
+ρ=1.00/0.90 was a wrong-denominator artefact the audit caught; the ventilation ρ=1.00 was a
+saturated-proxy artefact the audit caught. Two artefacts down; the out-of-sample collapse is the
+third and most decisive honesty check.) Parametric p retired; exact permutation p + sign-only
+bootstrap only.
 
 **Ceiling — UPDATED 2026-07-08 (now liftable):** the screen is at **n ≈ 8** today. This was
 believed data-gated (manual DTM clip), but the P1 handoff confirmed **`data/RJ/`** holds the
@@ -363,7 +370,26 @@ mechanism, not outcome):
 
 ## Cycle log (append-only — newest first)
 
-### Cycle 9 — 2026-07-27 · autonomous multi-track launch (A/B1/C/E) + satellite council
+### Cycle 9 — 2026-07-27/28 · autonomous multi-track launch (A/B1/C/D/E) + satellite council
+- **★ CdD OUT-OF-SAMPLE TEST — the headline result of the cycle, and it is NEGATIVE (honest).**
+  Cidade de Deus, the FIRST real out-of-sample favela, was onboarded end-to-end (bounded 4-core
+  SVF-streets + street-solar run, <3 min; sun-deficit **30.2%**; IBGE-2022 pop **30,576**; 9-yr TB
+  mean 139.7/yr → **457/100k, the highest of all six**). Adding it **collapses the screen: n=6
+  ρ = +0.257, exact p = 0.658** (from n=5 ρ=+0.80). CdD is a high-TB + low-sun-deficit off-trend
+  point — exactly the corner that breaks a positive gradient. The collapse is **robust**: deflating
+  the suspect TB freeze (178×3 → 130×3) only reaches ρ+0.43; it never recovers +0.80, and CdD stays
+  high-TB at any plausible population. **Read: the n=5 ρ=+0.80 is most likely a small-sample
+  artefact, not a stable gradient** — the association did not survive contact with point #6. This is
+  a clean negative update and is now **surfaced on `health.html#health-probe`** (new lead hedge:
+  "does not survive the first out-of-sample test") + the hub changelog — the honest, conservative
+  direction, so no G6 gate needed to *weaken* a claim. `cdd_n6_probe.json` holds the report; the
+  canonical `SITES`/`TB_YEARLY` were left at n=5 (CdD's recent-year TB is unconfirmed — see blocker).
+- **⚠ NEW BLOCKER — TabNet is now behind an F5 BIG-IP WAF** that rejects all scripted access
+  (curl any UA + WebFetch → "The requested URL was rejected"). The de-risked scrape recipe still
+  documents the query, but **automated TB pulls are blocked from this environment** — the CdD
+  178×3 recent-year freeze could not be re-confirmed. Future TB pulls need a manual/browser route
+  or a different host. This hardens the "TB side is the real n-scaling constraint" finding.
+
 - **E (T6/G13) LANDED (791b0f1):** external-citation re-verification + CEP-CONEP protocol draft.
   All 5 cites resolve to **real** articles — no fabrications (the standing agent-fabrication hazard
   did not bite this time). Pró-Saúde byline confirmed (Bezerra FF et al.). Three labels corrected
