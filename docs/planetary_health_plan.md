@@ -103,7 +103,7 @@ A (T7 polygon-agnostic pipeline)  ──unblocks──▶  B2 (onboard new favel
 | **B2** | **T5b** — onboard ≥3 new favela-bairros → sun-deficit → pair with TabNet TB → re-run screen | Semi (TabNet scrape) | **G9:** screen re-run at **n≥8** with real TB, ρ + exact-perm-p reported | A + TabNet |
 | **C** | **T3** — terrain-driven vs morphology-driven exposure split (slope/aspect from DTM) | **Yes** | **G12:** per-site decomposed exposure written for all 5 sites + a natural-experiment design note | — |
 | **D** | **T4** — compound sun×(morphometric ventilation index) exposure vs TB | **Yes** | **G11:** Δ(ρ or AUC) of compound vs sun-alone reported; no CFD touched | — |
-| **E** | **T6** protocol draft + external-citation re-verification | Draft yes / file no | **G13:** every external cite (Pró-Saúde byline, OR 3.23, all PMC IDs) marked VERIFIED/UNVERIFIED vs PubMed/PMC/SciELO | — |
+| **E** | **T6** protocol draft + external-citation re-verification | **✅ DONE (791b0f1)** | **G13 ✅:** all 5 cites resolve to real articles (no fabrications); fixed 3 labels — PMC4544397 is *bairro*- not setor-level, PMC8009065 = Leão et al. (dup), OR 3.23 is a pulmonary-TB meta-analysis. Protocol draft + `health_citation_verification.md` shipped. | — |
 
 ### Recommended autonomous sequence
 
@@ -249,7 +249,7 @@ open tier is bairro-level *ecological* at best; true favela resolution needs CEP
 | **1** | **SMS-Rio municipal TabNet — SINAN-Tuberculose** (tabnet.rio.rj.gov.br) | TB | **bairro** de residência | partial (down-weight to favela setores) | **open** | pull TB incidence by bairro for the 5 sites + comparison bairros |
 | 2 | SINAN-TB **address/CEP microdata** (SMS-Rio Vigilância) | TB | **CEP/point** | yes (point-in-polygon) | **ethics** (CEP-CONEP + DUA) | file the protocol now, scoped to the 5 sites' setores |
 | **3** | **IBGE Favelas e Comunidades Urbanas polygons + favela-flagged setores 2022** | *join fabric* | setor/polygon | **yes — the canonical key** | **open** | download RJ setor GeoPackage, filter favela setores, clip our rasters |
-| 4 | Published setor-level TB spatial analysis (PMC4544397) | TB | setor | yes (concept) | read-open | template + names **Rocinha/Vidigal** hotspots → sanity-check our surface |
+| 4 | Published **bairro-level** TB spatial analysis (Pereira et al., *Rev Saúde Pública* 2015, PMC4544397 — 158 neighbourhoods) | TB | **bairro** (not setor) | yes (concept) | read-open | template + names **Rocinha/Vidigal** hotspots → sanity-check our surface. *Corrected 2026-07-27 (G13): it is bairro-, not setor-level — which reinforces the setor/address gap the CEP-CONEP protocol exists to fill.* |
 | 5 | SIH-SUS respiratory AIH (J-codes) via PCDaS/Fiocruz | respiratory | CEP→setor | partial | request (DUA) | register PCDaS, pull RJ J00–J99, quantify favela geocoding loss |
 | 6 | SISAB / e-SUS APS — **Clínica da Família catchments** | respiratory | facility micro-area ≈ favela | partial (no geocoding needed) | open (aggregate) | map the CdF units serving each site → asthma/DPOC attendance |
 | 7 | SIM identified microdata (address/CEP) | mortality | CEP/point | yes | ethics | bundle respiratory + heat causes into the #2 protocol |
@@ -267,7 +267,7 @@ excluded vitamin D, so no national serum-D surface exists either. **So vitamin D
   only Rio study quantifying the **sun-exposure-index → 25(OH)D** coefficient (β≈0.49/unit)
   and season effect (≈20 nmol/L summer). Non-favela (UERJ civil servants), no geocoding →
   anchors the mechanism, cannot be spatially joined.
-- **2018 Rio clinical-lab cross-section** (n≈24,074; PMC8009065) — the strong seasonal 25(OH)D
+- **2018 Rio clinical-lab cross-section** (n≈24,074; PMC8009065 — *this IS Leão et al. Clinics 2021;76:e2571, the same study cited above, not a separate source; de-duplicated 2026-07-27, G13*) — the strong seasonal 25(OH)D
   swing that justifies our winter focus; private-lab selection skews from favela residents.
 
 **Therefore the tested downstream endpoint is georeferenced tuberculosis** — vitamin-D
@@ -357,6 +357,15 @@ mechanism, not outcome):
 ## Cycle log (append-only — newest first)
 
 ### Cycle 9 — 2026-07-27 · autonomous multi-track launch (A/B1/C/E) + satellite council
+- **E (T6/G13) LANDED (791b0f1):** external-citation re-verification + CEP-CONEP protocol draft.
+  All 5 cites resolve to **real** articles — no fabrications (the standing agent-fabrication hazard
+  did not bite this time). Pró-Saúde byline confirmed (Bezerra FF et al.). Three labels corrected
+  in the plan + memory: **PMC4544397 is bairro-, not setor-level** (which actually *strengthens*
+  the CEP-CONEP case — the setor/address source genuinely doesn't exist); **PMC8009065 = Leão et
+  al. Clinics e2571**, double-listed → de-duplicated; **OR 3.23** is a pulmonary-TB meta-analysis
+  (odds of vit-D deficiency given TB), relabelled. Protocol draft (`cep_conep_protocol_draft.md`)
+  + verdict table (`health_citation_verification.md`) shipped. Hub mechanism text was already
+  accurate ("pooled odds ratio 3.23"), so no hub change needed.
 - Drafted the **autonomous execution plan** (tracks A–E, dependency graph, blockers by hardness);
   launched all four health tracks as parallel background agents and a new satellite-reconstruction
   **council workflow** (planning-only, IPP = test set).
