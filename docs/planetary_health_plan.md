@@ -12,68 +12,46 @@ anchor it to **real Rio de Janeiro health data**.*
 
 ---
 
-## ▶ START HERE (fresh-session boot — status 2026-07-08)
+## ▶ START HERE (fresh-session boot — status 2026-07-28, post-Cycle-9)
 
-- **HEAD** on `main`, everything pushed. Health track = **loop cycles 1–7 done**; scorecard
-  **G1–G7 green**; P1-council handoff **T0/T1/T2 shipped** (all adversarial-gated).
-- **The result (honest, final):** TB × winter-sun-deficit ecological probe, **ρ ≈ +0.80,
-  n=5, exact two-tailed p ≈ 0.13 (not significant)**, AP-scale sign reversal, dengue-specificity
-  +0.10, crowding-adjusted +0.69–0.76. Lives at `health.html#health-probe` as a **Grade-C**
-  probe; it does **NOT** enter the P1 flagship (it justifies P1's outcome-free design instead).
-- **Dashboard is live** over Tailscale: `http://100.104.205.62:8773/` (health probe at
-  `/outputs/_hub/health.html#health-probe`). Restart if down:
+- **HEAD** on `main`, everything pushed (Cycle 9 = commits `6af72d0..2de2788`). Health scorecard
+  **G8/G10/G11/G12/G13 green**; tracks A/B1/C/D/E + B2 all done + adversarial-gated.
+- **★ THE HONEST HEADLINE CHANGED — the TB×sun-deficit association BROKE on its first out-of-sample
+  test.** The n=5 probe was ρ≈+0.80 (p≈0.13, n.s.). Onboarding a 6th favela (**Cidade de Deus**,
+  high-TB + low-sun-deficit) drops it to **ρ≈+0.26 (n=6, p≈0.66)**, robustly → the n=5 result is
+  **most likely a small-sample artefact**. This is now the lead hedge on `health.html#health-probe`.
+  Treat the health linkage as *a hypothesis to test at larger n (≈11 for power), not a finding.*
+- **Three artefacts caught by the adversarial gate** (the discipline works): wrong Jacarezinho
+  denominator (fake ρ=1.00), saturated ventilation proxy (fake ρ=1.00, LOO+partials *algebraically
+  vacuous*), and now the out-of-sample collapse. Every favourable health number gets MORE scrutiny.
+- **T7 SHIPPED (`1728ae3`):** `build_extended_context.py --area <any-favela>` / `--polygon x.gpkg`
+  onboards any favela from municipal `data/RJ/` (DTM window-clip + buildings clip). **No roads
+  fallback** → new-favela exposure uses the **built-cell** metric, not street-observer.
+- **⚠ NEW HARD BLOCKER:** `tabnet.rio.rj.gov.br` is behind an **F5 BIG-IP WAF** rejecting all
+  scripted access → automated TB pulls are dead from this env. **The TB side is now the binding
+  n-constraint** (not compute, not exposure). Next TB pulls need a manual/browser route.
+- **Dashboard restart if down:**
   `cd ~/MorphoFavela && setsid nohup python -m http.server 8773 --bind 0.0.0.0 >/tmp/hub.log 2>&1 &`
-- **Next open tasks (P1 handoff):** **T7** (pipeline accepts an arbitrary polygon — now the
-  keystone, it unblocks n-onboarding), then **T3** (terrain-vs-morphology exposure split),
-  **T4** (compound sun×ventilation exposure), **T5** (power curve + onboarding list). T6 parked.
-- **⚠ The big change (2026-07-08):** the **n-ceiling is no longer user-gated** — `data/RJ/`
-  has the municipal DTM + buildings (formal/informal flag) + favela polygons, so T7 can lift
-  n to 20+ programmatically.
-- **DTM-resolution flag RETRACTED (verified 2026-07-08):** every DTM in `data/` (raw,
-  extended, city-wide) measures **5 m**; no sub-2 m raster exists anywhere. The TR is
-  *consistent* — it states the DTM is 5 m (§208/222/378); the **"1 m" is the DSM rasterised
-  from building footprints** (§423), a derived SVF-input grid, NOT the terrain. No report error.
-  (Open, if desired: re-source native 1 m IPP LiDAR MDT — a data-quality upgrade, not a bug.)
 - **Pre-existing WIP NOT from this track** (leave alone): `outputs/paper_figures/fig0{1,4,5,8}*.py`,
   `fig_solar_deficit.py`, `scripts/brisa_ventilation/05_*.py`, `scripts/pooled_vs_stratified.py`
-  are **brisaverse P1 figure/analysis WIP** sitting uncommitted — review/commit under the P1
-  track, not here.
+  are **brisaverse P1 WIP** — review/commit under the P1 track, not here.
 
 ---
 
-## ▶ NEXT ACTION — T7 execution spec (the keystone)
+## ▶ NEXT ACTIONS (post-Cycle-9)
 
-**Goal:** any polygon — a `Favelas_Limit_2019` favela by name/code, or an arbitrary user
-polygon (e.g. a formal hillside mask) — flows end-to-end (scene → SVF → sun-deficit) with **no
-per-site `data/{area}/` dir**. Unblocks **T5** (screen power, n 8→20+) *and* the P1 **D3**
-formal-fabric comparison. Everything needed is already on disk in `data/RJ/`.
-
-Three fallbacks, in `src/svf_v2/paths.py` + `scripts/build_extended_context.py` (the pipeline
-currently hard-requires an `AREA_FILES` registry entry or a `data/{area}/` glob):
-
-1. **Boundary from the municipal favela layer** — `resolve_boundary(area)`: if `area` is not a
-   registered/globbed site, look it up in `data/RJ/Favelas_Limit_2019.shp` (1,074 polygons) by
-   name/code and return that single feature; also accept an explicit `--polygon <path>` for
-   arbitrary extents.
-2. **DTM optional → clip RJ alone** — `build_extended_dtm` (line ~225): make `site_dtm_path`
-   optional; when `resolve_paths` finds no per-site DTM, skip `rio_merge` and window-clip
-   `RJ_DTM` (5 m) to `buffer_bounds` directly (it already opens `RJ_DTM`; just guard the
-   site branch — mirror how `build_extended_buildings` already degrades when `site_bld` is empty).
-3. **Footprints from the municipal buildings** — when no per-site footprints, clip
-   `data/RJ/buildings_RJ_2019.shp` (2.36 M, carries `altura` height + `tipo` = A101 formal /
-   A102 favela) to `buffer_bounds`. Favela run → keep the polygon interior; D3 comparator →
-   filter `tipo=='A101'` + slope > 15° *outside* favela polygons.
-
-**Acceptance:** `build_extended_context.py --area <any-favela>` (or `--polygon x.gpkg`) produces
-extended DTM + buildings + scene with zero per-site files; sun-deficit computes for ≥3 new
-favela-bairros that also have TabNet TB (→ feeds the T5 power run); a test clips an arbitrary
-in-coverage polygon with no registry entry. Guardrails unchanged: 5 m DTM (honest resolution),
-ecological-only, and every new health number still clears the **G6 adversarial gate**.
-
-*After T7:* **T3** (terrain- vs morphology-driven exposure split), **T4** (compound
-sun×ventilation exposure via the morphometric index, not the gated CFD), **T5** (permutation
-power curve + ranked onboarding list). Optional, separate: re-source native **1 m IPP LiDAR MDT**
-(data-quality upgrade, not a bug — the current 5 m is correct as reported).
+1. **Satellite reconstruction track — AWAITING USER GO (planning done):**
+   `docs/satellite_reconstruction_plan.md`. Recommended: zero-shot fusion of Google Open Buildings
+   v3 + Open Buildings 2.5D-Temporal-2019 + GLO-30/FABDEM DTM, IPP data as held-out test set. Next
+   step if approved = one-favela prototype (Rocinha or Vidigal) → score vs IPP → gate before scaling.
+2. **Health track — the honest state is a *negative* update; do NOT chase a bigger ρ.** The
+   n-scaling path is real (T7 onboards favelas cheaply) but **gated on the TabNet WAF** for the TB
+   side. Options: (a) find a non-WAF TB route (manual export, PCDaS/Fiocruz microdata, a different
+   host); (b) accept n stays small and reframe the deliverable around the *method* (the T3
+   terrain/morphology split + the honest out-of-sample discipline) rather than an effect size.
+3. **T6 CEP-CONEP protocol** (`docs/cep_conep_protocol_draft.md`) is drafted — user files if/when
+   the individual-level linkage is pursued. Parked.
+4. Optional/separate: re-source native **1 m IPP LiDAR MDT** (quality upgrade, not a bug).
 
 ---
 
