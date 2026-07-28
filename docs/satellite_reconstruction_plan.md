@@ -2,6 +2,51 @@
 
 # Reconstructing the Rio Favela 2.5D Scene from Free Earth-Observation Data — Integrated Staged Plan
 
+---
+
+## ▶ NEXT ACTION — Rocinha one-favela prototype (APPROVED 2026-07-28, execute this)
+
+**User approved the one-favela prototype on Rocinha.** Build the free-EO reconstruction for Rocinha
+only, score it against the IPP ground truth, gate before scaling. This block is self-contained so a
+fresh (post-compaction) session can execute it directly.
+
+**Ground truth (answer key — quarantine; never an input to the reconstruction):**
+- Rocinha boundary: `data/RJ/Favelas_Limit_2019.shp` (match "Rocinha") — or the per-site
+  `rocinha_boundary.shp` via `resolve_boundary("rocinha")`. CRS EPSG:31983.
+- IPP terrain: clip `data/RJ/DTM_RJ.tif` (5 m) to the boundary.
+- IPP buildings: clip `data/RJ/buildings_RJ_2019.shp` (footprints + `altura` height + `tipo`) to it.
+
+**Free-EO inputs — PREFER no-auth sources to stay autonomous; GEE needs the user's Google login:**
+1. **Building footprints** — Google Open Buildings v3. No-auth route: the public GCS/`source.coop`
+   GeoParquet mirror (VIDA) — download the S2 tile(s) covering Rocinha, filter by bbox. (GEE
+   `GOOGLE/Research/open-buildings/v3/polygons` is the alt if the user auths GEE.)
+2. **Building heights** — Open Buildings **2.5D Temporal**, the **2019** slice
+   (`building_height` band). Primary route is GEE `GOOGLE/Research/open-buildings-temporal/v1`
+   (needs GEE auth) or its GCS/HDX mirror. If auth is blocked → **flag and stop at footprints+DTM**,
+   report to user (GEE auth is theirs to drive).
+3. **DTM** — **Copernicus GLO-30**, fully no-auth: AWS `copernicus-dem-30m` (anonymous S3) or
+   OpenTopography. Optional bare-earth cross-check: **FABDEM** (Zenodo; CC-BY-NC-SA).
+
+**Pipeline:** reproject all to EPSG:31983 → clip to the Rocinha polygon → per-building height =
+zonal median of the 2019 2.5D raster inside each OB footprint → base_elev = DTM at footprint
+centroid → roof = base + height → LoD1 prisms → GPKG mirroring the IPP schema.
+
+**Score vs IPP (write `outputs/comparative/satellite/rocinha/scorecard.json` + a figure):**
+- DTM: RMSE / MAE / bias vs the IPP 5 m DTM (expect ~4–8 m, worse on steep slopes).
+- Footprints: area-IoU + instance-F1 + building-count ratio (expect area OK, instance weak).
+- Heights: per-building MAE / R² *and* 100 m grid-mean R² (expect aggregate ok, per-bldg weak).
+- Baselines to beat: raw GLO-30 (DTM), Open Buildings as-is (footprints/heights).
+
+**Go/no-go gate:** report the honest numbers; scale to more favelas only if they land near the
+plan's stated ceiling (not if they blow past it — that would signal leakage). **Leakage rule:** the
+reconstruction code must never open the `data/RJ/` IPP files; only the scoring harness does.
+
+**Known access risks to surface early:** network egress to AWS/GCS/Zenodo; **GEE authentication is
+the user's to drive** (if the 2.5D height layer needs it and it's not available, stop at
+footprints+DTM and hand back). Bound compute: Rocinha only, capped cores.
+
+---
+
 ## 1. Problem statement & honest accuracy ceiling
 
 **Goal.** Reconstruct a 2.5D scene — bare-earth DTM + building footprints + per-building height — over five dense, steep, self-built Rio favelas (Rocinha, Vidigal, Maré, Complexo do Alemão, Jacarezinho) using **only free, online, ideally-redistributable** satellite/EO data, then score it against the held-out IPP ground truth (5 m DTM, 2.36 M footprints with `altura`, `tipo` A101/A102, EPSG:31983, ~2019). The IPP data is the **test set only** and never enters the reconstruction.

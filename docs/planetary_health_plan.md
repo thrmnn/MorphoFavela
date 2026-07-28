@@ -40,10 +40,11 @@ anchor it to **real Rio de Janeiro health data**.*
 
 ## ▶ NEXT ACTIONS (post-Cycle-9)
 
-1. **Satellite reconstruction track — AWAITING USER GO (planning done):**
-   `docs/satellite_reconstruction_plan.md`. Recommended: zero-shot fusion of Google Open Buildings
-   v3 + Open Buildings 2.5D-Temporal-2019 + GLO-30/FABDEM DTM, IPP data as held-out test set. Next
-   step if approved = one-favela prototype (Rocinha or Vidigal) → score vs IPP → gate before scaling.
+1. **Satellite reconstruction track — ROCINHA PROTOTYPE APPROVED (2026-07-28), execute it:**
+   full self-contained spec is at the TOP of `docs/satellite_reconstruction_plan.md`
+   (▶ NEXT ACTION). Free-EO fusion (Open Buildings v3 + 2.5D-Temporal-2019 + GLO-30) for Rocinha
+   only → score vs IPP → go/no-go gate before scaling. Prefer no-auth data sources; **GEE auth is
+   the user's to drive** — if the 2.5D height layer needs it, stop at footprints+DTM and hand back.
 2. **Health track — the honest state is a *negative* update; do NOT chase a bigger ρ.** The
    n-scaling path is real (T7 onboards favelas cheaply) but **gated on the TabNet WAF** for the TB
    side. Options: (a) find a non-WAF TB route (manual export, PCDaS/Fiocruz microdata, a different
