@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Fig 05 — predictors of the winter sun-adequacy floor (4-panel A–D).
+"""Fig 05 — predictors of the winter sun-adequacy floor (3-panel A–C).
 
-Target throughout: P(winter direct sun < WHO 2 h) — failure of the
-sun-adequacy floor, NOT a ventilation outcome (which stays CFD-gated).
+Target throughout: P(winter direct sun < WHO 2 h), failure of the
+sun-adequacy floor. This is a solar-adequacy outcome, not a ventilation
+outcome. The ventilation axis is delivered as a geometric flow-regime
+classification, read ordinally; CFD validates the regime ordering and adds
+hyper-local detail, and does not gate this result. A calibrated per-cell
+age-of-air field is future work.
 
   (A) Random-forest permutation importance, GROUPED and colored by feature
       family (openness / terrain-aspect / density) with a small family
@@ -29,9 +33,6 @@ sun-adequacy floor, NOT a ventilation outcome (which stays CFD-gated).
       blue = negative β (reduces P(fail)), red = positive β (raises P(fail))
       — with saturation ∝ |β| and a small sign legend. CI caps and per-fold
       LOSO dots stay neutral ink/grey. pseudo-R² and n annotated.
-
-  (D) Greyed placeholder for the SVF–ACH changepoint, pending the OpenFOAM
-      RANS campaign (per-cell ACH not yet available). No data fabricated.
 
 Two color encodings, intentionally distinct: A and B encode feature FAMILY
 by hue (importance/PD are about which family of predictors matters); C
@@ -409,30 +410,6 @@ def panel_logit(ax, stats: dict) -> None:
                  fontsize=FS_AXLABEL, color=INK, pad=6, loc="left")
 
 
-# ── Panel D ──────────────────────────────────────────────────────────────
-def panel_changepoint_placeholder(ax) -> None:
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.add_patch(plt.Rectangle((0, 0), 1, 1, facecolor="#EEEEEE",
-                               edgecolor="#BBBBBB", linewidth=0.8,
-                               hatch="////", zorder=0))
-    ax.set_xticks([])
-    ax.set_yticks([])
-    for spine in ax.spines.values():
-        spine.set_visible(False)
-
-    ax.text(0.5, 0.58,
-            "pending the OpenFOAM RANS campaign\n(per-cell ACH not yet available)",
-            transform=ax.transAxes, ha="center", va="center",
-            fontsize=FS_CAPTION, color="#666666", style="italic",
-            linespacing=1.5)
-
-    ax.text(-0.10, 1.04, "D", transform=ax.transAxes,
-            fontsize=FS_PANEL, fontweight="bold", color=INK, va="bottom", ha="left")
-    ax.set_title("SVF–ACH changepoint", fontsize=FS_AXLABEL, color="#666666",
-                 pad=6, loc="left")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--preset", choices=("paper", "presentation"), default="paper")
@@ -444,18 +421,17 @@ def main() -> None:
     stats = json.loads(STATS_PATH.read_text())
     pd_curves = json.loads(PD_PATH.read_text())
 
-    fig = plt.figure(figsize=(12.0, 9.0), dpi=300)
+    fig = plt.figure(figsize=(16.0, 5.1), dpi=300)
     gs = fig.add_gridspec(
-        nrows=2, ncols=2,
-        width_ratios=[1.0, 1.05], height_ratios=[1.0, 1.0],
-        wspace=0.32, hspace=0.42,
-        left=0.085, right=0.965, top=0.93, bottom=0.075,
+        nrows=1, ncols=3,
+        width_ratios=[1.06, 1.0, 1.06],
+        wspace=0.30,
+        left=0.055, right=0.985, top=0.88, bottom=0.155,
     )
 
     panel_importance(fig.add_subplot(gs[0, 0]), stats)
     panel_pd(fig.add_subplot(gs[0, 1]), stats, pd_curves)
-    panel_logit(fig.add_subplot(gs[1, 0]), stats)
-    panel_changepoint_placeholder(fig.add_subplot(gs[1, 1]))
+    panel_logit(fig.add_subplot(gs[0, 2]), stats)
 
     bad = check_text_overflow(fig)
     if bad:

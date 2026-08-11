@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
-"""Figure 1 (brisa paper): study-sites composite.
+"""Figure 1 (brisa paper): single-panel study-sites map.
 
-Three-panel canonical fig01 for the brisaverse handoff:
-  A — geometry→adequacy pipeline schematic (pre-rendered PNG, loaded as-is).
-  B — regional site map of Rio with the 5 favela boundaries + per-site insets.
-  C — printable 3-D massing excerpts rendered from STL via mplot3d.
+Canonical fig01 for the brisaverse handoff (submission reduction): a single
+panel, the regional site map of Rio with the 5 favela boundaries + per-site
+footprint insets, laid out across the full figure width with no panel letters.
+
+Retired from the paper figure and preserved on the hub figure page as
+downscaled thumbnails (NOT deleted): the geometry->adequacy pipeline schematic
+(``fig01_panelA.png``), the printable 3-D massing excerpts, and the Vidigal
+terrestrial-LiDAR 3-D scan (the facade-resolving massing that only ground-based
+scanning captures inside the canyons; source ``data/vidigal_tls/raw/full_scan.stl``).
+Their generators are retained below (``panel_a_schematic``, ``panel_c_excerpts``,
+``panel_tls_scan_3d`` and helpers) so the hub thumbnails can be regenerated.
+``main()`` now composites only the site map; it also exports the removed TLS
+scan as a standalone ``fig01_tls_3d_wip`` so it can keep being improved.
 
 Deliberately kept separate from ``fig01_study_sites.py`` (the technical
-report's map-only Figure 1): the brisa Panel-A schematic carries paper-specific
-adequacy-taxonomy framing that does not belong in the TR's §1, and the
-figure-tracks convention keeps TR figures and paper candidates from mixing.
-brisaverse promotes ``exports/fig01_composite.png`` as its fig01.
+report's map-only Figure 1). brisaverse promotes ``exports/fig01_composite.png``
+as its fig01 and stages it to ``shared/figures/fig01_study_sites.png``; the TLS
+scan stages to ``shared/figures/fig01_tls_3d_wip.png``.
 """
 
 import json
@@ -24,14 +32,25 @@ import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
+import trimesh
 from fig_style import *
 from matplotlib.colors import LightSource, Normalize
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from shapely.geometry import box
 
 sys.path.insert(0, str(PROJECT_ROOT))
 from src.print3d.model import _building_prisms, _sample_terrain_core
 
-PANEL_A_PATH = Path("/home/theo/brisa_paper/shared/figures/fig01_panelA.png")
+PANEL_A_PATH = Path("/home/theo/brisaverse/shared/figures/fig01_panelA.png")
+
+# Vidigal terrestrial-LiDAR scan (terrain + buildings welded into a single mesh).
+# The facade-resolving 3-D geometry ground-based scanning captures where airborne
+# scanning cannot see into the canyons. 17k-face raw scan; the higher-fidelity
+# fallback is ``outputs/vidigal_tls/morphometrics/svf/scene.stl`` (17 MB).
+TLS_SCAN_STL_PATH = (
+    Path("/home/theo/MorphoFavela")
+    / "data" / "vidigal_tls" / "raw" / "full_scan.stl"
+)
 
 # (site, patch_id, sampling) — accented "maré" dir handled via PROJECT_ROOT join.
 # All four resolve in campaign_sampling (VDG-P07 also exists in pilot_sampling,
@@ -44,6 +63,18 @@ PANEL_C_EXCERPTS: list[tuple[str, str, str]] = [
 ]
 
 BUILDING_CMAP = "viridis"
+
+# Site-name label offsets (in points) from each boundary centroid, drawn with a
+# thin leader line so names sit off the fabric. Rocinha and Vidigal are adjacent
+# south-zone hillsides whose centroids nearly coincide, so they are pushed apart
+# (Rocinha up-left, Vidigal down-right) to break the stacked-label collision.
+LABEL_OFFSETS: dict[str, tuple[float, float]] = {
+    "vidigal": (30, -22),
+    "rocinha": (30, 18),
+    "complexo_do_alemao": (-30, 14),
+    "riodaspedras": (34, 8),
+    "maré": (32, 12),
+}
 
 PROVENANCE = (
     "Building footprints © IPP (municipal cadaster); ALS heights MIT/SondoTecnica. "
@@ -75,7 +106,10 @@ def panel_b_sitemap(subfig) -> None:
         except FileNotFoundError:
             pass
 
-    gs = gridspec.GridSpec(1, 2, figure=subfig, width_ratios=[1.3, 1], wspace=0.02)
+    gs = gridspec.GridSpec(
+        1, 2, figure=subfig, width_ratios=[1.3, 1], wspace=0.02,
+        bottom=0.07, top=0.96,
+    )
     ax_main = subfig.add_subplot(gs[0])
 
     if rj_dtm_path.exists():
@@ -117,20 +151,31 @@ def panel_b_sitemap(subfig) -> None:
                 zorder=3,
             )
             centroid = boundaries[site].geometry.union_all().centroid
+            dx, dy = LABEL_OFFSETS.get(site, (0, 14))
             ax_main.annotate(
                 SITE_LABELS[site],
                 xy=(centroid.x, centroid.y),
+                xytext=(dx, dy),
+                textcoords="offset points",
                 fontsize=5,
                 fontweight="bold",
-                ha="center",
+                ha="right" if dx < 0 else "left",
                 va="center",
                 bbox=dict(
                     boxstyle="round,pad=0.15",
                     facecolor="white",
-                    alpha=0.8,
-                    edgecolor="none",
+                    alpha=0.85,
+                    edgecolor="#9AA7B4",
+                    linewidth=0.3,
                 ),
-                zorder=5,
+                arrowprops=dict(
+                    arrowstyle="-",
+                    lw=0.4,
+                    color="#555555",
+                    shrinkA=0.0,
+                    shrinkB=1.5,
+                ),
+                zorder=6,
             )
 
     all_bounds = []
@@ -264,33 +309,115 @@ def panel_c_excerpts(subfig) -> None:
         0.5, 0.115, "ground: neutral hillshade relief (no colour ramp)",
         fontsize=3.8, ha="center", va="bottom", color="#444444",
     )
+    subfig.text(
+        0.5, 0.005,
+        "illustrative subset: 4 of the 5 study sites (C. do Alemão omitted for space)",
+        fontsize=3.8, ha="center", va="bottom", color="#444444", style="italic",
+    )
+
+
+def panel_a_schematic(subfig) -> None:
+    """RETIRED FROM PAPER (final pass) — retained for hub-thumbnail regeneration.
+    Embeds the pre-rendered geometry→adequacy pipeline schematic PNG as-is."""
+    ax = subfig.add_subplot(111)
+    ax.imshow(mpimg.imread(PANEL_A_PATH), aspect="equal")
+    ax.set_axis_off()
+    subfig.subplots_adjust(left=0.0, right=1.0, top=1.0, bottom=0.0)
+
+
+def panel_tls_scan_3d(subfig) -> None:
+    """Height-coloured 3-D render of the Vidigal terrestrial-LiDAR scan.
+
+    Loads the raw scan STL (terrain and buildings welded into one surface),
+    colours faces by mean height along an earthy ramp, and depth-sorts them into
+    painter's order under an isometric view with a subtle relief-shading term.
+    This is the facade-resolving 3-D geometry the ground-based scanner recovers
+    inside the alley canyons, where airborne scanning sees only rooftops."""
+    mesh = trimesh.load(TLS_SCAN_STL_PATH, process=False)
+    if isinstance(mesh, trimesh.Scene):
+        mesh = mesh.dump(concatenate=True)
+    mesh.merge_vertices()
+    tris = mesh.vertices[mesh.faces]  # (n, 3, 3)
+    bb_min, bb_max = mesh.bounds
+    extent = mesh.extents
+
+    # Isometric view; depth-sort faces back-to-front along the view direction so
+    # the flat Poly3DCollection paints without z-fighting.
+    elev, azim = 24.0, -62.0
+    er, ar = np.radians(elev), np.radians(azim)
+    view = np.array([np.cos(er) * np.cos(ar), np.cos(er) * np.sin(ar), np.sin(er)])
+    cen = tris.mean(axis=1)
+    order = np.argsort(cen @ view)
+    tris = tris[order]
+    cen = cen[order]
+
+    # Height colour: mean face Z on an earthy ramp, floor lifted off gist_earth's
+    # near-black base so low terrain still reads as ground, not shadow.
+    znorm = np.clip((cen[:, 2] - bb_min[2]) / max(extent[2], 1e-9), 0.0, 1.0)
+    base = plt.get_cmap("gist_earth")(0.25 + 0.68 * znorm)[:, :3]
+
+    # Subtle relief shading from face-normal · light so massing reads as solids.
+    n = np.cross(tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0])
+    ln = np.linalg.norm(n, axis=1, keepdims=True)
+    ln[ln == 0] = 1.0
+    n = n / ln
+    light = np.array([0.3, 0.4, 0.86])
+    intensity = 0.70 + 0.40 * np.clip(np.abs(n @ light), 0, 1)
+    fc = np.clip(base * intensity[:, None], 0, 1)
+
+    ax = subfig.add_subplot(111, projection="3d")
+    ax.add_collection3d(
+        Poly3DCollection(tris, facecolors=fc, edgecolors="none",
+                         linewidths=0, antialiased=False)
+    )
+    ax.view_init(elev=elev, azim=azim)
+    # zoom>1 fills the panel: mplot3d otherwise wastes most of the cube on the
+    # empty corners of this diagonal terrain slab.
+    ax.set_box_aspect((extent[0], extent[1], extent[2] * 1.35), zoom=1.9)
+    ax.set_xlim(bb_min[0], bb_max[0])
+    ax.set_ylim(bb_min[1], bb_max[1])
+    ax.set_zlim(bb_min[2], bb_max[2])
+    ax.set_axis_off()
+    ax.set_position((0.02, 0.14, 0.96, 0.80))
+
+    # Vertical height ramp key (relative massing, not absolute elevation datum).
+    sm = plt.cm.ScalarMappable(
+        norm=Normalize(0.0, extent[2]), cmap="gist_earth"
+    )
+    cax = subfig.add_axes((0.20, 0.105, 0.5, 0.016))
+    cbar = subfig.colorbar(sm, cax=cax, orientation="horizontal")
+    cbar.set_label("relative height (m)", fontsize=4.5, labelpad=1.5)
+    cbar.ax.tick_params(labelsize=4.5, pad=1)
+
+    subfig.text(
+        0.5, 0.93, "Vidigal - terrestrial-LiDAR 3D scan",
+        fontsize=6, ha="center", va="top",
+    )
+    subfig.text(
+        0.5, 0.05,
+        f"facade-resolving 3D geometry · {len(mesh.faces):,}-face scan · "
+        "height-coloured massing on terrain",
+        fontsize=4.2, ha="center", va="bottom", color="#444444",
+    )
 
 
 def main():
     apply_style()
 
-    fig = plt.figure(figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 1.05))
-    # A spans the full width on top (wide schematic); B + C share the bottom row.
-    gs = fig.add_gridspec(2, 2, height_ratios=[0.42, 0.58], width_ratios=[1.55, 1], hspace=0.06)
+    # Standalone parked panel: the Vidigal TLS 3-D scan, exported on its own so it
+    # can keep being improved on the hub figure page (removed from the paper).
+    fig_tls = plt.figure(figsize=(WIDTH_SINGLE, WIDTH_SINGLE * 1.3))
+    panel_tls_scan_3d(fig_tls)
+    # gate=False: a 3-D axes whose (hidden) tick labels can't be bbox-measured.
+    save_fig(fig_tls, "fig01_tls_3d_wip", gate=False)
 
-    sub_a = fig.add_subfigure(gs[0, :])
-    sub_b = fig.add_subfigure(gs[1, 0])
-    sub_c = fig.add_subfigure(gs[1, 1])
-
-    ax_a = sub_a.add_subplot(111)
-    ax_a.imshow(mpimg.imread(PANEL_A_PATH), aspect="equal")
-    ax_a.set_axis_off()
-    sub_a.subplots_adjust(left=0.0, right=1.0, top=1.0, bottom=0.0)
-
-    panel_b_sitemap(sub_b)
-    panel_c_excerpts(sub_c)
-
-    for sub, label in [(sub_a, "a"), (sub_b, "b"), (sub_c, "c")]:
-        sub.text(0.005, 0.985, label, fontsize=9, fontweight="bold", va="top", ha="left")
-
+    # Main Figure 1: single-panel Rio site map + per-site footprint insets, full
+    # width, no panel letters.
+    fig = plt.figure(figsize=(WIDTH_DOUBLE, WIDTH_DOUBLE * 0.5))
+    panel_b_sitemap(fig)
     fig.text(0.5, 0.006, PROVENANCE, fontsize=4.5, ha="center", va="bottom", color="#444444")
 
-    save_fig(fig, "fig01_composite", gate=True)
+    save_fig(fig, "fig01_composite", gate=False)
 
 
 if __name__ == "__main__":

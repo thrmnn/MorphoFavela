@@ -194,11 +194,12 @@ def main() -> int:
     )
     fig.suptitle(
         "Cross-site solar by aspect quadrant.  Hillside sites (Vidigal, Rocinha) show winter aspect dissociation;\n"
-        "flatland sites (Rio das Pedras, Maré) collapse to a single curve. Complexo do Alemão (mixed) sits between.",
+        "flatland sites (Rio das Pedras, Maré) are aspect-insensitive but differ in absolute winter-sun level;\n"
+        "Complexo do Alemão (mixed) sits between.",
         fontsize=8.5,
         y=0.995,
     )
-    fig.tight_layout(rect=(0, 0.03, 1, 0.93))
+    fig.tight_layout(rect=(0, 0.03, 1, 0.90))
 
     save_fig(fig, "fig08_solar_cross_site")
 

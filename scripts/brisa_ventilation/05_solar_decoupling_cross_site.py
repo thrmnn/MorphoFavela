@@ -35,9 +35,9 @@ if str(_ROOT) not in sys.path:
 SITES = [
     ("vidigal", "Vidigal", "hillside"),
     ("rocinha", "Rocinha", "hillside"),
-    ("complexo_do_alemao", "Complexo do Alemão", "hillside"),
-    ("riodaspedras", "Rio das Pedras", "lowland"),
-    ("maré", "Maré", "lowland"),
+    ("complexo_do_alemao", "Complexo do Alemão", "mixed"),
+    ("riodaspedras", "Rio das Pedras", "flatland"),
+    ("maré", "Maré", "flatland"),
 ]
 
 QUADRANTS = ("N", "E", "S", "W")
