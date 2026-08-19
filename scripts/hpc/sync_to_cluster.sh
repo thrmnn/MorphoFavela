@@ -23,9 +23,9 @@ if [[ -z "$ACTION" || -z "$REMOTE" ]]; then
     echo "Usage: $0 {push|pull} user@host:/remote/path [--dry-run]"
     echo ""
     echo "Examples:"
-    echo "  $0 push theo@hpc.uni.edu:~/MorphoFavela"
-    echo "  $0 pull theo@hpc.uni.edu:~/MorphoFavela"
-    echo "  $0 push theo@hpc.uni.edu:~/MorphoFavela --dry-run"
+    echo "  $0 push theo@hpc.uni.edu:~/SCL/SCR/MorphoFavela"
+    echo "  $0 pull theo@hpc.uni.edu:~/SCL/SCR/MorphoFavela"
+    echo "  $0 push theo@hpc.uni.edu:~/SCL/SCR/MorphoFavela --dry-run"
     exit 1
 fi
 

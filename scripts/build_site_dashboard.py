@@ -31,7 +31,7 @@ from scipy.stats import gaussian_kde, pearsonr
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-ROOT = Path("/home/theo/MorphoFavela")
+ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
 sys.path.insert(0, str(ROOT))
 
 from src.svf_v2.paths import AREA_FILES

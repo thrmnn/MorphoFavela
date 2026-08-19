@@ -43,8 +43,8 @@ Verdict conformance (numbers = verdict points):
 
 Run (env: miniconda3/envs/MorphoFavela):
   vti2geotiff.py --self-test
-  vti2geotiff.py --patch VDG-P07 --repo-root ~/MorphoFavela --smoke-vti PATH --dry-run
-  vti2geotiff.py --patch VDG-P07 --repo-root ~/MorphoFavela       # full 8-dir composite
+  vti2geotiff.py --patch VDG-P07 --repo-root ~/SCL/SCR/MorphoFavela --smoke-vti PATH --dry-run
+  vti2geotiff.py --patch VDG-P07 --repo-root ~/SCL/SCR/MorphoFavela       # full 8-dir composite
 """
 
 from __future__ import annotations

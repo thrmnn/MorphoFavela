@@ -441,10 +441,10 @@
 - ~~Unified typology labels for OpenFOAM domain selection~~
 - *Replaced by 12-strata stratified sampling (Phase 5, 2026-04-09); no longer needed.*
 
-#### OpenFOAM Handoff (in `~/Airflow`)
+#### OpenFOAM Handoff (in `~/SCL/SCR/Airflow`)
 - [x] Per-patch exports ready (buildings.gpkg, terrain.tif, patch_meta.json) for all 119
 - [x] Airflow build_patch_case / preflight / write_summary updated for circular patches
-- [x] VDG-P07 preflight 7/7 in `~/Airflow/cases/VDG-P07/`
+- [x] VDG-P07 preflight 7/7 in `~/SCL/SCR/Airflow/cases/VDG-P07/`
 - [ ] **Submit VDG-P07 mesh + 8-direction wind campaign to MIT ORCD** (user-driven)
 - [ ] Validate end-to-end pipeline against real CFD return for VDG-P07
 - [ ] Submit remaining 118 patches incrementally
@@ -489,7 +489,7 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
 
 ---
 
-## Phase 6: CFD Simulations (in other repo at ~/Airflow)
+## Phase 6: CFD Simulations (in other repo at ~/SCL/SCR/Airflow)
 
 ### Wind input ✅ COMPLETE (2026-04-27)
 - [x] Iowa State ASOS METAR ingestion for SBGL Galeão (Maré)
@@ -500,13 +500,13 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
 - [x] Figure S5 in technical report §2.3
 
 ### Pilot patch in Airflow ✅ READY
-- [x] Vidigal patch VDG-P07 placed in `~/Airflow/cases/VDG-P07/`
+- [x] Vidigal patch VDG-P07 placed in `~/SCL/SCR/Airflow/cases/VDG-P07/`
       (buildings.gpkg + terrain.tif + patch_meta.json), preflight 7/7
 - [x] Airflow build_patch_case.py + preflight.py + write_summary.py
       updated to read circular `analysis_patch_diameter` (was hardcoded
       to old square `analysis_patch_size`)
 
-### Next steps (in ~/Airflow)
+### Next steps (in ~/SCL/SCR/Airflow)
 - [ ] Submit VDG-P07 mesh + 8-direction wind campaign to MIT ORCD
 - [ ] Validate end-to-end pipeline on VDG-P07 results
 - [ ] Submit remaining 118 patches incrementally
@@ -686,7 +686,7 @@ mid-range SVF/λp. Simplest geometry for end-to-end pipeline validation.
 - CFD campaign: 5 areas — vidigal, rocinha, riodaspedras, complexo_do_alemao, maré
   (CDD excluded from the campaign at allocation time; its building data was later
   confirmed valid — see `project_cdd_data_bug` memory — but the 5-site lock stood)
-- CFD simulation execution is handled in a separate repo (`~/Airflow`); this repo
+- CFD simulation execution is handled in a separate repo (`~/SCL/SCR/Airflow`); this repo
   produces the patches (`sampling_cfd/campaign_sampling/patches/`) and ingests
   results via `cfd-results-ingestor` + `src/cfd_integration/` for Phase 7 analysis
 - **Current focus**: VDG-P07 on MIT ORCD (user-driven), then incremental submission

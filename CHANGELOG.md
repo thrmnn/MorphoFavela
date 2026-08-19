@@ -330,7 +330,7 @@ a stable v1.0 is cut.
     `wind-ingestion` (INMET/ASOS download → extract → build rose,
     encoding the 3 known INMET quirks: server cuts, post-2019
     date format, accent-bearing column names),
-    `cfd-results-ingestor` (validates returns from `~/Airflow`
+    `cfd-results-ingestor` (validates returns from `~/SCL/SCR/Airflow`
     against the `src/cfd_integration/` contract and flags the
     `wind_NNN/*.parquet` → `wind_{N..NW}/sample_points.csv`
     producer drift).
@@ -437,7 +437,7 @@ a stable v1.0 is cut.
 - Technical report §2.3 documents the measured roses and the
   station / window / n / calm-fraction table.
 - README — adds a "Repository Map" section pointing at the CFD
-  execution repo (`~/Airflow`), the wind-input pipeline, and the
+  execution repo (`~/SCL/SCR/Airflow`), the wind-input pipeline, and the
   end-to-end ordering.
 
 ### Removed
@@ -478,7 +478,7 @@ First milestone: complete CFD pre-flight stack.
   porosity, density, Moran's I / LISA / Gi*.
 
 ### Notes
-- CFD execution lives in a separate repo (`~/Airflow`); this repo
+- CFD execution lives in a separate repo (`~/SCL/SCR/Airflow`); this repo
   produces the patch sampling and ingests results.
 - Wind roses at this milestone were placeholder priors; replaced
   with measured INMET / Iowa ASOS data in the unreleased work above.

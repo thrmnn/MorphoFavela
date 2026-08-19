@@ -41,14 +41,14 @@ from shapely.geometry import box
 sys.path.insert(0, str(PROJECT_ROOT))
 from src.print3d.model import _building_prisms, _sample_terrain_core
 
-PANEL_A_PATH = Path("/home/theo/brisaverse/shared/figures/fig01_panelA.png")
+PANEL_A_PATH = Path("/home/theo/SCL/SCR/brisaverse/shared/figures/fig01_panelA.png")
 
 # Vidigal terrestrial-LiDAR scan (terrain + buildings welded into a single mesh).
 # The facade-resolving 3-D geometry ground-based scanning captures where airborne
 # scanning cannot see into the canyons. 17k-face raw scan; the higher-fidelity
 # fallback is ``outputs/vidigal_tls/morphometrics/svf/scene.stl`` (17 MB).
 TLS_SCAN_STL_PATH = (
-    Path("/home/theo/MorphoFavela")
+    Path("/home/theo/SCL/SCR/MorphoFavela")
     / "data" / "vidigal_tls" / "raw" / "full_scan.stl"
 )
 

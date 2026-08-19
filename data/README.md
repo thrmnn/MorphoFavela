@@ -35,7 +35,7 @@ For each campaign site `data/{site}/`:
 | `dtm_extended_300m.tif` | DTM clipped to favela + 300 m buffer | Manual GIS clip from RJ DTM (see *Manual steps* below) |
 | `buildings_extended_300m.gpkg` | Building footprints clipped to favela + 300 m buffer | `scripts/build_extended_context.py` |
 | `wind_rose.json` | 8-direction frequency + mean speed climatology | `scripts/build_wind_rose.py`; INMET BDMEP for hillside/inland sites, Iowa ASOS METAR (SBGL) for Maré |
-| `cfd_results/{patch_id}/{wind_dir}/` | OpenFOAM outputs ingested back from `~/Airflow` | Produced in the CFD repo, dropped here after each campaign batch |
+| `cfd_results/{patch_id}/{wind_dir}/` | OpenFOAM outputs ingested back from `~/SCL/SCR/Airflow` | Produced in the CFD repo, dropped here after each campaign batch |
 
 ## Building-footprint required attributes
 
@@ -133,7 +133,7 @@ extended building context with
 
 ## CFD results contract — `data/{site}/cfd_results/`
 
-CFD runs happen in the separate `~/Airflow` repo. When results return,
+CFD runs happen in the separate `~/SCL/SCR/Airflow` repo. When results return,
 two equivalent layouts are accepted (auto-detected by
 `src/cfd_integration/io.py::load_campaign_results`):
 

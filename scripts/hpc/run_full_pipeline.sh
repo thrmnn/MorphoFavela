@@ -27,7 +27,7 @@
 # Setup — must happen BEFORE set -e so module sourcing doesn't kill the script
 # ---------------------------------------------------------------------------
 
-# Use SLURM_SUBMIT_DIR (where sbatch was invoked) or fall back to ~/MorphoFavela
+# Use SLURM_SUBMIT_DIR (where sbatch was invoked) or fall back to ~/SCL/SCR/MorphoFavela
 PROJECT_ROOT="${SLURM_SUBMIT_DIR:-$HOME/MorphoFavela}"
 cd "${PROJECT_ROOT}"
 mkdir -p logs

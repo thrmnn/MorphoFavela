@@ -406,7 +406,7 @@ morphometric `z0_kan_floored` (currently floored to 0.03 m; MAR-P07 sits in the
 synthetic MAR-P07 return must NOT be mistaken for the anchor (see
 `generate_synthetic_cfd_results.py`, which writes to a separate root).
 
-Execution happens in the CFD repo (`~/Airflow`), not here — this section is the
+Execution happens in the CFD repo (`~/SCL/SCR/Airflow`), not here — this section is the
 request + the return contract, not a runnable job.
 
 ## Roughness→CFD coupling — refinements from the expert council (2026-06-19)

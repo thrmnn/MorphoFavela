@@ -31,7 +31,7 @@ anchor it to **real Rio de Janeiro health data**.*
   scripted access → automated TB pulls are dead from this env. **The TB side is now the binding
   n-constraint** (not compute, not exposure). Next TB pulls need a manual/browser route.
 - **Dashboard restart if down:**
-  `cd ~/MorphoFavela && setsid nohup python -m http.server 8773 --bind 0.0.0.0 >/tmp/hub.log 2>&1 &`
+  `cd ~/SCL/SCR/MorphoFavela && setsid nohup python -m http.server 8773 --bind 0.0.0.0 >/tmp/hub.log 2>&1 &`
 - **Pre-existing WIP NOT from this track** (leave alone): `outputs/paper_figures/fig0{1,4,5,8}*.py`,
   `fig_solar_deficit.py`, `scripts/brisa_ventilation/05_*.py`, `scripts/pooled_vs_stratified.py`
   are **brisaverse P1 WIP** — review/commit under the P1 track, not here.
@@ -95,7 +95,7 @@ A (T7 polygon-agnostic pipeline)  ──unblocks──▶  B2 (onboard new favel
 
 **Hard (external / user-only — cannot be closed autonomously):**
 - **CEP-CONEP ethics approval** — the sole path to individual/address-level SINAN-TB/SIM linkage. Blocks the *publishable* point-join, the full T2 confound isolation, and T6 *filing*. Agent can draft; user must file. **Parked.**
-- **CFD / airflow (MAR-P07 pilot, `~/Airflow`)** — blocks upgrading the ventilation leg C→B. Out of scope until the pilot returns. Do not chase.
+- **CFD / airflow (MAR-P07 pilot, `~/SCL/SCR/Airflow`)** — blocks upgrading the ventilation leg C→B. Out of scope until the pilot returns. Do not chase.
 
 **Semi (autonomous but fragile — flag, don't trust):**
 - **Bairro↔favela mapping is the true binding constraint (B2 finding).** The screen's "bairro ≈ one

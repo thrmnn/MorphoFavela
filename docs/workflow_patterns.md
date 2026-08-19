@@ -1,7 +1,7 @@
 # Workflow patterns
 
 A reusable workflow lives at
-`/home/theo/MorphoFavela/.claude/workflows/audit-and-deliverable-per-entity.js`.
+`/home/theo/SCL/SCR/MorphoFavela/.claude/workflows/audit-and-deliverable-per-entity.js`.
 It encodes the shape we keep reinventing by hand: fan out per-entity probes,
 run a panel of persona-distinct critics, synthesize into severity buckets,
 optionally propose and judge a deliverable, then build it per entity.
@@ -141,7 +141,7 @@ Workflow({
       { name: 'paired-map-histogram',    medium: 'matplotlib PDF',
         constraint: 'two-row grid: SVF map above, histogram below' },
     ],
-    output_dir: '/home/theo/MorphoFavela/outputs/paper_figures/brisa_fig03_audit',
+    output_dir: '/home/theo/SCL/SCR/MorphoFavela/outputs/paper_figures/brisa_fig03_audit',
     artefact_basename: 'svf_audit',
     dashboard_spec_hint:
       'Favor reproducibility (matplotlib + commit-pinned data) over polish. ' +
@@ -244,7 +244,7 @@ Workflow({
       { name: 'per-patch-onepager', medium: 'matplotlib PDF',
         constraint: 'A4, residual plot + 8-wind U field + caveat box' },
     ],
-    output_dir: '/home/theo/MorphoFavela/docs/cfd_reports',
+    output_dir: '/home/theo/SCL/SCR/MorphoFavela/docs/cfd_reports',
     artefact_basename: 'patch_report',
     dashboard_spec_hint:
       'Phase-7 build will hit rate limits; throttle to 8 concurrent builds.',

@@ -21,7 +21,7 @@ The synthetic field is the validated stand-in from
 ``scripts/generate_synthetic_cfd_results.py`` (provenance: synthetic=true).
 It is NOT a CFD solve and is labelled as such in both deliverables.
 
-Run:  python scripts/cfd_overlay/build_vidigal_patch_viz.py [--repo-root ~/MorphoFavela]
+Run:  python scripts/cfd_overlay/build_vidigal_patch_viz.py [--repo-root ~/SCL/SCR/MorphoFavela]
 """
 
 from __future__ import annotations

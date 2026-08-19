@@ -4,7 +4,7 @@
 Produces a complete `data/{site}/cfd_results/` tree matching the contract
 in `src/cfd_integration/README.md` so the result-side analysis pipeline
 can be exercised end-to-end before real OpenFOAM results return from
-~/Airflow.
+~/SCL/SCR/Airflow.
 
 The synthetic field is deliberately simple: per-patch mean U_mag is
 modulated by the patch's SVF and λp (lower SVF + higher λp → lower

@@ -109,11 +109,11 @@ These are **independent** — run in any order or parallel.
 | `run_campaign_sampling.py` | `mf-campaign-sampling` | Incremental top-up to 22-25 patches per site (SVF-priority) | (sampling logic in script) |
 | `select_pilot_candidates.py` | — | Filter / rank candidate pilot patches against eligibility criteria | (sampling logic in script) |
 | `audit_rectangular_domain.py` | — | Verify per-patch rectangular-domain compatibility before CFD submission | `src.cfd_integration` |
-| `analyze_cfd_results.py` | — | Post-CFD per-patch summary (residuals, U_mean fields, convergence) once results return from `~/Airflow` | `src.cfd_integration` |
+| `analyze_cfd_results.py` | — | Post-CFD per-patch summary (residuals, U_mean fields, convergence) once results return from `~/SCL/SCR/Airflow` | `src.cfd_integration` |
 | `generate_synthetic_cfd_results.py` | — | Gitignored synthetic CFD tree for testing the analyzer without HPC runs (see memory `project-vdgp02-synthetic-cfd`) | `src.cfd_integration` |
 | `migrate_indicators_rectangular_v1.py` | — | One-shot migration script for the rectangular-domain indicator schema bump (run once after pulling a v0 → v1 patch) | `src.cfd_integration` |
 
-CFD execution itself happens in the separate `~/Airflow` repo — see
+CFD execution itself happens in the separate `~/SCL/SCR/Airflow` repo — see
 the top-level `README.md` Repository Map.
 
 ---
@@ -140,7 +140,7 @@ produce; they never re-cast rays or re-run the solver.
 ## Subdirectories
 
 - `scripts/hpc/` — small SLURM helpers; the bulk of the HPC code is
-  in the `~/Airflow` repo (mesh, solve, postprocess, submit).
+  in the `~/SCL/SCR/Airflow` repo (mesh, solve, postprocess, submit).
 - `scripts/data_utils/` — small shared loaders for repeated ad-hoc
   ingestion.
 - `scripts/debug/` — one-off diagnostics that aren't part of the

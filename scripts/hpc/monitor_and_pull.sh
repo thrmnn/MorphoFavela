@@ -82,7 +82,7 @@ pull_area() {
         --exclude='*.stl' --exclude='*.vtk' --exclude='*.npz' \
         --exclude='*' \
         -e ssh \
-        "orcd:~/MorphoFavela/outputs/${area}/" \
+        "orcd:~/SCL/SCR/MorphoFavela/outputs/${area}/" \
         "outputs/${area}/" \
         >> "${LOG_FILE}" 2>&1
 
@@ -91,7 +91,7 @@ pull_area() {
         --include="pipeline_*.out" --include="pipeline_*.err" \
         --exclude='*' \
         -e ssh \
-        "orcd:~/MorphoFavela/logs/" \
+        "orcd:~/SCL/SCR/MorphoFavela/logs/" \
         "logs/" \
         >> "${LOG_FILE}" 2>&1
 

@@ -111,7 +111,7 @@ Update the report (and rebuild the PDF in the same commit) when you:
 
 ## CFD integration boundary
 
-Simulation execution lives in a separate repo at `~/Airflow` (not in
+Simulation execution lives in a separate repo at `~/SCL/SCR/Airflow` (not in
 this codebase). Do not implement OpenFOAM case generation, mesh
 preparation, or HPC submission here — point work toward that repo.
 

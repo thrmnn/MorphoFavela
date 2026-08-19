@@ -12,14 +12,14 @@ A Python pipeline for the morphometric and CFD-coupled analysis of pedestrian-le
 
 **What this repo does NOT do**
 
-- Run OpenFOAM. Mesh generation, case setup, and HPC submission live in a separate repo at `~/Airflow` (MIT ORCD).
+- Run OpenFOAM. Mesh generation, case setup, and HPC submission live in a separate repo at `~/SCL/SCR/Airflow` (MIT ORCD).
 - Host the manuscript. The Nature Cities draft lives elsewhere; this repo provides the technical report that backs it.
 
 **Audience.** Engineers, researchers, and reviewers who need to read the methodology, reproduce a figure, validate a number, or onboard a new site. Start with [`docs/technical_report/technical_report.md`](docs/technical_report/technical_report.md) for the methodology; this README is the operational guide.
 
 ## Status
 
-See [ROADMAP.md](ROADMAP.md) for the full roadmap and version history. **As of June 2026**: 5 campaign sites + 3 calibration sites (Borel, Jacarezinho, Morro do Juramento) onboarded; 119-patch CFD campaign sampled and exported; wind input complete; result-side analysis pipeline shipped + synthetic-validated end-to-end on all 5 sites; SVF cross-validated against UMEP `svfForProcessing153` (closes the §10.3 limitation). CFD pilot ladder staged in `~/Airflow`; ingestion layer plumbed and waiting on first real return.
+See [ROADMAP.md](ROADMAP.md) for the full roadmap and version history. **As of June 2026**: 5 campaign sites + 3 calibration sites (Borel, Jacarezinho, Morro do Juramento) onboarded; 119-patch CFD campaign sampled and exported; wind input complete; result-side analysis pipeline shipped + synthetic-validated end-to-end on all 5 sites; SVF cross-validated against UMEP `svfForProcessing153` (closes the §10.3 limitation). CFD pilot ladder staged in `~/SCL/SCR/Airflow`; ingestion layer plumbed and waiting on first real return.
 
 **Dissolved λf is now canonical.** Party-wall-corrected frontal-area density (touching footprints unioned into blocks before projection) is the single authoritative source, pinned bit-for-bit in `outputs/brisa_ventilation_fix/lambda_f_canonical.json` (gitignored output; regenerable) and test-locked (`tests/test_lambda_f_lockfile.py`). Pooled built mask n = 64,389; Oke / Grimmond-Oke flow-regime split ≈ 65 % skimming / 30 % wake / 5 % isolated. On top of it: **k = 6 cell morphotypes + k = 3 block morphotopes**; a typology→WHO-2 h-sun-failure predictor where the re-baseline **flipped** the headline — the continuous fabric vector (LOSO AUC-PR ≈ 0.84) outperforms the discrete type (≈ 0.61), with spatially-blocked block-bootstrap CIs (which overlap, so the flip is a direction not a clean gap) and low VIF; the blind risk map is externally validated on 3 calibration favelas (pooled AUC-PR 0.76). New geometric scalars: lateral-connectivity (distance-to-open-edge), 2-D ventilation-susceptibility (regime × depth), and effective wind-exposure (directional λf × wind rose). Roughness z0/zd via UMEP is **out of validity envelope for 53–75 % of cells** — that envelope is the result, not a defect. Track C (terrain-following morphometry) resolved as a scoping null. See [`docs/council_roadmap_2026-06-25.md`](docs/council_roadmap_2026-06-25.md), [`docs/repo_parallel_plan_2026-06-26.md`](docs/repo_parallel_plan_2026-06-26.md), and [`docs/brisa_round4_results_2026-06-25.md`](docs/brisa_round4_results_2026-06-25.md) for the standing plan and round-4/5 results.
 
@@ -33,7 +33,7 @@ figures. CFD simulations themselves run in a separate repo.
 | **Morphometric analysis** | `src/morphometry/`, `src/svf_v2/`, `scripts/run_morphometric_audit.py`, `scripts/run_svf_v2.py`, … |
 | **CFD patch sampling** (5 sites × 119 patches) | `scripts/run_pilot_sampling.py`, `scripts/run_campaign_sampling.py` |
 | **CFD I/O contract** (what CFD must produce, how we ingest) | `src/cfd_integration/README.md` |
-| **CFD simulation execution** | **Separate repo at `~/Airflow`** (OpenFOAM + SLURM on MIT ORCD) |
+| **CFD simulation execution** | **Separate repo at `~/SCL/SCR/Airflow`** (OpenFOAM + SLURM on MIT ORCD) |
 | **Wind input** (boundary conditions, annual weighting) | `scripts/download_inmet_zips.py` → `scripts/extract_inmet_stations.py` → `scripts/build_wind_rose.py` → `data/{site}/wind_rose.json` |
 | **Technical report** (canonical deliverable) | `docs/technical_report/technical_report.md` (and `.pdf`) |
 | **Paper figures** (Nature Cities) | `outputs/paper_figures/` |
@@ -45,7 +45,7 @@ figures. CFD simulations themselves run in a separate repo.
    `run_svf_v2.py`, `compute_solar_access.py`, `compute_sectional_porosity.py`,
    `compute_occupancy_density.py`, `compute_urban_morphology.py`.
 3. `scripts/run_pilot_sampling.py` → `scripts/run_campaign_sampling.py` — stratify on SVF × slope × λp, allocate 22-25 patches per site.
-4. **CFD execution** lives in `~/Airflow` (`scripts/hpc/submit_patch_chain.sh PATCH_ID`). Returns `data/{site}/cfd_results/{patch_id}/{wind_dir}/`.
+4. **CFD execution** lives in `~/SCL/SCR/Airflow` (`scripts/hpc/submit_patch_chain.sh PATCH_ID`). Returns `data/{site}/cfd_results/{patch_id}/{wind_dir}/`.
 5. `src/cfd_integration/` ingests CFD outputs and weights them by the site's wind rose.
 
 **Wind input flow** (one-time, per site):
@@ -145,11 +145,11 @@ each with `buildings.gpkg`, `terrain.tif`, and `patch_meta.json`.
 
 ### 7. CFD execution (separate repo)
 
-CFD runs live in `~/Airflow`. Drop the patch artefacts in there and
+CFD runs live in `~/SCL/SCR/Airflow`. Drop the patch artefacts in there and
 submit:
 
 ```bash
-# ~/Airflow:
+# ~/SCL/SCR/Airflow:
 scripts/hpc/submit_patch_chain.sh VDG-P07
 ```
 
@@ -286,7 +286,7 @@ MorphoFavela/
 │   ├── build_roughness.py                # Per-cell z0/zd via UMEP (validity-envelope flagged)
 │   ├── brisa_ventilation/                # Numbered BRISA pipeline (λf repair → regime taxonomy → lock file)
 │   ├── brisa_deck/                       # BRISA presentation figure scripts
-│   ├── hpc/                              # SLURM helpers (most CFD HPC code is in ~/Airflow)
+│   ├── hpc/                              # SLURM helpers (most CFD HPC code is in ~/SCL/SCR/Airflow)
 │   └── data_utils/, debug/               # Small helpers
 │
 ├── data/        # gitignored — site rasters, footprints, INMET ZIPs, wind roses

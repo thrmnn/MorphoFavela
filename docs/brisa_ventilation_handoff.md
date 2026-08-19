@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-02
 **Branch:** `feat/brisa-paper`
-**Working dir:** `/home/theo/MorphoFavela`
+**Working dir:** `/home/theo/SCL/SCR/MorphoFavela`
 
 Three deliverables. Data + figures + stats only — no edits to
 `/home/theo/brisa_paper/`. The CFD campaign was not touched.
