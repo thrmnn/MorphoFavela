@@ -54,7 +54,13 @@ CSV_DIR = ROOT / "outputs" / "cross_site" / "audit_k_selection"
 SUMMARY_DIR = ROOT / "outputs" / "cross_site" / "signature"
 RANDOM_STATE = 0
 KRANGE = range(2, 11)
-K_CHOSEN = 6
+K_CHOSEN = 6  # derived-from: n/a — deliberate domain choice, NOT the BIC elbow
+# (elbow->8, silhouette/CH/DB internal indices all peak lower). D20 in
+# docs/morpho_signature_decisions.md: k=6 is a disclosed interpretability
+# choice justified by cross-site reproducibility (LOSO ARI 0.78), superseding
+# the earlier "k=6 by BIC elbow" (D10) claim. This script exists to REPORT
+# that divergence honestly, not to converge k_chosen onto elbow_k — do not
+# "fix" this to match the elbow without a new domain decision superseding D20.
 SILHOUETTE_SAMPLE = 5000
 
 
