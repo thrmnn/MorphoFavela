@@ -181,6 +181,17 @@ cell-types are real tissue states, not clustering noise. Maps are coherent regio
 (maps/profile/recurrence) in the gallery + overview. Next: name the 5 tissues;
 bootstrap-stability on the morphotope k.
 
+> **SUPERSEDED 2026-06-25 (recorded 2026-08-19) — the morphotope re-baselined to
+> k=3.** The BIC elbow on the composition vectors selects **k=3**, and
+> `build_morphotope.py` has produced three tissues (M0–M2 over 64,355 cells) since
+> `4ec9898` the same day. Everything above about *five* named tissues (M0–M4, the
+> "4 of 5 recur", the M2/M4 shares) describes the retired fit and must not be cited.
+> The k=3 partition is far more stable than the k=5 one ever was: bootstrap
+> **ARI 0.997 (sd 0.002, min 0.993)** vs 0.916. The stale k lived on in
+> `audit_morphotope_stability.py` as a hardcoded `REF_K = 5` for seven weeks, so the
+> published stability number defended a partition that no longer existed on disk;
+> the audit now derives k with the same elbow rule the producer uses.
+
 ## S1 — Canonical morphometry hardening (2026-06-26)
 
 **D21 · Built-cell + phantom-tower invariants unified behind shared helpers.**
@@ -215,8 +226,9 @@ and every `λf` value are **bit-for-bit untouched** (snapshot-verified).
   min 0.130 at Rio das Pedras) over 39,888 shared cells. A partition that merely
   re-encoded density would land near ARI≈1; 0.18 means the screened shape/grain
   axes reshuffle a large fraction of cells into genuinely different types. At
-  **tissue scale the ARI rises to 0.436** (k=5 morphotopes built from each
-  cell-label field) — the 50 m composition window absorbs much of the cell-level
+  **tissue scale the ARI rises to 0.560** (k=3 morphotopes built from each
+  cell-label field; re-measured 2026-08-19 — the 0.436 first reported here was
+  computed on the retired k=5 fit) — the 50 m composition window absorbs much of the cell-level
   churn, so the recurrent-tissue signature is the more robust scale (consistent
   with D18). *Decision:* keep the canonical density-anchored 6-feature fit as the
   signature; report `morphotype_shape` as a shape-sensitivity extension. The low

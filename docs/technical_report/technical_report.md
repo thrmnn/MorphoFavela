@@ -1038,8 +1038,8 @@ fractal_dimension 1.19, area_entropy 1.47). The shape-augmented partition is
 0.175 (LOSO mean 0.181, min 0.130 at Rio das Pedras) over 39,888 shared cells — a
 partition that merely re-encoded density would land near ARI ≈ 1, so an ARI near
 0.18 means the screened grain/convexity/adjacency axes reshuffle a large fraction of
-cells into different types. At tissue scale the agreement rises to ARI = 0.436
-(k = 5 morphotopes built from each label field): the ~50 m composition window
+cells into different types. At tissue scale the agreement rises to ARI = 0.560
+(k = 3 morphotopes built from each label field): the ~50 m composition window
 absorbs much of the cell-level churn, so the recurrent-tissue signature is again the
 more robust scale. The low ARI is the finding, not a defect — it quantifies how much
 fabric *character* is orthogonal to the density field the canonical signature is

@@ -1,12 +1,16 @@
-"""Bootstrap stability audit of the block-scale morphotope clustering (k=5).
+"""Bootstrap stability audit of the block-scale morphotope clustering.
 
 Rebuilds the per-cell 50 m morphotype-composition vectors over the 5 campaign
 sites, then defends the morphotope GMM on two axes:
 
-  (1) BIC-vs-k curve (k=2..8) with the elbow choice marked — why k=5;
+  (1) BIC-vs-k curve (k=2..8) with the elbow choice marked — why that k;
   (2) bootstrap stability — N=20 GMM refits on 80% subsamples, each compared
-      to the reference k=5 labels via Adjusted Rand Index (ARI) on the shared
+      to the reference labels via Adjusted Rand Index (ARI) on the shared
       cells; report mean / sd / min ARI.
+
+The reference k is DERIVED with the same elbow rule build_morphotope.py applies,
+never pinned here: a hardcoded REF_K=5 outlived the k=3 re-baseline and left the
+published ARI defending a partition that no longer existed on disk.
 
 This does NOT edit build_morphotope.py; it reuses the same primitives from
 src.morphometry.morphotope so the reference labels are bit-for-bit the canonical
@@ -49,7 +53,6 @@ FIGS = ROOT / "outputs" / "cross_site" / "signature" / "figures_v2"
 RADIUS = 50.0
 N_BOOT = 20
 SUBSAMPLE_FRAC = 0.80
-REF_K = 5
 COMP_COLS = [f"comp_{c}" for c in range(N_TYPES)] + ["diversity"]
 
 
@@ -94,7 +97,7 @@ def load_labelled(label_col: str) -> pd.DataFrame:
 
 def shape_morphotope_ari() -> None:
     """Morphotope-level ARI of the shape-augmented partition vs the canonical
-    one. Builds k=5 morphotopes from each cell-label field independently, then
+    one. Builds morphotopes from each cell-label field independently, then
     scores ARI on the shared cells. Reports whether the tissue-scale signature
     survives the shape re-fit."""
     from sklearn.metrics import adjusted_rand_score
@@ -103,8 +106,9 @@ def shape_morphotope_ari() -> None:
     shape = load_labelled("morphotype_shape")
     comp_c = neighborhood_composition(canon, radius=RADIUS)
     comp_s = neighborhood_composition(shape, radius=RADIUS)
-    lab_c = fit_morphotopes(comp_c, REF_K, random_state=0, n_init=4)
-    lab_s = fit_morphotopes(comp_s, REF_K, random_state=0, n_init=4)
+    ref_k = choose_k_elbow(select_k_bic(comp_c, krange=range(2, 9)))
+    lab_c = fit_morphotopes(comp_c, ref_k, random_state=0, n_init=4)
+    lab_s = fit_morphotopes(comp_s, ref_k, random_state=0, n_init=4)
 
     kc = comp_c[["site", "zone_id"]].copy()
     kc["mc"] = lab_c
@@ -115,14 +119,14 @@ def shape_morphotope_ari() -> None:
 
     OUT.mkdir(parents=True, exist_ok=True)
     meta = {
-        "reference_k": REF_K,
+        "reference_k": int(ref_k),
         "n_canon_cells": int(len(comp_c)),
         "n_shape_cells": int(len(comp_s)),
         "n_shared_cells": int(len(j)),
         "morphotope_ari_shape_vs_canon": ari,
     }
     (OUT / "shape_morphotope_ari.json").write_text(json.dumps(meta, indent=2))
-    print(f"morphotope-level ARI (shape-aug vs canonical), k={REF_K}: {ari:.3f}  "
+    print(f"morphotope-level ARI (shape-aug vs canonical), k={ref_k}: {ari:.3f}  "
           f"on {len(j)} shared cells")
 
 
@@ -162,7 +166,7 @@ def fig_stability(sel: pd.DataFrame, elbow_k: int, bic_min_k: int, aris: np.ndar
                    label=f"BIC argmin → k={bic_min_k}")
     ax.set_xlabel("k (number of morphotopes)")
     ax.set_ylabel("GMM BIC")
-    ax.set_title("Model selection — why k=5", fontsize=9)
+    ax.set_title(f"Model selection — why k={elbow_k}", fontsize=9)
     ax.legend(fontsize=8, frameon=False)
     ax.grid(alpha=0.25)
 
@@ -175,7 +179,7 @@ def fig_stability(sel: pd.DataFrame, elbow_k: int, bic_min_k: int, aris: np.ndar
     ax.axvline(aris.min(), color="0.4", ls="--", lw=1.2,
                label=f"min ARI = {aris.min():.3f}")
     ax.set_xlim(0, 1)
-    ax.set_xlabel("ARI vs reference k=5 labels")
+    ax.set_xlabel(f"ARI vs reference k={elbow_k} labels")
     ax.set_ylabel(f"count (N={N_BOOT} refits)")
     ax.set_title(f"Bootstrap stability — {int(SUBSAMPLE_FRAC * 100)}% subsamples",
                  fontsize=9)
@@ -209,8 +213,9 @@ def main():
     elbow_k = choose_k_elbow(sel)
     bic_min_k = int(sel.loc[sel["bic"].idxmin(), "k"])
 
-    ref_labels = fit_morphotopes(comp, REF_K, random_state=0, n_init=4)
-    aris = bootstrap_ari(comp, ref_labels, REF_K)
+    ref_k = elbow_k
+    ref_labels = fit_morphotopes(comp, ref_k, random_state=0, n_init=4)
+    aris = bootstrap_ari(comp, ref_labels, ref_k)
 
     sel.to_csv(OUT / "bic_curve.csv", index=False)
     pd.DataFrame({"boot": range(N_BOOT), "ari": aris}).to_csv(
@@ -221,7 +226,7 @@ def main():
         "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "radius_m": RADIUS,
         "n_cells": int(len(comp)),
-        "reference_k": REF_K,
+        "reference_k": int(ref_k),
         "elbow_k": int(elbow_k),
         "bic_argmin_k": bic_min_k,
         "n_bootstrap": N_BOOT,
@@ -233,7 +238,7 @@ def main():
     }
     (OUT / "stability_meta.json").write_text(json.dumps(meta, indent=2))
 
-    print(f"n_cells={len(comp)}  reference_k={REF_K}")
+    print(f"n_cells={len(comp)}  reference_k={ref_k}")
     print(f"elbow k={elbow_k}  BIC-argmin k={bic_min_k}")
     print("BIC curve:")
     print(sel.to_string(index=False))
