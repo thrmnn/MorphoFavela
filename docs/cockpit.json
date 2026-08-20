@@ -1,0 +1,84 @@
+{
+  "schema": "cockpit/v1",
+  "repo": "MorphoFavela",
+  "generated_utc": "2026-08-20T18:28:25Z",
+  "source_sha": "3275606a",
+  "status": {
+    "phase": "consolidation — 12 tracks (1 approved, 2 deferred, 2 shipped, 7 unclear); 7 stale >14d; statuses from a heuristic index, partly unclear",
+    "gate": "unknown — gate is `python -m pytest tests/ -q` (.claude/verify-cmd); no last-run state is recorded on disk",
+    "source": "docs/_tracks_index.json + tests/data/lambda_f_canonical_golden.json + docs/lambda_f_fix_and_figure_regen_plan.md + docs/work_queue.md"
+  },
+  "headline_metrics": [
+    {
+      "name": "tracks_total",
+      "value": 12,
+      "unit": "tracks",
+      "kind": "declared",
+      "source": "docs/_tracks_index.json",
+      "formula_or_method": "len(tracks); breakdown: 1 approved, 2 deferred, 2 shipped, 7 unclear"
+    },
+    {
+      "name": "tracks_status_unclear",
+      "value": 7,
+      "unit": "tracks",
+      "kind": "declared",
+      "source": "docs/_tracks_index.json",
+      "formula_or_method": "count(status startswith 'unclear') — no explicit marker in the plan header; heuristic index, statuses are curated not measured"
+    },
+    {
+      "name": "tracks_stale",
+      "value": 7,
+      "unit": "tracks",
+      "kind": "declared",
+      "source": "docs/_tracks_index.json",
+      "formula_or_method": "count(flag=='STALE'), threshold stale_days > 14 on the plan file's last dated heading/mtime"
+    },
+    {
+      "name": "skimming_regime_share_pooled",
+      "value": 65.2,
+      "unit": "% of built cells",
+      "kind": "measured",
+      "source": "tests/data/lambda_f_canonical_golden.json",
+      "formula_or_method": "flow_regime_pooled.skimming from the canonical dissolved-λf snapshot (2026-06-25); Oke(1988)/G&O(1999) thresholds (skimming λf ≥ 0.65)",
+      "caveat": "value read from the test-pinned golden of the canonical output, not recomputed at emit time"
+    },
+    {
+      "name": "built_cells_pooled",
+      "value": 64389,
+      "unit": "grid cells",
+      "kind": "declared",
+      "source": "tests/data/lambda_f_canonical_golden.json",
+      "formula_or_method": "parsed from canonical_denominator prose ('full built mask building_count > 0, pooled n'), 5 sites"
+    }
+  ],
+  "open_decisions": [
+    {
+      "id": "morphofavela.lambda-f-morphotype-cascade",
+      "question": "Dissolved-λf fix vs the published morphotypes: re-fit on dissolved λf gives ARI 0.226 (only 58% of cells keep their type). Scope the switch or re-baseline?",
+      "owner": "PI",
+      "options": [
+        {
+          "key": "A",
+          "label": "Scoped switch",
+          "detail": "dissolved λf canonical for absolute-physics consumers (roughness, regime — done); morphotype signature stays on summed λf. Published typology/predictor/TR §5.5 unchanged.",
+          "recommended": true
+        },
+        {
+          "key": "B",
+          "label": "Full re-baseline",
+          "detail": "regenerate features_grid on dissolved λf, re-fit morphotypes (ARI 0.23 vs current), cascade through recurrence, predictor, TR §5.5, brisa figures."
+        }
+      ],
+      "blocks": [
+        "morpho_signature",
+        "typology_predictor",
+        "roughness"
+      ]
+    }
+  ],
+  "blocked_on": [
+    "ray-caster cross-validation (work_queue Task 7): no Radiance/SOLWEIG installed locally — needs user",
+    "cfd_parameter_estimation: DEFERRED — gated on the Airflow pilot recalibrating Kanda"
+  ],
+  "next_wake": "2026-09-03"
+}
