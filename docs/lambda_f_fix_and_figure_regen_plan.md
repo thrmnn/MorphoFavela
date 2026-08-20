@@ -95,7 +95,18 @@ Per figure:
   0.87–0.93, prevalence 46% vs 56%) + separable PD lines + "P(below adequacy
   floor)" + shrink the pending-CFD stub.
 
-## 4b. Morphotype-cascade stability (measured 2026-06-24) — DECISION NEEDED
+## 4b. Morphotype-cascade stability (measured 2026-06-24) — DECIDED 2026-08-20: FULL RE-BASELINE
+
+**PI ruling (2026-08-20, interview):** Option B — full re-baseline. Regenerate
+`features_grid.parquet` on dissolved λf, re-fit the k=6 morphotype GMM, and
+cascade through type names, recurrence, the typology predictor, TR §5.5, and
+the brisa P4/E2 figures. The ARI 0.226 churn is accepted: the published types
+re-fit on the corrected physics rather than preserving continuity with the
+summed-λf artifact. Execution is a tracked campaign (bootstrap-ARI 0.90
+stability bar applies to the NEW fit; old typology archived, never deleted).
+Original decision block preserved below for the record.
+
+### (superseded decision block)
 
 The "full switch" ripples into the morphotype GMM (`lambda_f_mean` + `lambda_f_aniso`
 are 2 of the 6 signature features). Non-destructive check (re-fit k=6 on the
