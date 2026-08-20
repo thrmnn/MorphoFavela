@@ -941,7 +941,7 @@ Calinski-Harabasz, Davies-Bouldin) favour a coarser k = 2–3 — geometry alone
 separates only a few broad groups — so **k = 6 is a domain-driven granularity chosen
 for morphological interpretability, not a distance-based optimum** (Calinski-Harabasz
 does peak at k = 6). Its justification is *cross-site reproducibility*: leave-one-site-out
-refits recover the six-type labelling at ARI 0.763 (bootstrap ARI 0.90), and the held-out
+refits recover the six-type labelling at ARI 0.763 (bootstrap refit-stability ARI 0.843; configuration below), and the held-out
 experience gradient (below) is monotone in it. The clustering was re-fit on the
 **dissolved (party-wall-corrected) λf** (§4.2); membership differs from the previously-published
 summed-λf typology (cross-version ARI 0.23), so the type identities below were re-derived. The six types order along a **density → enclosure spine
@@ -973,8 +973,13 @@ inputs (SVF ≈ f(λp, H/W); excluded from the fabric set for that reason, §4.2
 **winter-sun / WHO-failure** outcomes — which depend on solar geometry and terrain,
 not just density — are the cleaner held-out signal; and the experience profiles are
 read on supported cells only (~35 % of cells carry a street observer; per-type
-support 0.23–0.59, lower for the open types). Bootstrap cluster stability (k = 6) is
-high (ARI 0.90).
+support 0.23–0.59, lower for the open types). Bootstrap refit stability of the k = 6
+fit is ARI 0.843 (sd 0.185, min 0.526; n = 20 refits on 80 % subsamples of the 5-site
+campaign cell population, seed 0 — decision D25): well above chance and comparable to
+the LOSO ARI 0.763, but with a wide spread across refits. This *refit-stability*
+bootstrap of the production pipeline is a different procedure from the B = 200
+k-selection bootstrap in the k-audit (`audit_k_selection.py`, mean ARI 0.866), which
+resamples to test the choice of k — the two numbers should not be conflated.
 
 ![Held-out experience by morphotype](figures/experience_dotplots.png)
 
@@ -996,7 +1001,8 @@ classes, the unit of signature), and the two use deliberately non-overlapping na
 tissue: Compact Hillside, Mixed Dense, Saturated Flatland). A single 10 m cell is the
 measurement unit, but a favela *signature* is a block-scale tissue. Clustering each
 cell's morphotype composition over a 50 m window yields **k = 3 morphotopes**
-(bootstrap stability ARI 0.916, min 0.810): **M0 Compact Hillside Tissue** (71 % T4
+(bootstrap stability ARI 0.997, sd 0.002, min 0.993; n = 20 refits on 80 % subsamples):
+**M0 Compact Hillside Tissue** (71 % T4
 Hillside Core + 22 % T2; recurs, 4 sites), **M1 Mixed Dense Tissue** (the most diverse
 tissue — 41 % T5 / 34 % T4 / 14 % T0), and **M2 Saturated Flatland Tissue** (94 % T5
 Saturated Core; flatland-specific, 2 sites). Two of three recur across ≥3 sites — a
