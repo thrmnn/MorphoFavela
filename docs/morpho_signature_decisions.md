@@ -244,6 +244,55 @@ reference k=6 labels) and emits `k_selection_summary.json` consolidating
 elbow_k, silhouette_peak_k, mean/min LOSO-ARI, and the bootstrap-ARI 2.5/97.5
 percentile CI. Schema pinned by `tests/test_audit_k_selection.py`.
 
+## WS-A.2 — Dissolved-λf re-baseline, phase 1 (2026-08-20)
+
+**D24 · Phase-1 cascade re-run: HALT on bootstrap stability.** Following the
+PI's 2026-08-20 "full re-baseline" ruling (§4b of
+`docs/lambda_f_fix_and_figure_regen_plan.md`), re-ran the chain for clean
+provenance: `build_feature_table.py` (26.6 s, all 8 discovered sites incl. the
+3 calibration sites) → `build_signature.py` (40.8 s) → `refine_signature_spatial.py`
+(46.4 s) → `pytest tests/ -q` (794 passed, 22 skipped, 0 failed, 192 s). Snapshots
+of the pre-run state taken first: `outputs/cross_site/{signature,morphotope,
+typology_predictor}_archive_2026-08-20/`.
+
+- **`build_signature.py`'s default (no `--k`) is BIC-elbow, which now lands on
+  k=8, not k=6.** k=6 is domain-pinned (D10/D17/D20), and the TR's own
+  documented invocation is `--k 6` (`docs/technical_report/technical_report.md:2179`).
+  Re-ran with `--k 6`. `k_selection.csv` BIC/silhouette/CH/DB values and
+  `recurrence_flags.csv` match the archived 2026-06-25 fit to float noise
+  (~1e-10 relative) — the 5-site k=6 fit itself is fully reproducible on the
+  dissolved-λf feature table.
+- **Bootstrap stability gate measured at 0.842, not 0.90 and not the on-disk
+  0.591.** `refine_signature_spatial.py` → `stability_meta.json`:
+  `bootstrap_ari_mean=0.8419485164611228, sd=0.174, min=0.542 (n=20)`,
+  `purity_before_mean=0.503 → purity_after_mean=0.876`. This is a *third*
+  distinct number against the two already on record: TR §5.5 quotes **0.90**
+  (D15's original pre-dissolve number: 20 refits/80% subsamples, mean 0.901 sd
+  0.109 min 0.729, summed-λf fit); the file already on disk before this run
+  (generated 2026-06-25T04:10:56Z, same post-dissolve state) recorded **0.591**.
+- **Root cause of the volatility: a site-scope bug in
+  `refine_signature_spatial.py`, not fit instability.** Its bootstrap-stability
+  step (`main()` step 1) pools `outputs/*/features/features_grid.parquet` via
+  an **unfiltered glob** — all 8 sites, including the 3 calibration sites
+  (borel, jacarezinho, morro_do_juramento) that D17 explicitly scopes *out* of
+  the published signature. `build_signature.py` filters to the 5-site
+  `CAMPAIGN_SITES` constant (`src/morphometry/signature.py`); the stability
+  script does not. Because this campaign's `build_feature_table.py` run (step
+  2, no site filter, as designed) regenerated all 8 sites' feature tables —
+  and the calibration sites' `features_grid.parquet` had evidently not been
+  touched since before the 06-25 dissolve event (their λf was still on the
+  old summed scale) — the pooled bootstrap population shifted under it: 0.591
+  (calibration sites stale/summed) → 0.842 (calibration sites now also
+  dissolved). The actual 5-site k=6 fit did not move (see above); the
+  measurement of its stability is the part that's confounded by out-of-scope
+  data. This is a genuine bug worth fixing (scope the glob to `CAMPAIGN_SITES`
+  like `build_signature.py` does) but is not a mechanical path/env fix, so it
+  was not patched in this phase-1 run — left for PI/engineering review.
+- **Verdict: HALT.** 0.842 < the 0.90 gate. Per the campaign spec, phase 2+
+  (morphotope, typology predictor, TR, figures) is **blocked pending PI
+  review** of this fork. See the DECISION NEEDED block appended to
+  `docs/lambda_f_fix_and_figure_regen_plan.md` (2026-08-20).
+
 ## Open questions / revisit list
 
 - **Terrain-aware λf & SVF (plan Risk 1).** Both assume a flat datum; on 20–30°

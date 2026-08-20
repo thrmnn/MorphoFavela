@@ -141,3 +141,35 @@ predictor still run on summed λf — nothing downstream has shifted yet.
 Review prototype (you) → §2.1 validate 5 sites → §2.2 core integration → §3 index
 (if adopted) → §4 figure regen against the new index. §4 cross-cutting gate can
 proceed in parallel since it's mechanical.
+
+## 6. DECISION NEEDED (2026-08-20) — bootstrap-ARI stability gate misses 0.90
+
+Phase-1 of the full re-baseline (§4b, Option B) re-ran
+`build_feature_table.py` → `build_signature.py --k 6` →
+`refine_signature_spatial.py` → `pytest`. The k=6 fit itself reproduces the
+2026-06-25 dissolved-λf fit to float noise, but the bootstrap-stability gate
+(`outputs/cross_site/signature/stability_meta.json`) measures **0.842**
+(sd 0.174, min 0.542, n=20), against the track's own **0.90** bar (the number
+this plan's §4b PI ruling quoted as the bar the new fit must clear). Full
+numbers and root-cause analysis in `docs/morpho_signature_decisions.md` (D24)
+— the volatility (0.591 on-disk before this run, 0.842 after) traces to a
+site-scope bug in `refine_signature_spatial.py` (pools all 8 sites incl. 3
+out-of-scope calibration sites, unlike `build_signature.py`'s 5-site
+`CAMPAIGN_SITES` filter), not to the published 5-site fit moving.
+Phase 2+ (morphotope, typology predictor, TR §5.5, brisa figures) is
+**halted pending this decision** — nothing downstream has been re-run.
+
+**Fork:**
+- **Accept the lower stability bar.** 0.84 is still a strong bootstrap ARI in
+  absolute terms (well above chance, comparable to the original LOSO-ARI 0.76
+  the k=6 choice was defended on in the first place). Document the revised bar,
+  proceed to phase 2 (morphotope/predictor/TR/figures) on the current fit.
+- **Investigate before proceeding.** Two sub-questions worth separating: (a)
+  is 0.90 even the right number to hold the *dissolved*-λf fit to — it was
+  measured on the *summed*-λf fit, a different feature distribution; (b) fix
+  the `refine_signature_spatial.py` scope bug (filter to `CAMPAIGN_SITES`) and
+  re-measure, since the current 0.842 is itself contaminated by out-of-scope
+  calibration-site data of unknown influence direction/magnitude.
+
+Owner: PI. Blocks: morpho_signature (phase 2), typology_predictor, TR §5.5,
+brisa P4/E2 figures.
