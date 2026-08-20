@@ -1102,8 +1102,9 @@ at Jacarezinho (2 %), 0.51 at Morro do Juramento (3 %). (These cell-level fracti
 computed over *all* built cells of each site; the 3–4 % figures in §5.5f are over the
 validated-building subset — two populations, one envelope.) Applied uniformly, the
 continuous vector also *beats* the earlier morphotype-rate blind map on the same
-calibration sites (a pre-re-baseline benchmark — AUC-PR 0.65/0.82/0.39 on summed-λf
-features, not regenerated) — directionally corroborating that the continuous fabric
+calibration sites (regenerated on the re-baselined dissolved-λf features,
+`scripts/diagnose_morro_transfer.py` — AUC-PR 0.58/0.79/0.31, down from 0.65/0.82/0.39
+pre-re-baseline) — directionally corroborating that the continuous fabric
 vector, not the discrete code, is the transferable predictor. The surface stays morphology-only:
 it predicts the winter-sun (solar-geometry) outcome, not ventilation adequacy, which is
 CFD-gated (§5.6, §10.2).
