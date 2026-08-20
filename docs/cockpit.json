@@ -1,8 +1,8 @@
 {
   "schema": "cockpit/v1",
   "repo": "MorphoFavela",
-  "generated_utc": "2026-08-20T20:04:16Z",
-  "source_sha": "5006cd34",
+  "generated_utc": "2026-08-20T20:52:08Z",
+  "source_sha": "376cea09",
   "status": {
     "phase": "consolidation — 12 tracks (1 approved, 2 deferred, 2 shipped, 7 unclear); 7 stale >14d; statuses from a heuristic index, partly unclear",
     "gate": "unknown — gate is `python -m pytest tests/ -q` (.claude/verify-cmd); no last-run state is recorded on disk",
@@ -51,37 +51,7 @@
       "formula_or_method": "parsed from canonical_denominator prose ('full built mask building_count > 0, pooled n'), 5 sites"
     }
   ],
-  "open_decisions": [
-    {
-      "id": "morphofavela.ari-stability-bar",
-      "question": "λf re-baseline HALTED: k=6 fit reproduces bit-for-bit, but bootstrap-ARI measures 0.843 on the correct 5-site population vs the 0.90 bar TR §5.5 quotes (source of 0.90 unestablished). Proceed how?",
-      "owner": "PI",
-      "options": [
-        {
-          "key": "A",
-          "label": "Re-pin bar to measured 0.843, cascade",
-          "detail": "Correct TR §5.5 to the honest measured stability (0.843, sd 0.185, n=20, 5-site population, config stated); run phases 2-3.",
-          "recommended": true
-        },
-        {
-          "key": "B",
-          "label": "Investigate before cascading",
-          "detail": "Hold phases 2-3; probe bootstrap variance (k, scaling, n_boot) for a defensible >=0.90 config."
-        },
-        {
-          "key": "C",
-          "label": "Keep 06-25 fit, fix TR number only",
-          "detail": "No cascade; correct the stability claim in place."
-        }
-      ],
-      "blocks": [
-        "morphotope",
-        "typology_predictor",
-        "tr_5_5",
-        "brisa_p4_e2"
-      ]
-    }
-  ],
+  "open_decisions": [],
   "blocked_on": [
     "ray-caster cross-validation (work_queue Task 7): no Radiance/SOLWEIG installed locally — needs user",
     "cfd_parameter_estimation: DEFERRED — gated on the Airflow pilot recalibrating Kanda"

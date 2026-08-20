@@ -142,7 +142,16 @@ Review prototype (you) → §2.1 validate 5 sites → §2.2 core integration →
 (if adopted) → §4 figure regen against the new index. §4 cross-cutting gate can
 proceed in parallel since it's mechanical.
 
-## 6. DECISION NEEDED (2026-08-20) — bootstrap-ARI stability gate misses 0.90
+## 6. DECIDED 2026-08-20 (via /ops card, option A) — re-pin stability bar to measured 0.843
+
+**PI ruling (2026-08-20T20:43Z, /ops decision morphofavela.ari-stability-bar
+= A):** re-pin the stability bar to the measured bootstrap ARI 0.843
+(sd 0.185, min 0.526, n=20, 5-site CAMPAIGN_SITES population, k=6, seed 0)
+and proceed with the cascade (phases 2-3). TR §5.5's stability claim is
+corrected to the honest measured number with its config stated; the
+unreproducible 0.90 is retired. Original decision block preserved below.
+
+### (superseded decision block — resolved by the ruling above)
 
 Phase-1 of the full re-baseline (§4b, Option B) re-ran
 `build_feature_table.py` → `build_signature.py --k 6` →

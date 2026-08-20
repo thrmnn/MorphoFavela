@@ -338,3 +338,12 @@ already the validated cross-figure identity palette. Density order is conveyed b
 - **Beco/street-network = orthogonal config axis.** Finest alley grain is **T4 Hillside
   Core (9.5 junctions/ha)**, not the densest T5 (3.0/ha) — circulation is information the
   density field misses. (`src/morphometry/streetnet.py`.)
+
+## D25 — 2026-08-20: stability bar re-pinned to measured 0.843 (PI, /ops option A)
+
+Follow-up to D24. PI ruled via the /ops card: the bootstrap-ARI stability bar
+for the dissolved-λf k=6 signature is re-pinned from the unreproducible 0.90
+to the measured **0.843** (sd 0.185, min 0.526, n=20; 5-site CAMPAIGN_SITES
+population per D17; seed 0; measured post site-scope fix in
+refine_signature_spatial.py). TR §5.5 to be corrected in the phase-3 rebuild;
+cascade (morphotope → predictor → TR → brisa P4/E2) unblocked.
