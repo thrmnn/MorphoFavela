@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))  # win over the stale brisa-0.1.0 editable install
 
 from src.morphometry.signature import (
+    CAMPAIGN_SITES,
     assemble_signature_matrix,
     bootstrap_stability,
     fit_morphotypes,
@@ -45,6 +46,11 @@ def main() -> None:
     # 1. stability on the pooled standardized matrix
     frames = []
     for p in sorted(glob.glob(str(ROOT / "outputs/*/features/features_grid.parquet"))):
+        # D17: calibration sites are out of the published signature — the
+        # bootstrap population must match build_signature.py's CAMPAIGN_SITES
+        # filter (unfiltered pooling made the stability metric volatile).
+        if Path(p).parents[1].name not in CAMPAIGN_SITES:
+            continue
         g = gpd.read_parquet(p)
         g["site"] = Path(p).parents[1].name
         frames.append(pd.DataFrame(g.drop(columns="geometry")))
@@ -61,6 +67,8 @@ def main() -> None:
     rows = []
     for p in sorted(glob.glob(str(ROOT / "outputs/*/features/features_grid.parquet"))):
         site = Path(p).parents[1].name
+        if site not in CAMPAIGN_SITES:
+            continue
         g = gpd.read_parquet(p).reset_index(drop=True)
         if "morphotype" not in g or g["morphotype"].isna().all():
             continue

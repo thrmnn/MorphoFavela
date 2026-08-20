@@ -113,33 +113,45 @@ def build() -> dict:
         )
 
     open_decisions = []
-    if "DECISION NEEDED" in plan_text and "Scoped switch" in plan_text:
+    # A decision is live iff a "## N. DECISION NEEDED (<date>)" heading exists
+    # whose heading line has not been edited to DECIDED. The 4b scope fork was
+    # resolved 2026-08-20 (heading now says DECIDED); keying on heading state,
+    # not on body text, prevents resurrecting superseded forks whose prose
+    # survives in preserved blocks.
+    live_headings = re.findall(r"^#{2,3} .*DECISION NEEDED \((\d{4}-\d{2}-\d{2})\)[^\n]*$",
+                               plan_text, flags=re.M)
+    if live_headings and "bootstrap-ARI stability gate" in plan_text:
         open_decisions.append(
             {
-                "id": "morphofavela.lambda-f-morphotype-cascade",
-                "question": "Dissolved-λf fix vs the published morphotypes: "
-                "re-fit on dissolved λf gives ARI 0.226 (only 58% of cells keep "
-                "their type). Scope the switch or re-baseline?",
+                "id": "morphofavela.ari-stability-bar",
+                "question": "λf re-baseline HALTED: k=6 fit reproduces "
+                "bit-for-bit, but bootstrap-ARI measures 0.843 on the correct "
+                "5-site population vs the 0.90 bar TR §5.5 quotes (source of "
+                "0.90 unestablished). Proceed how?",
                 "owner": "PI",
                 "options": [
                     {
                         "key": "A",
-                        "label": "Scoped switch",
-                        "detail": "dissolved λf canonical for absolute-physics "
-                        "consumers (roughness, regime — done); morphotype "
-                        "signature stays on summed λf. Published typology/"
-                        "predictor/TR §5.5 unchanged.",
+                        "label": "Re-pin bar to measured 0.843, cascade",
+                        "detail": "Correct TR §5.5 to the honest measured "
+                        "stability (0.843, sd 0.185, n=20, 5-site population, "
+                        "config stated); run phases 2-3.",
                         "recommended": True,
                     },
                     {
                         "key": "B",
-                        "label": "Full re-baseline",
-                        "detail": "regenerate features_grid on dissolved λf, "
-                        "re-fit morphotypes (ARI 0.23 vs current), cascade "
-                        "through recurrence, predictor, TR §5.5, brisa figures.",
+                        "label": "Investigate before cascading",
+                        "detail": "Hold phases 2-3; probe bootstrap variance "
+                        "(k, scaling, n_boot) for a defensible >=0.90 config.",
+                    },
+                    {
+                        "key": "C",
+                        "label": "Keep 06-25 fit, fix TR number only",
+                        "detail": "No cascade; correct the stability claim in "
+                        "place.",
                     },
                 ],
-                "blocks": ["morpho_signature", "typology_predictor", "roughness"],
+                "blocks": ["morphotope", "typology_predictor", "tr_5_5", "brisa_p4_e2"],
             }
         )
 

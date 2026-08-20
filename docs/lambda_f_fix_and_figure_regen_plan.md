@@ -151,11 +151,30 @@ Phase-1 of the full re-baseline (§4b, Option B) re-ran
 (`outputs/cross_site/signature/stability_meta.json`) measures **0.842**
 (sd 0.174, min 0.542, n=20), against the track's own **0.90** bar (the number
 this plan's §4b PI ruling quoted as the bar the new fit must clear). Full
-numbers and root-cause analysis in `docs/morpho_signature_decisions.md` (D24)
-— the volatility (0.591 on-disk before this run, 0.842 after) traces to a
-site-scope bug in `refine_signature_spatial.py` (pools all 8 sites incl. 3
-out-of-scope calibration sites, unlike `build_signature.py`'s 5-site
-`CAMPAIGN_SITES` filter), not to the published 5-site fit moving.
+numbers and root-cause analysis in `docs/morpho_signature_decisions.md` (D24).
+UPDATE (same day): the suspected site-scope bug in
+`refine_signature_spatial.py` (pooling all 8 sites incl. 3 out-of-scope
+calibration sites) was FIXED — bootstrap population now filtered to the
+5-site `CAMPAIGN_SITES`, matching `build_signature.py` and decision D17 —
+and the gate re-measured: **0.843** (sd 0.185, min 0.526). The pooling bug is
+RULED OUT as the cause; the k=6 dissolved-λf fit's bootstrap stability on
+the correct population is genuinely ~0.84, below the 0.90 the TR §5.5 quotes.
+Where 0.90 was measured from is unestablished (possibly a different
+feature-table state or bootstrap config on 2026-06-25).
+
+**Options:**
+- **(A) Re-pin the bar to the measured 0.843** and proceed with the cascade
+  (phases 2-3), correcting TR §5.5's stability claim to the honest number
+  with its config stated. Recommended: the fit is bit-reproducible; 0.84
+  mean with min 0.53 is a describable stability profile, and the 0.90 claim
+  cannot currently be reproduced.
+- **(B) Investigate before cascading**: hold phases 2-3; probe why bootstrap
+  draws vary (k choice, feature scaling, n_boot=20 too small) and whether a
+  config change recovers ≥0.90 defensibly.
+- **(C) Abandon the re-baseline**: keep the 2026-06-25 published fit as-is
+  (it is what this run reproduced anyway) and only fix the TR's stability
+  number.
+
 Phase 2+ (morphotope, typology predictor, TR §5.5, brisa figures) is
 **halted pending this decision** — nothing downstream has been re-run.
 

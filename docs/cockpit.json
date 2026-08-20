@@ -1,8 +1,8 @@
 {
   "schema": "cockpit/v1",
   "repo": "MorphoFavela",
-  "generated_utc": "2026-08-20T20:00:44Z",
-  "source_sha": "7c681ad8",
+  "generated_utc": "2026-08-20T20:04:16Z",
+  "source_sha": "5006cd34",
   "status": {
     "phase": "consolidation — 12 tracks (1 approved, 2 deferred, 2 shipped, 7 unclear); 7 stale >14d; statuses from a heuristic index, partly unclear",
     "gate": "unknown — gate is `python -m pytest tests/ -q` (.claude/verify-cmd); no last-run state is recorded on disk",
@@ -53,26 +53,32 @@
   ],
   "open_decisions": [
     {
-      "id": "morphofavela.lambda-f-morphotype-cascade",
-      "question": "Dissolved-λf fix vs the published morphotypes: re-fit on dissolved λf gives ARI 0.226 (only 58% of cells keep their type). Scope the switch or re-baseline?",
+      "id": "morphofavela.ari-stability-bar",
+      "question": "λf re-baseline HALTED: k=6 fit reproduces bit-for-bit, but bootstrap-ARI measures 0.843 on the correct 5-site population vs the 0.90 bar TR §5.5 quotes (source of 0.90 unestablished). Proceed how?",
       "owner": "PI",
       "options": [
         {
           "key": "A",
-          "label": "Scoped switch",
-          "detail": "dissolved λf canonical for absolute-physics consumers (roughness, regime — done); morphotype signature stays on summed λf. Published typology/predictor/TR §5.5 unchanged.",
+          "label": "Re-pin bar to measured 0.843, cascade",
+          "detail": "Correct TR §5.5 to the honest measured stability (0.843, sd 0.185, n=20, 5-site population, config stated); run phases 2-3.",
           "recommended": true
         },
         {
           "key": "B",
-          "label": "Full re-baseline",
-          "detail": "regenerate features_grid on dissolved λf, re-fit morphotypes (ARI 0.23 vs current), cascade through recurrence, predictor, TR §5.5, brisa figures."
+          "label": "Investigate before cascading",
+          "detail": "Hold phases 2-3; probe bootstrap variance (k, scaling, n_boot) for a defensible >=0.90 config."
+        },
+        {
+          "key": "C",
+          "label": "Keep 06-25 fit, fix TR number only",
+          "detail": "No cascade; correct the stability claim in place."
         }
       ],
       "blocks": [
-        "morpho_signature",
+        "morphotope",
         "typology_predictor",
-        "roughness"
+        "tr_5_5",
+        "brisa_p4_e2"
       ]
     }
   ],
