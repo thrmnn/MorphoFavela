@@ -1071,11 +1071,14 @@ continuous fabric vector itself is low-collinearity (VIF 1.1–3.0: λp 1.68, λ
 H̄ 2.26, σ_H 1.30, slope 1.09 — no SVF, no solar term), so the transfer is not riding on
 a redundant predictor. As a genuinely external check, the trained predictor is applied
 *blind* to three calibration favelas it was never fitted on (Borel, Jacarezinho,
-Morro do Juramento), producing a per-building risk map (Figure 5.5f): pooled AUC-PR 0.76
-and Brier 0.20 over 3,797 buildings, but site-variable (AUC-PR 0.82 at Jacarezinho vs
-0.39 at Morro do Juramento) with a large out-of-envelope fraction at some sites — so the
-blind map is flagged as *extrapolation*, a coarse prioritiser rather than a per-building
-guarantee. As with the geometric ventilation tendencies elsewhere in this report, these
+Morro do Juramento), producing a per-building risk map (Figure 5.5f): pooled AUC-PR 0.68
+and Brier 0.21 over 3,797 buildings, but strongly site-variable (AUC-PR 0.79 at
+Jacarezinho, 0.58 at Borel, 0.31 at Morro do Juramento). On the re-baselined
+(dissolved-λf, §4.2) features the calibration sites sit almost entirely *inside* the
+campaign training envelope (3–4 % of validated buildings out-of-envelope per site) —
+so the blind map is no longer extrapolation-flagged: it is an in-distribution transfer
+test, and site-to-site variability, not envelope exit, is what limits it. It remains a
+coarse prioritiser rather than a per-building guarantee. As with the geometric ventilation tendencies elsewhere in this report, these
 remain τ-gated, geometry-only descriptors: they are not a claim of per-cell ventilation
 adequacy, which awaits CFD integration.
 *(Provenance: `outputs/cross_site/typology_predictor/spatial_cv.json`,
@@ -1084,7 +1087,7 @@ adequacy, which awaits CFD integration.
 
 ![Blind external validation of the morphology-only failure predictor applied to three held-out calibration favelas.](figures/typology_blind_validation.png)
 
-*Figure 5.5f — **external blind validation** of the continuous-fabric-vector predictor on three favelas it was never fitted on (Borel, Jacarezinho, Morro do Juramento): pooled AUC-PR 0.76, Brier 0.20 over 3,797 buildings, but site-variable and extrapolation-flagged. A direction, not a per-building guarantee.*
+*Figure 5.5f — **external blind validation** of the continuous-fabric-vector predictor on three favelas it was never fitted on (Borel, Jacarezinho, Morro do Juramento): pooled AUC-PR 0.68, Brier 0.21 over 3,797 buildings; in-envelope under the re-baselined features (3–4 % out per site) but strongly site-variable (AUC-PR 0.31–0.79). A direction, not a per-building guarantee.*
 
 **A unified cross-site risk surface (all eight favelas).** The campaign out-of-fold
 scores and the calibration blind map are folded into one per-cell winter-sun-failure
@@ -1094,17 +1097,20 @@ with honest per-cell provenance (`scripts/run_cross_site_riskmap.py`,
 score is **out-of-fold** (each site held out of training): per-site AUC-PR runs 0.73
 (Complexo do Alemão) to 0.94 (Rocinha), consistent with the §5.5 pooled 0.84. For the
 three calibration favelas the score is **blind** (model fit on all five campaign sites)
-with an out-of-envelope flag: AUC-PR 0.74 at Borel (16 % of cells out-of-envelope), 0.90
-at Jacarezinho (60 % out-of-envelope — read as extrapolation), 0.51 at Morro do Juramento
-(10 %). Applied uniformly, the continuous vector also *beats* the earlier morphotype-rate
-blind map on the same calibration sites — corroborating that the continuous fabric vector,
-not the discrete code, is the transferable predictor. The surface stays morphology-only:
+with an out-of-envelope flag: AUC-PR 0.78 at Borel (6 % of cells out-of-envelope), 0.93
+at Jacarezinho (2 %), 0.51 at Morro do Juramento (3 %). (These cell-level fractions are
+computed over *all* built cells of each site; the 3–4 % figures in §5.5f are over the
+validated-building subset — two populations, one envelope.) Applied uniformly, the
+continuous vector also *beats* the earlier morphotype-rate blind map on the same
+calibration sites (a pre-re-baseline benchmark — AUC-PR 0.65/0.82/0.39 on summed-λf
+features, not regenerated) — directionally corroborating that the continuous fabric
+vector, not the discrete code, is the transferable predictor. The surface stays morphology-only:
 it predicts the winter-sun (solar-geometry) outcome, not ventilation adequacy, which is
 CFD-gated (§5.6, §10.2).
 
-![Unified cross-site winter-sun-failure risk surface across all eight favelas: per-cell predicted WHO-2h winter-sun-failure probability from the continuous fabric-vector logistic predictor. Top row — five campaign favelas scored out-of-fold (site held out of training); bottom row — three calibration favelas scored blind (model fit on all campaign sites) with per-panel out-of-envelope fraction. Morphology-only winter-sun risk, not ventilation adequacy (τ CFD-gated). Source: outputs/cross_site/risk_map/cross_site_risk.json, exports/cross_site_riskmap.png (run_cross_site_riskmap.py, 2026-06-28).](figures/cross_site_riskmap.png)
+![Unified cross-site winter-sun-failure risk surface across all eight favelas: per-cell predicted WHO-2h winter-sun-failure probability from the continuous fabric-vector logistic predictor. Top row — five campaign favelas scored out-of-fold (site held out of training); bottom row — three calibration favelas scored blind (model fit on all campaign sites) with per-panel out-of-envelope fraction. Morphology-only winter-sun risk, not ventilation adequacy (τ CFD-gated). Source: outputs/cross_site/risk_map/cross_site_risk.json, exports/cross_site_riskmap.png (run_cross_site_riskmap.py, re-run 2026-08-20 on re-baselined dissolved-λf features).](figures/cross_site_riskmap.png)
 
-*Figure 5.5g — **unified cross-site risk surface** (8 favelas): campaign sites out-of-fold (AUC-PR 0.73–0.94), calibration sites blind + out-of-envelope-flagged (AUC-PR 0.51–0.90). One predictor, honest provenance per cell; morphology-only, not adequacy.*
+*Figure 5.5g — **unified cross-site risk surface** (8 favelas): campaign sites out-of-fold (AUC-PR 0.73–0.94), calibration sites blind + out-of-envelope-flagged (AUC-PR 0.51–0.93; ≤ 6 % of cells out after the λf re-baseline). One predictor, honest provenance per cell; morphology-only, not adequacy.*
 
 ---
 
