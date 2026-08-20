@@ -212,8 +212,16 @@ def fig_maps_repartition(k, shares):
     fig.legend(handles, [f"M{m} {MORPHOTOPE_LABEL.get(m, '')}" for m in range(k)],
                loc="lower center", ncol=k, fontsize=8, frameon=False,
                bbox_to_anchor=(0.5, -0.03))
+    # stability read from the audit artifact, never hardcoded (0.916 defended
+    # the retired k=5 partition and leaked into this subtitle — D25-era fix)
+    _stab = ROOT / "outputs/cross_site/morphotope_stability/stability_meta.json"
+    try:
+        _ari = json.loads(_stab.read_text())["ari_mean"]
+        _ari_txt = f"bootstrap ARI {_ari:.3f}"
+    except (OSError, KeyError, ValueError):
+        _ari_txt = "bootstrap ARI: see morphotope_stability/stability_meta.json"
     fig.suptitle(f"Block-scale morphotopes (k={k}, data-driven) — tissue maps and per-site "
-                 "repartition; bootstrap ARI 0.916", fontsize=9)
+                 f"repartition; {_ari_txt}", fontsize=9)
     fig.savefig(FIGS / "morphotope_maps_repartition.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
