@@ -1,0 +1,39 @@
+{
+ "galeao": {
+  "path": "data/epw/BRA_RJ_Rio.de.Janeiro-Galeao-Jobim.Intl.AP.837460_TMYx.2011-2025.epw",
+  "station": "Rio.de.Janeiro-Galeao-Jobim.Intl.AP",
+  "wmo": "837460",
+  "lat": -22.809,
+  "lon": -43.244,
+  "tz": -3.0,
+  "alt": 8.5,
+  "n_hours": 8760,
+  "annual_ghi_kwh_m2": 1732.4,
+  "annual_dni_kwh_m2": 1770.5,
+  "annual_dhi_kwh_m2": 532.0
+ },
+ "santos_dumont": {
+  "path": "data/epw/BRA_RJ_Rio.de.Janeiro-Santos.Dumont.AP.837550_TMYx.2011-2025.epw",
+  "station": "Rio.de.Janeiro-Santos.Dumont.AP",
+  "wmo": "837550",
+  "lat": -22.91,
+  "lon": -43.163,
+  "tz": -3.0,
+  "alt": 3.4,
+  "n_hours": 8760,
+  "annual_ghi_kwh_m2": 1790.2,
+  "annual_dni_kwh_m2": 1864.0,
+  "annual_dhi_kwh_m2": 528.4
+ },
+ "_crosscheck": {
+  "santos_vs_galeao_ghi_pct": 3.34,
+  "verdict": "consistent"
+ },
+ "_meta": {
+  "source": "climate.onebuilding.org TMYx 2011-2025 (most recent multi-year TMYx available 2026-09-08)",
+  "downloaded_utc": "2026-09-08",
+  "primary": "galeao",
+  "reader": "pvlib.iotools.read_epw 0.15.0",
+  "southern_hemisphere_note": "winter solstice 21 June; sun in the northern sky"
+ }
+}

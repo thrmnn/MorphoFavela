@@ -8,10 +8,10 @@ help: ## Show available commands
 		awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 test: ## Run pytest (-x -q)
-	python -m pytest -x -q
+	TMPDIR=/tmp python -m pytest -x -q
 
 test-fast: ## Run only fast (synthetic-geometry) tests
-	python -m pytest -x -q -m fast
+	TMPDIR=/tmp python -m pytest -x -q -m fast
 
 lint: ## Lint with ruff
 	ruff check src/ tests/

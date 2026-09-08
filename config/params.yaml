@@ -1,0 +1,97 @@
+# P1 / C′ pipeline parameters — the single config home for WP-01..WP-07.
+#
+# Every WP entry point loads this file and hashes the resolved section into its
+# run manifest, so a number is never cached in code (defended-number-drift rule).
+#
+# status: measured  = read off the data, evidence recorded here
+#         default   = hypothesis from the plan, not yet challenged by data
+#         pending   = needs a measurement or a human decision before use
+#
+# Human decisions (HD-01..05) are NOT authored here. They resolve on the /ops
+# cards and are copied down into this file once resolved — never hand-edited
+# ahead of their card.
+
+meta:
+  config_version: 1
+  created_utc: "2026-09-08"
+  plan_of_record: "brisaverse/papers/p1-nature-cities/proposal/cprime_reframe_plan.md"
+  hemisphere_note: "Southern. Winter solstice 21 June; sun in the NORTHERN sky; south-facing slopes are the disadvantaged aspect. Any northern-hemisphere assumption is a bug."
+
+crs:
+  epsg: 31983                       # SIRGAS 2000 / UTM 23S
+  status: measured
+  evidence: "buildings_RJ_2019.shp, DTM_RJ.tif and Favelas_Limit_2019.shp all report EPSG:31983 (2026-09-08). Matches the plan's hypothesis."
+
+sky:
+  # THE one-resolution rule. Both WP-02 (sites) and WP-05 (citywide) import
+  # brisa_solar.constants.P1_SKY_PATCHES — never a literal, never a second value.
+  patches: 145                      # Tregenza
+  status: measured
+  evidence: "src/svf_v2/compute.py generates and asserts 145 Tregenza patches; docs/GPU_SVF_EXACT_VALIDATION.md validates the GPU kernel at 145 only. No Reinhart-577 code path exists in the repo — it was proposed in plan v1.0, never implemented."
+  reinhart_577: "NOT USED. Permitted only under outputs/{site}/figures_only/, which never feeds the citywide percentile."
+
+weather:
+  primary_epw: "data/epw/BRA_RJ_Rio.de.Janeiro-Galeao-Jobim.Intl.AP.837460_TMYx.2011-2025.epw"
+  crosscheck_epw: "data/epw/BRA_RJ_Rio.de.Janeiro-Santos.Dumont.AP.837550_TMYx.2011-2025.epw"
+  status: measured
+  evidence: "Fetched from climate.onebuilding.org 2026-09-08 (most recent multi-year TMYx). Galeão annual GHI 1732.4 kWh/m², Santos Dumont 1790.2 → +3.34%, inside the sanity band. 8760 h each, read by pvlib 0.15.0. Inventory + md5s: data/epw/epw_inventory.json."
+  wind_source: "MEASURED, not EPW: data/asos/SBGL_2015_2024.csv (+ data/inmet/). The prevailing sector for WP-06 is measured from these; EPW wind is the cross-check only."
+
+footprints:
+  path: "data/RJ/buildings_RJ_2019.shp"
+  n_features: 2362806
+  height_attr: "altura"             # building height, metres
+  base_attr: "base"                 # base (ground) elevation, metres
+  top_attr: "topo"                  # top elevation, metres
+  status: measured
+  evidence: "fiona schema read 2026-09-08. Invariant observed on sampled rows: topo = base + altura exactly (e.g. 2.990 + 2.563 = 5.553). Units are metres. Vintage 2019."
+  invariant_check: "WP-01 asserts |topo - (base + altura)| < 1e-3 over a large sample; violations are listed, never silently repaired."
+
+terrain:
+  dtm_city: "data/RJ/DTM_RJ.tif"
+  dtm_res_m: 5.0
+  dtm_nodata: 3.4e38
+  status: measured
+  evidence: "rasterio 2026-09-08: 7424×14319 float32, 5 m, EPSG:31983, bounds [623533.0, 7446251.2, 695128.0, 7483371.2]."
+  vintage: "UNVERIFIED — no TIFFTAG_DATETIME embedded and no provenance doc located; local mtime (2026-02-19) is only the copy date. The methods epoch table must state this honestly until provenance is found or the 1 m IPP MDT is re-sourced."
+
+als:
+  epoch: 2019
+  status: provisional              # /ops card als_epoch, provisional default adopted 2026-09-08
+  note: "2019 is epoch-matched to the 2019 footprints and needs no external data. Raw ALS is NOT ingested: the pipeline runs on the derived 5 m DTM plus rasterized footprint heights. The 2024 epoch (and the 1 m IPP mosaics) sit behind the deferred Drive mirror and would be a labeled sensitivity run, never blended into primary numbers."
+  cell_size_m: pending
+  cell_size_rule: "0.5 if ALS density P10 >= 4 pts/m²; 1.0 if 1 <= P10 < 4 (flagged); STOP and escalate if P10 < 1. NOT YET APPLICABLE — no raw ALS on disk; the working resolution is set by the DTM (5 m) and the footprint rasterization, so state the effective resolution instead of implying an ALS-derived one."
+
+canopy:
+  mode: pending                     # HD-01 — card opens once WP-01's canopy diagnostic exists
+  vegetation_height_min_m: 2.0
+  vegetation_min_patch_m2: 4.0
+  status: default
+
+domain:
+  fabric_coverage_threshold: 0.10   # sensitivity 0.05 / 0.20
+  fabric_footprint_distance_m: 10   # sensitivity 5 / 20
+  status: default                   # HD-02 / gate G3 — headline values need PI sign-off on the sensitivity table
+  alley_floor_policy: "Cells below the G2 alley-width validity floor are FLAGGED lower-confidence and RETAINED, not excluded — dropping the narrowest alleys would bias the citywide distribution toward open sites. Flag-vs-exclude is an HD-02 sub-decision."
+
+sampling:
+  city_sample_n: 3000000
+  stratum_floor: 50000              # per slope × density stratum
+  bootstrap_block_m: 1000
+  random_seed: 20260908
+  status: default
+  pilot_rule: "A 1–2% stratified pilot runs FIRST and its wall-time/memory extrapolation is the go/no-go for the full run. Venue: laptop GPU by default (RTX 4060); ORCD only with PI sign-off, never a dependency."
+
+reference_days:
+  winter_solstice: "2026-06-21"
+  equinox: "2026-03-20"
+  duration_thresholds_h: [1, 2, 3, 4]
+  status: default
+  floor_provenance: "The 2h daylight floor is the ATHENS CHARTER (1943) Point 26 — NOT a WHO benchmark. Older docstrings in src/solar/ still say 'WHO ≥2h'; that attribution is wrong and must not propagate."
+
+validation:
+  determinism: "tolerance, not bitwise — the GPU kernel's chunked reductions are not bitwise-reproducible. Golden tiles: Rio das Pedras + Vidigal_TLS, corr >= 0.9999 and max-abs-diff <= 0.01 against the existing CPU references."
+  epw_irradiance_tolerance: pending
+  epw_irradiance_tolerance_note: "PLACEHOLDER by design — lock it from the FIRST observed GPU-vs-CPU diff on the golden tiles. Never guess a W/m² tolerance before that comparison exists."
+  rsun_crosscheck: "OPTIONAL / UNAVAILABLE LOCALLY — GRASS is not installed and there is no passwordless sudo. Binding acceptance is the engine-independent analytic set (unobstructed identity, infinite-canyon SVF 0.447, isolated-wall shadow), which is stronger than an r.sun comparison that could share a bug class."
+  sky_model_labelling: "Every solar output carries sky_model ∈ {clear_sky, epw_weighted}. Existing results are clear_sky and are NOT citable as annual insolation until relabelled or recomputed."

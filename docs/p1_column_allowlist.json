@@ -1,0 +1,41 @@
+{
+  "_doc": "P1 (C′ reframe, 2026-09-08) column policy for outputs/{site}/cfd_analysis/per_patch_indicators.csv. P1's ventilation axis is DESCRIPTIVE GEOMETRY ONLY — no CFD-derived quantity may reach a P1 figure, table, or claim. Enforced by scripts/lint_p1_columns.py, wired into .claude/verify-cmd.",
+  "_source_schema": {
+    "file": "outputs/{site}/cfd_analysis/per_patch_indicators.csv",
+    "n_columns": 52,
+    "header_md5_8": "b4e9b983",
+    "verified_identical_across_sites": ["complexo_do_alemao", "maré", "riodaspedras", "rocinha", "vidigal"],
+    "verified_utc": "2026-09-08"
+  },
+  "p1_legal": [
+    "patch_id", "is_pilot", "center_x", "center_y", "stratum_id",
+    "svf", "lambda_p", "slope_deg", "porosity", "sigma_h", "H_max_analysis",
+    "aspect_deg", "aspect_sin", "aspect_cos", "aspect_wind_alignment",
+    "n_directions", "weight_method",
+    "lambda_p_patch",
+    "lambda_f_N", "lambda_f_NE", "lambda_f_E", "lambda_f_SE",
+    "lambda_f_S", "lambda_f_SW", "lambda_f_W", "lambda_f_NW",
+    "lambda_f_mean", "lambda_f_max", "lambda_f_max_dir", "H_mean"
+  ],
+  "p1_banned_cfd_output": {
+    "_why": "Direct products of a flow simulation. P1 makes no flow claim.",
+    "columns": [
+      "annual_TI_mean", "annual_TKE_mean", "annual_U_mean", "annual_U_median",
+      "annual_U_p10", "annual_U_p90", "annual_stagnation_frac",
+      "annual_vent_efficiency", "annual_wind_speed_ref"
+    ]
+  },
+  "p1_banned_cfd_setup": {
+    "_why": "Not flow results, but their DEFINITIONS presuppose a simulation (a blockage ratio or an 'eligible for a CFD run' flag is a non-question in a paper with no CFD). Banned for the same reason the word 'flow' is banned from P1.",
+    "columns": [
+      "domain_upstream_m", "domain_downstream_m", "domain_lateral_m", "domain_top_m",
+      "domain_blockage_frontal_m2", "domain_blockage_cross_section_m2",
+      "domain_blockage_ratio", "domain_blockage_ok", "lambda_f_blockage_diag",
+      "source_data_required_m", "source_data_extent_m", "source_data_ok", "eligible"
+    ]
+  },
+  "p1_output_convention": {
+    "path": "outputs/{site}/geometry_indicators/per_patch_geometry.csv",
+    "rule": "WP-06 writes P1's own geometry table containing ONLY p1_legal columns, produced by code that never imports the CFD post-processing module. The lint is the backstop, not the primary defence."
+  }
+}
