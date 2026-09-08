@@ -38,6 +38,29 @@ MARKER_RE = re.compile(
     re.I,
 )
 STALE_DAYS = 14
+HEADING_LEVEL_RE = re.compile(r"^(#{1,6})\s+(.*)$")
+
+
+def drop_superseded(text: str) -> str:
+    """Remove sections a human explicitly marked superseded.
+
+    Without this the tail scan reads retracted text: lambda_f_fix's resolved
+    "(superseded decision block)" still says "halted pending this decision",
+    which surfaced the track as a blocker three weeks after the PI decided it.
+    """
+    keep, skip_level = [], None
+    for line in text.split("\n"):
+        h = HEADING_LEVEL_RE.match(line)
+        if h:
+            level = len(h.group(1))
+            if skip_level is not None and level <= skip_level:
+                skip_level = None
+            if skip_level is None and re.search(r"supersed", h.group(2), re.I):
+                skip_level = level
+                continue
+        if skip_level is None:
+            keep.append(line)
+    return "\n".join(keep)
 
 
 def latest_dated_heading(text: str):
@@ -50,6 +73,7 @@ def latest_dated_heading(text: str):
 
 
 def find_marker(text: str, heading: str):
+    text = drop_superseded(text)
     log_start = CYCLE_LOG_RE.search(text)
     header = text[: log_start.start()] if log_start else text[:2000]
     m = MARKER_RE.search(heading or "") or MARKER_RE.search(header)
