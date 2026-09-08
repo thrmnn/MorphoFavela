@@ -66,7 +66,25 @@ canopy:
   mode: pending                     # HD-01 — card opens once WP-01's canopy diagnostic exists
   vegetation_height_min_m: 2.0
   vegetation_min_patch_m2: 4.0
-  status: default
+  status: blocked
+  blocker: |
+    NO DSM EXISTS ANYWHERE ON DISK (verified 2026-09-08: every site carries only
+    a *_dtm.tif; no citywide DSM). The vegetation layer is defined as
+    DSM - DTM > vegetation_height_min_m, so it cannot be built, and neither can
+    the canopy diagnostic that HD-01 depends on. Two ways out, in order of
+    preference: (1) mirror mosaico_mds_ipp_1m.tif from Drive (needs the deferred
+    OAuth step); (2) rasterize the per-site data/{site}/raw/full_scan.stl to a
+    DSM and characterise what it actually contains — it is a photogrammetry/LiDAR
+    mesh that may or may not carry vegetation, which must be established, not
+    assumed. Until then HD-01 stays uncarded: a canopy card without a canopy
+    diagnostic would be a guess.
+  consequence: |
+    The SPINE is unaffected. The plan's own primary model is the obstruction
+    surface (DTM + footprint heights), explicitly "not the raw DSM", and that is
+    fully buildable from what is on disk. Acceptance check A1.2 (footprint
+    heights vs DSM-DTM) is not computable as written; its substitute is the
+    base-vs-DTM agreement check, which tests the assumption the obstruction
+    surface actually rests on.
 
 domain:
   fabric_coverage_threshold: 0.10   # sensitivity 0.05 / 0.20

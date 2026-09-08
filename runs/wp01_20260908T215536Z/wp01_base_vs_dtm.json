@@ -1,0 +1,48 @@
+{
+ "_run_id": "wp01_20260908T215536Z",
+ "_utc": "2026-09-08T22:01:33Z",
+ "_check": "WP-01 base_vs_dtm + height_invariant (A1.2 substitute \u2014 no DSM on disk)",
+ "sampling": {
+  "method": "systematic (every Nth feature), not random",
+  "stride": 1000,
+  "population": 2362806,
+  "sampled": 2363
+ },
+ "inputs": {
+  "footprints": "data/RJ/buildings_RJ_2019.shp",
+  "dtm": "data/RJ/DTM_RJ.tif",
+  "height_attrs": [
+   "base",
+   "altura",
+   "topo"
+  ]
+ },
+ "base_vs_dtm_m": {
+  "n": 1895,
+  "median_abs": 0.1528,
+  "mean": -0.0868,
+  "p10": -0.6217,
+  "p90": 0.357,
+  "max_abs": 42.9352,
+  "outside_dtm_coverage": 468,
+  "frac_gt_1m": 0.0702,
+  "frac_gt_5m": 0.0011
+ },
+ "height_invariant_topo_minus_base_plus_altura": {
+  "n": 2363,
+  "median_abs": 0.0,
+  "mean": -0.0108,
+  "p10": -0.0,
+  "p90": 0.0,
+  "max_abs": 19.08,
+  "n_violations_gt_1mm": 202
+ },
+ "altura_m": {
+  "n": 2363,
+  "median_abs": 4.63,
+  "mean": 5.9661,
+  "p10": 2.63,
+  "p90": 9.516,
+  "max_abs": 73.59
+ }
+}

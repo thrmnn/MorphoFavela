@@ -83,3 +83,9 @@ docs/manuscript/figures/exports/*.svg
 
 # local review landing page (served, not tracked)
 /index.html
+
+# P1/C′ run artifacts: manifests + check results are tracked (small, diffable —
+# how defended-number drift gets caught); heavy outputs are restic-covered.
+runs/*/artifacts/
+runs/*/logs/
+runs/*.csv

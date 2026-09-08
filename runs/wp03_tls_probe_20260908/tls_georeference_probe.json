@@ -1,0 +1,16 @@
+{
+ "_check": "WP-03 precondition — is the Vidigal TLS already georeferenced to the project CRS?",
+ "_utc": "2026-09-08",
+ "source": "data/vidigal_tls/raw/pointclouds/ (12.08 GB copied from USB /mnt/e/MIT-RIO 2026-09-08; per-file size list md5 matches source)",
+ "reader": "PDAL 2.2.0 readers.e57",
+ "probed_file": "Nuvens Separadas/Vidigal1-registered.e57",
+ "num_points": 59747276,
+ "dimensions": ["X","Y","Z","NormalX","NormalY","NormalZ","Red","Green","Blue","Intensity"],
+ "tls_extent_m": {"x": [680340.42, 680458.20], "y": [7455909.76, 7456109.81], "z": [108.66, 185.89],
+                  "note": "PDAL's e57 summary prints min/max labels swapped; extents are ~118 m x ~200 m."},
+ "dtm_over_same_extent_m": {"citywide": {"min": 105.04, "max": 160.08, "mean": 132.64, "n_cells": 960},
+                            "vidigal":  {"min": 105.04, "max": 160.08, "mean": 133.01, "n_cells": 924}},
+ "verdict": "ALIGNED. Coordinates are EPSG:31983 project coordinates, not scanner-local: 'registered' in the filenames means georeferenced. TLS floor (108.66 m) sits just above the DTM floor (105.04 m) and the TLS ceiling exceeds the DTM ceiling by ~25.8 m, which is the expected rooftop signature.",
+ "consequence": "WP-03 does not need a from-scratch ICP co-registration to the ALS CRS. ICP is demoted to a refinement/verification step, and premortem risk C4 (TLS registration dead-end blocking G1/G2) drops from high to low. Registration RMSE must still be sourced from the .rcp report before G1's numeric floor is set — 'aligned' is not the same as 'quantified'.",
+ "not_yet_done": ["read the .rcp registration report for a real RMSE", "per-scan (Vidigal1/3/4) extent + overlap map", "occlusion/coverage fraction per building facade"]
+}
