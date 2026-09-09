@@ -4,7 +4,55 @@
 
 ---
 
-## ▶ NEXT ACTION — Rocinha one-favela prototype (APPROVED 2026-07-28, execute this)
+## ▶ RESULT — Rocinha prototype executed 2026-09-09 (DTM + footprints; heights blocked)
+
+Measured against the IPP answer key. `outputs/` is gitignored, so these numbers live here or
+nowhere; the scorecard itself is `outputs/comparative/satellite/rocinha/scorecard.json`
+(+ `scorecard.png`), regenerable via `scripts/satellite/{export_aoi,build_reconstruction,score_vs_ipp}.py`.
+
+| component | measured | band this plan committed to in §1 | |
+|---|---|---|---|
+| DTM RMSE | 7.91 m | 4–8 m | within |
+| DTM bias | +7.02 m | +1–3 m | 2.3x the ceiling |
+| Footprint area-IoU | 0.492 | 0.45–0.60 | within |
+| Footprint instance-F1 | 0.190 | 0.35–0.55 | ~half the floor |
+| Heights | not measured | — | BLOCKED |
+
+AOI = Rocinha proper (`cod_favela` 43), 0.844 km², 62% built. 7,534 Open Buildings (Google half of
+the VIDA mirror, no confidence threshold) vs 10,986 IPP A101+A102 instances — A102
+`EDIFICACAO_FAVELA` is 24% of the site, so an A101-only comparison would understate the truth set.
+
+**The DTM bias is not a datum shift, and that is the finding.** It is flat across slope classes
+(7.95 / 7.85 / 7.94 m RMSE for 0–10°, 10–25°, >25°) but tracks land cover: +6.93 m on building
+footprints, +6.75 m in the alleys, +11.43 m on the forested slopes, against a +2.06 m median on open
+flat ground outside the favela. A uniform vertical-reference offset would move every stratum
+equally. GLO-30's ML building-removal does not fire on this fabric, so it hands back a surface
+model, not bare earth. §1 assumed a +1–3 m residual *after* that removal worked; here it does not
+work at all. The bias is therefore correctable; the instance-F1 is not — under-segmentation of
+adjacent structures is a property of the product in dense fabric.
+
+**Heights BLOCKED.** Open Buildings 2.5D Temporal (2019) has no anonymous mirror (probed 2026-09-08:
+the public `open-buildings-data` bucket carries only v1/v2/v3 polygons; `open-buildings-temporal*`
+404). The layer needs Google Earth Engine auth, which is the PI's to drive. `height_m` is NULL, not
+estimated — a plausible number here would read as measured within a week.
+
+**Go/no-go: NO for scaling to the other four favelas.** The plan's own rule is to scale only if the
+numbers land near the stated ceiling. Two of four missed, and one of the two has an identified,
+fixable cause. Scaling now reproduces a known bias five times.
+
+Next actions, in order:
+1. Subtract the built-surface component and re-score Rocinha (no human gate; needs no auth).
+2. PI drives GEE auth if the heights third is wanted; the pipeline stops cleanly without it.
+3. Only then reconsider the five-site scale-out.
+
+Two traps found while building this, both now guarded by `tests/test_satellite_reconstruction.py`:
+`rasterio.merge(bounds=...)` silently regridded the DEM tiles by up to 27 m, and the reconstruction
+must never open `data/RJ/` (a static check enforces it). Alignment is verified at 0.000000 m against
+a direct reprojection inside the scored AOI.
+
+---
+
+## ▶ ORIGINAL NEXT ACTION — Rocinha one-favela prototype (APPROVED 2026-07-28, EXECUTED 2026-09-09)
 
 **User approved the one-favela prototype on Rocinha.** Build the free-EO reconstruction for Rocinha
 only, score it against the IPP ground truth, gate before scaling. This block is self-contained so a

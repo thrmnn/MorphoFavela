@@ -1,8 +1,8 @@
 {
   "schema": "cockpit/v1",
   "repo": "MorphoFavela",
-  "generated_utc": "2026-09-08T17:01:23Z",
-  "source_sha": "4007b5ef",
+  "generated_utc": "2026-09-09T21:54:06Z",
+  "source_sha": "930df09c",
   "status": {
     "phase": "consolidation — 12 tracks (1 approved, 2 deferred, 2 shipped, 7 unclear); 7 stale >14d; statuses from a heuristic index, partly unclear",
     "gate": "unknown — gate is `python -m pytest tests/ -q` (.claude/verify-cmd); no last-run state is recorded on disk",
@@ -56,5 +56,5 @@
     "ray-caster cross-validation (work_queue Task 7): no Radiance/SOLWEIG installed locally — needs user",
     "cfd_parameter_estimation: DEFERRED — gated on the Airflow pilot recalibrating Kanda"
   ],
-  "next_wake": "2026-09-22"
+  "next_wake": "2026-09-23"
 }
