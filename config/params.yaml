@@ -44,8 +44,23 @@ footprints:
   base_attr: "base"                 # base (ground) elevation, metres
   top_attr: "topo"                  # top elevation, metres
   status: measured
-  evidence: "fiona schema read 2026-09-08. Invariant observed on sampled rows: topo = base + altura exactly (e.g. 2.990 + 2.563 = 5.553). Units are metres. Vintage 2019."
-  invariant_check: "WP-01 asserts |topo - (base + altura)| < 1e-3 over a large sample; violations are listed, never silently repaired."
+  evidence: "fiona schema read 2026-09-08. Units are metres. Vintage 2019."
+  canonical_layer: "data/RJ/buildings_RJ_2019_utm.gpkg — USE THIS, not the raw .shp. Produced by src/brisa_solar/wp01_footprints.py."
+  defect_mixed_crs: |
+    The raw .shp declares EPSG:31983 but stores its first ~467,300 features
+    (19.8% of 2,362,806) in GEOGRAPHIC DEGREES — one contiguous block at the
+    head of the file, i.e. a two-source concatenation. Any projected-raster
+    operation silently DROPS that fifth of the city's buildings. Confirmed the
+    same data, not a distinct population: reprojecting 4674 -> 31983 puts 100%
+    inside the DTM bounds and their base-vs-DTM median becomes 0.166 m against
+    0.158 m for the projected majority. Repaired per-feature (geometric
+    detection), never by trusting the block boundary.
+  invariant_topo_base_altura: |
+    Measured on the 1-in-200 sample (n=11,815): violations are 2.85% above
+    0.1 m, 1.58% above 1 m, 0.15% above 5 m, max 183.8 m. At a 1 mm threshold
+    the rate reads 8.61%, but that is mostly float noise — use 0.1 m. Violations
+    are listed and characterised, never silently repaired.
+  base_vs_dtm: "median |base - DTM| = 0.158 m on 9,472 usable sampled buildings; 7.6% exceed 1 m, 0.18% exceed 5 m. This is the A1.2 substitute (no DSM exists, so heights-vs-DSM-DTM is not computable)."
 
 terrain:
   dtm_city: "data/RJ/DTM_RJ.tif"
