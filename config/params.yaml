@@ -78,28 +78,24 @@ als:
   cell_size_rule: "0.5 if ALS density P10 >= 4 pts/m²; 1.0 if 1 <= P10 < 4 (flagged); STOP and escalate if P10 < 1. NOT YET APPLICABLE — no raw ALS on disk; the working resolution is set by the DTM (5 m) and the footprint rasterization, so state the effective resolution instead of implying an ALS-derived one."
 
 canopy:
-  mode: pending                     # HD-01 — card opens once WP-01's canopy diagnostic exists
-  vegetation_height_min_m: 2.0
-  vegetation_min_patch_m2: 4.0
-  status: blocked
-  blocker: |
-    NO DSM EXISTS ANYWHERE ON DISK (verified 2026-09-08: every site carries only
-    a *_dtm.tif; no citywide DSM). The vegetation layer is defined as
-    DSM - DTM > vegetation_height_min_m, so it cannot be built, and neither can
-    the canopy diagnostic that HD-01 depends on. Two ways out, in order of
-    preference: (1) mirror mosaico_mds_ipp_1m.tif from Drive (needs the deferred
-    OAuth step); (2) rasterize the per-site data/{site}/raw/full_scan.stl to a
-    DSM and characterise what it actually contains — it is a photogrammetry/LiDAR
-    mesh that may or may not carry vegetation, which must be established, not
-    assumed. Until then HD-01 stays uncarded: a canopy card without a canopy
-    diagnostic would be a guess.
-  consequence: |
-    The SPINE is unaffected. The plan's own primary model is the obstruction
-    surface (DTM + footprint heights), explicitly "not the raw DSM", and that is
-    fully buildable from what is on disk. Acceptance check A1.2 (footprint
-    heights vs DSM-DTM) is not computable as written; its substitute is the
-    base-vs-DTM agreement check, which tests the assumption the obstruction
-    surface actually rests on.
+  mode: out_of_scope
+  status: decided
+  decision: |
+    DROPPED FROM P1 (PI, 2026-09-10). Solar access and the ventilation-potential
+    index are computed on TERRAIN + BUILDINGS only. Vegetation is named as a
+    stated limitation in the methods, not modelled.
+  rationale: |
+    No DSM exists on disk (every site carries only a DTM), so the vegetation
+    layer — defined as DSM - DTM > 2 m — could not be built without either the
+    deferred Drive mirror or an STL-derived DSM of unproven content. Rather than
+    hold the critical path on that, P1 states the limitation. This REMOVES HD-01
+    (canopy_mode) from the decision set and takes the vegetation branch off the
+    critical path entirely.
+  consequences:
+    - "HD-01 is CLOSED, not pending — do not re-card it."
+    - "The obstruction surface (DTM + footprint heights) is the complete model for P1."
+    - "The methods must state plainly that vegetation shading is unmodelled, and the discussion must not attribute any observed shortfall to trees."
+    - "vegetation_height_min_m / vegetation_min_patch_m2 are retired; they described a layer P1 no longer builds."
 
 domain:
   fabric_coverage_threshold: 0.10   # sensitivity 0.05 / 0.20
@@ -113,7 +109,8 @@ sampling:
   bootstrap_block_m: 1000
   random_seed: 20260908
   status: default
-  pilot_rule: "A 1–2% stratified pilot runs FIRST and its wall-time/memory extrapolation is the go/no-go for the full run. Venue: laptop GPU by default (RTX 4060); ORCD only with PI sign-off, never a dependency."
+  pilot_rule: "A 1–2% stratified pilot runs FIRST and its wall-time/memory extrapolation is the go/no-go for the full run."
+  compute_venue: "LAPTOP ONLY (RTX 4060). The 2026-09-10 autonomy grant covers multi-hour unattended compute and scope cuts on pilot evidence, but does NOT include HPC submits — ORCD is not authorized for P1. If the pilot says the full sample will not fit, the standing instruction is to CUT THE SAMPLE and defend it, not to reach for the cluster."
 
 reference_days:
   winter_solstice: "2026-06-21"
