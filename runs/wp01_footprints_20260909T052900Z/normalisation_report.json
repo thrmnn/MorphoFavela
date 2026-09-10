@@ -1,0 +1,11 @@
+{
+ "_utc": "2026-09-09T05:29:00Z",
+ "source": "data/RJ/buildings_RJ_2019.shp",
+ "output": "/tmp/test_norm.gpkg",
+ "declared_crs": "EPSG:31983",
+ "features_passthrough_already_projected": 0,
+ "features_reprojected_from_geographic": 20000,
+ "features_dropped_empty_geometry": 0,
+ "fraction_reprojected": 1.0,
+ "geographic_crs_assumed": "EPSG:4674 (SIRGAS 2000 geographic; EPSG:4326 gives an identical result at this precision \u2014 the datums agree to ~1 m)"
+}

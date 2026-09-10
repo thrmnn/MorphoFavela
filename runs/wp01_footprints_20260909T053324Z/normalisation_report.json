@@ -1,0 +1,12 @@
+{
+ "_utc": "2026-09-09T05:33:24Z",
+ "source": "data/RJ/buildings_RJ_2019.shp",
+ "output": "/tmp/norm_test/t.gpkg",
+ "declared_crs": "EPSG:31983",
+ "features_passthrough_already_projected": 0,
+ "features_reprojected_from_geographic": 30000,
+ "features_dropped_empty_geometry": 0,
+ "fraction_reprojected": 1.0,
+ "geometry_note": "Output is 2D; source 3D Polygon/MultiPolygon mix written as Unknown geometry type. Heights come from base/altura/topo attributes, never geometry Z.",
+ "geographic_crs_assumed": "EPSG:4674 (SIRGAS 2000 geographic; EPSG:4326 gives an identical result at this precision \u2014 the datums agree to ~1 m)"
+}
