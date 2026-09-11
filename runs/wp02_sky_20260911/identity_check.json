@@ -1,0 +1,23 @@
+{
+ "epw": "BRA_RJ_Rio.de.Janeiro-Galeao-Jobim.Intl.AP.837460_TMYx.2011-2025.epw",
+ "annual_ghi_kwh_m2_epw": 1732.37,
+ "unobstructed_from_cumulative_sky_kwh_m2": 1715.89,
+ "identity_error_pct": -0.9514,
+ "tolerance_pct": 2.0,
+ "identity_verdict": "PASS",
+ "annual_diffuse_kwh_m2": 531.95,
+ "annual_direct_horizontal_kwh_m2": 1183.94,
+ "cosine_sum_measured": 3.158803,
+ "cosine_sum_continuum_pi": 3.141593,
+ "discretization_bias_pct": 0.5478,
+ "sky_patches": 145,
+ "epw_internal_closure_pct": -0.951,
+ "model_vs_epw_components_pct": 0.0001,
+ "note": "The -0.95% gap to reported GHI is the EPW file's own inconsistency between its reported GHI and its DHI + DNI*cos(z) components; the cumulative sky reproduces those components to 0.0001%. Separating these matters: one is a data property to state, the other would be a model defect.",
+ "discretization_sweep": {
+  "max_abs_svf_error": 0.0328,
+  "worst_case": "H/W=3.0 (deep canyon)",
+  "direction": "POSITIVE \u2014 over-estimates sky access in narrow canyons",
+  "relative_at_worst": "+20%"
+ }
+}

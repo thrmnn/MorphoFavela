@@ -122,6 +122,8 @@ reference_days:
 validation:
   determinism: "tolerance, not bitwise — the GPU kernel's chunked reductions are not bitwise-reproducible. Golden tiles: Rio das Pedras + Vidigal_TLS, corr >= 0.9999 and max-abs-diff <= 0.01 against the existing CPU references."
   epw_irradiance_tolerance: pending
-  epw_irradiance_tolerance_note: "PLACEHOLDER by design — lock it from the FIRST observed GPU-vs-CPU diff on the golden tiles. Never guess a W/m² tolerance before that comparison exists."
+  epw_irradiance_tolerance_note: "Still PLACEHOLDER for the GPU-vs-CPU golden-tile comparison, which has not run. NOT the same as the sky-model tolerances below, which ARE now measured."
+  unobstructed_identity: "PASS — cumulative sky gives 1715.89 kWh/m² against the EPW's 1732.37 reported GHI (-0.95%, tolerance 2%). The residual is the FILE's own closure error: the model reproduces DHI + DNI·cos(z) to 0.0001%. Evidence: runs/wp02_sky_20260911/identity_check.json."
+  sky_discretization: "Centre-point cosines over-count the hemisphere projection by 0.548%; normalised out of the energy distribution. Binary patch-centre visibility carries up to 0.033 ABSOLUTE SVF error, measured over H/W 0.25–3.0, worst at deep canyons and POSITIVE (+20% relative at H/W=3, i.e. it over-estimates sky access in narrow alleys). This must be stated in the methods and is the quantitative basis for the G2 alley-width validity floor."
   rsun_crosscheck: "OPTIONAL / UNAVAILABLE LOCALLY — GRASS is not installed and there is no passwordless sudo. Binding acceptance is the engine-independent analytic set (unobstructed identity, infinite-canyon SVF 0.447, isolated-wall shadow), which is stronger than an r.sun comparison that could share a bug class."
   sky_model_labelling: "Every solar output carries sky_model ∈ {clear_sky, epw_weighted}. Existing results are clear_sky and are NOT citable as annual insolation until relabelled or recomputed."
