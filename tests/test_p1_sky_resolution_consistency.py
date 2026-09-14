@@ -32,15 +32,25 @@ def test_params_yaml_agrees_with_the_constant():
 
 
 def test_no_p1_module_hardcodes_a_patch_count():
-    """WP modules must import the constant, never restate 145 (or 577)."""
+    """WP modules must import the constant, never restate 145 (or 577) in code.
+
+    Parsed from the AST, not grepped: a line-based scan cannot tell a numeric
+    literal from the same digits inside a docstring, and it flagged prose
+    explaining the discretization (2026-09-14). Documentation SHOULD be free to
+    name the number; only executable code must not restate it.
+    """
+    import ast
+
     offenders = []
     for py in (REPO_ROOT / "src" / "brisa_solar").rglob("*.py"):
         if py.name == "constants.py":
             continue
-        for lineno, line in enumerate(py.read_text().splitlines(), 1):
-            code = line.split("#", 1)[0]
-            if "145" in code or "577" in code:
-                offenders.append(f"{py.relative_to(REPO_ROOT)}:{lineno}: {line.strip()}")
+        tree = ast.parse(py.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, int):
+                if node.value in (145, 577):
+                    offenders.append(
+                        f"{py.relative_to(REPO_ROOT)}:{node.lineno}: literal {node.value}")
     assert not offenders, "import P1_SKY_PATCHES instead of a literal:\n" + "\n".join(offenders)
 
 
