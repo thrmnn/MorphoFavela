@@ -108,8 +108,13 @@ sampling:
   stratum_floor: 50000              # per slope × density stratum
   bootstrap_block_m: 1000
   random_seed: 20260908
-  status: default
+  status: default                   # city_sample_n/stratum_floor/bootstrap are the PLAN's numbers; the run design is now the /ops card wp05_run_design
   pilot_rule: "A 1–2% stratified pilot runs FIRST and its wall-time/memory extrapolation is the go/no-go for the full run."
+  pilot_result: "RAN 2026-09-14 (runs/wp05_pilot_20260914T202113Z): 84,023 cells = 1% of an 8,402,056-cell fabric frame on the 5 m grid; 325 tiles of 2 km carry every frame cell. Cost is geography-bounded: build ≈ 3.8 s per tile (≈0.35 h for 325); marginal engine cost by regression on timing_*.jsonl = 0.11 / 0.25 / 0.31 ms per cell at 5 / 2 / 1 m → ALL 8.4 M cells at 1 m ≈ 0.7 h engine + 0.4 h build on the RTX 4060, peak GPU < 0.1 GB. GO."
+  cell_m: 1
+  cell_m_status: provisional        # evidence-settled at the pilot; final via the wp05_run_design card
+  cell_m_evidence: "Paired on the same 84,023 cells: 1 m vs 5 m signed median ΔSVF = -0.042 (5 m over-reads sky access, worst in narrow alleys — the favela direction); 1 m vs 2 m -0.009 but 5.6% of cells flip on_building at 2 m (2 m does not tile the 5 m DTM). Sites are computed at 1 m; one cell size citywide is required for the percentile claim."
+  run_design: "PROVISIONAL A_exhaustive_1m (every fabric cell, no sampling error, strata kept as reporting dimensions) — /ops card wp05_run_design, adopted 2026-09-15 under the provisional-default policy; a PI tap overrides."
   compute_venue: "LAPTOP ONLY (RTX 4060, torch 2.4.1+cu121 CUDA available; numba.cuda NOT available; no cupy/pytorch3d). The 2026-09-10 autonomy grant covers multi-hour unattended compute and scope cuts on pilot evidence, but does NOT include HPC submits — ORCD is not authorized for P1. If the pilot says the full sample will not fit, the standing instruction is to CUT THE SAMPLE and defend it, not to reach for the cluster."
 
 reference_days:
