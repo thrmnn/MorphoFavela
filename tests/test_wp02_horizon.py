@@ -305,7 +305,9 @@ def test_cpu_crossreference_riodaspedras(sky, directions_weights):
         pytest.skip(f"site data not on disk: {_RDP_DTM} / {_RDP_FOOTPRINTS}")
 
     ref = gpd.read_file(ref_path)
-    obs = ref[["original_x", "original_y"]].to_numpy(dtype="float64")
+    # Spec: use the geometry's x/y (offset for 673/16905 points, up to ~3.3 m,
+    # away from wall-flush original_x/original_y), not original_x/original_y.
+    obs = np.column_stack([ref.geometry.x.to_numpy(), ref.geometry.y.to_numpy()])
     ref_svf = ref["svf"].to_numpy(dtype="float64")
     obs_height_m = float((ref["z_observer"] - ref["z"]).median())
 
@@ -315,7 +317,7 @@ def test_cpu_crossreference_riodaspedras(sky, directions_weights):
 
     for cell_m in (1.0, 5.0):
         out_stem = RUN_DIR / "artifacts" / f"riodaspedras_{cell_m:g}m"
-        surface, transform, is_building = _surface_path(_RDP_DTM, _RDP_FOOTPRINTS, cell_m, out_stem)
+        surface, transform, _crs, is_building = _surface_path(_RDP_DTM, _RDP_FOOTPRINTS, cell_m, out_stem)
 
         vis, on_building = patch_visibility(
             surface, transform, obs, directions=directions, is_building=is_building,
