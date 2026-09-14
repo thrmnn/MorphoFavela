@@ -78,6 +78,7 @@ def patch_visibility(
     obs_height_m: float = 1.5,
     max_dist_m: float = 500.0,
     step_m: float | None = None,
+    march_sampling: str = "nearest",
     device: str | None = None,
     chunk: int = 4096,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -89,11 +90,20 @@ def patch_visibility(
     visibility row and ``on_building[i] = True`` instead of being silently
     sampled from the roof (spec §2).
 
-    Sampling: the observer's own elevation is read at its NEAREST cell (it
-    sits at a specific cell, not an interpolated point); each horizon-march
-    step samples the surface with BILINEAR interpolation, clamped to the
-    surface's edge outside its bounds.
+    Sampling: the observer's own elevation is always read at its NEAREST
+    cell (it sits at a specific cell, not an interpolated point).
+    ``march_sampling`` controls how each horizon-march step reads the
+    surface: ``"nearest"`` (default) or ``"bilinear"``, both clamped to the
+    surface's edge outside its bounds. NEAREST is the default because it is
+    the measured winner against the CPU (exact-polygon) reference on Rio das
+    Pedras (2026-09-14): bilinear interpolation blends a wall cell with its
+    shorter ground neighbour, softening every building silhouette and
+    letting extra sky "leak" past real edges (median |Delta| 0.042 -> 0.014,
+    r 0.988 -> 0.995; see runs/wp02_horizon_*/crossref_diagnostic.json).
     """
+    if march_sampling not in ("nearest", "bilinear"):
+        raise ValueError(f"march_sampling must be 'nearest' or 'bilinear', got {march_sampling!r}")
+    march_sample_fn = _nearest_sample if march_sampling == "nearest" else _bilinear_sample
     if directions.shape[0] != P1_SKY_PATCHES:
         raise ValueError(f"expected {P1_SKY_PATCHES} directions, got {directions.shape[0]}")
     n_patches = directions.shape[0]
@@ -146,7 +156,9 @@ def patch_visibility(
         for t in ts:
             xs = ox[:, None] + t * hx[None, :]
             ys = oy[:, None] + t * hy[None, :]
-            zs = _bilinear_sample(surface_t, xs, ys, inv_coeffs)
+            zs = march_sample_fn(surface_t, xs, ys, inv_coeffs)
+            if march_sampling == "nearest":
+                zs = zs[0]   # (_nearest_sample also returns row, col; unused for the march)
             ang = torch.atan2(zs - z_obs[:, None], t)
             horizon = torch.maximum(horizon, ang)
 

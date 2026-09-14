@@ -76,8 +76,13 @@ def _read_and_resample(dtm_path: Path, cell_m: float):
     return arr, transform, crs
 
 
-def build_surface(dtm_path, footprints_path, cell_m: float, out_path) -> Path:
+def build_surface(dtm_path, footprints_path, cell_m: float, out_path, all_touched: bool = False) -> Path:
     """Build `surface = max(dtm, building_top)` and an `is_building` mask.
+
+    `all_touched` (rasterio.features.rasterize) marks every cell a footprint
+    polygon *touches*, not just cells whose centre falls inside it — lets
+    thin building parts (a wall, an eave) survive rasterization at coarse
+    cell sizes, at the cost of slightly over-stating building footprint area.
 
     Writes `<out_path>_surface.tif`, `<out_path>_is_building.tif`, and
     `<out_path>_meta.json`. Returns the surface GeoTIFF path.
@@ -112,7 +117,7 @@ def build_surface(dtm_path, footprints_path, cell_m: float, out_path) -> Path:
             out_shape=dtm.shape,
             transform=transform,
             fill=np.nan,
-            all_touched=False,
+            all_touched=all_touched,
             dtype="float32",
             merge_alg=MergeAlg.replace,
         )
@@ -143,6 +148,7 @@ def build_surface(dtm_path, footprints_path, cell_m: float, out_path) -> Path:
         "dtm_path": str(dtm_path),
         "footprints_path": str(footprints_path),
         "cell_m": cell_m,
+        "all_touched": bool(all_touched),
         "shape": list(surface.shape),
         "bounds": list(bounds),
         "crs": str(crs),
