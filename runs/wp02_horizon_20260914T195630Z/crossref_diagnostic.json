@@ -1,0 +1,153 @@
+{
+ "_utc": "2026-09-14T19:56:53Z",
+ "reference": "/home/theo/SCL/SCR/MorphoFavela/outputs/riodaspedras/svf_v2/svf_streets.gpkg",
+ "reference_is_exact_polygons_not_a_scan": "src/svf_v2/scene.py builds the CPU reference from the same DTM + extruded altura/base footprints this engine uses \u2014 the bias below is a raster/horizon-march method difference, not unmodelled geometry.",
+ "n_points": 16905,
+ "obs_height_m_measured": 1.5,
+ "baseline": {
+  "params": {
+   "cell_m": 1.0,
+   "step_m": 1.0,
+   "march_sampling": "bilinear",
+   "all_touched": false
+  },
+  "metrics": {
+   "r": 0.9883718547576018,
+   "median_abs_delta": 0.04226070499743513,
+   "p95_abs_delta": 0.08988886289759761,
+   "max_abs_delta": 0.37224460325451136,
+   "n": 16018
+  },
+  "signed_median_delta": 0.04215229022814637
+ },
+ "binned_diagnostic": {
+  "variant": "1m, unweighted, bilinear march (baseline)",
+  "by_distance_to_nearest_footprint_edge": {
+   "<1m": {
+    "n": 5425,
+    "median_abs_delta": 0.03543519203061003,
+    "p95_abs_delta": 0.09763045927260344,
+    "signed_median_delta": 0.03515231755337683
+   },
+   "1-2m": {
+    "n": 4459,
+    "median_abs_delta": 0.048822832860071885,
+    "p95_abs_delta": 0.09601933823147081,
+    "signed_median_delta": 0.0488163704980783
+   },
+   "2-5m": {
+    "n": 4812,
+    "median_abs_delta": 0.047837840479945826,
+    "p95_abs_delta": 0.08333283599126856,
+    "signed_median_delta": 0.047835066690055605
+   },
+   ">5m": {
+    "n": 1322,
+    "median_abs_delta": 0.024428250868012757,
+    "p95_abs_delta": 0.055653396237277,
+    "signed_median_delta": 0.024428250868012757
+   }
+  },
+  "by_reference_svf_quartile": {
+   "Q1 [0.000,0.095)": {
+    "n": 4004,
+    "median_abs_delta": 0.03339843104198735,
+    "p95_abs_delta": 0.08274112819534342,
+    "signed_median_delta": 0.029049803152708963
+   },
+   "Q2 [0.095,0.193)": {
+    "n": 4005,
+    "median_abs_delta": 0.04769230364741266,
+    "p95_abs_delta": 0.08964664266402918,
+    "signed_median_delta": 0.047646756131326004
+   },
+   "Q3 [0.193,0.337)": {
+    "n": 4004,
+    "median_abs_delta": 0.05480729515053874,
+    "p95_abs_delta": 0.09755132585030936,
+    "signed_median_delta": 0.05475251158719746
+   },
+   "Q4 [0.337,0.897]": {
+    "n": 4005,
+    "median_abs_delta": 0.035093499194600475,
+    "p95_abs_delta": 0.08850413685338661,
+    "signed_median_delta": 0.03505455235222371
+   }
+  }
+ },
+ "variants": {
+  "A_nearest_sampling": {
+   "r": 0.9945170429856711,
+   "median_abs_delta": 0.013715461132694826,
+   "p95_abs_delta": 0.047382805278647175,
+   "max_abs_delta": 0.35845149980623553,
+   "n": 16018
+  },
+  "B_step_0.5m": {
+   "r": 0.9891848644402849,
+   "median_abs_delta": 0.03473942903947168,
+   "p95_abs_delta": 0.07728069393213007,
+   "max_abs_delta": 0.3653480515303735,
+   "n": 16018
+  },
+  "C_all_touched": {
+   "r": 0.9908031480846984,
+   "median_abs_delta": 0.014346651332531213,
+   "p95_abs_delta": 0.06939884912693389,
+   "max_abs_delta": 0.33776184463382175,
+   "n": 11983
+  }
+ },
+ "combo_best": {
+  "kwargs": {
+   "cell_m": 1.0,
+   "step_m": 0.5,
+   "march_sampling": "nearest",
+   "all_touched": true
+  },
+  "metrics": {
+   "r": 0.9888581448104944,
+   "median_abs_delta": 0.05508334064687341,
+   "p95_abs_delta": 0.1113882592786194,
+   "max_abs_delta": 0.3170721894614079,
+   "n": 11983
+  },
+  "combined_from": [
+   "A_nearest_sampling",
+   "B_step_0.5m",
+   "C_all_touched"
+  ]
+ },
+ "default_decision": {
+  "floor": "r >= 0.98 and median_abs_delta <= 0.03",
+  "qualifying": {
+   "A_nearest_sampling": {
+    "r": 0.9945170429856711,
+    "median_abs_delta": 0.013715461132694826,
+    "p95_abs_delta": 0.047382805278647175,
+    "max_abs_delta": 0.35845149980623553,
+    "n": 16018
+   },
+   "C_all_touched": {
+    "r": 0.9908031480846984,
+    "median_abs_delta": 0.014346651332531213,
+    "p95_abs_delta": 0.06939884912693389,
+    "max_abs_delta": 0.33776184463382175,
+    "n": 11983
+   }
+  },
+  "chosen": "A_nearest_sampling",
+  "chosen_metrics": {
+   "r": 0.9945170429856711,
+   "median_abs_delta": 0.013715461132694826,
+   "p95_abs_delta": 0.047382805278647175,
+   "max_abs_delta": 0.35845149980623553,
+   "n": 16018
+  },
+  "chosen_kwargs": {
+   "march_sampling": "nearest",
+   "step_m": 1.0,
+   "all_touched": false
+  }
+ }
+}

@@ -21,6 +21,10 @@ Two things worth stating plainly:
    appropriate for a sun-hours-on-a-given-day claim — compute those from sun
    positions directly (src/solar), never from this binning.
 
+The per-patch visibility array this module's `irradiation`/`svf` consume is
+produced by `src.brisa_solar.wp02_horizon.patch_visibility` (raster horizon
+engine, spec `docs/wp02_horizon_engine_spec.md`), not by this module.
+
 Run: python3 -m src.brisa_solar.wp02_sky <epw_path>
 """
 from __future__ import annotations
