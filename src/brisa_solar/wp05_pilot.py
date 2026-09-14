@@ -404,6 +404,15 @@ def build_frame_and_pilot(run_dir: Path, *, dtm_path: Path, footprints_path: Pat
     slope_deg = compute_slope_deg(dtm, cell_m)
     stratum = assign_strata(slope_deg, frame["coverage"])
 
+    # How many 2km tiles contain >=1 FRAME cell (not just pilot cells) — the
+    # geography-bounded ceiling on how many tiles a bigger sample can ever
+    # touch, since fabric coverage/distance rules already confine the frame
+    # to the built city. Feeds the extrapolation's per-tile cost model.
+    frame_rows, frame_cols = np.where(frame["in_frame"])
+    frame_xs, frame_ys = rasterio.transform.xy(transform, frame_rows, frame_cols)
+    fi, fj = tile_index_for_xy(np.asarray(frame_xs), np.asarray(frame_ys), bounds.left, bounds.bottom)
+    n_active_tiles_in_frame = int(len(set(zip(fi.tolist(), fj.tolist()))))
+
     rows, cols, strata_vals, per_stratum = stratified_pilot(
         frame["in_frame"], stratum,
         pilot_fraction=PILOT_FRACTION,
@@ -456,6 +465,7 @@ def build_frame_and_pilot(run_dir: Path, *, dtm_path: Path, footprints_path: Pat
             "removal_counts": frame["removal_counts"],
             "fabric_coverage_threshold": frame["fabric_coverage_threshold"],
             "fabric_footprint_distance_m": frame["fabric_footprint_distance_m"],
+            "n_active_2km_tiles_in_frame": n_active_tiles_in_frame,
         },
         "strata": {
             "slope_bins_deg_PILOT_DEFAULT": list(SLOPE_BINS_DEG),
@@ -553,6 +563,12 @@ def run_cellsize_pass(
 
 
 def compute_extrapolation(run_dir: Path, cell_sizes: list[float], city_sample_n: int) -> dict:
+    diagnostics_path = run_dir / "frame_and_pilot_diagnostics.json"
+    n_active_tiles_in_frame = None
+    if diagnostics_path.exists():
+        diag = json.loads(diagnostics_path.read_text())
+        n_active_tiles_in_frame = diag.get("frame", {}).get("n_active_2km_tiles_in_frame")
+
     result = {}
     for cell_m in cell_sizes:
         timing_path = run_dir / f"timing_{cell_m:g}m.jsonl"
@@ -562,26 +578,69 @@ def compute_extrapolation(run_dir: Path, cell_sizes: list[float], city_sample_n:
         if not rows:
             continue
         n_obs = sum(r["n_obs"] for r in rows)
+        n_tiles = len(rows)
         total_s = sum(r["build_s"] + r["engine_s"] for r in rows)
+        build_s_total = sum(r["build_s"] for r in rows)
+        engine_s_total = sum(r["engine_s"] for r in rows)
         peaks = [r["peak_gb"] for r in rows if r["peak_gb"] == r["peak_gb"]]  # drop NaN (cpu device)
         cells_per_s = n_obs / total_s if total_s > 0 else float("nan")
         s_per_1000 = 1000.0 / cells_per_s if cells_per_s > 0 else float("nan")
         peak_gb = max(peaks) if peaks else float("nan")
-        proj_hours = (city_sample_n / cells_per_s) / 3600.0 if cells_per_s > 0 else float("nan")
+        proj_hours_linear = (city_sample_n / cells_per_s) / 3600.0 if cells_per_s > 0 else float("nan")
+
+        # Per-tile model: build_s is dominated by clipping/rasterizing/resampling
+        # a tile's DTM+footprints, a cost per TILE, not per observer (measured
+        # 94-98% of wall time here); engine_s is the part that truly scales with
+        # observer count. A bigger sample does not multiply the tile count by
+        # the same factor it multiplies the cell count — the frame is already
+        # geography-bounded (n_active_2km_tiles_in_frame, measured from the
+        # frame mask, not the 1% pilot's own tile footprint) — so this model
+        # projects build cost against that tile ceiling and engine cost
+        # per-cell, separately.
+        build_s_per_tile = build_s_total / n_tiles if n_tiles > 0 else float("nan")
+        engine_s_per_cell = engine_s_total / n_obs if n_obs > 0 else float("nan")
+        if n_active_tiles_in_frame:
+            proj_hours_per_tile_model = (
+                n_active_tiles_in_frame * build_s_per_tile + city_sample_n * engine_s_per_cell
+            ) / 3600.0
+        else:
+            proj_hours_per_tile_model = float("nan")
         result[f"{cell_m:g}m"] = {
             "n_measured_cells": n_obs,
-            "n_tiles_measured": len(rows),
+            "n_tiles_measured": n_tiles,
             "measured_wall_s": total_s,
+            "measured_build_s": build_s_total,
+            "measured_engine_s": engine_s_total,
             "cells_per_s": cells_per_s,
             "s_per_1000_cells": s_per_1000,
             "peak_gb_measured": peak_gb,
-            "projected_hours_for_city_sample_n": proj_hours,
+            "n_active_2km_tiles_in_frame": n_active_tiles_in_frame,
+            "build_s_per_tile_measured": build_s_per_tile,
+            "engine_s_per_cell_measured": engine_s_per_cell,
+            "projected_hours_for_city_sample_n_LINEAR_PER_CELL": proj_hours_linear,
+            "projected_hours_for_city_sample_n_PER_TILE_MODEL": proj_hours_per_tile_model,
             "projected_peak_gb_for_city_sample_n": peak_gb,
             "peak_gb_note": (
                 "peak GB is bounded by tile surface size + engine chunk size, not by "
                 "total observer count (the engine processes chunk-of-4096 at a time and "
                 "tiles are processed sequentially) — so it does not scale with city_sample_n; "
                 "reported as the measured peak, not an extrapolation."
+            ),
+            "hours_note": (
+                f"{build_s_total:.0f}s of {total_s:.0f}s measured ({build_s_total / total_s:.0%}) is "
+                "build_s (clip DTM/footprints, rasterize, resample) — a cost per TILE (2km, 500m halo), "
+                "not per observer; engine_s (the visibility march) is the part that truly scales with "
+                "observer count. LINEAR_PER_CELL divides total measured wall time by measured cells and "
+                "projects that rate straight to city_sample_n — it implicitly assumes tile count scales "
+                "with cell count, which is wrong here: this pilot's 1% draw already touched "
+                f"{n_tiles} of the {n_active_tiles_in_frame if n_active_tiles_in_frame else '?'} 2km "
+                "tiles that contain ANY frame cell (measured from the frame mask, not the pilot) — going "
+                "to 3,000,000 cells cannot multiply the tile count by ~36x because the frame is already "
+                "geography-bounded. PER_TILE_MODEL instead charges the measured build_s/tile against "
+                "n_active_2km_tiles_in_frame (a ceiling) and the measured engine_s/cell against "
+                "city_sample_n directly, and is the more defensible number; LINEAR_PER_CELL is kept as "
+                "the naive/conservative comparison. Neither is a defended params.yaml number — both are "
+                "PLACEHOLDER-class until the full run is actually staged."
             ),
         }
     result["city_sample_n"] = city_sample_n
