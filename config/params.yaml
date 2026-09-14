@@ -72,7 +72,7 @@ terrain:
 
 als:
   epoch: 2019
-  status: provisional              # /ops card als_epoch, provisional default adopted 2026-09-08
+  status: decided                  # /ops card als_epoch: PI confirmed 2026-09-14 (provisional since 2026-09-08)
   note: "2019 is epoch-matched to the 2019 footprints and needs no external data. Raw ALS is NOT ingested: the pipeline runs on the derived 5 m DTM plus rasterized footprint heights. The 2024 epoch (and the 1 m IPP mosaics) sit behind the deferred Drive mirror and would be a labeled sensitivity run, never blended into primary numbers."
   cell_size_m: pending
   cell_size_rule: "0.5 if ALS density P10 >= 4 pts/m²; 1.0 if 1 <= P10 < 4 (flagged); STOP and escalate if P10 < 1. NOT YET APPLICABLE — no raw ALS on disk; the working resolution is set by the DTM (5 m) and the footprint rasterization, so state the effective resolution instead of implying an ALS-derived one."
@@ -110,7 +110,7 @@ sampling:
   random_seed: 20260908
   status: default
   pilot_rule: "A 1–2% stratified pilot runs FIRST and its wall-time/memory extrapolation is the go/no-go for the full run."
-  compute_venue: "LAPTOP ONLY (RTX 4060). The 2026-09-10 autonomy grant covers multi-hour unattended compute and scope cuts on pilot evidence, but does NOT include HPC submits — ORCD is not authorized for P1. If the pilot says the full sample will not fit, the standing instruction is to CUT THE SAMPLE and defend it, not to reach for the cluster."
+  compute_venue: "LAPTOP ONLY (RTX 4060, torch 2.4.1+cu121 CUDA available; numba.cuda NOT available; no cupy/pytorch3d). The 2026-09-10 autonomy grant covers multi-hour unattended compute and scope cuts on pilot evidence, but does NOT include HPC submits — ORCD is not authorized for P1. If the pilot says the full sample will not fit, the standing instruction is to CUT THE SAMPLE and defend it, not to reach for the cluster."
 
 reference_days:
   winter_solstice: "2026-06-21"
@@ -120,7 +120,7 @@ reference_days:
   floor_provenance: "The 2h daylight floor is the ATHENS CHARTER (1943) Point 26 — NOT a WHO benchmark. Older docstrings in src/solar/ still say 'WHO ≥2h'; that attribution is wrong and must not propagate."
 
 validation:
-  determinism: "tolerance, not bitwise — the GPU kernel's chunked reductions are not bitwise-reproducible. Golden tiles: Rio das Pedras + Vidigal_TLS, corr >= 0.9999 and max-abs-diff <= 0.01 against the existing CPU references."
+  determinism: "tolerance, not bitwise. CORRECTED 2026-09-14: no GPU SVF kernel existed (compute_svf_gpu is a stub; the v1 torch kernel was deleted in 588963a) and the cited golden-tile files do not exist. The engine is the raster-horizon per-patch visibility module (src/brisa_solar/wp02_horizon.py, spec docs/wp02_horizon_engine_spec.md); its cross-reference is outputs/riodaspedras/svf_v2/svf_streets.gpkg (CPU raycaster, 16,905 street points) and the acceptance numbers are MEASURED into runs/wp02_horizon_*/ before any threshold is written here."
   epw_irradiance_tolerance: pending
   epw_irradiance_tolerance_note: "Still PLACEHOLDER for the GPU-vs-CPU golden-tile comparison, which has not run. NOT the same as the sky-model tolerances below, which ARE now measured."
   unobstructed_identity: "PASS — cumulative sky gives 1715.89 kWh/m² against the EPW's 1732.37 reported GHI (-0.95%, tolerance 2%). The residual is the FILE's own closure error: the model reproduces DHI + DNI·cos(z) to 0.0001%. Evidence: runs/wp02_sky_20260911/identity_check.json."
