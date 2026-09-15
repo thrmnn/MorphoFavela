@@ -1,0 +1,38 @@
+{
+ "_utc": "2026-09-15T21:01:49Z",
+ "sky": {
+  "patches": 145
+ },
+ "cell_m": 1.0,
+ "obs_height_m": 1.5,
+ "max_dist_m": 500.0,
+ "step_m": 1.0,
+ "sampling_rule": "G2 alley-width classes on TLS-covered ground cells; G1-lite <= 2000 facade points",
+ "device": "cuda",
+ "torch_version": "2.4.1+cu121",
+ "git_sha": "4d96422",
+ "params_sky_section_sha256": "a82a40e3e9bb1d85",
+ "pdal_version": "pdal 2.2.0 (git-version: Release)",
+ "point_counts": {
+  "Vidigal1-registered_1m": 59747276,
+  "Vidigal3-registered_1m": 66165363,
+  "Vidigal4-registered_1m": 136602887,
+  "Vidigal1-registered_0p5m": 59747276,
+  "Vidigal3-registered_0p5m": 66165363,
+  "Vidigal4-registered_0p5m": 136602887
+ },
+ "pdal_elapsed_s": {
+  "1m_pass": 215.16124181999476,
+  "total": 430.1909515319858
+ },
+ "pdal_fallback_reason": null,
+ "e57_scans": [
+  "/home/theo/SCL/SCR/MorphoFavela/data/vidigal_tls/raw/pointclouds/Nuvens Separadas/Vidigal1-registered.e57",
+  "/home/theo/SCL/SCR/MorphoFavela/data/vidigal_tls/raw/pointclouds/Nuvens Separadas/Vidigal3-registered.e57",
+  "/home/theo/SCL/SCR/MorphoFavela/data/vidigal_tls/raw/pointclouds/Nuvens Separadas/Vidigal4-registered.e57"
+ ],
+ "e57_z_range": [
+  50.0,
+  250.0
+ ]
+}

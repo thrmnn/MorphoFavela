@@ -1,0 +1,37 @@
+{
+ "n": 2000,
+ "n_total_in_extent": 104394,
+ "storey_bins": [
+  {
+   "storey_bin": "0-3m",
+   "n": 837,
+   "mean_delta": 0.06273144013435032,
+   "median_delta": 0.018494028003304852,
+   "sign_consistency": 0.7359617682198327
+  },
+  {
+   "storey_bin": "3-6m",
+   "n": 676,
+   "mean_delta": 0.08414468820028555,
+   "median_delta": 0.05198170414090385,
+   "sign_consistency": 0.7943786982248521
+  },
+  {
+   "storey_bin": "6-9m",
+   "n": 377,
+   "mean_delta": 0.08265250491050191,
+   "median_delta": 0.06825335023393361,
+   "sign_consistency": 0.7639257294429708
+  },
+  {
+   "storey_bin": ">9m",
+   "n": 110,
+   "mean_delta": 0.08370601261800288,
+   "median_delta": 0.101656893323357,
+   "sign_consistency": 0.7272727272727273
+  }
+ ],
+ "overall_mean_delta": 0.0748778401775419,
+ "overall_median_delta": 0.03862637433843985,
+ "note": "REPORT ONLY -- the 2.5D facade layer is NOT ACCEPTED (2026-09-15); this does not change solar_gates status text."
+}
