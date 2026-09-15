@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Guard P1's geometry-only ventilation axis against CFD leakage (C′ reframe).
+"""Guard P1's geometry-only ventilation axis against simulation-output
+leakage (C′ reframe).
 
 Three checks, all reading the policy from docs/p1_column_allowlist.json so the
 column lists live in exactly one place:
 
-  1. schema drift  — the source CFD table still has the 52-column header the
-     policy was written against (a renamed/added column silently escapes an
-     allowlist written for the old schema).
+  1. schema drift  — the source simulation-output table still has the
+     52-column header the policy was written against (a renamed/added column
+     silently escapes an allowlist written for the old schema).
   2. artifact leak — no P1-bound table carries a banned column.
   3. code leak     — no banned column name appears in P1 pipeline source.
 
@@ -31,7 +32,7 @@ P1_ARTIFACT_GLOBS = [
     "outputs/p1_cprime/**/*.csv",
     "runs/*/artifacts/*.csv",
 ]
-# P1 pipeline source. A banned name here means code is reaching for CFD output.
+# P1 pipeline source. A banned name here means code is reaching for simulation output.
 P1_SOURCE_GLOBS = ["src/brisa_solar/**/*.py"]
 
 
@@ -71,7 +72,7 @@ def main() -> int:
             header = Path(f).read_text().split("\n", 1)[0].strip()
             hit = sorted(banned.intersection(header.split(",")))
             if hit:
-                fail(f"{Path(f).relative_to(ROOT)}: CFD-derived column(s) in a P1 artifact: {hit}")
+                fail(f"{Path(f).relative_to(ROOT)}: simulation-derived column(s) in a P1 artifact: {hit}")
                 errors += 1
 
     # 3. banned column names referenced in P1 pipeline source
@@ -90,7 +91,7 @@ def main() -> int:
         return 1
     print(f"lint_p1_columns: OK ✓ — {len(files)} source table(s) on the pinned 52-column schema; "
           f"{n_art} P1 artifact(s) and {n_src} P1 source file(s) clean of "
-          f"{len(banned)} banned CFD columns.")
+          f"{len(banned)} banned simulation-derived columns.")
     return 0
 
 

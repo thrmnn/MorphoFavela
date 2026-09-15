@@ -1,14 +1,18 @@
 .DEFAULT_GOAL := help
 AREA ?= vidigal_tls
 
-.PHONY: help test test-fast lint format svf morphology pipeline report cross-cluster clean
+.PHONY: help test test-fast lint lint-p1 format svf morphology pipeline report cross-cluster clean
 
 help: ## Show available commands
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-test: ## Run pytest (-x -q)
+test: lint-p1 ## Run pytest (-x -q)
 	TMPDIR=/tmp python -m pytest -x -q
+
+lint-p1: ## P1 geometry-only column + vocabulary guards (C′ reframe)
+	python3 scripts/lint_p1_columns.py
+	python3 scripts/lint_p1_tokens.py
 
 test-fast: ## Run only fast (synthetic-geometry) tests
 	TMPDIR=/tmp python -m pytest -x -q -m fast
