@@ -35,7 +35,7 @@ from rasterio.features import rasterize
 from . import wp02_sky
 from .constants import P1_SKY_PATCHES, REPO_ROOT, load_params
 from .wp02_horizon import hemisphere_mask, patch_visibility
-from .wp02_surface import build_surface, load_surface
+from .wp02_surface import build_surface, load_building_id, load_ground, load_surface
 from .wp05_pilot import pack_visibility  # tile/checkpoint pattern reuse (spec: reuse WP-05)
 import src.config as _svf_config
 from src.svf_v2 import sampling as svf_sampling
@@ -45,6 +45,19 @@ from src.svf_v2.paths import resolve_boundary, resolve_paths
 CELL_M = 1.0
 OBS_HEIGHT_M = 1.5
 MAX_DIST_M = 500.0
+
+#: WP-04F decision (docs/wp04f_facade_spec.md §4), taken 2026-09-15 against
+#: runs/wp04f_facade_20260915T060126Z/comparison.{json,md}: at the SAME default
+#: inset (0.1 m), own-building exclusion alone drops the exact-zero share on
+#: both comparison sites (Vidigal 0.172 -> 0.146; Rio das Pedras 0.293 -> 0.252)
+#: and raises every quoted quantile. Because exclusion can only ever substitute
+#: ground height for cells matching the OBSERVER'S OWN building id (never a
+#: different building's — proven by test_opposite_wall_closed_form_both_engine_
+#: variants, which shows the two engine variants agree exactly on a genuinely
+#: separate wall), every zero it removes was, by construction, never explained
+#: by a real opposite wall — there is no other obstruction left to attribute it
+#: to. Adopted as the façade default; see runs/wp04_sites_20260915T*Z/manifest.json.
+FACADE_OWN_BUILDING_EXCLUSION_DEFAULT = True
 
 #: (site_key for svf_v2.paths / data/<key>/, display name for Favelas_Limit_2019 match)
 SITES: list[tuple[str, str]] = [
@@ -153,8 +166,64 @@ def build_site_surface(site_key: str, data_root: Path, cell_m: float, tmp_dir: P
     out_stem = tmp_dir / f"{site_key}_{cell_m:g}m"
     surface_tif = build_surface(dtm_path, fp_path, cell_m, out_stem)
     is_building_tif = surface_tif.with_name(surface_tif.stem.replace("_surface", "_is_building") + ".tif")
+    building_id_tif = surface_tif.with_name(surface_tif.stem.replace("_surface", "_building_id") + ".tif")
+    ground_tif = surface_tif.with_name(surface_tif.stem.replace("_surface", "_ground") + ".tif")
     surface, transform, crs, is_building = load_surface(surface_tif, is_building_tif)
-    return surface, transform, crs, is_building, dtm_path, fp_path
+    building_id = load_building_id(building_id_tif)
+    ground = load_ground(ground_tif)
+    return surface, transform, crs, is_building, building_id, ground, dtm_path, fp_path
+
+
+# ---------------------------------------------------------------------------
+# WP-04F: own-building exclusion for façade observers
+# ---------------------------------------------------------------------------
+
+def map_native_building_ids_to_raster(native_gdf: gpd.GeoDataFrame, raster_fp_gdf: gpd.GeoDataFrame) -> np.ndarray:
+    """Per native-footprints row (position, 0-based), the id its building carries
+    in the ``building_id`` raster built from ``raster_fp_gdf`` (WP-02's
+    ``wp02_surface.build_surface`` on ``buildings_extended_700m.gpkg``).
+
+    Façade points are generated from the per-site NATIVE footprints file
+    (``svf_v2.paths.resolve_paths``'s ``footprints``), whose row order/index is
+    unrelated to the EXTENDED footprints file the surface (and its
+    ``building_id`` raster) is built from — the two are separately-clipped
+    exports of the same underlying buildings layer, not the same table.
+    ``build_surface`` assigns id ``i + 1`` to ``raster_fp_gdf`` row ``i``
+    (positional, 0-based) in its own read order (docstring: WP-04F spec §1),
+    so this function has to reproduce that mapping by GEOMETRY, not by row
+    label: each native building's own representative point is matched to
+    whichever extended-footprints polygon contains it (point-in-polygon;
+    falls back to nearest polygon for the rare point that lands just outside
+    every polygon, e.g. a sliver mismatch between the two clips).
+    """
+    if raster_fp_gdf.crs is not None and native_gdf.crs is not None and str(raster_fp_gdf.crs) != str(native_gdf.crs):
+        raster_fp_gdf = raster_fp_gdf.to_crs(native_gdf.crs)
+
+    n = len(native_gdf)
+    if n == 0:
+        return np.zeros(0, dtype=np.int64)
+
+    from shapely import STRtree
+
+    reps = native_gdf.geometry.representative_point().to_numpy()
+    ext_geoms = raster_fp_gdf.geometry.to_numpy()
+    tree = STRtree(ext_geoms)
+
+    mapped = np.full(n, -1, dtype=np.int64)
+    q_idx, t_idx = tree.query(reps, predicate="intersects")
+    seen = np.zeros(n, dtype=bool)
+    order = np.argsort(q_idx, kind="stable")
+    for qi, ti in zip(q_idx[order], t_idx[order]):
+        if not seen[qi]:
+            mapped[qi] = ti
+            seen[qi] = True
+
+    missing = mapped == -1
+    if missing.any():
+        nearest = tree.nearest(reps[missing])
+        mapped[missing] = np.atleast_1d(nearest)
+
+    return mapped + 1  # +1: build_surface's id scheme, 0 reserved for "no building"
 
 
 def ground_grid_points(surface: np.ndarray, transform, is_building: np.ndarray, polygon) -> pd.DataFrame:
@@ -199,6 +268,28 @@ def facade_svf_irradiation(sky: "wp02_sky.CumulativeSky", directions, weights, v
     radiance_proxy = sky.patch_total_kwh / cos_zenith
     irr = (front_visible * dotprod * radiance_proxy[None, :]).sum(axis=1)
     return svf, irr
+
+
+def opposite_wall_horizon_deg(directions: np.ndarray, H: float, D: float, z_p: float) -> np.ndarray:
+    """WP-04F physics check: closed-form horizon angle (deg, per patch) for a
+    vertical façade point at height ``z_p`` facing +y, opposite an infinite
+    parallel wall of height H at perpendicular distance D (spanning all x —
+    the same "infinite" construction as the WP-02 canyon/isolated-wall tests).
+
+    Derived from the SAME patch-centre rule ``wp02_horizon.patch_visibility``
+    marches with: for a patch's normalised horizontal direction (hx, hy) with
+    hy > 0, the ray reaches the wall's plane (y=D) at horizontal distance
+    t = D / hy, where the wall presents height (H - z_p) above the observer —
+    ``horizon = atan2((H - z_p) * hy, D)``, exactly ``atan2(zs - z_obs, t)``
+    with ``zs = H`` and ``t = D / hy`` substituted in. hy <= 0 never reaches
+    this wall (open sky that direction — no obstruction, horizon = -inf).
+    """
+    directions = np.asarray(directions, dtype=np.float64)
+    dx, dy = directions[:, 0], directions[:, 1]
+    horiz_norm = np.hypot(dx, dy)
+    hy = np.divide(dy, horiz_norm, out=np.zeros_like(dy), where=horiz_norm > 1e-9)
+    horizon = np.where(hy > 0.0, np.arctan2((H - z_p) * hy, D), -np.inf)
+    return np.degrees(horizon)
 
 
 # ---------------------------------------------------------------------------
@@ -317,12 +408,13 @@ def direct_sun_hours(
 def evaluate_points(
     surface, transform, is_building, obs_xy, *, directions, weights, sky,
     obs_z=None, obs_height_m=OBS_HEIGHT_M, device=None, max_dist_m=MAX_DIST_M,
-    normals=None,
+    normals=None, obs_building=None, building_id_raster=None, ground_surface=None,
 ):
     vis, on_building, horizon_deg = patch_visibility(
         surface, transform, obs_xy, directions=directions, is_building=is_building,
         obs_height_m=obs_height_m, obs_z=obs_z, max_dist_m=max_dist_m,
         march_sampling="nearest", device=device, return_horizon=True,
+        obs_building=obs_building, building_id_raster=building_id_raster, ground_surface=ground_surface,
     )
     if normals is None:
         svf = sky.svf(vis.astype(float))
@@ -353,6 +445,9 @@ def evaluate_and_write_parquet(
     device: str, obs_z: np.ndarray | None = None, normals: np.ndarray | None = None,
     obs_height_m: float = OBS_HEIGHT_M, max_dist_m: float = MAX_DIST_M,
     chunk: int = 300_000,
+    obs_building: np.ndarray | None = None,
+    building_id_raster: np.ndarray | None = None,
+    ground_surface: np.ndarray | None = None,
 ) -> int:
     """Evaluate `obs_xy` in chunks and stream the result to a Parquet file.
 
@@ -376,11 +471,13 @@ def evaluate_and_write_parquet(
             xy = obs_xy[start:end]
             oz = obs_z[start:end] if obs_z is not None else None
             nrm = normals[start:end] if normals is not None else None
+            ob = obs_building[start:end] if obs_building is not None else None
 
             vis, on_building, horizon_deg, svf, irr = evaluate_points(
                 surface, transform, is_building, xy,
                 directions=directions, weights=weights, sky=sky, device=device,
                 obs_z=oz, obs_height_m=obs_height_m, max_dist_m=max_dist_m, normals=nrm,
+                obs_building=ob, building_id_raster=building_id_raster, ground_surface=ground_surface,
             )
 
             cols = {}
@@ -453,8 +550,8 @@ def run_site(
     patch_az_deg = patch_azimuth_deg(directions)
 
     favelas_path = data_root / "data/RJ/Favelas_Limit_2019.shp"
-    surface, transform, crs, is_building, dtm_path, fp_path = build_site_surface(
-        site_key, data_root, CELL_M, tmp_dir
+    surface, transform, crs, is_building, building_id_raster, ground_surface, dtm_path, fp_path = (
+        build_site_surface(site_key, data_root, CELL_M, tmp_dir)
     )
     polygon, match_method, matched_polygons = site_polygon(favelas_path, display_name, crs)
 
@@ -517,7 +614,7 @@ def run_site(
         report["n_facade"] = int(pq_row_count(facade_path))
     else:
         native_dtm, native_fp, _native_roads = resolve_native_paths(site_key, data_root)
-        footprints_gdf = gpd.read_file(native_fp)
+        footprints_gdf = gpd.read_file(native_fp).reset_index(drop=True)
         facade_pts = svf_sampling.sample_facade_points(footprints_gdf, native_dtm)
         obs_xy = np.column_stack([facade_pts["x"].to_numpy(), facade_pts["y"].to_numpy()])
         obs_z = facade_pts["z"].to_numpy(dtype="float64")
@@ -532,8 +629,18 @@ def run_site(
             "height_above_ground": facade_pts["height_above_ground"].to_numpy(),
             "site": np.full(len(facade_pts), site_key),
         }
+        exclusion_kwargs = {}
+        if FACADE_OWN_BUILDING_EXCLUSION_DEFAULT:
+            ext_fp_gdf = gpd.read_file(fp_path)
+            native_to_raster_id = map_native_building_ids_to_raster(footprints_gdf, ext_fp_gdf)
+            obs_building = native_to_raster_id[facade_pts["building_id"].to_numpy()]
+            exclusion_kwargs = dict(
+                obs_building=obs_building,
+                building_id_raster=building_id_raster,
+                ground_surface=ground_surface,
+            )
         report["n_facade"] = evaluate_and_write_parquet(
-            facade_path, base_cols, obs_xy, obs_z=obs_z, normals=normals, **common
+            facade_path, base_cols, obs_xy, obs_z=obs_z, normals=normals, **common, **exclusion_kwargs
         )
 
     return report
@@ -612,6 +719,12 @@ def main() -> int:
         default="/home/theo/SCL/SCR/MorphoFavela/runs/wp05_full_20260914T215419Z/distribution.json",
     )
     ap.add_argument("--sites", default=None, help="comma-separated site keys, default all 5")
+    ap.add_argument(
+        "--carried-from", default=None,
+        help="run_id whose ground.parquet/street.parquet were hard-linked/copied into "
+             "this run_dir before this invocation (WP-04F deliverable 4) — recorded in "
+             "the manifest, not itself performed by this script",
+    )
     args = ap.parse_args()
 
     data_root = Path(args.data_root)
@@ -660,6 +773,26 @@ def main() -> int:
         "obs_height_m": OBS_HEIGHT_M,
         "max_dist_m": MAX_DIST_M,
         "march_sampling": "nearest",
+        "facade_own_building_exclusion_default": FACADE_OWN_BUILDING_EXCLUSION_DEFAULT,
+        "facade_own_building_exclusion_decision": (
+            "docs/wp04f_facade_spec.md deliverable 4, taken 2026-09-15 against "
+            "runs/wp04f_facade_20260915T060126Z/comparison.json: own-building exclusion "
+            "measurably drops the exact-zero share at fixed inset on both comparison "
+            "sites and, by construction, can only remove blocking attributed to the "
+            "observer's OWN building — see FACADE_OWN_BUILDING_EXCLUSION_DEFAULT's "
+            "docstring in src/brisa_solar/wp04_sites.py."
+        ),
+        "carried_from": (
+            {
+                "run_id": args.carried_from,
+                "carried": ["ground.parquet", "street.parquet"],
+                "method": "hard link (or copy) into each site_key/ subdirectory before this run",
+                "note": "façade.parquet and summary.json were recomputed by THIS run "
+                        "(WP-04F own-building exclusion is now the façade default); "
+                        "ground and street are unaffected by WP-04F and were not recomputed.",
+            }
+            if args.carried_from else None
+        ),
         "reference_days": params["reference_days"],
         "sun_azimuth_quantisation": "nearest of the 145-patch scheme's own azimuth sampling (~12-deg bands at the lowest altitude ring); not a second sky",
         "floor_provenance": params["reference_days"]["floor_provenance"],

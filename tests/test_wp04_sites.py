@@ -220,7 +220,7 @@ def test_riodaspedras_street_crossreference(sky, directions_weights, tmp_path):
 
     directions, weights = directions_weights
 
-    surface, transform, _crs, is_building, _dtm, _fp = wp04_sites.build_site_surface(
+    surface, transform, _crs, is_building, _bid, _ground, _dtm, _fp = wp04_sites.build_site_surface(
         "riodaspedras", MAIN_CHECKOUT, wp04_sites.CELL_M, tmp_path
     )
     native_dtm, native_fp, native_roads = wp04_sites.resolve_native_paths("riodaspedras", MAIN_CHECKOUT)

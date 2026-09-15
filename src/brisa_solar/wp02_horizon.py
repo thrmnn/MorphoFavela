@@ -59,13 +59,18 @@ def _bilinear_sample(surface_t: torch.Tensor, x: torch.Tensor, y: torch.Tensor, 
 
 def _nearest_sample(surface_t: torch.Tensor, x: torch.Tensor, y: torch.Tensor, inv_coeffs):
     """Nearest-cell sample plus the (row, col) indices used — the observer's own cell."""
+    row, col = _nearest_rowcol(x, y, inv_coeffs, surface_t.shape[-2], surface_t.shape[-1])
+    return surface_t[row, col], row, col
+
+
+def _nearest_rowcol(x: torch.Tensor, y: torch.Tensor, inv_coeffs, h: int, w: int):
+    """(row, col) long-tensor indices of the nearest cell to world (x, y), clamped to bounds."""
     a, b, c, d, e, f = inv_coeffs
     colf = a * x + b * y + c
     rowf = d * x + e * y + f
-    h, w = surface_t.shape[-2], surface_t.shape[-1]
     col = torch.floor(colf).long().clamp(0, w - 1)
     row = torch.floor(rowf).long().clamp(0, h - 1)
-    return surface_t[row, col], row, col
+    return row, col
 
 
 def patch_visibility(
@@ -83,6 +88,9 @@ def patch_visibility(
     device: str | None = None,
     chunk: int = 4096,
     return_horizon: bool = False,
+    obs_building: np.ndarray | None = None,
+    building_id_raster: np.ndarray | None = None,
+    ground_surface: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray] | tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Per-(observer, patch) visibility by horizon-angle raster marching.
 
@@ -106,6 +114,21 @@ def patch_visibility(
     ``surface[cell] + obs_height_m`` elevation with the given per-observer
     height); ``on_building`` is still computed and returned either way.
 
+    Own-building exclusion (WP-04F, ``obs_building`` + ``building_id_raster`` +
+    ``ground_surface``, all three required together): a façade point sits just
+    outside its own wall, but at cell size 1 m its own raster cell — or a
+    neighbour along the same wall further out along a near-parallel ray — can
+    still be marked as its own building (cell-centre rule), so the march reads
+    its own roof and reports near-total self-occlusion. When given, every march
+    step whose ``building_id_raster`` cell equals the observer's own
+    ``obs_building`` id is sampled from ``ground_surface`` (bare DTM, no
+    building tops) instead of ``surface`` (which has the roof) for that step
+    only; other buildings still occlude normally. ``obs_building == 0`` opts a
+    given observer out (0 is the "no building" sentinel in
+    ``wp02_surface.build_surface``'s ``building_id`` raster, so it can never
+    match a real building id). Orthogonal to the ``obs_z`` / ``is_building``
+    forcing above — both can be used together.
+
     Sampling: the observer's own elevation is always read at its NEAREST
     cell (it sits at a specific cell, not an interpolated point).
     ``march_sampling`` controls how each horizon-march step reads the
@@ -124,6 +147,16 @@ def patch_visibility(
         raise ValueError(f"expected {P1_SKY_PATCHES} directions, got {directions.shape[0]}")
     n_patches = directions.shape[0]
 
+    own_building_given = (
+        obs_building is not None or building_id_raster is not None or ground_surface is not None
+    )
+    if own_building_given and (
+        obs_building is None or building_id_raster is None or ground_surface is None
+    ):
+        raise ValueError(
+            "obs_building, building_id_raster and ground_surface must be given together"
+        )
+
     dev = device or default_device()
     torch_dev = torch.device(dev)
     dtype = torch.float64
@@ -132,6 +165,13 @@ def patch_visibility(
     ib_t = None
     if is_building is not None:
         ib_t = torch.as_tensor(np.ascontiguousarray(is_building), dtype=torch.bool, device=torch_dev)
+    bid_t = None
+    ground_t = None
+    obs_building_arr = None
+    if own_building_given:
+        bid_t = torch.as_tensor(np.ascontiguousarray(building_id_raster), dtype=torch.int64, device=torch_dev)
+        ground_t = torch.as_tensor(np.ascontiguousarray(ground_surface), dtype=dtype, device=torch_dev)
+        obs_building_arr = np.asarray(obs_building, dtype=np.int64)
 
     obs_xy = np.asarray(obs_xy, dtype=np.float64)
     n = obs_xy.shape[0]
@@ -173,6 +213,10 @@ def patch_visibility(
         else:
             z_obs = z_ground + obs_height_m
 
+        ob_chunk = None
+        if own_building_given:
+            ob_chunk = torch.as_tensor(obs_building_arr[start:end], dtype=torch.int64, device=torch_dev)
+
         horizon = torch.full((m, n_patches), float("-inf"), dtype=dtype, device=torch_dev)
         for t in ts:
             xs = ox[:, None] + t * hx[None, :]
@@ -180,6 +224,12 @@ def patch_visibility(
             zs = march_sample_fn(surface_t, xs, ys, inv_coeffs)
             if march_sampling == "nearest":
                 zs = zs[0]   # (_nearest_sample also returns row, col; unused for the march)
+            if own_building_given:
+                # Categorical id lookup: always nearest-cell, independent of
+                # march_sampling — a building id cannot be bilinearly blended.
+                step_row, step_col = _nearest_rowcol(xs, ys, inv_coeffs, bid_t.shape[-2], bid_t.shape[-1])
+                own_step = bid_t[step_row, step_col] == ob_chunk[:, None]
+                zs = torch.where(own_step, ground_t[step_row, step_col], zs)
             ang = torch.atan2(zs - z_obs[:, None], t)
             horizon = torch.maximum(horizon, ang)
 

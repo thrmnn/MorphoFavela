@@ -127,9 +127,31 @@ def build_surface(dtm_path, footprints_path, cell_m: float, out_path, all_touche
     is_building = np.isfinite(building_top)
     surface = np.where(is_building, np.fmax(dtm, building_top), dtm).astype("float32")
 
+    # building_id: 1-based positional index into `gdf` (0 = no building), rasterized
+    # with the SAME order/filter/merge rule as building_top so a cell's owning id
+    # always agrees with which building's height won that cell (WP-04F spec §1) —
+    # this is what lets patch_visibility recognise "this cell is the observer's own
+    # building" rather than a neighbour's, at the 1 m cell size where a façade point
+    # inset just outside a wall can still nearest-round onto its own roof cell.
+    id_shapes = [(gdf.geometry.iloc[i], int(i) + 1) for i in order if valid.iloc[i]]
+    if id_shapes:
+        building_id = rasterize(
+            id_shapes,
+            out_shape=dtm.shape,
+            transform=transform,
+            fill=0,
+            all_touched=all_touched,
+            dtype="int32",
+            merge_alg=MergeAlg.replace,
+        )
+    else:
+        building_id = np.zeros(dtm.shape, dtype="int32")
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     surface_tif = out_path.with_name(out_path.stem + "_surface.tif")
     building_tif = out_path.with_name(out_path.stem + "_is_building.tif")
+    building_id_tif = out_path.with_name(out_path.stem + "_building_id.tif")
+    ground_tif = out_path.with_name(out_path.stem + "_ground.tif")
     meta_json = out_path.with_name(out_path.stem + "_meta.json")
 
     profile = dict(
@@ -141,6 +163,11 @@ def build_surface(dtm_path, footprints_path, cell_m: float, out_path, all_touche
     bprofile = dict(profile, dtype="uint8", nodata=None)
     with rasterio.open(building_tif, "w", **bprofile) as dst:
         dst.write(is_building.astype("uint8"), 1)
+    idprofile = dict(profile, dtype="int32", nodata=0)
+    with rasterio.open(building_id_tif, "w", **idprofile) as dst:
+        dst.write(building_id.astype("int32"), 1)
+    with rasterio.open(ground_tif, "w", **profile) as dst:
+        dst.write(dtm.astype("float32"), 1)
 
     bounds = rasterio.transform.array_bounds(surface.shape[0], surface.shape[1], transform)
     meta = {
@@ -174,6 +201,27 @@ def load_surface(surface_tif, is_building_tif=None):
         with rasterio.open(is_building_tif) as src:
             is_building = src.read(1).astype(bool)
     return surface, transform, crs, is_building
+
+
+def load_building_id(building_id_tif) -> np.ndarray | None:
+    """Read a `_building_id.tif` (WP-04F) back into an int32 array, or None if absent —
+    kept as a standalone loader (not folded into load_surface's return tuple) so the
+    5 existing 4-tuple call sites of load_surface are untouched."""
+    p = Path(building_id_tif)
+    if not p.exists():
+        return None
+    with rasterio.open(p) as src:
+        return src.read(1).astype("int32")
+
+
+def load_ground(ground_tif) -> np.ndarray | None:
+    """Read a `_ground.tif` (WP-04F, the bare DTM on the surface grid, no building
+    tops) back into a float32 array, or None if absent."""
+    p = Path(ground_tif)
+    if not p.exists():
+        return None
+    with rasterio.open(p) as src:
+        return src.read(1).astype("float32")
 
 
 def main() -> int:
