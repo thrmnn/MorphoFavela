@@ -1,0 +1,42 @@
+{
+ "detected": {
+  "dx_cells": 3.0,
+  "dy_cells": 0.0
+ },
+ "baseline": {
+  "dx_cells": 0.0,
+  "dy_cells": 0.0,
+  "n": 7384,
+  "median_delta_m": 1.561149806826549,
+  "p95_abs_delta_m": 9.619940685086304
+ },
+ "detected_shift": {
+  "dx_cells": 3.0,
+  "dy_cells": 0.0,
+  "n": 7360,
+  "median_delta_m": 2.3891261680767286,
+  "p95_abs_delta_m": 10.681997955287155
+ },
+ "origin_plus_0p5_cell_x": {
+  "dx_cells": 0.5,
+  "dy_cells": 0.0,
+  "n": 7396,
+  "median_delta_m": 1.7296016402151508,
+  "p95_abs_delta_m": 9.59556887457532
+ },
+ "origin_minus_0p5_cell_x": {
+  "dx_cells": -0.5,
+  "dy_cells": 0.0,
+  "n": 7427,
+  "median_delta_m": 1.3947452826007805,
+  "p95_abs_delta_m": 9.310783064010735
+ },
+ "medians_side_by_side": {
+  "baseline_unshifted": 1.561149806826549,
+  "detected_shift": 2.3891261680767286,
+  "origin_plus_0p5_cell_x": 1.7296016402151508,
+  "origin_minus_0p5_cell_x": 1.3947452826007805
+ },
+ "closest_to_zero": "origin_minus_0p5_cell_x",
+ "note": "half-cell test scoped to the x axis only -- the detected planar shift has dy_cells=0."
+}

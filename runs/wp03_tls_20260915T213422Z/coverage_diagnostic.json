@@ -1,0 +1,10 @@
+{
+ "n_cells_total": 77871,
+ "n_covered": 34238,
+ "n_uncovered": 43633,
+ "share_uncovered_of_total": 0.5603241257977938,
+ "n_uncovered_inside_footprint": 30577,
+ "n_uncovered_on_ground": 13056,
+ "share_uncovered_inside_footprint": 0.700776934888731,
+ "share_uncovered_on_ground": 0.299223065111269
+}

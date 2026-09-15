@@ -1,0 +1,15 @@
+{
+ "min_ground": {
+  "n": 7384,
+  "median_delta_m": 1.561149806826549,
+  "p95_abs_delta_m": 9.619940685086304
+ },
+ "smrf_ground": {
+  "n": 6881,
+  "median_delta_m": 1.2961287054346826,
+  "p95_abs_delta_m": 6.6538918543240015,
+  "elapsed_s": 208.23214527100208
+ },
+ "fallback_reason": null,
+ "method_note": "PDAL writers.gdal has no per-cell-percentile output_type; SMRF ground classification (the spec's own offered fallback) substitutes for a literal numpy 5th-percentile-per-cell, which would require extracting and binning ~262M raw points -- not tractable in this check's time budget. Reported as SMRF, not relabelled as a percentile."
+}
