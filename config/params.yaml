@@ -100,7 +100,7 @@ canopy:
 domain:
   fabric_coverage_threshold: 0.10   # sensitivity 0.05 / 0.20
   fabric_footprint_distance_m: 10   # sensitivity 5 / 20
-  status: default                   # HD-02 / gate G3 — headline values need PI sign-off on the sensitivity table
+  status: decided                   # HD-02 / gate G3 — /ops card g3_domain: PI locked B_centre_010_10 on 2026-09-15 (runs/g3_domain_20260915T042927Z)
   alley_floor_policy: "Cells below the G2 alley-width validity floor are FLAGGED lower-confidence and RETAINED, not excluded — dropping the narrowest alleys would bias the citywide distribution toward open sites. Flag-vs-exclude is an HD-02 sub-decision."
 
 sampling:
