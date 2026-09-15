@@ -1,0 +1,159 @@
+{
+ "variants": {
+  "a_dtm_fill_merged": {
+   "variant": "a_dtm_fill_merged",
+   "cell_m": 1.0,
+   "n_candidates": 15968,
+   "n_used": 15968,
+   "classes": [
+    {
+     "class": "<1.5m",
+     "n": 4567,
+     "r": 0.01507604543529259,
+     "median_delta": -0.5704533272448191,
+     "median_abs_delta": 0.5704533272448191,
+     "p95_abs_delta": 0.8157270181197441,
+     "share_within_tol": 0.025399605868184804,
+     "below_min_points": false
+    },
+    {
+     "class": "1.5-3m",
+     "n": 3006,
+     "r": 0.10909351707877243,
+     "median_delta": -0.46423090643328047,
+     "median_abs_delta": 0.46423090643328047,
+     "p95_abs_delta": 0.7176532428449494,
+     "share_within_tol": 0.06254158349966733,
+     "below_min_points": false
+    },
+    {
+     "class": ">3m",
+     "n": 8395,
+     "r": 0.1527494874820359,
+     "median_delta": -0.30572663067097866,
+     "median_abs_delta": 0.30777322767588433,
+     "p95_abs_delta": 0.5994127340087726,
+     "share_within_tol": 0.1650982727814175,
+     "below_min_points": false
+    }
+   ],
+   "floor": null
+  },
+  "b_als_fill": {
+   "variant": "b_als_fill",
+   "cell_m": 1.0,
+   "n_candidates": 15968,
+   "n_used": 15968,
+   "classes": [
+    {
+     "class": "<1.5m",
+     "n": 4567,
+     "r": 0.021677690815187448,
+     "median_delta": -0.5555140567504718,
+     "median_abs_delta": 0.5555140567504718,
+     "p95_abs_delta": 0.7953267250244088,
+     "share_within_tol": 0.028246113422377928,
+     "below_min_points": false
+    },
+    {
+     "class": "1.5-3m",
+     "n": 3006,
+     "r": 0.11161136772685169,
+     "median_delta": -0.45204697798098226,
+     "median_abs_delta": 0.45204697798098226,
+     "p95_abs_delta": 0.7034199752308505,
+     "share_within_tol": 0.06520292747837658,
+     "below_min_points": false
+    },
+    {
+     "class": ">3m",
+     "n": 8395,
+     "r": 0.15345080329066302,
+     "median_delta": -0.3000629533657551,
+     "median_abs_delta": 0.30283393198515834,
+     "p95_abs_delta": 0.5861206066680671,
+     "share_within_tol": 0.16914830256104824,
+     "below_min_points": false
+    }
+   ],
+   "floor": null
+  },
+  "c_covered_only_observers": {
+   "variant": "c_covered_only_observers",
+   "cell_m": 1.0,
+   "n_candidates": 15968,
+   "n_used": 0,
+   "classes": [
+    {
+     "class": "<1.5m",
+     "n": 0,
+     "r": null,
+     "median_delta": null,
+     "median_abs_delta": null,
+     "p95_abs_delta": null,
+     "share_within_tol": null
+    },
+    {
+     "class": "1.5-3m",
+     "n": 0,
+     "r": null,
+     "median_delta": null,
+     "median_abs_delta": null,
+     "p95_abs_delta": null,
+     "share_within_tol": null
+    },
+    {
+     "class": ">3m",
+     "n": 0,
+     "r": null,
+     "median_delta": null,
+     "median_abs_delta": null,
+     "p95_abs_delta": null,
+     "share_within_tol": null
+    }
+   ],
+   "floor": null
+  },
+  "coverage_min_share": 0.8,
+  "coverage_share_note": "coverage_share_disc uses max_dist_m=500 m (the same radius patch_visibility marches to), which exceeds the TLS raster's own extent (303x257 cells at 1 m) -- the disc is effectively the whole raster for nearly every observer, so the per-observer share is close to the raster's global coverage fraction everywhere, and the >=80% filter can retain very few or zero observers.",
+  "d_als_fill_shift_corrected": {
+   "variant": "d_als_fill_shift_corrected",
+   "cell_m": 1.0,
+   "n_candidates": 15876,
+   "n_used": 15876,
+   "classes": [
+    {
+     "class": "<1.5m",
+     "n": 4450,
+     "r": 0.010982683833500895,
+     "median_delta": -0.529964912141465,
+     "median_abs_delta": 0.529964912141465,
+     "p95_abs_delta": 0.792235463779261,
+     "share_within_tol": 0.06629213483146068,
+     "below_min_points": false
+    },
+    {
+     "class": "1.5-3m",
+     "n": 3005,
+     "r": 0.032214474936633965,
+     "median_delta": -0.4504762243481755,
+     "median_abs_delta": 0.4504762243481755,
+     "p95_abs_delta": 0.7120072471131138,
+     "share_within_tol": 0.07753743760399334,
+     "below_min_points": false
+    },
+    {
+     "class": ">3m",
+     "n": 8421,
+     "r": 0.062417502299073876,
+     "median_delta": -0.34515792859143685,
+     "median_abs_delta": 0.3462570307478412,
+     "p95_abs_delta": 0.6140747426271553,
+     "share_within_tol": 0.12136325852036575,
+     "below_min_points": false
+    }
+   ],
+   "floor": null
+  }
+ }
+}

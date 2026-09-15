@@ -1,0 +1,19 @@
+{
+ "_utc": "2026-09-15T21:38:06Z",
+ "device": "cuda",
+ "seed": 0,
+ "sky": {
+  "patches": 145
+ },
+ "rasters_dir": "/home/theo/SCL/SCR/MorphoFavela/.claude/worktrees/agent-a87510f3220e4c3c0/runs/_wp03b_rasters",
+ "pdal_version": "pdal 2.2.0 (git-version: Release)",
+ "point_counts": {
+  "Vidigal1-registered_1m": 59747276,
+  "Vidigal3-registered_1m": 66165363,
+  "Vidigal4-registered_1m": 136602887,
+  "Vidigal1-registered_0p5m": 59747276,
+  "Vidigal3-registered_0p5m": 66165363,
+  "Vidigal4-registered_0p5m": 136602887
+ },
+ "spec": "docs/wp03b_tls_diagnostic_spec.md"
+}

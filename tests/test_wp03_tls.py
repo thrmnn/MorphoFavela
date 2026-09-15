@@ -18,12 +18,19 @@ import pytest
 from affine import Affine
 from shapely.geometry import box
 
+import rasterio.transform
+import rasterio.warp
+
 from src.brisa_solar.constants import P1_SKY_PATCHES, REPO_ROOT
 from src.brisa_solar.wp03_tls import (
     ALLEY_CLASSES,
     alley_width_class,
+    als_fill_surface,
     compute_svf_pair,
+    coverage_share_mask,
     g2_floor,
+    _resample_array_to_grid,
+    _shift_transform,
 )
 from src.svf_v2.compute import generate_tregenza_patches
 
@@ -93,6 +100,72 @@ def test_identical_surfaces_give_exact_zero_delta():
         obs, directions, weights, obs_height_m=1.5, max_dist_m=100.0, device="cpu",
     )
     assert np.all(svf_a - svf_b == 0.0)
+
+
+# ---------------------------------------------------------------------------
+# WP-03B deliverable 5(a): ALS-fill leaves TLS-covered cells untouched and
+# sets uncovered cells to the (resampled) ALS surface value.
+# ---------------------------------------------------------------------------
+
+def test_als_fill_leaves_covered_cells_untouched_and_fills_uncovered_with_als():
+    transform = Affine(1.0, 0, 0, 0, -1.0, 10)
+    tls_dsm = np.full((5, 5), -9999.0, dtype="float32")
+    tls_dsm[1:3, 1:3] = 7.0  # a small covered patch
+    als_surface = (np.arange(25, dtype="float32").reshape(5, 5) + 100.0)
+
+    filled = als_fill_surface(tls_dsm, transform, "EPSG:31983", als_surface, transform, "EPSG:31983")
+
+    covered = tls_dsm != -9999.0
+    assert np.array_equal(filled[covered], tls_dsm[covered])
+    assert np.allclose(filled[~covered], als_surface[~covered])
+
+
+# ---------------------------------------------------------------------------
+# WP-03B deliverable 5(b): the covered-only filter keeps exactly the
+# observers whose march-disc coverage share meets the threshold.
+# ---------------------------------------------------------------------------
+
+def test_coverage_share_mask_keeps_observers_meeting_threshold():
+    transform = Affine(1.0, 0, 0, 0, -1.0, 10)
+    coverage_share = np.array([[1.0, 0.9], [0.5, 0.79]])
+    rows = [0, 0, 1, 1]
+    cols = [0, 1, 0, 1]
+    xs, ys = rasterio.transform.xy(transform, rows, cols)
+    obs_xy = np.column_stack([xs, ys])
+
+    keep = coverage_share_mask(obs_xy, transform, coverage_share, min_share=0.8)
+
+    assert list(keep) == [True, True, False, False]
+
+
+# ---------------------------------------------------------------------------
+# WP-03B deliverable 5(c): the shift corrector moves a synthetic raster by
+# exactly (dx, dy) cells.
+# ---------------------------------------------------------------------------
+
+def test_shift_transform_moves_raster_by_exact_integer_cells():
+    transform = Affine(1.0, 0, 0, 0, -1.0, 10)
+    src = np.arange(100, dtype="float64").reshape(10, 10)
+    dx_cells, dy_cells = 2, 3
+
+    shifted_transform = _shift_transform(transform, dx_cells, dy_cells)
+    out = _resample_array_to_grid(
+        src, transform, "EPSG:31983", shifted_transform, src.shape, "EPSG:31983",
+        resampling=rasterio.warp.Resampling.nearest,
+    )
+
+    h, w = src.shape
+    expected = np.full(src.shape, np.nan)
+    for r in range(h):
+        for c in range(w):
+            sr, sc = r + dy_cells, c + dx_cells
+            if 0 <= sr < h and 0 <= sc < w:
+                expected[r, c] = src[sr, sc]
+
+    valid = np.isfinite(expected)
+    assert valid.sum() > 0
+    assert np.allclose(out[valid], expected[valid])
+    assert np.all(np.isnan(out[~valid]))
 
 
 # ---------------------------------------------------------------------------
