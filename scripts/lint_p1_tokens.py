@@ -34,6 +34,8 @@ P1_SOURCE_GLOBS = [
     "src/brisa_solar/**/*.py",
     "scripts/lint_p1_*.py",
     "docs/p1_column_allowlist.json",
+    "runs/wp07_*/**/*.md",
+    "runs/wp07_*/**/*.json",
 ]
 # P1's own written artifacts (WP-06's table). Only the header/leading-comment
 # lines matter — a banned word could not appear in numeric cell data anyway.

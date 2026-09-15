@@ -1,0 +1,413 @@
+# WP-07 C′ numbers ledger
+
+Generated 2026-09-15T18:46:19Z · status: final
+
+## _meta
+
+- **supersession**: Both PI decisions (wp05_run_design, g3_domain) were decided 2026-09-15; every source run's own 'PROVISIONAL — ... untapped' status string is superseded by that decision. Every entry in this ledger is status=final regardless of what the source file's own status field still says.
+- **facade_exclusion**: WP-04's facade surface is excluded throughout — facade was not accepted for release; only ground and street summaries are copied into this ledger.
+- **rounding**: values unrounded; ledger.md rounds to 3 significant figures for reading only
+- **derived_formula**: derived.spread[<favela>] = max(svf_percentile_of_citywide_median across the 9 g3_domain grid variants) - min(same) for that favela, EXCLUDING the wp04_polygon_interior universe. derived.rank_under_locked_domain = the 5 favelas sorted descending by svf_percentile_of_citywide_median under the locked 0.10/10 grid variant (g3_domain, 2026-09-15). derived.rank_invariant_across_grid = True iff every one of the 9 grid variants yields that identical descending order.
+- **engine_acceptance_source**: runs/wp02_horizon_20260914T195630Z/crossref_diagnostic.json#/variants/A_nearest_sampling — chosen because march_sampling='nearest' is the nearest-cell march named in docs/wp07_ledger_spec.md (r≈0.995), not the bilinear-march baseline in the same file (r≈0.988) nor the sibling run's single-site crossref (also bilinear-march, r≈0.988).
+- **sky_patches**: 145
+- **decision_provenance_pointers**:
+  - domain_status: `config/params.yaml#/domain/status`
+  - sampling_run_design: `config/params.yaml#/sampling/run_design`
+  - sampling_cell_m_status: `config/params.yaml#/sampling/cell_m_status`
+- **runs_of_record**:
+  - wp05: `wp05_full_20260914T215419Z`
+  - wp04: `wp04_sites_20260914T230606Z`
+  - g3: `g3_domain_20260915T042927Z`
+  - wp06: `wp06_geometry_20260915T052604Z`
+  - wp02_crossref: `wp02_horizon_20260914T195630Z`
+
+## Entries
+
+371 entries. Values rounded to 3 significant figures for reading; ledger.json carries the unrounded values.
+
+| id | value | unit | release_class | run_id |
+|---|---|---|---|---|
+| citywide.kwh_m2.p1 | 197 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.kwh_m2.p10 | 687 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.kwh_m2.p25 | 1.04e+03 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.kwh_m2.p5 | 494 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.kwh_m2.p50 | 1.4e+03 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.kwh_m2.p75 | 1.6e+03 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.kwh_m2.p90 | 1.67e+03 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.kwh_m2.p95 | 1.69e+03 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.kwh_m2.p99 | 1.7e+03 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.svf.p1 | 0.0993 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.svf.p10 | 0.382 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.svf.p25 | 0.563 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.svf.p5 | 0.269 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.svf.p50 | 0.755 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.svf.p75 | 0.885 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.svf.p90 | 0.942 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.svf.p95 | 0.962 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| citywide.svf.p99 | 0.983 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| engine.crossref.median_abs_delta | 0.0137 | fraction | publishable-candidate | wp02_horizon_20260914T195630Z |
+| engine.crossref.p95_abs_delta | 0.0474 | fraction | publishable-candidate | wp02_horizon_20260914T195630Z |
+| engine.crossref.r | 0.995 | dimensionless | publishable-candidate | wp02_horizon_20260914T195630Z |
+| favela.complexo_do_alemao.kwh_m2.iqr_high | 1.5e+03 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.complexo_do_alemao.kwh_m2.iqr_low | 875 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.complexo_do_alemao.kwh_m2.median | 1.23e+03 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.complexo_do_alemao.kwh_m2.percentile | 36.8 | percentile | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.complexo_do_alemao.svf.iqr_high | 0.812 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.complexo_do_alemao.svf.iqr_low | 0.475 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.complexo_do_alemao.svf.median | 0.662 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.complexo_do_alemao.svf.percentile | 36.8 | percentile | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.mare.kwh_m2.iqr_high | 879 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.mare.kwh_m2.iqr_low | 385 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.mare.kwh_m2.median | 611 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.mare.kwh_m2.percentile | 7.74 | percentile | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.mare.svf.iqr_high | 0.49 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.mare.svf.iqr_low | 0.212 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.mare.svf.median | 0.34 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.mare.svf.percentile | 7.86 | percentile | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.riodaspedras.kwh_m2.iqr_high | 1.22e+03 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.riodaspedras.kwh_m2.iqr_low | 475 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.riodaspedras.kwh_m2.median | 815 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.riodaspedras.kwh_m2.percentile | 14.5 | percentile | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.riodaspedras.svf.iqr_high | 0.641 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.riodaspedras.svf.iqr_low | 0.248 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.riodaspedras.svf.median | 0.43 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.riodaspedras.svf.percentile | 13 | percentile | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.rocinha.kwh_m2.iqr_high | 1.28e+03 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.rocinha.kwh_m2.iqr_low | 530 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.rocinha.kwh_m2.median | 911 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.rocinha.kwh_m2.percentile | 18.5 | percentile | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.rocinha.svf.iqr_high | 0.673 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.rocinha.svf.iqr_low | 0.289 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.rocinha.svf.median | 0.496 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.rocinha.svf.percentile | 18.3 | percentile | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.vidigal.kwh_m2.iqr_high | 1.26e+03 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.vidigal.kwh_m2.iqr_low | 651 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.vidigal.kwh_m2.median | 994 | kWh/m2 | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.vidigal.kwh_m2.percentile | 22.5 | percentile | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.vidigal.svf.iqr_high | 0.61 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.vidigal.svf.iqr_low | 0.297 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.vidigal.svf.median | 0.458 | fraction | publishable-candidate | wp05_full_20260914T215419Z |
+| favela.vidigal.svf.percentile | 15 | percentile | publishable-candidate | wp05_full_20260914T215419Z |
+| g3.grid_005_05.complexo_do_alemao.svf_percentile | 39.8 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_05.mare.svf_percentile | 9.08 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_05.riodaspedras.svf_percentile | 14 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_05.rocinha.svf_percentile | 18.2 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_05.vidigal.svf_percentile | 16.1 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_10.complexo_do_alemao.svf_percentile | 36.6 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_10.mare.svf_percentile | 7.61 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_10.riodaspedras.svf_percentile | 12.6 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_10.rocinha.svf_percentile | 18.4 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_10.vidigal.svf_percentile | 14.5 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_20.complexo_do_alemao.svf_percentile | 31.8 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_20.mare.svf_percentile | 6.26 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_20.riodaspedras.svf_percentile | 11.9 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_20.rocinha.svf_percentile | 17.4 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_005_20.vidigal.svf_percentile | 12.7 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_05.complexo_do_alemao.svf_percentile | 40.1 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_05.mare.svf_percentile | 9.29 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_05.riodaspedras.svf_percentile | 14.2 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_05.rocinha.svf_percentile | 18.1 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_05.vidigal.svf_percentile | 16.4 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_10.complexo_do_alemao.svf_percentile | 36.8 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_10.mare.svf_percentile | 7.86 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_10.riodaspedras.svf_percentile | 13 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_10.rocinha.svf_percentile | 18.3 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_10.vidigal.svf_percentile | 15 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_20.complexo_do_alemao.svf_percentile | 32.4 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_20.mare.svf_percentile | 6.64 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_20.riodaspedras.svf_percentile | 12.5 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_20.rocinha.svf_percentile | 17.2 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_010_20.vidigal.svf_percentile | 13.5 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_05.complexo_do_alemao.svf_percentile | 39.9 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_05.mare.svf_percentile | 9.83 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_05.riodaspedras.svf_percentile | 15 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_05.rocinha.svf_percentile | 18.2 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_05.vidigal.svf_percentile | 17 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_10.complexo_do_alemao.svf_percentile | 36.5 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_10.mare.svf_percentile | 8.44 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_10.riodaspedras.svf_percentile | 13.9 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_10.rocinha.svf_percentile | 18.2 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_10.vidigal.svf_percentile | 15.6 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_20.complexo_do_alemao.svf_percentile | 32.7 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_20.mare.svf_percentile | 7.44 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_20.riodaspedras.svf_percentile | 14 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_20.rocinha.svf_percentile | 17.4 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| g3.grid_020_20.vidigal.svf_percentile | 14.5 | percentile | publishable-candidate | g3_domain_20260915T042927Z |
+| site.complexo_do_alemao.ground.kwh_m2.p10 | 595 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.kwh_m2.p25 | 928 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.kwh_m2.p50 | 1.32e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.kwh_m2.p75 | 1.56e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.kwh_m2.p90 | 1.64e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.share_ge_1h_equinox | 0.952 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.share_ge_1h_winter_solstice | 0.799 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.share_ge_2h_equinox | 0.916 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.share_ge_2h_winter_solstice | 0.729 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.share_ge_3h_equinox | 0.87 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.share_ge_3h_winter_solstice | 0.661 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.share_ge_4h_equinox | 0.816 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.share_ge_4h_winter_solstice | 0.591 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.sun_h_equinox.p10 | 2.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.sun_h_equinox.p25 | 5 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.sun_h_equinox.p50 | 7.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.sun_h_equinox.p75 | 9.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.sun_h_equinox.p90 | 10.7 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.sun_h_winter.p10 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.sun_h_winter.p25 | 1.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.sun_h_winter.p50 | 5.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.sun_h_winter.p75 | 7.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.sun_h_winter.p90 | 9.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.svf.p10 | 0.325 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.svf.p25 | 0.504 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.svf.p50 | 0.707 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.svf.p75 | 0.853 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.ground.svf.p90 | 0.918 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.kwh_m2.p10 | 230 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.kwh_m2.p25 | 598 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.kwh_m2.p50 | 1.01e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.kwh_m2.p75 | 1.38e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.kwh_m2.p90 | 1.57e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.sun_h_equinox.p10 | 1.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.sun_h_equinox.p25 | 3.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.sun_h_equinox.p50 | 6.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.sun_h_equinox.p75 | 8.83 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.sun_h_equinox.p90 | 10.3 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.sun_h_winter.p10 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.sun_h_winter.p25 | 0.667 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.sun_h_winter.p50 | 3.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.sun_h_winter.p75 | 6.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.sun_h_winter.p90 | 8.83 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.svf.p10 | 0.115 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.svf.p25 | 0.321 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.svf.p50 | 0.546 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.svf.p75 | 0.739 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.complexo_do_alemao.street.svf.p90 | 0.862 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.kwh_m2.p10 | 233 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.kwh_m2.p25 | 395 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.kwh_m2.p50 | 635 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.kwh_m2.p75 | 897 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.kwh_m2.p90 | 1.22e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.share_ge_1h_equinox | 0.796 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.share_ge_1h_winter_solstice | 0.538 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.share_ge_2h_equinox | 0.654 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.share_ge_2h_winter_solstice | 0.394 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.share_ge_3h_equinox | 0.512 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.share_ge_3h_winter_solstice | 0.282 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.share_ge_4h_equinox | 0.383 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.share_ge_4h_winter_solstice | 0.192 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.sun_h_equinox.p10 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.sun_h_equinox.p25 | 1.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.sun_h_equinox.p50 | 3 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.sun_h_equinox.p75 | 5.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.sun_h_equinox.p90 | 7.5 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.sun_h_winter.p10 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.sun_h_winter.p25 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.sun_h_winter.p50 | 1.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.sun_h_winter.p75 | 3.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.sun_h_winter.p90 | 5.5 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.svf.p10 | 0.128 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.svf.p25 | 0.22 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.svf.p50 | 0.353 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.svf.p75 | 0.504 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.ground.svf.p90 | 0.658 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.kwh_m2.p10 | 352 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.kwh_m2.p25 | 607 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.kwh_m2.p50 | 953 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.kwh_m2.p75 | 1.47e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.kwh_m2.p90 | 1.68e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.sun_h_equinox.p10 | 1.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.sun_h_equinox.p25 | 3 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.sun_h_equinox.p50 | 5.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.sun_h_equinox.p75 | 8.5 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.sun_h_equinox.p90 | 10.8 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.sun_h_winter.p10 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.sun_h_winter.p25 | 1 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.sun_h_winter.p50 | 3.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.sun_h_winter.p75 | 6.83 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.sun_h_winter.p90 | 9.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.svf.p10 | 0.193 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.svf.p25 | 0.349 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.svf.p50 | 0.557 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.svf.p75 | 0.811 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.mare.street.svf.p90 | 0.958 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.kwh_m2.p10 | 282 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.kwh_m2.p25 | 514 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.kwh_m2.p50 | 900 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.kwh_m2.p75 | 1.35e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.kwh_m2.p90 | 1.59e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.share_ge_1h_equinox | 0.887 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.share_ge_1h_winter_solstice | 0.699 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.share_ge_2h_equinox | 0.779 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.share_ge_2h_winter_solstice | 0.561 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.share_ge_3h_equinox | 0.679 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.share_ge_3h_winter_solstice | 0.468 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.share_ge_4h_equinox | 0.583 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.share_ge_4h_winter_solstice | 0.397 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.sun_h_equinox.p10 | 0.833 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.sun_h_equinox.p25 | 2.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.sun_h_equinox.p50 | 4.83 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.sun_h_equinox.p75 | 7.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.sun_h_equinox.p90 | 9.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.sun_h_winter.p10 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.sun_h_winter.p25 | 0.5 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.sun_h_winter.p50 | 2.5 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.sun_h_winter.p75 | 6.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.sun_h_winter.p90 | 8.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.svf.p10 | 0.14 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.svf.p25 | 0.271 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.svf.p50 | 0.471 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.svf.p75 | 0.72 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.ground.svf.p90 | 0.886 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.kwh_m2.p10 | 112 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.kwh_m2.p25 | 295 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.kwh_m2.p50 | 596 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.kwh_m2.p75 | 996 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.kwh_m2.p90 | 1.35e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.sun_h_equinox.p10 | 0.5 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.sun_h_equinox.p25 | 1.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.sun_h_equinox.p50 | 3.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.sun_h_equinox.p75 | 5.83 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.sun_h_equinox.p90 | 8.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.sun_h_winter.p10 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.sun_h_winter.p25 | 0.333 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.sun_h_winter.p50 | 1.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.sun_h_winter.p75 | 3.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.sun_h_winter.p90 | 6.83 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.svf.p10 | 0.0508 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.svf.p25 | 0.148 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.svf.p50 | 0.308 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.svf.p75 | 0.51 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.riodaspedras.street.svf.p90 | 0.716 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.kwh_m2.p10 | 292 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.kwh_m2.p25 | 601 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.kwh_m2.p50 | 1.06e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.kwh_m2.p75 | 1.43e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.kwh_m2.p90 | 1.56e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.share_ge_1h_equinox | 0.856 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.share_ge_1h_winter_solstice | 0.623 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.share_ge_2h_equinox | 0.79 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.share_ge_2h_winter_solstice | 0.548 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.share_ge_3h_equinox | 0.724 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.share_ge_3h_winter_solstice | 0.476 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.share_ge_4h_equinox | 0.655 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.share_ge_4h_winter_solstice | 0.406 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.sun_h_equinox.p10 | 0.333 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.sun_h_equinox.p25 | 2.5 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.sun_h_equinox.p50 | 6 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.sun_h_equinox.p75 | 8.83 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.sun_h_equinox.p90 | 10.2 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.sun_h_winter.p10 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.sun_h_winter.p25 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.sun_h_winter.p50 | 2.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.sun_h_winter.p75 | 6 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.sun_h_winter.p90 | 8.83 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.svf.p10 | 0.151 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.svf.p25 | 0.336 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.svf.p50 | 0.568 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.svf.p75 | 0.758 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.ground.svf.p90 | 0.839 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.kwh_m2.p10 | 0 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.kwh_m2.p25 | 68.3 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.kwh_m2.p50 | 427 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.kwh_m2.p75 | 971 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.kwh_m2.p90 | 1.37e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.sun_h_equinox.p10 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.sun_h_equinox.p25 | 1.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.sun_h_equinox.p50 | 4.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.sun_h_equinox.p75 | 8.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.sun_h_equinox.p90 | 10.2 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.sun_h_winter.p10 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.sun_h_winter.p25 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.sun_h_winter.p50 | 1.5 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.sun_h_winter.p75 | 6.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.sun_h_winter.p90 | 8.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.svf.p10 | 0 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.svf.p25 | 0.025 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.svf.p50 | 0.225 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.svf.p75 | 0.508 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.rocinha.street.svf.p90 | 0.699 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.kwh_m2.p10 | 334 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.kwh_m2.p25 | 649 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.kwh_m2.p50 | 1.02e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.kwh_m2.p75 | 1.28e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.kwh_m2.p90 | 1.48e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.share_ge_1h_equinox | 0.904 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.share_ge_1h_winter_solstice | 0.632 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.share_ge_2h_equinox | 0.85 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.share_ge_2h_winter_solstice | 0.549 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.share_ge_3h_equinox | 0.793 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.share_ge_3h_winter_solstice | 0.476 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.share_ge_4h_equinox | 0.73 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.share_ge_4h_winter_solstice | 0.401 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.sun_h_equinox.p10 | 1 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.sun_h_equinox.p25 | 3.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.sun_h_equinox.p50 | 6.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.sun_h_equinox.p75 | 8.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.sun_h_equinox.p90 | 9.83 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.sun_h_winter.p10 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.sun_h_winter.p25 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.sun_h_winter.p50 | 2.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.sun_h_winter.p75 | 5.83 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.sun_h_winter.p90 | 7.33 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.svf.p10 | 0.146 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.svf.p25 | 0.298 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.svf.p50 | 0.462 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.svf.p75 | 0.618 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.ground.svf.p90 | 0.788 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.kwh_m2.p10 | 46.5 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.kwh_m2.p25 | 296 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.kwh_m2.p50 | 729 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.kwh_m2.p75 | 1.11e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.kwh_m2.p90 | 1.32e+03 | kWh/m2 | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.sun_h_equinox.p10 | 0.5 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.sun_h_equinox.p25 | 1.83 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.sun_h_equinox.p50 | 5.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.sun_h_equinox.p75 | 8 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.sun_h_equinox.p90 | 9.5 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.sun_h_winter.p10 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.sun_h_winter.p25 | 0 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.sun_h_winter.p50 | 1.67 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.sun_h_winter.p75 | 5.17 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.sun_h_winter.p90 | 7.5 | hours | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.svf.p10 | 0.0109 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.svf.p25 | 0.126 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.svf.p50 | 0.327 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.svf.p75 | 0.508 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| site.vidigal.street.svf.p90 | 0.652 | fraction | publishable-candidate | wp04_sites_20260914T230606Z |
+| wp06.complexo_do_alemao.n | 17768 | count | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.complexo_do_alemao.share_n0 | 0.174 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.complexo_do_alemao.share_n1 | 0.379 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.complexo_do_alemao.share_n2 | 0.344 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.complexo_do_alemao.share_n3 | 0.103 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.mare.n | 29229 | count | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.mare.share_n0 | 0.0983 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.mare.share_n1 | 0.243 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.mare.share_n2 | 0.338 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.mare.share_n3 | 0.32 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.riodaspedras.n | 6605 | count | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.riodaspedras.share_n0 | 0.0321 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.riodaspedras.share_n1 | 0.126 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.riodaspedras.share_n2 | 0.288 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.riodaspedras.share_n3 | 0.554 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.rocinha.n | 8031 | count | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.rocinha.share_n0 | 0.105 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.rocinha.share_n1 | 0.296 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.rocinha.share_n2 | 0.53 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.rocinha.share_n3 | 0.0691 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.vidigal.n | 2756 | count | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.vidigal.share_n0 | 0.203 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.vidigal.share_n1 | 0.399 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.vidigal.share_n2 | 0.329 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+| wp06.vidigal.share_n3 | 0.0686 | fraction | publishable-candidate | wp06_geometry_20260915T052604Z |
+
+## Derived
+
+- **rank_under_locked_domain** (descending SVF percentile, 0.10/10 grid): complexo_do_alemao, rocinha, vidigal, riodaspedras, mare
+- **rank_invariant_across_grid**: True
+
+| favela | svf percentile spread (max-min, 9 grid variants) |
+|---|---|
+| complexo_do_alemao | 8.28 |
+| mare | 3.57 |
+| riodaspedras | 3.19 |
+| rocinha | 1.27 |
+| vidigal | 4.28 |
