@@ -103,3 +103,4 @@ runs/_smoke_*/
 runs/wp02_horizon_*/
 !runs/wp02_horizon_20260914T194910Z/
 !runs/wp02_horizon_20260914T195630Z/
+runs/**/*.svg

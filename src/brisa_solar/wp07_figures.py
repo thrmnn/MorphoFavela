@@ -31,6 +31,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.ticker import FuncFormatter  # noqa: E402
 import numpy as np  # noqa: E402
 import pyarrow.parquet as pq  # noqa: E402
 
@@ -243,7 +244,8 @@ def _skip(fig_id: str, reason: str) -> dict:
 
 
 def _produced(fig, fig_id: str, out_dir: Path, ledger_ids: list[str],
-              source_parquets: list[str], release_class: str) -> dict:
+              source_parquets: list[str], release_class: str,
+              plotted_ids: list[str] | None = None) -> dict:
     svg_name, png_name, checklist = _save_and_checklist(fig, fig_id, out_dir)
     return {
         "id": fig_id,
@@ -251,6 +253,7 @@ def _produced(fig, fig_id: str, out_dir: Path, ledger_ids: list[str],
         "svg_path": svg_name,
         "png_path": png_name,
         "ledger_ids_used": sorted(set(ledger_ids)),
+        "ledger_ids_plotted": sorted(set(plotted_ids or [])),
         "source_parquets": source_parquets,
         "release_class_proposed": release_class,
         "checklist": checklist,
@@ -267,6 +270,7 @@ def render_f1(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
         return _skip("f1_citywide_position", f"citywide parquet absent: {path}")
 
     ledger_ids: list[str] = []
+    plotted_ids: list[str] = []
     fig, (axA, axB) = plt.subplots(1, 2, figsize=(7.2, 3.0))
     panels = (
         ("A", "svf", axA, "sky-view factor (fraction)", (0.0, 1.0)),
@@ -278,7 +282,8 @@ def render_f1(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
         centers = (edges[:-1] + edges[1:]) / 2
         ax.bar(centers, counts, width=(edges[1] - edges[0]), color="#88AACC", edgecolor="none")
         ax.set_xlabel(xlabel)
-        ax.set_ylabel("citywide ground cells (count)")
+        ax.set_ylabel("citywide ground cells (thousands)")
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _pos: f"{v / 1e3:.0f}"))
         ax.set_title(tag, loc="left", fontsize=8)
         ymax = ax.get_ylim()[1]
         for slug in FIGURE_SITE_ORDER:
@@ -286,14 +291,15 @@ def render_f1(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
             median_id, pct_id = f"favela.{slug}.{metric}.median", f"favela.{slug}.{metric}.percentile"
             median_val, _ = get_value(ledger, median_id)
             pct_val, _ = get_value(ledger, pct_id)
-            ledger_ids += [median_id, pct_id]
+            ledger_ids.append(pct_id)
+            plotted_ids.append(median_id)
             ax.axvline(median_val, color=COLORS[slug], linewidth=1.0, linestyle="--")
             ax.text(median_val, ymax * 0.97, f"{display} · p{fmt3(pct_val)}", color=COLORS[slug],
                     rotation=90, ha="right", va="top", fontsize=5.5)
 
     source_parquets = [str(path.relative_to(repo_root))]
     return _produced(fig, "f1_citywide_position", out_dir, ledger_ids, source_parquets,
-                      "publishable-candidate")
+                      "publishable-candidate", plotted_ids=plotted_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -328,6 +334,7 @@ def render_f2(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
         ax.set_title(tag, loc="left", fontsize=8)
         ax.set_ylabel(f"direct-sun hours, {day_label} (h)" if tag == "A" else "")
     axA.legend(fontsize=5, loc="upper left", frameon=False)
+    axB.legend(fontsize=5, loc="upper left", frameon=False)
 
     source_parquets = [str(paths[slug].relative_to(repo_root)) for slug in FIGURE_SITE_ORDER]
     return _produced(fig, "f2_direct_sun_reference_days", out_dir, ledger_ids, source_parquets,

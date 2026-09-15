@@ -96,6 +96,8 @@ def test_a_ledger_ids_exist_and_their_values_appear_in_svg_text(staged, ledger):
             value, _unit = figs.get_value(ledger, lid)  # raises KeyError if id doesn't exist
             expected = figs.fmt3(value)
             assert expected in text, f"{fid}: {lid} = {expected!r} not found in SVG text"
+        for lid in f.get("ledger_ids_plotted", []):
+            figs.get_value(ledger, lid)  # plotted as a marker position, never printed
 
 
 # ---------------------------------------------------------------------------
