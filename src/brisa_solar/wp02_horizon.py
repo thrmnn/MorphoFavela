@@ -76,19 +76,35 @@ def patch_visibility(
     directions: np.ndarray,
     is_building: np.ndarray | None = None,
     obs_height_m: float = 1.5,
+    obs_z: np.ndarray | None = None,
     max_dist_m: float = 500.0,
     step_m: float | None = None,
     march_sampling: str = "nearest",
     device: str | None = None,
     chunk: int = 4096,
-) -> tuple[np.ndarray, np.ndarray]:
+    return_horizon: bool = False,
+) -> tuple[np.ndarray, np.ndarray] | tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Per-(observer, patch) visibility by horizon-angle raster marching.
 
-    Returns ``(visible, on_building)``: ``visible`` is ``(n, P)`` bool with
-    ``P == P1_SKY_PATCHES``; ``on_building`` is ``(n,)`` bool. An observer
-    whose cell is a building cell (per ``is_building``) gets an all-False
-    visibility row and ``on_building[i] = True`` instead of being silently
-    sampled from the roof (spec §2).
+    Returns ``(visible, on_building)`` — or ``(visible, on_building,
+    horizon_deg)`` when ``return_horizon=True``. ``visible`` is ``(n, P)``
+    bool with ``P == P1_SKY_PATCHES``; ``on_building`` is ``(n,)`` bool;
+    ``horizon_deg`` is ``(n, P)`` float16, the marched horizon elevation
+    angle (degrees) per direction — independent of the patch's own altitude,
+    so patches sharing an azimuth share a horizon value (WP-04 direct-sun-
+    hours reads this against pvlib sun altitude at the nearest azimuth,
+    docs/wp04_sites_spec.md).
+
+    An observer whose cell is a building cell (per ``is_building``) gets an
+    all-False visibility row and ``on_building[i] = True`` instead of being
+    silently sampled from the roof (spec §2) — UNLESS ``obs_z`` is given: a
+    façade point sits at the offset edge just outside a wall
+    (``sampling._offset_points_outside_buildings``), and at cell size 1 m
+    that offset point's nearest cell can still read as a building cell, so
+    forcing an all-False row would blank every façade observation. Passing
+    an explicit ``obs_z`` opts out of that forcing (it also replaces the
+    ``surface[cell] + obs_height_m`` elevation with the given per-observer
+    height); ``on_building`` is still computed and returned either way.
 
     Sampling: the observer's own elevation is always read at its NEAREST
     cell (it sits at a specific cell, not an interpolated point).
@@ -119,6 +135,7 @@ def patch_visibility(
 
     obs_xy = np.asarray(obs_xy, dtype=np.float64)
     n = obs_xy.shape[0]
+    obs_z_arr = np.asarray(obs_z, dtype=np.float64) if obs_z is not None else None
 
     step = float(step_m) if step_m is not None else abs(transform.a)
     n_steps = max(1, int(round(max_dist_m / step)))
@@ -138,6 +155,7 @@ def patch_visibility(
 
     out_visible = np.zeros((n, n_patches), dtype=bool)
     out_on_building = np.zeros(n, dtype=bool)
+    out_horizon = np.zeros((n, n_patches), dtype=np.float16) if return_horizon else None
 
     for start in range(0, n, chunk):
         end = min(start + chunk, n)
@@ -150,7 +168,10 @@ def patch_visibility(
             on_building = ib_t[row, col]
         else:
             on_building = torch.zeros(m, dtype=torch.bool, device=torch_dev)
-        z_obs = z_ground + obs_height_m
+        if obs_z_arr is not None:
+            z_obs = torch.as_tensor(obs_z_arr[start:end], dtype=dtype, device=torch_dev)
+        else:
+            z_obs = z_ground + obs_height_m
 
         horizon = torch.full((m, n_patches), float("-inf"), dtype=dtype, device=torch_dev)
         for t in ts:
@@ -164,12 +185,32 @@ def patch_visibility(
 
         vis = alt[None, :] > horizon
         vis = vis | zenith_patch[None, :]   # zenith cap: no horizontal march exists to obstruct it
-        vis = vis & ~on_building[:, None]
+        if obs_z_arr is None:
+            vis = vis & ~on_building[:, None]
 
         out_visible[start:end] = vis.cpu().numpy()
         out_on_building[start:end] = on_building.cpu().numpy()
+        if return_horizon:
+            out_horizon[start:end] = np.degrees(horizon.cpu().numpy()).astype(np.float16)
 
+    if return_horizon:
+        return out_visible, out_on_building, out_horizon
     return out_visible, out_on_building
+
+
+def hemisphere_mask(directions: np.ndarray, normals: np.ndarray) -> np.ndarray:
+    """Boolean ``(n, P)``: ``True`` where patch direction is on the front side of a normal.
+
+    ``directions`` is ``(P, 3)``, ``normals`` is ``(n, 3)`` (or ``(3,)`` for a
+    single normal). Used for façade SVF: a wall can only ever "see" the half
+    of the sky its outward normal faces, independent of obstruction.
+    """
+    directions = np.asarray(directions, dtype=np.float64)
+    normals = np.asarray(normals, dtype=np.float64)
+    if normals.ndim == 1:
+        normals = normals[None, :]
+    dot = normals @ directions.T   # (n, P)
+    return dot > 0.0
 
 
 def svf_unweighted(visibility: np.ndarray) -> np.ndarray:
