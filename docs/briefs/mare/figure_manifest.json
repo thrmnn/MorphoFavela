@@ -1,0 +1,104 @@
+[
+  {
+    "file": "fig_built_form_maps.png",
+    "class": "band-classed map, freshly rendered",
+    "layers": [
+      "lambda_p",
+      "H_mean",
+      "porosity",
+      "svf"
+    ],
+    "n_classes": 5,
+    "basemap": false,
+    "coordinate_ticks": false,
+    "source": "morphometrics/grid/grid_metrics.gpkg",
+    "classes": {
+      "lambda_p": [
+        0,
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1.0
+      ],
+      "H_mean_m": [
+        0.01,
+        4.8,
+        6.28,
+        7.57,
+        9.02,
+        19.88
+      ],
+      "porosity": [
+        0,
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1.0
+      ],
+      "svf": [
+        0,
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1.0
+      ]
+    }
+  },
+  {
+    "file": "fig_street_svf_map.png",
+    "class": "band-classed map, freshly rendered",
+    "layers": [
+      "street_svf"
+    ],
+    "n_classes": 5,
+    "basemap": false,
+    "coordinate_ticks": false,
+    "source": "svf_v2/svf_streets_segments.gpkg",
+    "classes": {
+      "svf_median": [
+        0,
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1.0
+      ]
+    }
+  },
+  {
+    "file": "fig_distributions.png",
+    "class": "distribution (histogram), freshly rendered",
+    "layers": [
+      "lambda_p",
+      "H_mean",
+      "svf",
+      "street_svf"
+    ],
+    "basemap": false,
+    "coordinate_ticks": false,
+    "source": "morphometrics/grid/grid_metrics.gpkg, svf_v2/svf_streets_segments.gpkg"
+  },
+  {
+    "file": "fig_wind_rose.png",
+    "class": "wind rose, freshly rendered",
+    "layers": [
+      "wind_frequency"
+    ],
+    "basemap": false,
+    "coordinate_ticks": false,
+    "source": "data/maré/wind_rose.json"
+  },
+  {
+    "file": "fig_mare_diagnostic_map.png",
+    "class": "publishable (already band-classed; copied verbatim)",
+    "layers": [
+      "diagnostic_classification"
+    ],
+    "basemap": false,
+    "coordinate_ticks": false,
+    "source": "paper_figures/fig_maré_diagnostic_map.png"
+  }
+]
