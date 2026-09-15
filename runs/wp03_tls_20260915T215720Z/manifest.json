@@ -1,0 +1,23 @@
+{
+ "_utc": "2026-09-15T22:09:30Z",
+ "device": "cuda",
+ "seed": 0,
+ "sky": {
+  "patches": 145
+ },
+ "rasters_dir": "/home/theo/SCL/SCR/MorphoFavela/.claude/worktrees/agent-ae8782929242585c9/runs/wp03_tls_20260915T215720Z",
+ "pdal_version": "pdal 2.2.0 (git-version: Release)",
+ "point_counts": {
+  "Vidigal1-registered_1m": 59747276,
+  "Vidigal3-registered_1m": 66165363,
+  "Vidigal4-registered_1m": 136602887,
+  "Vidigal1-registered_0p5m": 59747276,
+  "Vidigal3-registered_0p5m": 66165363,
+  "Vidigal4-registered_0p5m": 136602887
+ },
+ "coverage_disc_radius_m": 50.0,
+ "coverage_min_share": 0.8,
+ "wall_share_threshold_m": 2.0,
+ "phase2_source": "/home/theo/SCL/SCR/MorphoFavela/runs/wp03_tls_20260915T213422Z/g2_result_v2.json",
+ "spec": "docs/wp03c_tls_observer_spec.md"
+}

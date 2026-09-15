@@ -35,7 +35,7 @@ from shapely.geometry import Point
 
 from .constants import P1_SKY_PATCHES, REPO_ROOT
 from .wp02_horizon import default_device, hemisphere_mask, patch_visibility, svf_solid_angle, write_run_manifest
-from .wp04_sites import CELL_M, MAX_DIST_M, OBS_HEIGHT_M, build_site_surface, resolve_native_paths
+from .wp04_sites import CELL_M, MAX_DIST_M, OBS_HEIGHT_M, build_site_surface, resolve_native_boundary, resolve_native_paths
 from src.svf_v2 import sampling as svf_sampling
 from src.svf_v2.compute import generate_tregenza_patches
 
@@ -60,6 +60,17 @@ STOREY_BIN_EDGES = (0.0, 3.0, 6.0, 9.0)
 STOREY_BIN_LABELS = ("0-3m", "3-6m", "6-9m", ">9m")
 
 MAX_PDAL_WALL_SECONDS = 40 * 60  # spec: fall back to 1 m DSM only past ~40 minutes total
+
+#: WP-03C deliverable 3 (docs/wp03c_tls_observer_spec.md): variant (c)'s repaired
+#: coverage disc -- phase 2's variant (c) used max_dist_m=500 m (the march radius),
+#: far larger than the TLS raster (303x257 cells at 1 m), so no observer passed.
+G2_COVERAGE_DISC_RADIUS_M = 50.0
+
+#: WP-03C phase-2 run folder (docs/wp03c_tls_observer_spec.md: "copy a-d from
+#: phase 2's json by code") -- lives in the main checkout under runs/, tracked
+#: (json/md are not gitignored), so reading it via data_root is safe from any
+#: worktree.
+PHASE2_RUN_ID = "wp03_tls_20260915T213422Z"
 
 #: WP-03B deliverable 4 (docs/wp03b_tls_diagnostic_spec.md): "filters.smrf if it
 #: runs in < 10 min on the 1 m grid".
@@ -230,14 +241,17 @@ def _write_tif(path: Path, arr: np.ndarray, transform, crs, nodata: float = -999
 # Registration residual (replaces the missing .rcp floor)
 # ---------------------------------------------------------------------------
 
-def _resample_to_grid(src_path: Path, dst_transform, dst_shape, dst_crs) -> np.ndarray:
+def _resample_to_grid(
+    src_path: Path, dst_transform, dst_shape, dst_crs,
+    resampling=rasterio.warp.Resampling.bilinear,
+) -> np.ndarray:
     out = np.full(dst_shape, np.nan, dtype="float64")
     with rasterio.open(src_path) as src:
         rasterio.warp.reproject(
             source=rasterio.band(src, 1), destination=out,
             src_transform=src.transform, src_crs=src.crs,
             dst_transform=dst_transform, dst_crs=dst_crs,
-            resampling=rasterio.warp.Resampling.bilinear,
+            resampling=resampling,
             dst_nodata=np.nan,
         )
     return out
@@ -480,17 +494,26 @@ def compute_svf_pair(
     surface_b: np.ndarray, transform_b, cell_b: float,
     obs_xy: np.ndarray, directions: np.ndarray, weights: np.ndarray,
     obs_height_m: float, max_dist_m: float, device: str,
+    obs_z: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """SVF (solid-angle-weighted, geometric -- no cumulative-sky/kWh weighting
     so this does not depend on the EPW-derived weather sky) at the SAME
-    observer points on two independently-marched surfaces."""
+    observer points on two independently-marched surfaces.
+
+    ``obs_z``, when given, is the SAME per-observer elevation passed to BOTH
+    marches (WP-03C deliverable 1) -- without it each surface supplies its
+    own ``surface[cell] + obs_height_m`` observer height, which is exactly the
+    untested confound docs/wp03c_tls_observer_spec.md names: a TLS max-DSM
+    cell lifted by a stray wall/wire/vegetation point puts that surface's
+    observer standing on a wall while the other stands on the ground.
+    """
     vis_a, _ob_a = patch_visibility(
         surface_a, transform_a, obs_xy, directions=directions,
-        obs_height_m=obs_height_m, max_dist_m=max_dist_m, step_m=cell_a, device=device,
+        obs_height_m=obs_height_m, obs_z=obs_z, max_dist_m=max_dist_m, step_m=cell_a, device=device,
     )
     vis_b, _ob_b = patch_visibility(
         surface_b, transform_b, obs_xy, directions=directions,
-        obs_height_m=obs_height_m, max_dist_m=max_dist_m, step_m=cell_b, device=device,
+        obs_height_m=obs_height_m, obs_z=obs_z, max_dist_m=max_dist_m, step_m=cell_b, device=device,
     )
     svf_a = svf_solid_angle(vis_a, weights)
     svf_b = svf_solid_angle(vis_b, weights)
@@ -515,6 +538,60 @@ def g2_candidate_points(als_surface, als_transform, als_is_building, tls_dsm, tl
 
     keep = ground_mask & covered
     return np.column_stack([xs[keep], ys[keep]])
+
+
+def g2_candidate_cells(als_surface, als_transform, als_is_building, tls_dsm, tls_transform, tls_crs):
+    """Same candidate rule as `g2_candidate_points`, but also returns each
+    candidate's ALS-grid (row, col) and TLS-grid (row, col) -- WP-03C needs the
+    observer's own ALS-grid DTM/TLS-ground value at EXACTLY the cell the
+    candidate was generated from (deliverable 1's shared obs_z, deliverable 2's
+    wall-share diagnostic), not a value resampled at the point's xy a second
+    time with its own, independent rounding."""
+    h, w = als_surface.shape
+    rows, cols = np.mgrid[0:h, 0:w]
+    rows_f, cols_f = rows.ravel(), cols.ravel()
+    xs, ys = rasterio.transform.xy(als_transform, rows_f, cols_f, offset="center")
+    xs, ys = np.asarray(xs), np.asarray(ys)
+    ground_mask = ~als_is_building.ravel() if als_is_building is not None else np.ones(xs.shape, dtype=bool)
+
+    inv = ~tls_transform
+    cols_tls = np.floor(inv.a * xs + inv.b * ys + inv.c).astype(int)
+    rows_tls = np.floor(inv.d * xs + inv.e * ys + inv.f).astype(int)
+    th, tw = tls_dsm.shape
+    in_bounds = (rows_tls >= 0) & (rows_tls < th) & (cols_tls >= 0) & (cols_tls < tw)
+    covered = np.zeros(xs.shape, dtype=bool)
+    covered[in_bounds] = tls_dsm[rows_tls[in_bounds], cols_tls[in_bounds]] != -9999.0
+
+    keep = ground_mask & covered
+    return (
+        np.column_stack([xs[keep], ys[keep]]),
+        rows_f[keep], cols_f[keep],
+        rows_tls[keep], cols_tls[keep],
+    )
+
+
+def observer_wall_share(
+    tls_z_at_obs: np.ndarray, dtm_z_at_obs: np.ndarray, labels: np.ndarray,
+    threshold_m: float = GROUND_CLEARANCE_M,
+) -> list[dict]:
+    """WP-03C deliverable 2: share of G2 observer cells whose TLS DSM sits more
+    than `threshold_m` above the ALS DTM at the SAME cell, per alley class --
+    the "standing on a wall" diagnostic that tells the reader whether the
+    untested confound (docs/wp03c_tls_observer_spec.md) was real."""
+    rows = []
+    for cls in ALLEY_CLASSES:
+        idx = np.where(labels == cls)[0]
+        n_cls = len(idx)
+        if n_cls == 0:
+            rows.append({"class": cls, "n": 0, "threshold_m": threshold_m, "share_above_threshold": None, "median_diff_m": None})
+            continue
+        diff = tls_z_at_obs[idx].astype("float64") - dtm_z_at_obs[idx].astype("float64")
+        rows.append({
+            "class": cls, "n": n_cls, "threshold_m": threshold_m,
+            "share_above_threshold": float(np.mean(diff > threshold_m)),
+            "median_diff_m": float(np.median(diff)),
+        })
+    return rows
 
 
 # ---------------------------------------------------------------------------
@@ -682,6 +759,115 @@ def compute_g2_variant(
         "n_candidates": n_candidates, "n_used": len(obs_xy),
         "classes": rows, "floor": g2_floor(rows),
     }
+
+
+def compute_g2_variant_shared_obs_z(
+    footprints: gpd.GeoDataFrame, als_bundle,
+    obs_xy: np.ndarray, labels: np.ndarray, obs_z: np.ndarray,
+    tls_filled: np.ndarray, tls_filled_transform,
+    device: str, variant: str, n_candidates: int,
+    keep: np.ndarray | None = None,
+) -> dict:
+    """WP-03C deliverables 1/3/4: a G2 class table where `obs_z` is the SAME
+    per-observer elevation passed to BOTH the ALS march and the TLS-filled
+    march (`compute_svf_pair`'s `obs_z`) -- this is what removes the
+    "standing on a wall" confound: neither surface supplies its own, possibly
+    wall-lifted, `surface[cell] + obs_height_m`. `keep`, when given, restricts
+    to a subset of `obs_xy`/`labels`/`obs_z` (deliverable 3's repaired
+    coverage-disc filter, deliverable 4's in-scanned-extent filter)."""
+    directions, weights = generate_tregenza_patches()
+    als_surface, als_transform, als_crs, _als_is_building = als_bundle[:4]
+
+    if keep is not None:
+        obs_xy, labels, obs_z = obs_xy[keep], labels[keep], obs_z[keep]
+
+    rows = []
+    for cls in ALLEY_CLASSES:
+        idx = np.where(labels == cls)[0]
+        n_cls = len(idx)
+        row = {"class": cls, "n": n_cls}
+        if n_cls == 0:
+            row.update(r=None, median_delta=None, median_abs_delta=None, p95_abs_delta=None, share_within_tol=None)
+            rows.append(row)
+            continue
+        xy_cls = obs_xy[idx]
+        oz_cls = obs_z[idx]
+        svf_als, svf_tls = compute_svf_pair(
+            als_surface, als_transform, CELL_M,
+            tls_filled, tls_filled_transform, CELL_M,
+            xy_cls, directions, weights, OBS_HEIGHT_M, MAX_DIST_M, device,
+            obs_z=oz_cls,
+        )
+        delta = svf_als - svf_tls
+        r = float(np.corrcoef(svf_als, svf_tls)[0, 1]) if n_cls > 1 and svf_als.std() > 0 and svf_tls.std() > 0 else None
+        row.update(
+            r=r,
+            median_delta=float(np.median(delta)),
+            median_abs_delta=float(np.median(np.abs(delta))),
+            p95_abs_delta=float(np.percentile(np.abs(delta), 95)),
+            share_within_tol=float(np.mean(np.abs(delta) <= G2_TOLERANCE)),
+            below_min_points=n_cls < G2_MIN_POINTS_PER_CLASS,
+        )
+        rows.append(row)
+
+    return {
+        "variant": variant, "cell_m": CELL_M,
+        "n_candidates": n_candidates, "n_used": len(obs_xy),
+        "classes": rows, "floor": g2_floor(rows),
+    }
+
+
+def compute_street_point_e(
+    data_root: Path, tls: dict, footprints: gpd.GeoDataFrame, als_bundle, device: str,
+) -> dict:
+    """WP-03C deliverable 4: variant (e) -- shared obs_z = ALS DTM + 1.5 m on
+    both surfaces -- rerun on the Vidigal svf_v2 street sample points
+    (`svf_v2.paths.resolve_paths("vidigal")`, as WP-04's `run_site` does),
+    restricted to points inside the TLS scanned extent. These are the points
+    the paper's ground-level claim is about (pedestrian street network), not
+    the G2 alley-centreline grid."""
+    als_surface, als_transform, als_crs, _als_is_building = als_bundle[:4]
+    tls_dsm = tls["dsm_1m"]
+    tls_transform = tls["grid_1m"]["transform"]
+    tls_crs = tls["grid_1m"]["crs"]
+
+    native_dtm, native_fp, native_roads = resolve_native_paths(SITE_KEY, data_root)
+    footprints_native = gpd.read_file(native_fp)
+    boundary_path = resolve_native_boundary(SITE_KEY, data_root)
+    boundary_gdf = gpd.read_file(boundary_path) if boundary_path is not None else None
+    street_pts = svf_sampling.sample_street_points(
+        native_roads, native_dtm, footprints_gdf=footprints_native, boundary_gdf=boundary_gdf,
+    )
+    obs_xy_all = np.column_stack([street_pts.geometry.x.to_numpy(), street_pts.geometry.y.to_numpy()])
+    n_total = len(obs_xy_all)
+
+    rows_tls, cols_tls = xy_to_rowcol(tls_transform, obs_xy_all)
+    th, tw = tls_dsm.shape
+    in_extent = (rows_tls >= 0) & (rows_tls < th) & (cols_tls >= 0) & (cols_tls < tw)
+    obs_xy = obs_xy_all[in_extent]
+    n_in_extent = len(obs_xy)
+
+    dist, labels = alley_width_class(obs_xy, footprints)
+
+    h, w = als_surface.shape
+    rows_als, cols_als = xy_to_rowcol(als_transform, obs_xy)
+    rows_als = np.clip(rows_als, 0, h - 1)
+    cols_als = np.clip(cols_als, 0, w - 1)
+    dtm_on_als = _resample_to_grid(
+        data_root / f"data/{SITE_KEY}/dtm_extended_700m.tif", als_transform, als_surface.shape, als_crs,
+        resampling=rasterio.warp.Resampling.nearest,
+    )
+    obs_z = dtm_on_als[rows_als, cols_als] + OBS_HEIGHT_M
+
+    tls_filled = als_fill_surface(tls_dsm, tls_transform, tls_crs, als_surface, als_transform, als_crs)
+
+    result = compute_g2_variant_shared_obs_z(
+        footprints, als_bundle, obs_xy, labels, obs_z, tls_filled, tls_transform, device,
+        "e_street_points", n_in_extent,
+    )
+    result["n_total_street_points"] = n_total
+    result["n_in_scanned_extent"] = n_in_extent
+    return result
 
 
 def compute_g2_variants(
@@ -1289,6 +1475,186 @@ def run_wp03b(data_root: Path, run_dir: Path, rasters_dir: Path, device: str, se
     return {"manifest": manifest, "coverage": coverage, "variants": variants, "shift": shift, "ground_definition": ground_def}
 
 
+# ---------------------------------------------------------------------------
+# WP-03C orchestration (docs/wp03c_tls_observer_spec.md) -- LAST bounded round
+# ---------------------------------------------------------------------------
+
+def _wall_share_verdict(variant_e: dict, variant_f: dict) -> str:
+    """Spec's stop rule: if (e) and (f) both read r < 0.5 in EVERY class, the
+    confound was not the explanation and the fallback in the plan of record
+    applies -- WP-03 closes as "TLS not usable as a validity reference at
+    this site"; do not iterate further."""
+    rs = []
+    for v in (variant_e, variant_f):
+        for row in v["classes"]:
+            r = row.get("r")
+            if r is not None:
+                rs.append(r)
+    if rs and any(r >= 0.5 for r in rs):
+        return (
+            "at least one class in variant (e) or (f) reads r >= 0.5 with the shared "
+            "observer elevation -- the confound was (at least partly) real; see the "
+            "per-class table for which class(es) cleared the bar."
+        )
+    return (
+        "every class in both variant (e) and variant (f) still reads r < 0.5 with the "
+        "shared observer elevation -- per the spec's stop rule, the fallback in the plan "
+        "of record (DTM + footprint decomposition, stated accuracy note) applies and "
+        "WP-03 closes as \"TLS not usable as a validity reference at this site\"."
+    )
+
+
+def _render_report_v3(
+    manifest: dict, wall_share: list[dict],
+    variants: dict, street: dict, verdict: str,
+) -> str:
+    lines = [f"# WP-03C TLS shared-observer validity floor -- {manifest['_utc']}", "",
+             f"device={manifest['device']}, sky_patches={manifest['sky']['patches']}", ""]
+
+    lines += ["## Deliverable 2 -- observer-cell sanity (\"standing on a wall\" share)", "",
+              f"threshold: TLS DSM > {GROUND_CLEARANCE_M} m above the ALS DTM at the SAME observer cell", "",
+              "| class | n | share above threshold | median diff (m) |", "|---|---|---|---|"]
+    for row in wall_share:
+        lines.append(f"| {row['class']} | {row['n']} | {row.get('share_above_threshold')} | {row.get('median_diff_m')} |")
+    lines.append("")
+
+    lines += ["## Deliverable 5 -- G2 variants a-f side by side", ""]
+    for key in (
+        "a_dtm_fill_merged", "b_als_fill", "c_covered_only_observers", "d_als_fill_shift_corrected",
+        "c_repaired_50m_disc", "e_shared_obs_z_als_dtm", "f_shared_obs_z_smrf_ground",
+    ):
+        if key in variants:
+            lines += _render_variant_table(variants[key])
+    lines.append("")
+
+    lines += [
+        "## Deliverable 4 -- street-point view (Vidigal svf_v2 street sample, variant e)", "",
+        f"n_total_street_points={street.get('n_total_street_points')}, "
+        f"n_in_scanned_extent={street.get('n_in_scanned_extent')}", "",
+    ]
+    lines += _render_variant_table(street)
+
+    lines += ["## Verdict (spec's stop rule)", "", verdict, ""]
+    return "\n".join(lines)
+
+
+def run_wp03c(
+    data_root: Path, run_dir: Path, rasters_dir: Path | None, device: str, seed: int = 0,
+) -> dict:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    tmp_dir = run_dir / "_tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    if rasters_dir is not None and (rasters_dir / "tls_dsm_1m.tif").exists():
+        tls = load_tls_rasters(rasters_dir)
+    else:
+        tls = build_tls_rasters(data_root, tmp_dir)
+        _write_tif(run_dir / "tls_dsm_1m.tif", tls["dsm_1m"], tls["grid_1m"]["transform"], tls["grid_1m"]["crs"])
+        _write_tif(run_dir / "tls_ground_1m.tif", tls["ground_1m"], tls["grid_1m"]["transform"], tls["grid_1m"]["crs"])
+        rasters_dir = run_dir
+
+    footprints = _footprints_gdf(data_root)
+    als_bundle = build_site_surface(SITE_KEY, data_root, CELL_M, tmp_dir)
+    als_surface, als_transform, als_crs, als_is_building = als_bundle[:4]
+    dtm_path = data_root / f"data/{SITE_KEY}/dtm_extended_700m.tif"
+
+    smrf_tif = rasters_dir / "tls_ground_smrf_1m.tif"
+    if smrf_tif.exists():
+        with rasterio.open(smrf_tif) as ds:
+            smrf_arr = ds.read(1).astype("float32")
+            smrf_transform, smrf_crs = ds.transform, ds.crs
+    else:
+        smrf = build_smrf_ground_raster(data_root, tmp_dir)
+        if smrf["ground_smrf"] is None:
+            raise RuntimeError(f"SMRF ground pass did not complete: {smrf['fallback_reason']}")
+        smrf_arr = smrf["ground_smrf"]
+        smrf_transform, smrf_crs = smrf["grid"]["transform"], smrf["grid"]["crs"]
+        _write_tif(run_dir / "tls_ground_smrf_1m.tif", smrf_arr, smrf_transform, smrf_crs)
+
+    tls_dsm = tls["dsm_1m"]
+    tls_transform = tls["grid_1m"]["transform"]
+    tls_crs = tls["grid_1m"]["crs"]
+
+    obs_xy, rows_als, cols_als, rows_tls, cols_tls = g2_candidate_cells(
+        als_surface, als_transform, als_is_building, tls_dsm, tls_transform, tls_crs
+    )
+    dist, labels = alley_width_class(obs_xy, footprints)
+    n_candidates = len(obs_xy)
+
+    dtm_on_als = _resample_to_grid(dtm_path, als_transform, als_surface.shape, als_crs, resampling=rasterio.warp.Resampling.nearest)
+    smrf_on_als = _resample_array_to_grid(
+        smrf_arr, smrf_transform, smrf_crs, als_transform, als_surface.shape, als_crs,
+        resampling=rasterio.warp.Resampling.nearest,
+    )
+    dtm_at_obs = dtm_on_als[rows_als, cols_als]
+    smrf_at_obs = smrf_on_als[rows_als, cols_als]
+    tls_dsm_at_obs = tls_dsm[rows_tls, cols_tls]
+
+    wall_share = observer_wall_share(tls_dsm_at_obs, dtm_at_obs, labels, threshold_m=GROUND_CLEARANCE_M)
+
+    obs_z_e = dtm_at_obs + OBS_HEIGHT_M
+    obs_z_f = smrf_at_obs + OBS_HEIGHT_M
+    tls_filled = als_fill_surface(tls_dsm, tls_transform, tls_crs, als_surface, als_transform, als_crs)
+
+    variant_e = compute_g2_variant_shared_obs_z(
+        footprints, als_bundle, obs_xy, labels, obs_z_e, tls_filled, tls_transform, device,
+        "e_shared_obs_z_als_dtm", n_candidates,
+    )
+    variant_f = compute_g2_variant_shared_obs_z(
+        footprints, als_bundle, obs_xy, labels, obs_z_f, tls_filled, tls_transform, device,
+        "f_shared_obs_z_smrf_ground", n_candidates,
+    )
+
+    covered = tls_dsm != -9999.0
+    coverage_share_50 = coverage_share_disc(covered, CELL_M, G2_COVERAGE_DISC_RADIUS_M)
+    keep_50 = coverage_share_mask(obs_xy, tls_transform, coverage_share_50, COVERAGE_MIN_SHARE)
+    variant_c_repaired = compute_g2_variant_shared_obs_z(
+        footprints, als_bundle, obs_xy, labels, obs_z_e, tls_filled, tls_transform, device,
+        "c_repaired_50m_disc", n_candidates, keep=keep_50,
+    )
+
+    street = compute_street_point_e(data_root, tls, footprints, als_bundle, device)
+
+    phase2_path = data_root / "runs" / PHASE2_RUN_ID / "g2_result_v2.json"
+    phase2_variants = json.loads(phase2_path.read_text())["variants"]
+    variants = {
+        "a_dtm_fill_merged": phase2_variants["a_dtm_fill_merged"],
+        "b_als_fill": phase2_variants["b_als_fill"],
+        "c_covered_only_observers": phase2_variants["c_covered_only_observers"],
+        "d_als_fill_shift_corrected": phase2_variants["d_als_fill_shift_corrected"],
+        "c_repaired_50m_disc": variant_c_repaired,
+        "e_shared_obs_z_als_dtm": variant_e,
+        "f_shared_obs_z_smrf_ground": variant_f,
+        "coverage_disc_radius_m": G2_COVERAGE_DISC_RADIUS_M,
+        "coverage_min_share": COVERAGE_MIN_SHARE,
+        "phase2_source": str(phase2_path),
+    }
+    (run_dir / "g2_result_v3.json").write_text(json.dumps({"variants": variants, "wall_share": wall_share, "street": street}, indent=1))
+
+    verdict = _wall_share_verdict(variant_e, variant_f)
+
+    manifest = {
+        "_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "device": device, "seed": seed,
+        "sky": {"patches": int(P1_SKY_PATCHES)},
+        "rasters_dir": str(rasters_dir),
+        "pdal_version": _pdal_version(),
+        "point_counts": tls.get("point_counts"),
+        "coverage_disc_radius_m": G2_COVERAGE_DISC_RADIUS_M,
+        "coverage_min_share": COVERAGE_MIN_SHARE,
+        "wall_share_threshold_m": GROUND_CLEARANCE_M,
+        "phase2_source": str(phase2_path),
+        "spec": "docs/wp03c_tls_observer_spec.md",
+    }
+    (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=1, default=str))
+    (run_dir / "report_v3.md").write_text(_render_report_v3(manifest, wall_share, variants, street, verdict))
+
+    return {
+        "manifest": manifest, "wall_share": wall_share, "variants": variants,
+        "street": street, "verdict": verdict,
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
@@ -1297,7 +1663,8 @@ def main() -> int:
     ap.add_argument("--max-wall-seconds", type=float, default=MAX_PDAL_WALL_SECONDS)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--wp03b", action="store_true", help="run the WP-03B diagnostic (deliverables 1-5) instead of phase 1")
-    ap.add_argument("--rasters-dir", type=Path, default=None, help="--wp03b: dir holding tls_dsm_1m.tif etc (skips the PDAL pass)")
+    ap.add_argument("--wp03c", action="store_true", help="run the WP-03C shared-observer validity floor (deliverables 1-5)")
+    ap.add_argument("--rasters-dir", type=Path, default=None, help="--wp03b/--wp03c: dir holding tls_dsm_1m.tif etc (skips the PDAL pass if present)")
     args = ap.parse_args()
 
     run_dir = args.run_dir
@@ -1310,6 +1677,14 @@ def main() -> int:
         rasters_dir = args.rasters_dir or run_dir
         result = run_wp03b(args.data_root, run_dir, rasters_dir, device, args.seed)
         print(json.dumps({"run_dir": str(run_dir), "coverage": result["coverage"]}, indent=1))
+        return 0
+
+    if args.wp03c:
+        if run_dir is None:
+            run_id = "wp03_tls_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            run_dir = REPO_ROOT / "runs" / run_id
+        result = run_wp03c(args.data_root, run_dir, args.rasters_dir, device, args.seed)
+        print(json.dumps({"run_dir": str(run_dir), "verdict": result["verdict"]}, indent=1))
         return 0
 
     if run_dir is None:
