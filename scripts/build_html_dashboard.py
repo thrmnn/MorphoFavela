@@ -71,7 +71,7 @@ SITE_META = {
         subtitle="a north-zone low-rise grid of 16 favelas, ~4 km²",
         typology="Dense low-rise grid",
         boundary_shp="data/maré/raw/mare_boundary.shp",
-        atoms_subdir="mare",
+        atoms_subdir="maré",
     ),
 }
 
