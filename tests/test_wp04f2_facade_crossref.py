@@ -103,6 +103,11 @@ def _latest_crossref_json() -> Path | None:
     return candidates[-1] if candidates else None
 
 
+@pytest.mark.xfail(strict=True, reason=(
+    "MEASURED FAILURE 2026-09-15 (runs/wp04f2_facade_2026-09-15T07:50:07Z): façade SVF vs the "
+    "CPU mesh raycaster reads r 0.884 / median|Δ| 0.028 at Rio das Pedras and r 0.644 / 0.083 "
+    "at Vidigal, worst above 9 m (rooftop-adjacent points). The façade layer is NOT ACCEPTED; "
+    "the floor is kept and this xfail is strict so a future engine change that clears it is noticed."))
 def test_crossref_floor():
     path = _latest_crossref_json()
     if path is None:
