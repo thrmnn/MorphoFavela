@@ -22,8 +22,10 @@ import importlib.util
 import json
 import re
 import string
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -32,7 +34,13 @@ ROOT = Path(__file__).resolve().parent.parent
 BRIEF_DIR = ROOT / "docs" / "briefs" / "mare"
 OUTPUTS_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela/outputs")
 
-sys.path.insert(0, str(BRIEF_DIR))
+# Build into a throwaway copy of the brief directory: the builder writes next to
+# its own file (HERE), and rebuilding the TRACKED pdf/json from a test run left
+# the repo dirty after every full suite (weasyprint/matplotlib bytes differ run to run).
+BUILD_DIR = Path(tempfile.mkdtemp(prefix="mare_brief_test_")) / "mare"
+shutil.copytree(BRIEF_DIR, BUILD_DIR)
+
+sys.path.insert(0, str(BUILD_DIR))
 import build_brief  # noqa: E402
 import collect_numbers  # noqa: E402
 from numbers_format import format_entry  # noqa: E402
@@ -48,9 +56,10 @@ def _load_module(name: str, path: Path):
 LINT_P1 = _load_module("lint_p1_tokens", ROOT / "scripts" / "lint_p1_tokens.py")
 
 SRC_MD = BRIEF_DIR / "mare_morphology_brief.src.md"
-NUMBERS_JSON = BRIEF_DIR / "mare_numbers.json"
-MANIFEST_JSON = BRIEF_DIR / "figure_manifest.json"
-PDF = BRIEF_DIR / "mare_morphology_brief.pdf"
+NUMBERS_JSON = BUILD_DIR / "mare_numbers.json"
+MANIFEST_JSON = BUILD_DIR / "figure_manifest.json"
+PDF = BUILD_DIR / "mare_morphology_brief.pdf"
+TRACKED_PDF = BRIEF_DIR / "mare_morphology_brief.pdf"
 
 EXCLUDED_BASENAME_PATTERNS = ["slope", "aspect", "risk", "tb", "cfd"]
 # per-building height maps are distinguished from the allowed *aggregated*
@@ -142,10 +151,10 @@ def test_d_no_banned_tokens(built):
     # "WHO" as a standalone word (not inside e.g. "WHOLE"/"whole")
     assert not re.search(r"\bWHO\b", filled), "banned token 'WHO' present (use Athens Charter, Point 26)"
 
-    tmp_path = BRIEF_DIR / "_test_tmp_lint_target.md"
+    tmp_path = BUILD_DIR / "_test_tmp_lint_target.md"
     tmp_path.write_text(filled)
     try:
-        hits = LINT_P1._scan_lines(filled.split("\n"), str(tmp_path.relative_to(ROOT)))
+        hits = LINT_P1._scan_lines(filled.split("\n"), tmp_path.name)
     finally:
         tmp_path.unlink(missing_ok=True)
     assert not hits, f"lint_p1_tokens hits in rendered brief: {hits}"
@@ -153,6 +162,7 @@ def test_d_no_banned_tokens(built):
 
 def test_e_pdf_exists_and_page_count(built):
     assert PDF.exists(), f"missing {PDF}"
+    assert TRACKED_PDF.exists(), f"the committed brief PDF is missing: {TRACKED_PDF}"
     n_pages = _pdf_page_count(PDF)
     assert n_pages is not None, "could not determine PDF page count (no pypdf, no pdfinfo)"
     assert n_pages <= 8, f"PDF has {n_pages} pages, spec caps at 8"
