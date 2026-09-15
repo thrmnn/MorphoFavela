@@ -29,6 +29,7 @@ from hubkit import (
     card,
     git_provenance,
     page,
+    relativize_page,
     render_doc_page,
     section,
     toc_sections,
@@ -300,9 +301,11 @@ def build_callout(prov):
     """Top panel: newest results (direct links) + the live work queue, so new
     figures are never hard to find."""
     if (ROOT / "docs/work_queue.md").exists():
-        render_doc_page(ROOT / "docs/work_queue.md", DOCS / "work_queue.html",
+        wq_md = ROOT / "docs/work_queue.md"
+        render_doc_page(wq_md, DOCS / "work_queue.html",
                         crumb=breadcrumb([("← Project hub", "../index.html"),
-                                          ("Work queue", None)]), provenance=prov)
+                                          ("Work queue", None)]), provenance=prov,
+                        base=_doc_base(wq_md), root=ROOT, mirror_dir=DOCS)
     hub = "/outputs/_hub"
     tr = f"{hub}/docs/technical_report.html"
     # A dated changelog of new/updated results. Each lands on the EXACT figure or
@@ -388,7 +391,8 @@ def build_callout(prov):
 def _doc_card(url, name, desc, prov):
     src = ROOT / url.lstrip("/")
     back = breadcrumb([("← Project hub", "../index.html"), (src.stem, None)])
-    render_doc_page(src, DOCS / f"{src.stem}.html", crumb=back, provenance=prov)
+    render_doc_page(src, DOCS / f"{src.stem}.html", crumb=back, provenance=prov,
+                    base=_doc_base(src), root=ROOT, mirror_dir=DOCS)
     return card(name, desc, f"/outputs/_hub/docs/{src.stem}.html", meta=url, kind="doc",
                 new_tab=False)
 
@@ -924,7 +928,8 @@ def deliverables_section(prov):
     if tr_md.exists():
         back = breadcrumb([("← Project hub", "../index.html"), ("Technical report", None)])
         render_doc_page(tr_md, DOCS / "technical_report.html", crumb=back,
-                        provenance=prov, base="/docs/technical_report/")
+                        provenance=prov, base=_doc_base(tr_md), root=ROOT,
+                        mirror_dir=DOCS)
         cards.append(card("Technical report", "Full report — fast HTML view, figures inline.",
                           "docs/technical_report.html", kind="ok",
                           badge_label="Report", new_tab=False))
@@ -937,22 +942,82 @@ def deliverables_section(prov):
     return section("Deliverables", cards, anchor="deliverables")
 
 
-def _relativize(html_str):
+def _relativize(html_str, page_dir=None):
     """Rewrite root-absolute URLs (and lightbox zoom() targets) to paths relative
-    to OUT (outputs/_hub), so the hub resolves both from the :8773 server and when
-    opened directly via file://."""
-    def rel(url):
-        base, _, frag = url.partition("#")
-        r = os.path.relpath(ROOT / base.lstrip("/"), OUT)
-        return r + (f"#{frag}" if frag else "")
-    html_str = re.sub(r'(href|src)="(/[^"]*)"',
-                      lambda m: f'{m.group(1)}="{rel(m.group(2))}"', html_str)
-    html_str = re.sub(r"zoom\('(/[^']*)'",
-                      lambda m: f"zoom('{rel(m.group(1))}'", html_str)
-    return html_str
+    to `page_dir` (default OUT, i.e. outputs/_hub), so every page resolves under
+    any URL prefix and when opened directly via file://. A target outside
+    outputs/ (e.g. under docs/) is mirrored into OUT/docs first — see
+    hubkit.relativize_page."""
+    return relativize_page(html_str, OUT if page_dir is None else page_dir,
+                           ROOT, mirror_dir=DOCS)
 
 
-def main():
+def _doc_base(src: Path) -> str:
+    """Root-absolute base directory for a markdown doc's relative links/images,
+    e.g. docs/technical_report/technical_report.md -> '/docs/technical_report/'.
+    Consumed by hubkit._rel inside md_to_html; the resulting root-absolute URLs
+    are then resolved (and mirrored if needed) by _relativize."""
+    rel = src.parent.relative_to(ROOT)
+    return "/" if str(rel) == "." else f"/{rel}/"
+
+
+def _is_withheld(rel: str) -> bool:
+    """True if `rel` (a path under outputs/, no leading 'outputs/') is a
+    per-cell layer the hub must never expose: <site>/morphometrics/grid,
+    <site>/svf_v2/*.gpkg, runs/, <site>/cfd*. Scoped to a known site's own
+    top-level subtree so an unrelated file merely named e.g.
+    'cfd_parameter_estimation_plan.html' never false-positives."""
+    parts = rel.split("/")
+    if "runs" in parts:
+        return True
+    if len(parts) >= 2 and parts[0] in SITE_NAMES:
+        p1 = parts[1]
+        if p1 == "morphometrics" and len(parts) >= 3 and parts[2] == "grid":
+            return True
+        if p1 == "svf_v2" and rel.endswith(".gpkg"):
+            return True
+        if p1.startswith("cfd"):
+            return True
+    return False
+
+
+def build_mirror_manifest(out_dir: Path, root: Path) -> list[str]:
+    """Scan every emitted *.html page under `out_dir` and return the sorted
+    list of first-segment directories under outputs/ that any href/src/zoom()
+    target resolves into — computed from the written HTML, never typed by
+    hand. Asserts no withheld per-cell layer is referenced."""
+    segments, refs = set(), set()
+    for html_file in sorted(out_dir.rglob("*.html")):
+        text = html_file.read_text()
+        targets = re.findall(r'(?:href|src)="([^"]+)"', text)
+        targets += re.findall(r"zoom\('([^']+)'", text)
+        for t in targets:
+            base, _, _frag = t.partition("#")
+            if not base or base.startswith(("http:", "https:", "mailto:")):
+                continue
+            assert not base.startswith("/"), (
+                f"root-absolute target leaked into {html_file}: {base}")
+            abspath = (html_file.parent / base).resolve()
+            try:
+                rel = abspath.relative_to(root / "outputs")
+            except ValueError:
+                continue  # points outside outputs/ entirely — should not happen
+            if not rel.parts:
+                continue
+            refs.add(rel.as_posix())
+            segments.add(rel.parts[0])
+    for ref in refs:
+        assert not _is_withheld(ref), f"withheld per-cell layer referenced by hub: {ref}"
+    return sorted(segments)
+
+
+def main(root: Path | None = None):
+    global ROOT, OUT, DOCS, DASH
+    if root is not None:
+        ROOT = Path(root).resolve()
+        OUT = ROOT / "outputs" / "_hub"
+        DOCS = OUT / "docs"
+        DASH = ROOT / "outputs" / "_distribution" / "html_dashboards"
     DOCS.mkdir(parents=True, exist_ok=True)
     prov = git_provenance(ROOT, "scripts/build_project_hub.py")
 
@@ -992,8 +1057,21 @@ def main():
     (OUT / "index.html").write_text(_relativize(
         page("MorphoFavela — project hub", sub, body,
              provenance=prov, sidebar=sidebar)))
-    print(f"hub written: {len(sections)} sections, {n_sites} site dashboards")
+
+    manifest = build_mirror_manifest(OUT, ROOT)
+    (OUT / "mirror_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+
+    print(f"hub written: {len(sections)} sections, {n_sites} site dashboards, "
+          f"{len(manifest)} mirrored subtrees")
+    return manifest
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=None,
+                        help="repo root to build the hub for (default: this "
+                             "script's own repo)")
+    args = parser.parse_args()
+    main(root=args.root)
