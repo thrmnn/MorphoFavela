@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 from pathlib import Path
 
 import geopandas as gpd
@@ -191,15 +190,6 @@ def render_all(outputs_root: Path, figures_dir: Path) -> list[dict]:
         "file": p.name, "class": "wind rose, freshly rendered",
         "layers": ["wind_frequency"], "basemap": False, "coordinate_ticks": False,
         "source": "data/maré/wind_rose.json",
-    })
-
-    src_diag = outputs_root / SITE / "paper_figures" / "fig_maré_diagnostic_map.png"
-    dst_diag = figures_dir / "fig_mare_diagnostic_map.png"
-    shutil.copy2(src_diag, dst_diag)
-    manifest.append({
-        "file": dst_diag.name, "class": "publishable (already band-classed; copied verbatim)",
-        "layers": ["diagnostic_classification"], "basemap": False, "coordinate_ticks": False,
-        "source": "paper_figures/fig_maré_diagnostic_map.png",
     })
 
     return manifest

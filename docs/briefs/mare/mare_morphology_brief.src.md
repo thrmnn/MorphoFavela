@@ -39,7 +39,7 @@ same campaign.
 |---|---|---|---|---|
 | Building footprints (input) | per-building polygon | municipal cadastre (2019) + LiDAR height attributes | restricted input | not shareable; pipeline is open |
 | Digital terrain model (input) | ${mare_dtm_resolution_m} m raster | municipal DTM | restricted input | not shareable; pipeline is open |
-| Morphometric grid | ${mare_grid_resolution_m} m cell, ${mare_cells_10m} cells | derived (λp, height, porosity, SVF, slope per cell) | derived aggregate | shareable, de-georeferenced |
+| Morphometric grid | ${mare_grid_resolution_m} m cell, ${mare_cells_10m} cells | derived (λp, height, porosity, SVF per cell; terrain columns held back) | derived aggregate | shareable, de-georeferenced, without terrain columns |
 | Street-level SVF and solar hours | per street sample point (${mare_street_points_n} points) | derived (ray-cast SVF + sun-position accumulation) | derived aggregate | shareable, de-georeferenced |
 | Street-segment SVF | per segment (${mare_svf_street_n_segments} segments) | derived, aggregated from street points | derived aggregate | shareable, de-georeferenced |
 | Geometry-derived ventilation tendencies | per built cell | derived (λf regime, lateral depth, wind exposure) | derived aggregate | shareable, de-georeferenced |
@@ -109,22 +109,6 @@ daylight-adequacy floor of the **Athens Charter (1943), Point 26**,
 ${mare_share_below_2h_winter_pct}% of street points fall below the floor at
 the winter reference date, ${mare_share_below_2h_annual_pct}% on the annual
 proxy, and ${mare_share_below_2h_summer_pct}% in summer.
-
-A companion classification crosses this sun floor with the enclosure
-threshold used elsewhere in the campaign (frontal-area density λf >
-${mare_diag_enclosure_threshold}) at grid-cell resolution. Of the
-${mare_diag_n_classified} classified cells, ${mare_diag_share_unconstrained_pct}%
-meet the sun floor and sit below the enclosure threshold,
-${mare_diag_share_sun_only_pct}% fall below the sun floor only,
-${mare_diag_share_enclosure_only_pct}% sit above the enclosure threshold
-only, and ${mare_diag_share_both_pct}% meet neither condition; the remaining
-cells (${mare_diag_share_nodata_pct}% of the full grid) lack sufficient
-sample coverage to classify.
-
-![Maré diagnostic classification: sun-floor and enclosure-threshold co-occurrence, band-classed.](figures/fig_mare_diagnostic_map.png)
-
-**Figure Four.** Cell-level co-occurrence of the Athens Charter sun floor
-and the campaign enclosure threshold, already band-classed for publication.
 
 ## Geometry-derived ventilation potential
 

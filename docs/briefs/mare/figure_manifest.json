@@ -90,15 +90,5 @@
     "basemap": false,
     "coordinate_ticks": false,
     "source": "data/maré/wind_rose.json"
-  },
-  {
-    "file": "fig_mare_diagnostic_map.png",
-    "class": "publishable (already band-classed; copied verbatim)",
-    "layers": [
-      "diagnostic_classification"
-    ],
-    "basemap": false,
-    "coordinate_ticks": false,
-    "source": "paper_figures/fig_maré_diagnostic_map.png"
   }
 ]
