@@ -1,5 +1,5 @@
 {
-  "_doc": "P1 (C′ reframe, 2026-09-08) column policy for outputs/{site}/cfd_analysis/per_patch_indicators.csv. P1's ventilation axis is DESCRIPTIVE GEOMETRY ONLY — no CFD-derived quantity may reach a P1 figure, table, or claim. Enforced by scripts/lint_p1_columns.py, wired into .claude/verify-cmd.",
+  "_doc": "P1 (C′ reframe, 2026-09-08) column policy for outputs/{site}/cfd_analysis/per_patch_indicators.csv. P1's ventilation axis is DESCRIPTIVE GEOMETRY ONLY — no simulation-derived quantity may reach a P1 figure, table, or claim. Enforced by scripts/lint_p1_columns.py, wired into .claude/verify-cmd.",
   "_source_schema": {
     "file": "outputs/{site}/cfd_analysis/per_patch_indicators.csv",
     "n_columns": 52,
@@ -15,10 +15,14 @@
     "lambda_p_patch",
     "lambda_f_N", "lambda_f_NE", "lambda_f_E", "lambda_f_SE",
     "lambda_f_S", "lambda_f_SW", "lambda_f_W", "lambda_f_NW",
-    "lambda_f_mean", "lambda_f_max", "lambda_f_max_dir", "H_mean"
+    "lambda_f_mean", "lambda_f_max", "lambda_f_max_dir", "H_mean",
+    "svf_c_p50", "kwh_m2_p50", "sun_h_winter_p50", "share_ge_2h_winter",
+    "wind_exposure", "exposure_ratio", "open_edge_dist_m",
+    "constraint_vertical", "constraint_lateral", "constraint_directional",
+    "n_constraints"
   ],
   "p1_banned_cfd_output": {
-    "_why": "Direct products of a flow simulation. P1 makes no flow claim.",
+    "_why": "Direct products of a numerical simulation. P1 makes no simulation-based claim.",
     "columns": [
       "annual_TI_mean", "annual_TKE_mean", "annual_U_mean", "annual_U_median",
       "annual_U_p10", "annual_U_p90", "annual_stagnation_frac",
@@ -26,7 +30,7 @@
     ]
   },
   "p1_banned_cfd_setup": {
-    "_why": "Not flow results, but their DEFINITIONS presuppose a simulation (a blockage ratio or an 'eligible for a CFD run' flag is a non-question in a paper with no CFD). Banned for the same reason the word 'flow' is banned from P1.",
+    "_why": "Not simulation results, but their DEFINITIONS presuppose one (a blockage ratio or an 'eligible for a run' flag is a non-question in a paper with no numerical simulation). Banned for the same reason simulation vocabulary is banned from P1.",
     "columns": [
       "domain_upstream_m", "domain_downstream_m", "domain_lateral_m", "domain_top_m",
       "domain_blockage_frontal_m2", "domain_blockage_cross_section_m2",
@@ -36,6 +40,13 @@
   },
   "p1_output_convention": {
     "path": "outputs/{site}/geometry_indicators/per_patch_geometry.csv",
-    "rule": "WP-06 writes P1's own geometry table containing ONLY p1_legal columns, produced by code that never imports the CFD post-processing module. The lint is the backstop, not the primary defence."
-  }
+    "rule": "WP-06 writes P1's own geometry table containing ONLY p1_legal columns, produced by code that never imports the simulation post-processing module. The lint is the backstop, not the primary defence."
+  },
+  "_changelog": [
+    {
+      "utc": "2026-09-15",
+      "task": "WP-06",
+      "change": "Added 11 columns to p1_legal for outputs/{site}/geometry_indicators/per_patch_geometry.csv: svf_c_p50, kwh_m2_p50, sun_h_winter_p50, share_ge_2h_winter (medians/share of the WP-04 1 m ground SVF/sun-hours inside the cell; engine = raster horizon, sky = epw_weighted), wind_exposure, exposure_ratio (scripts.run_wind_exposure), open_edge_dist_m (scripts.run_lateral_connectivity), constraint_vertical, constraint_lateral, constraint_directional, n_constraints (scripts.run_ventilation_index.count_constraints, the council-locked ordinal 0-3 checklist). All geometry x climatology x WP-04 solar, none simulation-derived. Does not touch the pinned 52-column source schema (outputs/{site}/cfd_analysis/per_patch_indicators.csv), so the schema-drift check is unaffected."
+    }
+  ]
 }

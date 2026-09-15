@@ -8,7 +8,7 @@ stratified sample, and the run-manifest/acceptance machinery around them.
 
 Boundaries that matter:
   * P1's ventilation axis is DESCRIPTIVE GEOMETRY ONLY. Nothing in this package
-    may read a CFD-derived column (scripts/lint_p1_columns.py enforces it).
+    may read a simulation-derived column (scripts/lint_p1_columns.py enforces it).
   * One sky resolution end-to-end: constants.P1_SKY_PATCHES.
   * Existing solar results are clear-sky and are not annual-insolation claims
     until recomputed or relabelled under an explicit sky_model.
