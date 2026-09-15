@@ -29,6 +29,7 @@ from src.brisa_solar.wp03_tls import (
     compute_svf_pair,
     coverage_share_mask,
     g2_floor,
+    observer_wall_share,
     _resample_array_to_grid,
     _shift_transform,
 )
@@ -100,6 +101,73 @@ def test_identical_surfaces_give_exact_zero_delta():
         obs, directions, weights, obs_height_m=1.5, max_dist_m=100.0, device="cpu",
     )
     assert np.all(svf_a - svf_b == 0.0)
+
+
+# ---------------------------------------------------------------------------
+# WP-03C deliverable 5(a): a shared obs_z gives Delta = 0 exactly even when one
+# surface is lifted ONLY at the observer's own cell ("standing on a wall") --
+# the confound docs/wp03c_tls_observer_spec.md names, and the mechanism that
+# removes it: the march never samples the observer's own cell (it starts at
+# step 1), so once obs_z is explicit the observer-cell height cannot leak in.
+# ---------------------------------------------------------------------------
+
+def test_shared_obs_z_gives_exact_zero_delta_when_only_observer_cell_differs():
+    directions, weights = generate_tregenza_patches()
+    cell, size = 1.0, 40
+    transform = Affine(cell, 0, -size * cell / 2, 0, -cell, size * cell / 2)
+    rng = np.random.default_rng(1)
+    surface_a = rng.uniform(0, 5, size=(size, size)).astype("float32")
+    surface_b = surface_a.copy()
+
+    # Observers sit at exact cell CENTRES, spaced far apart, with max_dist_m
+    # well under their pairwise spacing: the closest any march step (1 m away,
+    # per the marched unit-direction vector) can land is 0.5*sqrt(2) m < 1 m
+    # from centre, so the first march step always leaves the observer's OWN
+    # cell -- and the spacing/max_dist_m bound stops a ray from ever crossing
+    # a DIFFERENT observer's lifted cell either. The lifted cell can then only
+    # ever be read as an observer's own elevation (bypassed via obs_z), never
+    # sampled by any march.
+    rows = np.array([5, 20, 35])
+    cols = np.array([5, 20, 35])
+    xs, ys = rasterio.transform.xy(transform, rows, cols, offset="center")
+    obs = np.column_stack([xs, ys])
+    surface_b[rows, cols] = surface_a[rows, cols] + 5.0  # lifted only at each observer's own cell
+    obs_z = surface_a[rows, cols].astype("float64") + 1.5  # shared, from the UNLIFTED surface
+
+    svf_a, svf_b = compute_svf_pair(
+        surface_a, transform, cell, surface_b, transform, cell,
+        obs, directions, weights, obs_height_m=1.5, max_dist_m=8.0, device="cpu",
+        obs_z=obs_z,
+    )
+    assert np.all(svf_a - svf_b == 0.0)
+
+
+# ---------------------------------------------------------------------------
+# WP-03C deliverable 5(b): the wall-share diagnostic on a synthetic pair.
+# ---------------------------------------------------------------------------
+
+def test_observer_wall_share_synthetic():
+    labels = np.array(["<1.5m", "<1.5m", "1.5-3m", ">3m"], dtype=object)
+    tls_z = np.array([5.0, 1.0, 3.0, 10.0])
+    dtm_z = np.array([0.0, 0.0, 0.0, 9.5])
+
+    rows = observer_wall_share(tls_z, dtm_z, labels, threshold_m=2.0)
+    by_class = {r["class"]: r for r in rows}
+
+    assert by_class["<1.5m"]["n"] == 2
+    assert by_class["<1.5m"]["share_above_threshold"] == pytest.approx(0.5)  # 5-0=5>2, 1-0=1<=2
+    assert by_class["1.5-3m"]["n"] == 1
+    assert by_class["1.5-3m"]["share_above_threshold"] == pytest.approx(1.0)  # 3-0=3>2
+    assert by_class[">3m"]["n"] == 1
+    assert by_class[">3m"]["share_above_threshold"] == pytest.approx(0.0)  # 10-9.5=0.5<=2
+
+
+def test_observer_wall_share_empty_class_reports_none():
+    labels = np.array(["<1.5m"], dtype=object)
+    rows = observer_wall_share(np.array([1.0]), np.array([0.0]), labels, threshold_m=2.0)
+    by_class = {r["class"]: r for r in rows}
+    assert by_class[">3m"]["n"] == 0
+    assert by_class[">3m"]["share_above_threshold"] is None
 
 
 # ---------------------------------------------------------------------------
