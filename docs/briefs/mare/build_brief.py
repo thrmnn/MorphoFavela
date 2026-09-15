@@ -225,7 +225,7 @@ def build(outputs_root: Path) -> int:
         numbers = collect_numbers.collect(outputs_root)
     except collect_numbers.MissingSource as e:
         print(f"build_brief: SKIP — {e}")
-        return 0
+        return 2  # distinct from success so callers cannot mistake a skip for a build
 
     by_id = {n["id"]: n for n in numbers}
     NUMBERS_JSON.write_text(json.dumps(by_id, indent=2, ensure_ascii=False, sort_keys=True) + "\n")

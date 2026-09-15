@@ -14,13 +14,14 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import os
 from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-REPO_ROOT = HERE.parent.parent.parent
+REPO_ROOT = Path(os.environ.get("MORPHOFAVELA_ROOT", HERE.parent.parent.parent))
 TR_MD = REPO_ROOT / "docs" / "technical_report" / "technical_report.md"
 OUT_JSON = HERE / "mare_numbers.json"
 

@@ -22,6 +22,7 @@ import importlib.util
 import json
 import re
 import string
+import os
 import shutil
 import subprocess
 import sys
@@ -40,6 +41,7 @@ OUTPUTS_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela/outputs")
 BUILD_DIR = Path(tempfile.mkdtemp(prefix="mare_brief_test_")) / "mare"
 shutil.copytree(BRIEF_DIR, BUILD_DIR)
 
+os.environ["MORPHOFAVELA_ROOT"] = str(ROOT)
 sys.path.insert(0, str(BUILD_DIR))
 import build_brief  # noqa: E402
 import collect_numbers  # noqa: E402
@@ -85,7 +87,9 @@ def built():
         rc = build_brief.build(OUTPUTS_ROOT)
     except collect_numbers.MissingSource as e:
         pytest.skip(f"missing source file: {e}")
-    assert rc == 0
+    if rc == 2:
+        pytest.skip("build_brief skipped: a source of record is missing on this checkout")
+    assert rc == 0, "build_brief failed (pandoc/weasyprint)"
     if not NUMBERS_JSON.exists():
         pytest.skip("mare_numbers.json not produced (collect_numbers SKIP)")
     return json.loads(NUMBERS_JSON.read_text())
