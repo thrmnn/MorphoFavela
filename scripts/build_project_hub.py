@@ -401,13 +401,13 @@ def sites_section(prov):
             camp = s in CAMPAIGN
             tag = "campaign site" if camp else "calibration site"
             cards.append(card(SITE_NAMES[s], f"Interactive per-favela dashboard — {tag}.",
-                              "/" + str(idx.relative_to(ROOT)),
+                              os.path.relpath(idx, OUT),
                               kind="ok" if camp else "info",
                               badge_label="Campaign" if camp else "Calibration"))
     if (DASH / "index.html").exists():
         cards.append(card("All sites — interactive index",
                           "Combined dashboard index for every favela.",
-                          "/" + str((DASH / "index.html").relative_to(ROOT)), kind="info"))
+                          os.path.relpath(DASH / "index.html", OUT), kind="info"))
     return section("Sites", cards, anchor="sites")
 
 
