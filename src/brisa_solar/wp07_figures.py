@@ -420,7 +420,7 @@ def render_f4(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
 
     ax.set_xticks(x)
     ax.set_xticklabels([FAVELAS[s] for s in FIGURE_SITE_ORDER], rotation=20, ha="right")
-    ax.set_ylabel("share of buildings (fraction)")
+    ax.set_ylabel("share of built 10 m grid cells (fraction)")
     ax.set_ylim(0, 1.14)
     ax.legend(fontsize=5.5, loc="upper center", ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.22))
 
