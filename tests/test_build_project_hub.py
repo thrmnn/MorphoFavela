@@ -5,9 +5,12 @@ Locks the 'Latest' callout guarantees the council flagged: HTML-escaped text
 and no hand-inlined style= (all styling flows through the hubkit token system).
 """
 
+import json
 import re
 import sys
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -44,6 +47,9 @@ def test_latest_item_preserves_href():
 
 
 def test_headline_section_heros_the_money_figure():
+    if not (bph.ROOT / "outputs/cross_site/signature/figures_v2"
+            "/typology_failure_lookup.png").exists():
+        pytest.skip("signature gallery figures not built in this checkout")
     html = bph.headline_section(None)
     assert 'id="headline"' in html
     assert "typology_failure_lookup.png" in html
@@ -91,6 +97,9 @@ def test_generated_hub_every_sidebar_anchor_resolves():
 
 
 def test_generated_hub_headline_precedes_facade_solar():
+    if not bph.headline_section(None) or not bph.facade_solar_section(None):
+        pytest.skip("headline or facade-solar section has no real artifacts "
+                    "in this checkout")
     html = _generated_hub()
     assert 0 < html.find('id="headline"') < html.find('id="facade-solar"')
 
@@ -157,7 +166,6 @@ def test_health_page_carries_all_four_evidence_grades():
 def test_health_table_binds_to_real_cross_site_shares():
     """The compound-deprivation table is read from cross_site_stats.json, not
     hardcoded, so it can never silently drift from the taxonomy it summarises."""
-    import json
     js = bph.ROOT / "outputs/paper_figures/cross_site_stats.json"
     if not js.exists():
         return  # gitignored data absent in this checkout; page degrades gracefully
@@ -173,7 +181,91 @@ def test_health_page_has_no_root_absolute_urls():
 
 
 def test_hub_index_exposes_health_section():
+    if not bph.facade_solar_section(None):
+        pytest.skip("facade-solar section has no real artifacts in this checkout")
     html = (bph.OUT / "index.html").read_text() if (bph.OUT / "index.html").exists() \
         else bph.main() or (bph.OUT / "index.html").read_text()
     assert 'id="health"' in html
     assert 0 < html.find('id="facade-solar"') < html.find('id="health"')
+
+
+# ── synthetic-fixture link check (mirror_links_spec deliverable 4) ──────────
+# Builds the hub against a throwaway --root tree instead of the real,
+# gitignored outputs/, so this test passes in any checkout (worktree or not).
+
+def _write(path: Path, content: str = "") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+
+
+def _build_synthetic_project(root: Path) -> Path:
+    """A minimal fixture tree exercising: a site dashboard under outputs/, a
+    doc with a base-relative figure link + its PDF sibling (docs/technical_report/,
+    outside outputs/), and a doc with root-absolute image links into another
+    docs/ subtree (docs/roughness_explainer/) — the two doc-mirroring shapes
+    the real hub uses."""
+    _write(root / "README.md", "# Synthetic project\n")
+    _write(root / "ROADMAP.md", "# Roadmap\n")
+
+    tr_dir = root / "docs/technical_report"
+    _write(tr_dir / "technical_report.md",
+          "# Technical report\n\n![Fig](figures/fig1.png)\n")
+    _write(tr_dir / "figures/fig1.png", "not a real png")
+    _write(tr_dir / "technical_report.pdf", "%PDF-1.4 fake")
+
+    _write(root / "docs/roughness_wall_treatment_explainer.md",
+          "# Roughness\n\n"
+          "![log profile](/docs/roughness_explainer/log_profile.png)\n")
+    for fn in ("log_profile", "two_roles", "regimes", "wall_treatment"):
+        _write(root / f"docs/roughness_explainer/{fn}.png", "not a real png")
+
+    _write(root / "outputs/_distribution/html_dashboards/vidigal/index.html",
+          "<html><body>Vidigal dashboard</body></html>")
+    return root
+
+
+def test_synthetic_fixture_hub_has_no_root_absolute_links(tmp_path):
+    saved = (bph.ROOT, bph.OUT, bph.DOCS, bph.DASH)
+    try:
+        root = _build_synthetic_project(tmp_path)
+        manifest = bph.main(root=root)
+        out = bph.OUT
+        assert out == root / "outputs" / "_hub"
+
+        html_files = sorted(out.rglob("*.html"))
+        assert html_files, "synthetic build emitted no pages"
+
+        referenced_outputs_segments = set()
+        for hf in html_files:
+            text = hf.read_text()
+            targets = re.findall(r'(?:href|src)="([^"]*)"', text)
+            targets += re.findall(r"zoom\('([^']*)'", text)
+            for t in targets:
+                # (a) no root-absolute href/src/zoom target anywhere in the hub
+                assert not t.startswith("/"), f"{hf.name}: root-absolute target {t!r}"
+                base = t.split("#", 1)[0]
+                if not base or base.startswith(("http:", "https:", "mailto:")):
+                    continue
+                # (b) every relative target resolves under the tmp outputs/
+                target = (hf.parent / base).resolve()
+                assert target.exists(), (
+                    f"{hf.name}: relative target {t!r} does not resolve")
+                try:
+                    rel = target.relative_to(root / "outputs")
+                except ValueError:
+                    continue
+                if rel.parts:
+                    referenced_outputs_segments.add(rel.parts[0])
+
+        # (c) the manifest equals the set of first segments actually referenced
+        assert set(manifest) == referenced_outputs_segments
+        on_disk = json.loads((out / "mirror_manifest.json").read_text())
+        assert on_disk == manifest
+        assert bph.build_mirror_manifest(out, root) == manifest
+
+        # deliverable 2: docs outside outputs/ landed inside outputs/_hub/docs/
+        assert (out / "docs/technical_report/technical_report.pdf").exists()
+        assert (out / "docs/technical_report/figures/fig1.png").exists()
+        assert (out / "docs/roughness_explainer/log_profile.png").exists()
+    finally:
+        bph.ROOT, bph.OUT, bph.DOCS, bph.DASH = saved

@@ -7,13 +7,15 @@ so a generated hub is a single portable artifact and the engine drops into any
 project's env unchanged.
 
 Public API: `page`, `card`, `section`, `badge`, `breadcrumb`, `md_to_html`,
-`render_doc_page`, `git_provenance`.
+`render_doc_page`, `relativize_page`, `git_provenance`.
 """
 
 from __future__ import annotations
 
 import html as _html
+import os
 import re
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -327,11 +329,57 @@ def md_to_html(md: str, base: str = "") -> str:
     return "\n".join(out)
 
 
-def render_doc_page(md_path: Path, out_path: Path, *, crumb="", provenance="", base="") -> None:
+def relativize_page(html_str: str, page_dir: Path, root: Path,
+                    mirror_dir: Path | None = None) -> str:
+    """Rewrite root-absolute href/src/zoom() targets in `html_str` to paths
+    relative to `page_dir`. A target that resolves under `root` is relinked
+    in place; one that resolves elsewhere under `root` but outside
+    `root/outputs` (e.g. a doc living in `docs/`) is instead copied — once,
+    only when newer — into `mirror_dir` (its path under `root` with a leading
+    'docs/' segment stripped) so the emitted page never points outside the
+    self-contained output tree."""
+    def resolve(url: str) -> str:
+        base, _, frag = url.partition("#")
+        rel = base.lstrip("/")
+        src = root / rel
+        if mirror_dir is not None and not rel.startswith("outputs/"):
+            mrel = rel[len("docs/"):] if rel.startswith("docs/") else rel
+            target = mirror_dir / mrel
+            if src.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if src.is_dir():
+                    shutil.copytree(src, target, dirs_exist_ok=True)
+                elif not target.exists() or target.stat().st_mtime < src.stat().st_mtime:
+                    shutil.copy2(src, target)
+        else:
+            target = src
+        r = os.path.relpath(target, page_dir)
+        return r + (f"#{frag}" if frag else "")
+
+    html_str = re.sub(r'(href|src)="(/[^"]*)"',
+                      lambda m: f'{m.group(1)}="{resolve(m.group(2))}"', html_str)
+    html_str = re.sub(r"zoom\('(/[^']*)'",
+                      lambda m: f"zoom('{resolve(m.group(1))}'", html_str)
+    return html_str
+
+
+def render_doc_page(md_path: Path, out_path: Path, *, crumb="", provenance="",
+                    base="", root: Path | None = None,
+                    mirror_dir: Path | None = None) -> str:
+    """Render `md_path` to a standalone doc page at `out_path`. When `root` is
+    given, root-absolute links/images in the rendered HTML are relativized to
+    `out_path`'s directory (and, for anything outside `root/outputs`, mirrored
+    into `mirror_dir` first) so the page is portable under any URL prefix.
+    Returns the written HTML."""
     text = Path(md_path).read_text()
     title = next((ln.lstrip("# ").strip() for ln in text.splitlines()
                   if ln.startswith("# ")), Path(md_path).stem)
     body = md_to_html(text, base=base)
-    out_path.write_text(page(title, f"source: {md_path.name}", body,
-                             crumb=crumb, provenance=provenance, doc=True,
-                             sidebar=toc_from_html(body)))
+    out_path = Path(out_path)
+    html_out = page(title, f"source: {md_path.name}", body,
+                    crumb=crumb, provenance=provenance, doc=True,
+                    sidebar=toc_from_html(body))
+    if root is not None:
+        html_out = relativize_page(html_out, out_path.parent, root, mirror_dir)
+    out_path.write_text(html_out)
+    return html_out
