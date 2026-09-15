@@ -69,7 +69,7 @@ def _plot_grid_layer(ax, gdf, col, edges, cmap, title):
 
 
 def render_built_form_maps(grid: gpd.GeoDataFrame, out_path: Path) -> dict:
-    fig, axes = plt.subplots(2, 2, figsize=(6.3, 6.6))
+    fig, axes = plt.subplots(2, 2, figsize=(6.3, 5.6))
     layers = [
         ("lambda_p", [0, 0.2, 0.4, 0.6, 0.8, 1.0], BAND_CMAP_5, "Plan density (λp)"),
         ("H_mean", None, BAND_CMAP_5, "Mean building height"),
@@ -98,7 +98,7 @@ def render_built_form_maps(grid: gpd.GeoDataFrame, out_path: Path) -> dict:
 
 def render_street_svf_map(segments: gpd.GeoDataFrame, out_path: Path) -> dict:
     edges = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
-    fig, ax = plt.subplots(figsize=(6.3, 4.2))
+    fig, ax = plt.subplots(figsize=(6.3, 3.5))
     norm, labels = _band_classes(segments["svf_median"], edges)
     segments.plot(column="svf_median", ax=ax, cmap=BAND_CMAP_5, norm=norm, linewidth=1.2)
     ax.set_title("Maré — street-segment Sky View Factor", fontsize=9)
@@ -135,7 +135,7 @@ def render_wind_rose(wind_rose: dict, out_path: Path) -> dict:
     sectors = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
     freqs = [wind_rose["frequencies"][s] for s in sectors]
     angles = np.deg2rad(np.linspace(0, 360, len(sectors), endpoint=False))
-    fig = plt.figure(figsize=(4.2, 4.2))
+    fig = plt.figure(figsize=(3.6, 3.6))
     ax = fig.add_subplot(111, projection="polar")
     ax.bar(angles, freqs, width=2 * np.pi / len(sectors) * 0.85, color=ACCENT, alpha=0.85, edgecolor="white")
     ax.set_theta_zero_location("N")

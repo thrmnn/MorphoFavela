@@ -75,7 +75,7 @@ ACCENT = "#2A5FA5"
 CSS = f"""
 @page {{
   size: A4;
-  margin: 18mm 15mm 20mm 15mm;
+  margin: 14mm 15mm 16mm 15mm;
   @bottom-center {{
     content: "Maré morphology brief · """ + date.today().isoformat() + f""" · draft for PI review";
     font-size: 7.5pt; color: #777;
@@ -84,42 +84,44 @@ CSS = f"""
 }}
 body {{
   font-family: "Liberation Sans", "Arial", sans-serif;
-  font-size: 10.5pt;
-  line-height: 1.45;
+  font-size: 10pt;
+  line-height: 1.32;
   color: #1c1c1c;
 }}
 h1 {{
-  font-size: 19pt;
+  font-size: 17pt;
   font-weight: 700;
   color: {ACCENT};
   border-bottom: 2px solid {ACCENT};
-  padding-bottom: 6px;
+  padding-bottom: 5px;
   margin-top: 0;
+  margin-bottom: 6pt;
 }}
 h1:first-of-type {{ page-break-before: avoid; }}
 h2 {{
-  font-size: 13.5pt;
+  font-size: 12.5pt;
   font-weight: 700;
   color: #1c1c1c;
-  margin-top: 16pt;
+  margin-top: 10pt;
+  margin-bottom: 4pt;
   padding-bottom: 2px;
   border-bottom: 1px solid #ccc;
   page-break-after: avoid;
 }}
 p, li {{ text-align: left; }}
-p {{ margin: 0.5em 0; }}
+p {{ margin: 0.35em 0; }}
 em {{ color: #555; }}
 strong {{ font-weight: 600; }}
 table {{
   border-collapse: collapse;
-  margin: 0.7em 0;
-  font-size: 9pt;
+  margin: 0.4em 0;
+  font-size: 8.5pt;
   width: 100%;
   page-break-inside: avoid;
 }}
 th, td {{
   border: 1px solid #d5d5d5;
-  padding: 4px 7px;
+  padding: 3px 6px;
   text-align: left;
   vertical-align: top;
 }}
@@ -132,20 +134,14 @@ img {{
   max-width: 100%;
   height: auto;
   display: block;
-  margin: 0.6em auto;
+  margin: 0.4em auto;
   page-break-inside: avoid;
 }}
-figure {{ margin: 1em 0; page-break-inside: avoid; }}
-figcaption {{ font-size: 8pt; color: #555; text-align: center; }}
-p > strong:first-child {{
-  display: block;
-  font-size: 8.5pt;
-  color: #555;
-  margin-top: -0.3em;
-}}
+figure {{ margin: 0.5em 0; page-break-inside: avoid; }}
+figcaption {{ font-size: 7.5pt; color: #555; text-align: center; }}
 a {{ color: {ACCENT}; text-decoration: none; }}
-ul, ol {{ margin: 0.4em 0; padding-left: 1.5em; }}
-li {{ margin: 0.15em 0; }}
+ul, ol {{ margin: 0.3em 0; padding-left: 1.4em; }}
+li {{ margin: 0.1em 0; }}
 /* key-numbers block: the first two-column table in section 2 */
 h2:nth-of-type(2) + table th,
 h2:nth-of-type(2) + table td {{ border: none; padding: 2px 10px 2px 0; }}
