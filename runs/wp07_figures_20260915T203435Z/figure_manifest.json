@@ -1,6 +1,6 @@
 {
- "_utc": "2026-09-15T19:24:22Z",
- "git_sha": "8ce8fdd",
+ "_utc": "2026-09-15T20:34:37Z",
+ "git_sha": "ce3df1f",
  "ledger_source": "runs/wp07_ledger_20260915T184619Z/ledger.json",
  "site_order": {
   "order": [
@@ -97,6 +97,18 @@
    "svg_path": "f3_domain_sensitivity.svg",
    "png_path": "f3_domain_sensitivity.png",
    "ledger_ids_used": [
+    "g3.grid_010_10.complexo_do_alemao.svf_percentile",
+    "g3.grid_010_10.mare.svf_percentile",
+    "g3.grid_010_10.riodaspedras.svf_percentile",
+    "g3.grid_010_10.rocinha.svf_percentile",
+    "g3.grid_010_10.vidigal.svf_percentile",
+    "g3.spread.complexo_do_alemao.svf",
+    "g3.spread.mare.svf",
+    "g3.spread.riodaspedras.svf",
+    "g3.spread.rocinha.svf",
+    "g3.spread.vidigal.svf"
+   ],
+   "ledger_ids_plotted": [
     "g3.grid_005_05.complexo_do_alemao.svf_percentile",
     "g3.grid_005_05.mare.svf_percentile",
     "g3.grid_005_05.riodaspedras.svf_percentile",
@@ -117,11 +129,6 @@
     "g3.grid_010_05.riodaspedras.svf_percentile",
     "g3.grid_010_05.rocinha.svf_percentile",
     "g3.grid_010_05.vidigal.svf_percentile",
-    "g3.grid_010_10.complexo_do_alemao.svf_percentile",
-    "g3.grid_010_10.mare.svf_percentile",
-    "g3.grid_010_10.riodaspedras.svf_percentile",
-    "g3.grid_010_10.rocinha.svf_percentile",
-    "g3.grid_010_10.vidigal.svf_percentile",
     "g3.grid_010_20.complexo_do_alemao.svf_percentile",
     "g3.grid_010_20.mare.svf_percentile",
     "g3.grid_010_20.riodaspedras.svf_percentile",
@@ -141,14 +148,8 @@
     "g3.grid_020_20.mare.svf_percentile",
     "g3.grid_020_20.riodaspedras.svf_percentile",
     "g3.grid_020_20.rocinha.svf_percentile",
-    "g3.grid_020_20.vidigal.svf_percentile",
-    "g3.spread.complexo_do_alemao.svf",
-    "g3.spread.mare.svf",
-    "g3.spread.riodaspedras.svf",
-    "g3.spread.rocinha.svf",
-    "g3.spread.vidigal.svf"
+    "g3.grid_020_20.vidigal.svf_percentile"
    ],
-   "ledger_ids_plotted": [],
    "source_parquets": [],
    "release_class_proposed": "publishable-candidate",
    "checklist": {

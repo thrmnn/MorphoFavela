@@ -286,7 +286,8 @@ def render_f1(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
         ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _pos: f"{v / 1e3:.0f}"))
         ax.set_title(tag, loc="left", fontsize=8)
         ymax = ax.get_ylim()[1]
-        for slug in FIGURE_SITE_ORDER:
+        order = sorted(FIGURE_SITE_ORDER, key=lambda s: get_value(ledger, f"favela.{s}.{metric}.median")[0])
+        for k, slug in enumerate(order):
             display = FAVELAS[slug]
             median_id, pct_id = f"favela.{slug}.{metric}.median", f"favela.{slug}.{metric}.percentile"
             median_val, _ = get_value(ledger, median_id)
@@ -294,8 +295,9 @@ def render_f1(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
             ledger_ids.append(pct_id)
             plotted_ids.append(median_id)
             ax.axvline(median_val, color=COLORS[slug], linewidth=1.0, linestyle="--")
-            ax.text(median_val, ymax * 0.97, f"{display} · p{fmt3(pct_val)}", color=COLORS[slug],
-                    rotation=90, ha="right", va="top", fontsize=5.5)
+            # neighbours in x alternate label height so adjacent medians do not overprint
+            ax.text(median_val, ymax * (0.97 - 0.28 * (k % 2)), f"{display} · p{fmt3(pct_val)}",
+                    color=COLORS[slug], rotation=90, ha="right", va="top", fontsize=5.5)
 
     source_parquets = [str(path.relative_to(repo_root))]
     return _produced(fig, "f1_citywide_position", out_dir, ledger_ids, source_parquets,
@@ -351,6 +353,7 @@ def render_f3(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
         return _skip("f3_domain_sensitivity", "no g3.grid_*.*.svf_percentile ids in ledger")
 
     ledger_ids: list[str] = []
+    plotted_ids: list[str] = []
     fig, ax = plt.subplots(figsize=(7.2, 3.6))
     x = np.arange(len(variants))
     locked_idx = next((i for i, (_, t, d) in enumerate(variants) if (t, d) == LOCKED_VARIANT), None)
@@ -358,20 +361,19 @@ def render_f3(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
     for row, slug in enumerate(FIGURE_SITE_ORDER):
         display = FAVELAS[slug]
         ys = []
-        for gslug, _t, _d in variants:
+        for i, (gslug, _t, _d) in enumerate(variants):
             gid = f"g3.grid_{gslug}.{slug}.svf_percentile"
             val, _ = get_value(ledger, gid)
-            ledger_ids.append(gid)
+            (ledger_ids if i == locked_idx else plotted_ids).append(gid)
             ys.append(val)
         spread_id = f"g3.spread.{slug}.svf"
         spread_val, _ = get_value(ledger, spread_id)
         ledger_ids.append(spread_id)
         ax.plot(x, ys, marker="o", markersize=3, linewidth=1.0, color=COLORS[slug],
                 label=f"{display} (spread {fmt3(spread_val)} pts)")
-        for xi, yi in zip(x, ys):
-            ax.annotate(fmt3(yi), (xi, yi), xytext=(0, 3 + 6 * (row % 2)),
-                        textcoords="offset points", ha="center", fontsize=4,
-                        color=COLORS[slug])
+        if locked_idx is not None:
+            ax.annotate(fmt3(ys[locked_idx]), (x[locked_idx], ys[locked_idx]), xytext=(6, -2),
+                        textcoords="offset points", ha="left", fontsize=5, color=COLORS[slug])
 
     if locked_idx is not None:
         ax.axvline(locked_idx, color="black", linewidth=0.8, linestyle=":")
@@ -383,7 +385,8 @@ def render_f3(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
     ax.set_ylabel("SVF percentile of citywide median")
     ax.legend(fontsize=5, loc="best", frameon=False)
 
-    return _produced(fig, "f3_domain_sensitivity", out_dir, ledger_ids, [], "publishable-candidate")
+    return _produced(fig, "f3_domain_sensitivity", out_dir, ledger_ids, [], "publishable-candidate",
+                      plotted_ids=plotted_ids)
 
 
 # ---------------------------------------------------------------------------
