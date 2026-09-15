@@ -1,0 +1,22 @@
+{
+ "n": 7384,
+ "clearance_m": 2.0,
+ "median_delta_m": 1.561149806826549,
+ "p95_abs_delta_m": 9.619940685086304,
+ "shift": {
+  "dy_cells": 0,
+  "dx_cells": 3,
+  "r": 0.9788889897395747
+ },
+ "corrected": false,
+ "shift_applied": false,
+ "corrected_variant": {
+  "n": 34223,
+  "median_delta_m": 1.3829552447743083,
+  "p95_abs_delta_m": 10.85023545150799,
+  "shift_m": [
+   0.0,
+   3.0
+  ]
+ }
+}
