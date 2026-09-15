@@ -1,0 +1,15 @@
+{
+ "_utc": "2026-09-14T19:56:53Z",
+ "sky": {
+  "patches": 145
+ },
+ "cell_m": 1.0,
+ "obs_height_m": 1.5,
+ "max_dist_m": 500.0,
+ "step_m": 1.0,
+ "sampling_rule": "wp02_horizon_diagnostic: baseline + variants A/B/C + combo vs 16905 street points",
+ "device": "cuda",
+ "torch_version": "2.4.1+cu121",
+ "git_sha": "d4f70f5",
+ "params_sky_section_sha256": "a82a40e3e9bb1d85"
+}

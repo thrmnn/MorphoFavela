@@ -1,0 +1,55 @@
+{
+ "reference": "/home/theo/SCL/SCR/MorphoFavela/outputs/riodaspedras/svf_v2/svf_streets.gpkg",
+ "n_points": 16905,
+ "obs_height_m_measured": 1.5,
+ "results": {
+  "1m": {
+   "unweighted": {
+    "r": 0.9883718547576018,
+    "median_abs_delta": 0.04226070499743513,
+    "p95_abs_delta": 0.08988886289759761,
+    "max_abs_delta": 0.37224460325451136,
+    "n": 16018
+   },
+   "solid_angle": {
+    "r": 0.9882876125212876,
+    "median_abs_delta": 0.042613171571005436,
+    "p95_abs_delta": 0.09053093467100615,
+    "max_abs_delta": 0.37064002637462606,
+    "n": 16018
+   },
+   "cosine_weighted": {
+    "r": 0.9654401894004118,
+    "median_abs_delta": 0.17787594942498364,
+    "p95_abs_delta": 0.27221341274996186,
+    "max_abs_delta": 0.5821115272688537,
+    "n": 16018
+   },
+   "n_on_building_excluded": 887
+  },
+  "5m": {
+   "unweighted": {
+    "r": 0.939224805628041,
+    "median_abs_delta": 0.1462860652990602,
+    "p95_abs_delta": 0.26865669849709783,
+    "max_abs_delta": 0.591859488592896,
+    "n": 11830
+   },
+   "solid_angle": {
+    "r": 0.9396376396087815,
+    "median_abs_delta": 0.14777964551553274,
+    "p95_abs_delta": 0.2687774135828604,
+    "max_abs_delta": 0.5928217168312717,
+    "n": 11830
+   },
+   "cosine_weighted": {
+    "r": 0.8991662803336768,
+    "median_abs_delta": 0.3344903800600281,
+    "p95_abs_delta": 0.4709994219510814,
+    "max_abs_delta": 0.7563170808476435,
+    "n": 11830
+   },
+   "n_on_building_excluded": 5075
+  }
+ }
+}

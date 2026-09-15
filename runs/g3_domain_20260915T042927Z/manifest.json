@@ -1,0 +1,13 @@
+{
+ "_utc": "2026-09-15T04:59:29Z",
+ "sky": {
+  "patches": 145
+ },
+ "params_sky_section_sha256": "a82a40e3e9bb1d85",
+ "git_sha": "e3c9839",
+ "wp05_run_dir": "/home/theo/SCL/SCR/MorphoFavela/runs/wp05_full_20260914T215419Z",
+ "wp04_run_dir": "/home/theo/SCL/SCR/MorphoFavela/runs/wp04_sites_20260914T230606Z",
+ "n_added_cells_total": 3780177,
+ "added_cells_wall_s": 1563.338592597007,
+ "status": "PROVISIONAL \u2014 g3_domain_sensitivity, HD-02 not yet PI-signed"
+}

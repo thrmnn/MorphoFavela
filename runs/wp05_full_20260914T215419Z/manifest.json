@@ -1,0 +1,23 @@
+{
+ "_utc": "2026-09-14T22:31:01Z",
+ "sky": {
+  "patches": 145
+ },
+ "cell_m": 1.0,
+ "obs_height_m": 1.5,
+ "max_dist_m": 500.0,
+ "tile_m": 2000.0,
+ "march_sampling": "nearest",
+ "sampling_rule": "WP-05 FULL exhaustive: 8402056 frame cells (every fabric cell), no sampling error",
+ "device": "cuda",
+ "torch_version": "2.4.1+cu121",
+ "git_sha": "3557cd1",
+ "params_sky_section_sha256": "a82a40e3e9bb1d85",
+ "n_tiles_total": 325,
+ "n_tiles_done": 325,
+ "stopped_early": false,
+ "wall_s": 1948.6685589760018,
+ "peak_gb": 0.129325568,
+ "n_cells_consolidated": 8402056,
+ "run_design_status": "PROVISIONAL \u2014 wp05_run_design untapped"
+}

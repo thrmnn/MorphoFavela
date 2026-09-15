@@ -1,0 +1,127 @@
+{
+  "_utc": "2026-09-15T05:26:15Z",
+  "status": "PROVISIONAL — depends on WP-05/G3 cards",
+  "depth_median_m": 31.622776601683796,
+  "per_site": {
+    "vidigal": {
+      "n": 2756,
+      "shares": {
+        "0": 0.20319303338171263,
+        "1": 0.39876632801161105,
+        "2": 0.32946298984034833,
+        "3": 0.068577648766328
+      },
+      "svf_c_p50_median": 0.3293131772487172,
+      "share_ge_2h_winter_median": 0.21466973886328725,
+      "output_csv": "/home/theo/SCL/SCR/MorphoFavela/outputs/vidigal/geometry_indicators/per_patch_geometry.csv"
+    },
+    "rocinha": {
+      "n": 8031,
+      "shares": {
+        "0": 0.10496824803884945,
+        "1": 0.2958535674262234,
+        "2": 0.5300709749719835,
+        "3": 0.0691072095629436
+      },
+      "svf_c_p50_median": 0.31693898640226015,
+      "share_ge_2h_winter_median": 0.0,
+      "output_csv": "/home/theo/SCL/SCR/MorphoFavela/outputs/rocinha/geometry_indicators/per_patch_geometry.csv"
+    },
+    "complexo_do_alemao": {
+      "n": 17768,
+      "shares": {
+        "0": 0.17379558757316524,
+        "1": 0.3790522287257992,
+        "2": 0.3438766321476812,
+        "3": 0.10327555155335434
+      },
+      "svf_c_p50_median": 0.5500357137398167,
+      "share_ge_2h_winter_median": 0.6896551724137931,
+      "output_csv": "/home/theo/SCL/SCR/MorphoFavela/outputs/complexo_do_alemao/geometry_indicators/per_patch_geometry.csv"
+    },
+    "riodaspedras": {
+      "n": 6605,
+      "shares": {
+        "0": 0.032096896290688876,
+        "1": 0.12566237698713095,
+        "2": 0.2882664647993944,
+        "3": 0.5539742619227858
+      },
+      "svf_c_p50_median": 0.27690238358604946,
+      "share_ge_2h_winter_median": 0.0,
+      "output_csv": "/home/theo/SCL/SCR/MorphoFavela/outputs/riodaspedras/geometry_indicators/per_patch_geometry.csv"
+    },
+    "maré": {
+      "n": 29229,
+      "shares": {
+        "0": 0.09832700400287386,
+        "1": 0.24325156522631633,
+        "2": 0.3384994354921482,
+        "3": 0.3199219952786616
+      },
+      "svf_c_p50_median": 0.2476676929478719,
+      "share_ge_2h_winter_median": 0.0,
+      "output_csv": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/geometry_indicators/per_patch_geometry.csv"
+    }
+  },
+  "comparison_vs_ventilation_index": {
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/paper_figures/ventilation_index.json",
+    "per_site": {
+      "vidigal": {
+        "n_wp06": 2756,
+        "n_ventilation_index": 2756,
+        "share_diff": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 0.0,
+          "3": 0.0
+        },
+        "cause": "constraint shares reuse the same count_constraints/open_edge_distance/wind_exposure pure functions and the same pooled depth median as ventilation_index.json, so diffs here are expected to be ~0; svf_c_p50 is NOT comparable to ventilation_index.json (which carries no SVF column) — it is new: WP-04's C′ engine (raster-horizon visibility, epw_weighted sky) 1 m ground-point median per cell, distinct from the grid's own clear-sky street SVF column."
+      },
+      "rocinha": {
+        "n_wp06": 8031,
+        "n_ventilation_index": 8031,
+        "share_diff": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 0.0,
+          "3": 0.0
+        },
+        "cause": "constraint shares reuse the same count_constraints/open_edge_distance/wind_exposure pure functions and the same pooled depth median as ventilation_index.json, so diffs here are expected to be ~0; svf_c_p50 is NOT comparable to ventilation_index.json (which carries no SVF column) — it is new: WP-04's C′ engine (raster-horizon visibility, epw_weighted sky) 1 m ground-point median per cell, distinct from the grid's own clear-sky street SVF column."
+      },
+      "complexo_do_alemao": {
+        "n_wp06": 17768,
+        "n_ventilation_index": 17768,
+        "share_diff": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 0.0,
+          "3": 0.0
+        },
+        "cause": "constraint shares reuse the same count_constraints/open_edge_distance/wind_exposure pure functions and the same pooled depth median as ventilation_index.json, so diffs here are expected to be ~0; svf_c_p50 is NOT comparable to ventilation_index.json (which carries no SVF column) — it is new: WP-04's C′ engine (raster-horizon visibility, epw_weighted sky) 1 m ground-point median per cell, distinct from the grid's own clear-sky street SVF column."
+      },
+      "riodaspedras": {
+        "n_wp06": 6605,
+        "n_ventilation_index": 6605,
+        "share_diff": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 0.0,
+          "3": 0.0
+        },
+        "cause": "constraint shares reuse the same count_constraints/open_edge_distance/wind_exposure pure functions and the same pooled depth median as ventilation_index.json, so diffs here are expected to be ~0; svf_c_p50 is NOT comparable to ventilation_index.json (which carries no SVF column) — it is new: WP-04's C′ engine (raster-horizon visibility, epw_weighted sky) 1 m ground-point median per cell, distinct from the grid's own clear-sky street SVF column."
+      },
+      "maré": {
+        "n_wp06": 29229,
+        "n_ventilation_index": 29229,
+        "share_diff": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 0.0,
+          "3": 0.0
+        },
+        "cause": "constraint shares reuse the same count_constraints/open_edge_distance/wind_exposure pure functions and the same pooled depth median as ventilation_index.json, so diffs here are expected to be ~0; svf_c_p50 is NOT comparable to ventilation_index.json (which carries no SVF column) — it is new: WP-04's C′ engine (raster-horizon visibility, epw_weighted sky) 1 m ground-point median per cell, distinct from the grid's own clear-sky street SVF column."
+      }
+    }
+  }
+}

@@ -89,3 +89,17 @@ docs/manuscript/figures/exports/*.svg
 runs/*/artifacts/
 runs/*/logs/
 runs/*.csv
+
+# runs/: ledgers (manifest/summary/distribution/sensitivity/crossref json+md) are tracked; heavy artifacts are not
+runs/**/*.parquet
+runs/**/*.tif
+runs/**/*.npy
+runs/**/*.png
+runs/*/_tmp/
+runs/*/tiles/
+runs/*/added_cells/
+runs/*.log
+runs/_smoke_*/
+runs/wp02_horizon_*/
+!runs/wp02_horizon_20260914T194910Z/
+!runs/wp02_horizon_20260914T195630Z/

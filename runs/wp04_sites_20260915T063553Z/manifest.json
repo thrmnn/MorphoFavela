@@ -1,0 +1,284 @@
+{
+ "_utc": "2026-09-15T07:33:18Z",
+ "sky": {
+  "patches": 145
+ },
+ "cell_m": 1.0,
+ "sky_model": "epw_weighted",
+ "obs_height_m": 1.5,
+ "max_dist_m": 500.0,
+ "march_sampling": "nearest",
+ "facade_own_building_exclusion_default": true,
+ "facade_own_building_exclusion_decision": "docs/wp04f_facade_spec.md deliverable 4, taken 2026-09-15 against runs/wp04f_facade_20260915T060126Z/comparison.json: own-building exclusion measurably drops the exact-zero share at fixed inset on both comparison sites and, by construction, can only remove blocking attributed to the observer's OWN building \u2014 see FACADE_OWN_BUILDING_EXCLUSION_DEFAULT's docstring in src/brisa_solar/wp04_sites.py.",
+ "carried_from": {
+  "run_id": "wp04_sites_20260914T230606Z",
+  "carried": [
+   "ground.parquet",
+   "street.parquet"
+  ],
+  "method": "hard link (or copy) into each site_key/ subdirectory before this run",
+  "note": "fa\u00e7ade.parquet and summary.json were recomputed by THIS run (WP-04F own-building exclusion is now the fa\u00e7ade default); ground and street are unaffected by WP-04F and were not recomputed."
+ },
+ "reference_days": {
+  "winter_solstice": "2026-06-21",
+  "equinox": "2026-03-20",
+  "duration_thresholds_h": [
+   1,
+   2,
+   3,
+   4
+  ],
+  "status": "default",
+  "floor_provenance": "The 2h daylight floor is the ATHENS CHARTER (1943) Point 26 \u2014 NOT a WHO benchmark. Older docstrings in src/solar/ still say 'WHO \u22652h'; that attribution is wrong and must not propagate."
+ },
+ "sun_azimuth_quantisation": "nearest of the 145-patch scheme's own azimuth sampling (~12-deg bands at the lowest altitude ring); not a second sky",
+ "floor_provenance": "The 2h daylight floor is the ATHENS CHARTER (1943) Point 26 \u2014 NOT a WHO benchmark. Older docstrings in src/solar/ still say 'WHO \u22652h'; that attribution is wrong and must not propagate.",
+ "device": "cuda",
+ "torch_version": "2.4.1+cu121",
+ "git_sha": "175bc05",
+ "params_sky_section_sha256": "a82a40e3e9bb1d85",
+ "sites": [
+  {
+   "site_key": "vidigal",
+   "display_name": "Vidigal"
+  },
+  {
+   "site_key": "rocinha",
+   "display_name": "Rocinha"
+  },
+  {
+   "site_key": "complexo_do_alemao",
+   "display_name": "Complexo do Alem\u00e3o"
+  },
+  {
+   "site_key": "mar\u00e9",
+   "display_name": "Mar\u00e9"
+  },
+  {
+   "site_key": "riodaspedras",
+   "display_name": "Rio das Pedras"
+  }
+ ],
+ "site_reports": [
+  {
+   "site_key": "vidigal",
+   "display_name": "Vidigal",
+   "match_method": "nome_exact_unique",
+   "matched_polygons": [
+    {
+     "objectid": 606,
+     "cod_favela": 45,
+     "nome": "Vidigal",
+     "complexo": "Isolada"
+    }
+   ],
+   "surface_shape": [
+    1930,
+    2585
+   ],
+   "n_ground": 141239,
+   "n_street": 6876,
+   "n_facade": 864873
+  },
+  {
+   "site_key": "rocinha",
+   "display_name": "Rocinha",
+   "match_method": "nome_exact_unique",
+   "matched_polygons": [
+    {
+     "objectid": 605,
+     "cod_favela": 43,
+     "nome": "Rocinha",
+     "complexo": "Isolada"
+    }
+   ],
+   "surface_shape": [
+    2500,
+    2995
+   ],
+   "n_ground": 310710,
+   "n_street": 35316,
+   "n_facade": 3908771
+  },
+  {
+   "site_key": "complexo_do_alemao",
+   "display_name": "Complexo do Alem\u00e3o",
+   "match_method": "complexo_exact",
+   "matched_polygons": [
+    {
+     "objectid": 218,
+     "cod_favela": 861,
+     "nome": "Estrada do Itarar\u00e9",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 219,
+     "cod_favela": 860,
+     "nome": "Rua 1 pela Ademas",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 478,
+     "cod_favela": 580,
+     "nome": "Rua Armando Sodr\u00e9",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 495,
+     "cod_favela": 545,
+     "nome": "Vila Matinha",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 647,
+     "cod_favela": 87,
+     "nome": "Itarar\u00e9",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 649,
+     "cod_favela": 89,
+     "nome": "Joaquim de Queir\u00f3z",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 651,
+     "cod_favela": 91,
+     "nome": "Morro da Baiana",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 652,
+     "cod_favela": 92,
+     "nome": "Morro do Adeus",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 653,
+     "cod_favela": 93,
+     "nome": "Morro do Alem\u00e3o",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 655,
+     "cod_favela": 95,
+     "nome": "Morro do Pianc\u00f3",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 707,
+     "cod_favela": 147,
+     "nome": "Morro das Palmeiras",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 708,
+     "cod_favela": 148,
+     "nome": "Nova Bras\u00edlia (RA - Alem\u00e3o)",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 714,
+     "cod_favela": 154,
+     "nome": "Relic\u00e1rio",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 1000,
+     "cod_favela": 444,
+     "nome": "Mour\u00e3o Filho",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 1036,
+     "cod_favela": 485,
+     "nome": "Parque Alvorada",
+     "complexo": "Complexo do Alem\u00e3o"
+    }
+   ],
+   "surface_shape": [
+    3030,
+    4445
+   ],
+   "n_ground": 846016,
+   "n_street": 47508,
+   "n_facade": 4884087
+  },
+  {
+   "site_key": "mar\u00e9",
+   "display_name": "Mar\u00e9",
+   "match_method": "complexo_exact",
+   "matched_polygons": [
+    {
+     "objectid": 644,
+     "cod_favela": 84,
+     "nome": "Baixa do Sapateiro",
+     "complexo": "Mar\u00e9"
+    },
+    {
+     "objectid": 650,
+     "cod_favela": 90,
+     "nome": "Parque Mar\u00e9",
+     "complexo": "Mar\u00e9"
+    },
+    {
+     "objectid": 656,
+     "cod_favela": 96,
+     "nome": "Nova Holanda",
+     "complexo": "Mar\u00e9"
+    },
+    {
+     "objectid": 664,
+     "cod_favela": 104,
+     "nome": "Parque Rubens Vaz",
+     "complexo": "Mar\u00e9"
+    },
+    {
+     "objectid": 665,
+     "cod_favela": 105,
+     "nome": "Parque Uni\u00e3o",
+     "complexo": "Mar\u00e9"
+    },
+    {
+     "objectid": 668,
+     "cod_favela": 108,
+     "nome": "Timbau",
+     "complexo": "Mar\u00e9"
+    }
+   ],
+   "surface_shape": [
+    6310,
+    3785
+   ],
+   "n_ground": 258178,
+   "n_street": 84147,
+   "n_facade": 10335941
+  },
+  {
+   "site_key": "riodaspedras",
+   "display_name": "Rio das Pedras",
+   "match_method": "complexo_exact",
+   "matched_polygons": [
+    {
+     "objectid": 471,
+     "cod_favela": 587,
+     "nome": "A.M. e Amigos de Rio das Pedras",
+     "complexo": "Rio das Pedras"
+    },
+    {
+     "objectid": 811,
+     "cod_favela": 256,
+     "nome": "Rio das Pedras",
+     "complexo": "Rio das Pedras"
+    }
+   ],
+   "surface_shape": [
+    2855,
+    2710
+   ],
+   "n_ground": 167661,
+   "n_street": 16905,
+   "n_facade": 3879596
+  }
+ ]
+}

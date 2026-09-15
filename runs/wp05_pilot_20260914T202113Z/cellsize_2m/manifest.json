@@ -1,0 +1,15 @@
+{
+ "_utc": "2026-09-14T21:09:57Z",
+ "sky": {
+  "patches": 145
+ },
+ "cell_m": 2.0,
+ "obs_height_m": 1.5,
+ "max_dist_m": 500.0,
+ "step_m": 2.0,
+ "sampling_rule": "WP-05 pilot: 84023 stratified cells, seed=20260908",
+ "device": "cuda",
+ "torch_version": "2.4.1+cu121",
+ "git_sha": "683d873",
+ "params_sky_section_sha256": "a82a40e3e9bb1d85"
+}

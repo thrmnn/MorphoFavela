@@ -1,0 +1,50 @@
+{
+ "_utc": "2026-09-14T21:33:14Z",
+ "available_cell_sizes": [
+  1.0,
+  2.0,
+  5.0
+ ],
+ "1m_vs_2m": {
+  "svf": {
+   "n": 84023,
+   "median_abs_diff": 0.01629481242021369,
+   "p95_abs_diff": 0.2315209009908009,
+   "signed_median_diff": -0.008615788924195011
+  },
+  "irradiation_kwh_m2": {
+   "n": 84023,
+   "median_abs_diff": 27.011584745310074,
+   "p95_abs_diff": 466.4063628634404,
+   "signed_median_diff": -9.154348907625035
+  }
+ },
+ "1m_vs_5m": {
+  "svf": {
+   "n": 84023,
+   "median_abs_diff": 0.04217798333226941,
+   "p95_abs_diff": 0.32851920922618827,
+   "signed_median_diff": -0.041497365049038004
+  },
+  "irradiation_kwh_m2": {
+   "n": 84023,
+   "median_abs_diff": 63.94106363507103,
+   "p95_abs_diff": 610.0885667651844,
+   "signed_median_diff": -60.41649795104922
+  }
+ },
+ "2m_vs_5m": {
+  "svf": {
+   "n": 84023,
+   "median_abs_diff": 0.03283877858057982,
+   "p95_abs_diff": 0.47034696833299666,
+   "signed_median_diff": -0.029062906133195954
+  },
+  "irradiation_kwh_m2": {
+   "n": 84023,
+   "median_abs_diff": 51.19105058227069,
+   "p95_abs_diff": 868.851399763991,
+   "signed_median_diff": -40.660469566110805
+  }
+ }
+}

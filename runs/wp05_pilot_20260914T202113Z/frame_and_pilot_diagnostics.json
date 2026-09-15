@@ -1,0 +1,104 @@
+{
+ "_utc": "2026-09-14T20:26:15Z",
+ "dtm_path": "/home/theo/SCL/SCR/MorphoFavela/data/RJ/DTM_RJ.tif",
+ "footprints_path": "/home/theo/SCL/SCR/MorphoFavela/data/RJ/buildings_RJ_2019_utm.gpkg",
+ "favelas_path": "/home/theo/SCL/SCR/MorphoFavela/data/RJ/Favelas_Limit_2019.shp",
+ "grid_cell_m": 5.0,
+ "dtm_shape": [
+  7424,
+  14319
+ ],
+ "dtm_bounds": [
+  623533.04,
+  7446251.19,
+  695128.04,
+  7483371.19
+ ],
+ "frame": {
+  "total_cells": 106304256,
+  "frame_cells": 8402056,
+  "removal_counts": {
+   "rule_order": [
+    "not_building_cell",
+    "within_municipality_dtm_valid",
+    "fabric_coverage_ge_threshold",
+    "within_fabric_footprint_distance_m"
+   ],
+   "removed_building_cells": 7965127,
+   "removed_invalid_dtm_cells": 58162305,
+   "removed_low_fabric_coverage_cells": 27470257,
+   "removed_far_from_footprint_cells": 4304511
+  },
+  "fabric_coverage_threshold": 0.1,
+  "fabric_footprint_distance_m": 10,
+  "n_active_2km_tiles_in_frame": 325,
+  "n_active_2km_tiles_in_frame_note": "Added as a follow-up measurement (2026-09-14T21:40Z, wp05_pilot.build_frame + tile_index_for_xy, same params.yaml domain thresholds, deterministic) after this run's compute_extrapolation was found to need it; not present in the original 20:26:15Z build_frame_and_pilot call. Recomputed from the SAME cached artifacts/frame_5m_surface.tif / _is_building.tif this run already wrote, so it is the same frame, not a re-fetch."
+ },
+ "strata": {
+  "slope_bins_deg_PILOT_DEFAULT": [
+   5.0,
+   15.0
+  ],
+  "density_bins_PILOT_DEFAULT": [
+   0.1,
+   0.25,
+   0.45
+  ],
+  "per_stratum": {
+   "0": {
+    "frame_n": 1060666,
+    "pilot_n": 10607,
+    "target_n": 10607
+   },
+   "1": {
+    "frame_n": 2651086,
+    "pilot_n": 26511,
+    "target_n": 26511
+   },
+   "2": {
+    "frame_n": 2092651,
+    "pilot_n": 20927,
+    "target_n": 20927
+   },
+   "3": {
+    "frame_n": 354391,
+    "pilot_n": 3544,
+    "target_n": 3544
+   },
+   "4": {
+    "frame_n": 805402,
+    "pilot_n": 8054,
+    "target_n": 8054
+   },
+   "5": {
+    "frame_n": 507670,
+    "pilot_n": 5077,
+    "target_n": 5077
+   },
+   "6": {
+    "frame_n": 277259,
+    "pilot_n": 2773,
+    "target_n": 2773
+   },
+   "7": {
+    "frame_n": 454379,
+    "pilot_n": 4544,
+    "target_n": 4544
+   },
+   "8": {
+    "frame_n": 198552,
+    "pilot_n": 1986,
+    "target_n": 1986
+   }
+  }
+ },
+ "pilot": {
+  "pilot_fraction": 0.01,
+  "pilot_stratum_floor": 1000,
+  "random_seed": 20260908,
+  "n_pilot_cells": 84023,
+  "n_favela_cells": 8273,
+  "favela_share": 0.09846113564143151
+ },
+ "git_sha": "76b2c03"
+}
