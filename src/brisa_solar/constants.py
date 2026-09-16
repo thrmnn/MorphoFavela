@@ -19,6 +19,15 @@ import yaml
 #: Tregenza sky-patch count for every P1 number feeding the citywide percentile.
 P1_SKY_PATCHES = 145
 
+#: Frontal-area-density threshold for the second axis's vertical constraint —
+#: lambda_f_mean >= this value. Oke (1988), cited as a geometry threshold on
+#: frontal-area density. The identical value lives in the June 2026 E2 script
+#: scripts/run_ventilation_index.py under an identifier that names an
+#: air-movement regime; P1 does not use that vocabulary, so WP modules
+#: import it from here instead. tests/test_ventaxis.py asserts the two
+#: can never diverge.
+LAMBDA_F_CONSTRAINT_MIN = 0.65
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PARAMS_PATH = REPO_ROOT / "config" / "params.yaml"
 

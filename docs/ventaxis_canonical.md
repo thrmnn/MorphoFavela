@@ -28,18 +28,25 @@ dimensionless ratio) and are never collapsed into one continuous scale.
 ## The three constraints
 
 Each predicate below is quoted verbatim from its implementation in
-`src/brisa_solar/wp06_geometry.py::compute_site_table` (lines 171–173).
+`src/brisa_solar/wp06_geometry.py::compute_site_table`.
 
 ### 1. Vertical — `constraint_vertical`
 
 ```python
-grid["constraint_vertical"] = (np.nan_to_num(grid["lambda_f_mean"].to_numpy(), nan=0.0) >= SKIM_MIN).astype(int)
+grid["constraint_vertical"] = (np.nan_to_num(grid["lambda_f_mean"].to_numpy(), nan=0.0) >= LAMBDA_F_CONSTRAINT_MIN).astype(int)
 ```
 
 Predicate: `lambda_f_mean >= 0.65`.
 
-- `SKIM_MIN` is imported from `scripts/run_ventilation_index.py:52`
-  (`SKIM_MIN = 0.65`).
+- `LAMBDA_F_CONSTRAINT_MIN` is imported from `src/brisa_solar/constants.py`,
+  P1's own constants home. **Vocabulary note:** until 2026-09-16 this module
+  imported the same value from the June 2026 E2 script
+  `scripts/run_ventilation_index.py`, where its identifier names an air-movement regime — vocabulary P1 does not use, and which the whole-word token lint
+  cannot see inside an identifier. The value is unchanged (the predicate and
+  therefore every ledgered number are identical); only where P1 reads it from
+  changed. `tests/test_ventaxis.py` asserts the two definitions can never
+  diverge, so the June index and the P1 ledger cannot come to describe
+  different cells.
 - Threshold source: Oke (1988) — a geometry threshold on frontal-area
   density (`lambda_f`, the built frontal area presented to the wind divided
   by plan area), never cited by a named regime. Cited here purely on that

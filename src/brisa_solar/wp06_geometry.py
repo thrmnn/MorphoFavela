@@ -34,8 +34,9 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from scripts.run_lateral_connectivity import CELL_M, open_edge_distance
-from scripts.run_ventilation_index import SKIM_MIN, count_constraints
+from scripts.run_ventilation_index import count_constraints
 from scripts.run_wind_exposure import SECTORS, wind_exposure
+from src.brisa_solar.constants import LAMBDA_F_CONSTRAINT_MIN
 from src.morphometry.aspect import aspect_to_sincos, aspect_wind_alignment
 from src.morphometry.invariants import built_mask
 
@@ -168,7 +169,7 @@ def compute_site_table(grid: gpd.GeoDataFrame, ground: pd.DataFrame, freq: dict,
         grid["lambda_f_mean"].to_numpy(), grid["open_edge_dist_m"].to_numpy(),
         grid["exposure_ratio"].to_numpy(), depth_median,
     )
-    grid["constraint_vertical"] = (np.nan_to_num(grid["lambda_f_mean"].to_numpy(), nan=0.0) >= SKIM_MIN).astype(int)
+    grid["constraint_vertical"] = (np.nan_to_num(grid["lambda_f_mean"].to_numpy(), nan=0.0) >= LAMBDA_F_CONSTRAINT_MIN).astype(int)
     grid["constraint_lateral"] = (np.nan_to_num(grid["open_edge_dist_m"].to_numpy(), nan=0.0) >= depth_median).astype(int)
     grid["constraint_directional"] = (np.nan_to_num(grid["exposure_ratio"].to_numpy(), nan=0.0) >= 1.0).astype(int)
     grid["n_constraints"] = n_con

@@ -43,3 +43,20 @@ def test_ventaxis_definition_of_record_is_railed_and_wired():
     for family, rel_path in dor.items():
         target = ROOT / rel_path
         assert target.exists(), f"definition_of_record[{family!r}] -> {target} does not exist"
+
+
+def test_vertical_constraint_threshold_cannot_diverge_from_the_e2_script():
+    """P1 imports the frontal-area-density threshold from its own constants home,
+    not from the June E2 script whose identifier names a flow regime. The value
+    must stay identical in both places or the June index and the P1 ledger would
+    silently describe different cells."""
+    from scripts.run_ventilation_index import SKIM_MIN as _e2_value
+
+    from src.brisa_solar.constants import LAMBDA_F_CONSTRAINT_MIN
+
+    assert LAMBDA_F_CONSTRAINT_MIN == _e2_value
+
+    # and the P1 module must not reach into the E2 script for it
+    src = (ROOT / "src" / "brisa_solar" / "wp06_geometry.py").read_text()
+    assert "LAMBDA_F_CONSTRAINT_MIN" in src
+    assert "import SKIM_MIN" not in src and "SKIM_MIN," not in src
