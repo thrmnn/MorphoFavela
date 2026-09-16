@@ -1,9 +1,18 @@
 """
-Folha de Rua — per-site street-level SVF + solar dashboard.
+Folha de Rua — per-site grid-based morphology dashboard (v3).
 
 A3-portrait static PNG + atomic per-panel exports + low-fidelity PDF and a
 web-1200 thumbnail. One parameterised entry point handles every site via
---site. Reads only existing pipeline outputs; never regenerates SVF or solar.
+--site. Reads only existing pipeline outputs; never regenerates SVF, solar,
+or the 10 m geometry grid.
+
+v3 restructure (docs/folha_v3_spec.md, PI brief 2026-09-16): the sheet's
+spine is a 10 m grid row — terrain, density, SVF, sunlight, in the PI's own
+causal order — with two code-selected zoom inlets on the extreme cells the
+analysis itself flags. The per-site cross-comparison strip is gone (PI: "no
+need to show the other sites"); the single-site street SVF hero map and the
+per-class ridgelines are superseded by the grid row (see build_dashboard's
+docstring for the reasoning).
 
 Run:
     python scripts/build_site_dashboard.py --site rocinha
@@ -23,11 +32,10 @@ import geopandas as gpd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import patches as mpatches
-from matplotlib import patheffects
-from matplotlib.lines import Line2D
+import pandas as pd
 from matplotlib.patches import Rectangle
-from scipy.stats import gaussian_kde, pearsonr
+from scipy import ndimage
+from scipy.stats import pearsonr
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -58,24 +66,38 @@ SITE_DISPLAY = {
 
 STRIP_ORDER = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "maré"]
 
-# Brazilian Portuguese street-class abbrevs from per-site segments. Used for
-# labelling the ridgelines. R == Rua, Trv == Travessa, Etr == Estrada, Bc ==
-# Beco, Via == Via, Esc == Escadaria, Lrg == Largo, Tun == Túnel, Aetr ==
-# Auto-Estrada, Cam == Caminho, Vila == Vila, Srv == Servidão.
-CLASS_LABELS = {
-    "R": "Rua",
-    "Trv": "Travessa",
-    "Etr": "Estrada",
-    "Bc": "Beco",
-    "Via": "Via",
-    "Esc": "Escadaria",
-    "Lrg": "Largo",
-    "Tun": "Túnel",
-    "Aetr": "Auto-estrada",
-    "Cam": "Caminho",
-    "Vila": "Vila",
-    "Srv": "Servidão",
-}
+# 10 m analysis grid, one row per site: outputs/<site>/geometry_indicators/
+# per_patch_geometry.csv (src/brisa_solar/wp06_geometry.py). The sheet's new
+# spine — terrain -> density -> SVF -> sunlight, the PI's own order (docs/
+# folha_v3_spec.md), each panel a sequential colormap over the same 10 m
+# lattice, same extent, same boundary outline. svf_c_p50/kwh_m2_p50 carry
+# real NaNs where a cell has no nearby street observer (has_street_support
+# is False upstream) — never interpolated, so the panel shows the gap
+# honestly (buildings visible through it) rather than fabricating a value.
+GRID_CELL_M = 10.0
+GRID_LAYERS = [
+    dict(key="terrain", col="slope_deg", title="Terrain", unit="slope (°)", cmap="Greys"),
+    dict(key="density", col="lambda_p", title="Density", unit="λp (–)", cmap="Purples"),
+    dict(key="svf", col="svf_c_p50", title="SVF", unit="SVF (–)", cmap="YlGnBu_r"),
+    dict(key="sunlight", col="kwh_m2_p50", title="Sunlight", unit="kWh/m²·yr", cmap="YlOrRd"),
+]
+# Fraction-bounded columns get a fixed [0, 1] scale (their own definition,
+# not a value read from a file); everything else is normalised per-site from
+# its own 2nd/98th percentile, computed by code — never a constant tuned to
+# one site (folha_v3_spec.md's standing hexbin residual applies here too).
+GRID_FIXED_01 = {"density", "svf"}
+GRID_LAYERS_BY_KEY = {layer["key"]: layer for layer in GRID_LAYERS}
+
+# Zoom inlets: A = densest n_constraints==3 cluster, shown as density+SVF
+# (the two spine layers that drive a constraint score); B = densest
+# bottom-decile-SVF cluster, shown as SVF+sunlight (the direct causal pair
+# the PI's brief and the hexbin below are both about).
+ZOOM_LABELS = {"A": "constraint cluster", "B": "low-SVF cluster"}
+ZOOM_INLET_LAYER_KEYS = {"A": ["density", "svf"], "B": ["svf", "sunlight"]}
+ZOOM_COLORS = {"A": "#B91C1C", "B": "#C026D3"}
+ZOOM_MIN_CLUSTER_CELLS = 3
+ZOOM_SVF_DECILE = 0.10
+ZOOM_PAD_CELLS = 3.0
 
 INK = "#1A1A1A"
 PAPER = "#FAFAF7"
@@ -122,7 +144,17 @@ def site_paths(site: str) -> dict:
         "segments": out / "morphometrics" / "svf" / "svf_streets_segments.gpkg",
         "observers": out / "sampling_streets" / "observers.gpkg",
         "manifest": out / "sampling_streets" / "manifest.json",
+        "grid": out / "geometry_indicators" / "per_patch_geometry.csv",
     }
+
+
+def load_grid_table(site: str) -> pd.DataFrame:
+    """The 10 m analysis grid (src/brisa_solar/wp06_geometry.py output) —
+    single source for the grid row, the zoom-inlet selection, and the
+    identity card's cell count. Verified header (2026-09-16): patch_id,
+    center_x, center_y, svf, lambda_p, slope_deg, ..., n_constraints — 35
+    columns, one row per built 10 m cell, same lattice for all five sites."""
+    return pd.read_csv(site_paths(site)["grid"])
 
 
 def load_site(site: str, issues: list) -> dict:
@@ -150,9 +182,10 @@ def load_site(site: str, issues: list) -> dict:
         buildings = None
     with open(p["manifest"]) as f:
         manifest = json.load(f)
+    grid = load_grid_table(site)
     return dict(
         svf=svf, solar=solar, seg=seg, boundary=boundary,
-        buildings=buildings, manifest=manifest,
+        buildings=buildings, manifest=manifest, grid=grid,
     )
 
 
@@ -162,8 +195,10 @@ def compute_stats(d: dict) -> dict:
     seg = d["seg"]
     boundary = d["boundary"]
     manifest = d["manifest"]
+    grid = d["grid"]
 
     n_obs = len(svf)
+    n_grid_cells = len(grid)
     road_km = float(seg.geometry.length.sum() / 1000.0) if seg is not None else float("nan")
     area_km2 = float(boundary.geometry.area.sum() / 1e6)
     obs_per_km2 = n_obs / area_km2 if area_km2 > 0 else float("nan")
@@ -206,7 +241,7 @@ def compute_stats(d: dict) -> dict:
     offset_frac = manifest.get("qa", {}).get("offset_fraction", float("nan"))
 
     return dict(
-        n_obs=n_obs, road_km=road_km, area_km2=area_km2,
+        n_obs=n_obs, n_grid_cells=n_grid_cells, road_km=road_km, area_km2=area_km2,
         obs_per_km2=obs_per_km2, edge_share=edge_share,
         mean_svf=mean_svf, pearson=r, offset_frac=offset_frac,
         merged=merged, inner_union=inner_union, near=near,
@@ -216,7 +251,8 @@ def compute_stats(d: dict) -> dict:
 # --- panel renderers ---------------------------------------------------------
 
 
-def draw_masthead(ax, site: str, stats: dict, sha: str, build_date: str, folha_nn: str) -> None:
+def draw_masthead(ax, site: str, stats: dict, sha: str, build_date: str,
+                   folha_nn: str, provenance: str = "") -> None:
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
@@ -224,11 +260,11 @@ def draw_masthead(ax, site: str, stats: dict, sha: str, build_date: str, folha_n
     ax.axhline(1.0, color=INK, lw=0.4)
     ax.axhline(0.0, color=INK, lw=0.4)
 
-    ax.text(0.005, 0.62, "MORPHOFAVELA", fontsize=14, fontweight="bold",
+    ax.text(0.005, 0.66, "MORPHOFAVELA", fontsize=14, fontweight="bold",
             family="DejaVu Sans", color=INK, va="center", ha="left")
 
-    ax.text(0.5, 0.55, SITE_DISPLAY.get(site, site.title()),
-            fontsize=32, family="DejaVu Serif", color=INK,
+    ax.text(0.5, 0.60, SITE_DISPLAY.get(site, site.title()),
+            fontsize=30, family="DejaVu Serif", color=INK,
             ha="center", va="center")
 
     typ_label, typ_color = TYPOLOGY[site]
@@ -236,467 +272,429 @@ def draw_masthead(ax, site: str, stats: dict, sha: str, build_date: str, folha_n
         f"Folha {folha_nn}/05 · EPSG:31983",
         f"build {build_date} · {sha}",
     ]
-    ax.text(0.995, 0.78, right_lines[0], fontsize=8, family="DejaVu Sans Mono",
+    ax.text(0.995, 0.84, right_lines[0], fontsize=8, family="DejaVu Sans Mono",
             ha="right", va="center", color=INK)
-    ax.text(0.995, 0.52, right_lines[1], fontsize=8, family="DejaVu Sans Mono",
+    ax.text(0.995, 0.64, right_lines[1], fontsize=8, family="DejaVu Sans Mono",
             ha="right", va="center", color=INK)
-    ax.text(0.995, 0.22, typ_label.upper(), fontsize=9, family="DejaVu Sans",
+    ax.text(0.995, 0.42, typ_label.upper(), fontsize=9, family="DejaVu Sans",
             fontweight="bold", ha="right", va="center", color=typ_color)
+    # Zoom-inlet selection rule (docs/folha_v3_spec.md: "the selection rule
+    # printed in the sheet's provenance line") — states the rule AND this
+    # build's actual outcome per site, not just the method.
+    if provenance:
+        ax.text(0.005, 0.10, provenance, fontsize=5.8, style="italic",
+                family="DejaVu Sans Mono", color=MUTED, ha="left", va="center")
 
 
 def draw_identity_card(ax, site: str, stats: dict) -> None:
+    """Orients a reader who has never seen the site — nothing more
+    (docs/folha_v3_spec.md §2): extent, grid cell count, observer count.
+    Every other number that used to live here (edge share, mean SVF, the
+    SVF~solar r) is read directly off the grid row / graph below instead of
+    being repeated as text.
+
+    Honesty carry-forward: n_obs is the TRUE total (len of the full street
+    observer table, no decimation) — this script never draws a decimated
+    map sample, so there is no separate "display sample" figure to show
+    here (that distinction lives in build_html_dashboard.py's map layer,
+    out of scope this round)."""
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    obs_per_road_km = (
-        stats["n_obs"] / stats["road_km"] if stats["road_km"] > 0 else float("nan")
-    )
     cells = [
-        ("n_obs", f"{stats['n_obs']:,}"),
-        ("road km", f"{stats['road_km']:.1f}"),
-        ("obs / road-km", f"{obs_per_road_km:,.0f}"),
-        ("edge share %", f"{stats['edge_share']*100:.1f}"),
-        ("mean SVF", f"{stats['mean_svf']:.3f}"),
-        # "r(SVF, sol)" — matches the "r = 0.88" notation already used on
-        # the hexbin panel below; the prior "ρ(...)" reads ambiguously
-        # close to a probability notation for a reader who hasn't reached
-        # the hexbin yet (round-1 finding 8).
-        ("r(SVF, sol)", f"{stats['pearson']:.2f}" if not np.isnan(stats['pearson']) else "n/a"),
+        ("extent", f"{stats['area_km2']:.2f} km²"),
+        ("grid cells (10 m)", f"{stats['n_grid_cells']:,}"),
+        ("observers", f"{stats['n_obs']:,}"),
     ]
     n = len(cells)
     for i, (lab, val) in enumerate(cells):
         x0 = i / n
         x1 = (i + 1) / n
         cx = (x0 + x1) / 2
-        # vertical thin divider
         if i > 0:
             ax.plot([x0, x0], [0.05, 0.95], color=INK, lw=0.3)
-        # value-cell tint for edge_share severity
-        face = None
-        if lab == "edge share %":
-            es = stats["edge_share"] * 100
-            if es > 20:
-                face = RED
-            elif es > 15:
-                face = ACCENT
-        if face:
-            ax.add_patch(Rectangle((x0 + 0.005, 0.05), (x1 - x0) - 0.01, 0.9,
-                                   facecolor=face, alpha=0.18, edgecolor="none",
-                                   transform=ax.transAxes))
-        ax.text(cx, 0.60, val, fontsize=13, family="DejaVu Sans Mono",
+        ax.text(cx, 0.58, val, fontsize=14, family="DejaVu Sans Mono",
                 ha="center", va="center", color=INK)
-        ax.text(cx, 0.22, lab.upper(), fontsize=7.5, family="DejaVu Sans",
+        ax.text(cx, 0.20, lab.upper(), fontsize=7.5, family="DejaVu Sans",
                 fontweight="bold", ha="center", va="center", color=MUTED)
-        if lab == "mean SVF":
-            ax.text(cx, 0.05, "length-weighted, segment-level",
-                    fontsize=6.5, style="italic", ha="center", va="center",
-                    color=MUTED)
 
 
-def draw_hero_map(ax, site: str, d: dict, stats: dict) -> None:
+# --- grid row + zoom inlets --------------------------------------------------
+
+
+def _grid_lattice(grid: pd.DataFrame, cell: float = GRID_CELL_M) -> dict:
+    """Index every grid row onto its (ix, iy) cell in a shared, gap-free
+    lattice, floored against the grid's own minimum center — the same
+    convention src.brisa_solar.wp06_geometry.bin_ground_to_cells uses, so
+    this never depends on a hand-picked origin."""
+    x0 = float(grid["center_x"].min())
+    y0 = float(grid["center_y"].min())
+    ix = np.round((grid["center_x"].to_numpy() - x0) / cell).astype(np.int64)
+    iy = np.round((grid["center_y"].to_numpy() - y0) / cell).astype(np.int64)
+    return dict(ix=ix, iy=iy, x0=x0, y0=y0, cell=cell,
+                nx=int(ix.max()) + 1, ny=int(iy.max()) + 1)
+
+
+def _grid_to_2d(lat: dict, values: np.ndarray) -> np.ndarray:
+    """Scatter a per-row array onto the (ny, nx) lattice. A cell with no row
+    (not built, or this layer's own coverage gap) stays NaN — never
+    interpolated, so a coverage gap renders as a stated gap, not a guess."""
+    arr = np.full((lat["ny"], lat["nx"]), np.nan)
+    arr[lat["iy"], lat["ix"]] = values
+    return arr
+
+
+def _grid_coords(lat: dict) -> tuple:
+    """Cell-center X/Y meshgrid, shape (ny, nx), for pcolormesh(shading='nearest')."""
+    xs = lat["x0"] + np.arange(lat["nx"]) * lat["cell"]
+    ys = lat["y0"] + np.arange(lat["ny"]) * lat["cell"]
+    return np.meshgrid(xs, ys)
+
+
+def _panel_norm(key: str, values: np.ndarray) -> tuple:
+    """[0, 1] for the two fraction-bounded layers (their own definition, not
+    a number read from a file); every other layer is normalised from its
+    own 2nd/98th percentile, computed here from the data — never a constant
+    tuned to fit one site (the hexbin's standing residual, applied
+    up-front to the grid row too)."""
+    if key in GRID_FIXED_01:
+        return 0.0, 1.0
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return 0.0, 1.0
+    lo, hi = np.nanpercentile(finite, [2.0, 98.0])
+    if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
+        lo, hi = float(np.nanmin(finite)), float(np.nanmax(finite))
+        if hi <= lo:
+            hi = lo + 1.0
+    return float(lo), float(hi)
+
+
+def _largest_cluster(lat: dict, mask: np.ndarray, min_cells: int = ZOOM_MIN_CLUSTER_CELLS):
+    """8-connected components of `mask` over the site's own 10 m lattice;
+    returns the biggest cluster's cell-index bounding box, or None if no
+    cluster reaches `min_cells`. This — not a human picking a spot on the
+    map — is the zoom-window selection rule (docs/folha_v3_spec.md: 'never
+    pick a zoom window by eye; the rule must be in the code')."""
+    field = np.zeros((lat["ny"], lat["nx"]), dtype=bool)
+    field[lat["iy"][mask], lat["ix"][mask]] = True
+    if not field.any():
+        return None
+    labels, n = ndimage.label(field, structure=np.ones((3, 3), dtype=int))
+    if n == 0:
+        return None
+    counts = np.bincount(labels.ravel())
+    counts[0] = 0
+    best = int(np.argmax(counts))
+    n_cells = int(counts[best])
+    if n_cells < min_cells:
+        return None
+    iy_idx, ix_idx = np.where(labels == best)
+    return dict(
+        n_cells=n_cells,
+        ix_min=int(ix_idx.min()), ix_max=int(ix_idx.max()),
+        iy_min=int(iy_idx.min()), iy_max=int(iy_idx.max()),
+    )
+
+
+def _cluster_bounds_xy(lat: dict, cluster: dict, pad_cells: float = ZOOM_PAD_CELLS) -> tuple:
+    """Cluster's cell-index bbox -> real-world (xmin, xmax, ymin, ymax),
+    padded by a fixed cell count for visual context — a formula, not an
+    eyeballed crop."""
+    cell = lat["cell"]
+    xmin = lat["x0"] + (cluster["ix_min"] - 0.5 - pad_cells) * cell
+    xmax = lat["x0"] + (cluster["ix_max"] + 0.5 + pad_cells) * cell
+    ymin = lat["y0"] + (cluster["iy_min"] - 0.5 - pad_cells) * cell
+    ymax = lat["y0"] + (cluster["iy_max"] + 0.5 + pad_cells) * cell
+    return xmin, xmax, ymin, ymax
+
+
+def select_zoom_windows(grid: pd.DataFrame, lat: dict) -> dict:
+    """The two zoom-inlet selection rules, verbatim from docs/folha_v3_spec.md
+    §4: A = the densest cluster of n_constraints==3 cells; B = the densest
+    cluster of cells at/below svf_c_p50's bottom decile — the places the
+    analysis itself flags as extreme. Either can come back not-ok ('no
+    qualifying cluster') — that drops the inlet; it is never fabricated."""
+    out = {}
+
+    mask_a = (grid["n_constraints"] == 3).to_numpy()
+    cluster_a = _largest_cluster(lat, mask_a)
+    if cluster_a is None:
+        out["A"] = dict(ok=False, reason=(
+            f"no cluster of >= {ZOOM_MIN_CLUSTER_CELLS} connected n_constraints=3 "
+            f"cells ({int(mask_a.sum())} such cell(s) total)"))
+    else:
+        out["A"] = dict(ok=True, bounds=_cluster_bounds_xy(lat, cluster_a), **cluster_a)
+
+    svf_valid = grid["svf_c_p50"].notna()
+    if svf_valid.sum() < 10:
+        out["B"] = dict(ok=False, reason="fewer than 10 cells with svf_c_p50 — decile undefined")
+    else:
+        p10 = float(grid.loc[svf_valid, "svf_c_p50"].quantile(ZOOM_SVF_DECILE))
+        mask_b = (grid["svf_c_p50"] <= p10).to_numpy() & svf_valid.to_numpy()
+        cluster_b = _largest_cluster(lat, mask_b)
+        if cluster_b is None:
+            out["B"] = dict(ok=False, reason=(
+                f"no cluster of >= {ZOOM_MIN_CLUSTER_CELLS} connected cells at/below "
+                f"svf_c_p50's {ZOOM_SVF_DECILE:.0%} decile (p10={p10:.2f})"))
+        else:
+            out["B"] = dict(ok=True, bounds=_cluster_bounds_xy(lat, cluster_b), p10=p10, **cluster_b)
+
+    return out
+
+
+def provenance_line(zooms: dict) -> str:
+    """One line printed on the masthead (docs/folha_v3_spec.md: 'the
+    selection rule printed in the sheet's provenance line'): the rule AND
+    this build's actual outcome per site — not just the method."""
+    parts = []
+    for key in ("A", "B"):
+        z = zooms.get(key, {})
+        parts.append(f"{key}: n={z['n_cells']} cells" if z.get("ok")
+                     else f"{key}: none ({z.get('reason', 'n/a')})")
+    return ("zoom by code, 10 m lattice, 8-connected: A=largest cluster of "
+            f"n_constraints==3, B=largest cluster <= svf_c_p50 p{int(ZOOM_SVF_DECILE*100)} — "
+            + " · ".join(parts))
+
+
+# Fixed inches, not fractions of a cell: title/colorbar strips need the
+# same physical size everywhere, and the alternative — matplotlib's own
+# set_aspect('equal') auto-shrink, anchored center by default — leaves a
+# gap-sized-by-aspect-ratio blank band and strands a pre-shrink-anchored
+# colorbar/badge far from the now-smaller map (round-1's original hero_map
+# bug, in a form that would otherwise repeat for every one of the four
+# narrower grid-row columns and each site's own aspect ratio).
+_TITLE_RESERVE_IN = 0.20
+_CBAR_RESERVE_IN = 0.34
+_CBAR_GAP_IN = 0.05
+
+
+def _fit_square_axes(ax) -> None:
+    """Resize+reposition `ax` in place so its box has exactly the physical
+    (inches) aspect ratio of its current data limits, anchored to the TOP of
+    its originally-allocated cell — the map sits directly under its title
+    with deterministic, computable room left below for a colorbar, instead
+    of matplotlib centring an auto-shrunk box and leaving blank margin on
+    both sides. Call after set_xlim/set_ylim, before drawing the colorbar."""
     fig = ax.figure
-    # Capture the panel's full gridspec cell now, before set_aspect("equal")
-    # (below) shrinks the axes' *active* box to match the data's aspect
-    # ratio. Insets anchored with ax.inset_axes() are relative to that
-    # shrunk active box, so for a tall/narrow site (Maré) they collapse
-    # onto the narrow data column instead of sitting in the panel's actual
-    # blank margin — round-1 finding 2 (colorbar drawn over the street
-    # network). Anchoring fig.add_axes() to this original cell instead
-    # keeps the colorbar/locator in a fixed panel corner for every site.
-    cell_bbox = ax.get_position()
-    ax.set_facecolor(PAPER)
-    boundary = d["boundary"]
-    buildings = d["buildings"]
-    svf = d["svf"]
+    cell = ax.get_position()
+    fig_w_in, fig_h_in = fig.get_size_inches()
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+    data_w, data_h = xmax - xmin, ymax - ymin
 
-    # Buildings basemap
+    cell_w_in = cell.width * fig_w_in
+    cell_h_in = max(cell.height * fig_h_in - _TITLE_RESERVE_IN - _CBAR_RESERVE_IN, 0.05)
+
+    if data_h / data_w > cell_h_in / cell_w_in:
+        box_h_in = cell_h_in
+        box_w_in = box_h_in * data_w / data_h
+    else:
+        box_w_in = cell_w_in
+        box_h_in = box_w_in * data_h / data_w
+
+    box_w_frac = box_w_in / fig_w_in
+    box_h_frac = box_h_in / fig_h_in
+    box_x0 = cell.x0 + (cell.width - box_w_frac) / 2
+    box_y0 = cell.y1 - _TITLE_RESERVE_IN / fig_h_in - box_h_frac
+    ax.set_position([box_x0, box_y0, box_w_frac, box_h_frac])
+    ax.set_aspect("equal", adjustable="box")
+
+
+def draw_grid_panel(ax, X: np.ndarray, Y: np.ndarray, Z: np.ndarray, boundary,
+                     buildings, cmap: str, vmin: float, vmax: float, title: str,
+                     unit: str, scalebar: bool = False, zoom_bounds: dict | None = None,
+                     window: tuple | None = None, coverage_pct: float | None = None) -> None:
+    """One grid-row map, or the same map re-rendered at a zoom `window`
+    inside an inlet: buildings for context, one shared boundary outline, the
+    metric as a masked pcolormesh (NaN cells stay transparent — a stated
+    gap, never fabricated), a compact horizontal colorbar whose label is the
+    whole caption. Title budget: 2-3 words + a unit, nothing else
+    (docs/folha_v3_spec.md's text budget)."""
+    ax.set_facecolor(PAPER)
     if buildings is not None:
         try:
-            buildings.plot(ax=ax, color="#D9D9D6", edgecolor="none",
-                           linewidth=0, zorder=1)
+            buildings.plot(ax=ax, color="#E4E4E0", edgecolor="none", linewidth=0, zorder=1)
         except Exception:
             pass
-
-    # Boundary + 15 m edge-halo, drawn as a single ticked/hachured stroke
-    # along the boundary line rather than a filled hatch polygon. A filled
-    # "////" hatch on the true 15 m ring collapses to a sub-pixel sliver
-    # for an elongated/narrow site — at web1200 the ring is ~0.10 px/m for
-    # Maré (edge_share 5.1%), so the hatch rendered nothing there even
-    # though the ring geometry was present and non-empty; the same
-    # happened for Rocinha/Alemão/Rio das Pedras's multi-part boundaries
-    # (round-2 finding B: hatch visible on only 1 of 5 sheets). TickedStroke
-    # draws tick length/spacing in points (screen space), so the mark stays
-    # visible regardless of a site's absolute size or aspect ratio. Density
-    # — not an alpha on/off toggle — addresses the original "too much hatch
-    # on Rio das Pedras" complaint (round-1 finding 10): wider spacing and
-    # shorter ticks once edge_share crosses ~10%.
     try:
-        busy = stats.get("edge_share", 0.0) > 0.10
-        tick_spacing = 9.0 if busy else 6.5
-        tick_length = 0.5 if busy else 0.7
-        halo_pe = [patheffects.withTickedStroke(angle=-45, length=tick_length,
-                                                spacing=tick_spacing)]
-        boundary.boundary.plot(ax=ax, color=INK, linewidth=0.7,
-                               zorder=3, path_effects=halo_pe)
-        inner = boundary.buffer(-15.0)
-        inner_gs = gpd.GeoSeries(inner, crs=boundary.crs)
-        inner_gs.boundary.plot(ax=ax, color=INK, linewidth=0.5,
-                               linestyle="--", zorder=2.5, alpha=0.6)
+        boundary.boundary.plot(ax=ax, color=INK, linewidth=0.5, zorder=2)
     except Exception:
         pass
 
-    # observer classification
-    is_zero = svf["svf"] == 0.0
-    is_offset = (svf["offset_distance"] > 2.5) & ~is_zero
-    normal = ~is_zero & ~is_offset
+    Zm = np.ma.masked_invalid(Z)
+    pc = ax.pcolormesh(X, Y, Zm, cmap=cmap, vmin=vmin, vmax=vmax,
+                        shading="nearest", zorder=3)
 
-    cmap = mpl.colormaps.get_cmap("YlGnBu_r")
-    norm_v = mpl.colors.Normalize(vmin=0.0, vmax=1.0)
-
-    if normal.any():
-        ax.scatter(
-            svf.loc[normal].geometry.x, svf.loc[normal].geometry.y,
-            c=cmap(norm_v(svf.loc[normal, "svf"].values)),
-            s=1.6, alpha=0.85, linewidths=0, zorder=4,
-        )
-    if is_offset.any():
-        ax.scatter(
-            svf.loc[is_offset].geometry.x, svf.loc[is_offset].geometry.y,
-            facecolors="none",
-            edgecolors=cmap(norm_v(svf.loc[is_offset, "svf"].values)),
-            s=4.0, linewidths=0.6, zorder=5,
-        )
-    if is_zero.any():
-        # Larger, bolder cross with faint halo so dense-alley svf==0 streaks
-        # remain legible as discrete glyphs rather than continuous strokes
-        # (orthogonal-grid failure mode flagged in riodaspedras review).
-        ax.scatter(
-            svf.loc[is_zero].geometry.x, svf.loc[is_zero].geometry.y,
-            marker="o", facecolors=MAGENTA, edgecolors="none",
-            s=3.0, alpha=0.30, linewidths=0, zorder=6,
-        )
-        # Smaller, partly-transparent cross than round-1's s=20/alpha=1.0 —
-        # at sites where unresolved SVF is a double-digit share of
-        # observers (Rocinha 12.4%, Alemão 3.9%) the full-opacity glyph
-        # overplotted and hid the street-SVF line underneath it (round-2
-        # finding E).
-        ax.scatter(
-            svf.loc[is_zero].geometry.x, svf.loc[is_zero].geometry.y,
-            marker="+", c=MAGENTA, s=11.0, linewidths=0.8, alpha=0.7,
-            zorder=7,
-        )
-
-    minx, miny, maxx, maxy = boundary.total_bounds
-    # Per-axis padding (4% of each axis' own extent), not 4% of the larger
-    # of the two — the old single `pad` used the tall dimension's larger
-    # absolute value on the narrow axis too, baking extra blank margin
-    # into the already-narrow rendered width for elongated sites like Maré
-    # (round-1 finding 6).
-    pad_x = 0.04 * (maxx - minx)
-    pad_y = 0.04 * (maxy - miny)
-    ax.set_xlim(minx - pad_x, maxx + pad_x)
-    ax.set_ylim(miny - pad_y, maxy + pad_y)
-    ax.set_aspect("equal")
+    if window is not None:
+        xmin, xmax, ymin, ymax = window
+    else:
+        xmin, ymin, xmax, ymax = boundary.total_bounds
+        pad_x = 0.04 * (xmax - xmin)
+        pad_y = 0.04 * (ymax - ymin)
+        xmin, xmax = xmin - pad_x, xmax + pad_x
+        ymin, ymax = ymin - pad_y, ymax + pad_y
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    _fit_square_axes(ax)
     ax.set_xticks([])
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
+    ax.set_title(title, fontsize=9.5, color=INK, pad=3, loc="left")
 
-    # Scalebar 200 m bottom-left
-    bar_y = miny - pad_y + (maxy - miny) * 0.02
-    bar_x0 = minx - pad_x + (maxx - minx) * 0.04
-    bar_x1 = bar_x0 + 200.0
-    ax.plot([bar_x0, bar_x1], [bar_y, bar_y], color=INK, lw=1.4)
-    ax.text((bar_x0 + bar_x1) / 2, bar_y + (maxy - miny) * 0.012,
-            "200 m", fontsize=7, family="DejaVu Sans Mono",
-            ha="center", va="bottom", color=INK)
-    # North arrow top-left of bar
-    arr_x = bar_x0
-    arr_y0 = bar_y + (maxy - miny) * 0.04
-    arr_y1 = arr_y0 + (maxy - miny) * 0.04
-    ax.annotate("", xy=(arr_x, arr_y1), xytext=(arr_x, arr_y0),
-                arrowprops=dict(arrowstyle="->", color=INK, lw=1.0))
-    ax.text(arr_x + (maxx - minx) * 0.004, arr_y1, "N",
-            fontsize=7, family="DejaVu Sans Mono", color=INK,
-            ha="left", va="center")
+    if zoom_bounds:
+        for key, b in zoom_bounds.items():
+            if not b.get("ok"):
+                continue
+            bxmin, bxmax, bymin, bymax = b["bounds"]
+            ax.add_patch(Rectangle((bxmin, bymin), bxmax - bxmin, bymax - bymin,
+                                   facecolor="none", edgecolor=ZOOM_COLORS[key],
+                                   linewidth=1.1, zorder=5))
+            ax.text(bxmax, bymax, key, fontsize=6.5, fontweight="bold",
+                    color=ZOOM_COLORS[key], ha="left", va="bottom", zorder=6)
 
-    # colorbar inset for SVF — anchored to the panel's full cell (see
-    # cell_bbox note above), not ax.inset_axes(), so it stays in the fixed
-    # top-left corner margin instead of collapsing onto the data column.
-    cbar_w = cell_bbox.width * 0.30
-    cbar_h = cell_bbox.height * 0.018
-    cbar_x0 = cell_bbox.x0 + cell_bbox.width * 0.02
-    cbar_y0 = cell_bbox.y1 - cell_bbox.height * 0.05
-    cbar_ax = fig.add_axes([cbar_x0, cbar_y0, cbar_w, cbar_h])
-    sm = mpl.cm.ScalarMappable(norm=norm_v, cmap=cmap)
-    sm.set_array([])
-    # Fixed ticks + 1-decimal format for every site (round-1 finding 7 —
-    # tick precision/position previously drifted across stale renders).
-    cb = plt.colorbar(sm, cax=cbar_ax, orientation="horizontal",
-                      format="%.1f", ticks=[0.0, 0.5, 1.0])
+    if scalebar:
+        bar_y = ymin + (ymax - ymin) * 0.02
+        bar_x0 = xmin + (xmax - xmin) * 0.04
+        bar_x1 = bar_x0 + 200.0
+        ax.plot([bar_x0, bar_x1], [bar_y, bar_y], color=INK, lw=1.2, zorder=7)
+        ax.text((bar_x0 + bar_x1) / 2, bar_y + (ymax - ymin) * 0.015,
+                "200 m", fontsize=6.5, family="DejaVu Sans Mono",
+                ha="center", va="bottom", color=INK, zorder=7)
+
+    # Coverage is of BUILT cells (len(grid) — this layer's own denominator,
+    # passed in by the caller), never of the lattice's full rectangular
+    # envelope: most of that envelope is simply not built, which is not a
+    # data gap. Conflating the two would print e.g. "cov 26%" on Maré's
+    # Terrain panel — implying slope_deg is missing for 3/4 of the site —
+    # when slope_deg is in fact ~100% complete for every built cell; the
+    # real, load-bearing gap is svf_c_p50/kwh_m2_p50's missing street
+    # support, which is what this badge is for.
+    if coverage_pct is not None and coverage_pct < 99.5:
+        ax.text(0.02, 0.98, f"cov {coverage_pct:.0f}%", fontsize=6, color=MUTED,
+                family="DejaVu Sans Mono", ha="left", va="top",
+                transform=ax.transAxes, zorder=8)
+
+    # Colorbar directly below the now-fitted map box — its own physical
+    # strip (_CBAR_RESERVE_IN), not a fraction of the original tall cell,
+    # so it never floats away from a map that _fit_square_axes shrank.
+    panel_box = ax.get_position()
+    fig_w_in, fig_h_in = ax.figure.get_size_inches()
+    cbar_w = panel_box.width
+    cbar_h = 0.055 / fig_h_in
+    cbar_x0 = panel_box.x0
+    cbar_y0 = panel_box.y0 - _CBAR_GAP_IN / fig_h_in - cbar_h
+    cbar_ax = ax.figure.add_axes([cbar_x0, cbar_y0, cbar_w, cbar_h])
+    cb = plt.colorbar(pc, cax=cbar_ax, orientation="horizontal")
     cb.outline.set_linewidth(0.3)
-    cb.ax.tick_params(labelsize=6, length=2, pad=2)
-    cb.set_label("SVF", fontsize=7, color=INK)
-
-    # Locator inset top-right: all five site boundaries in their geographic
-    # Rio-metro positions, current site filled orange. No external coastline
-    # tile dependency — works offline from the data already on disk.
-    # Anchored to cell_bbox for the same reason as the colorbar above.
-    try:
-        loc_w = cell_bbox.width * 0.16
-        loc_h = cell_bbox.height * 0.13
-        loc_x0 = cell_bbox.x1 - cell_bbox.width * 0.03 - loc_w
-        loc_y0 = cell_bbox.y1 - cell_bbox.height * 0.03 - loc_h
-        loc_ax = fig.add_axes([loc_x0, loc_y0, loc_w, loc_h])
-        loc_ax.set_facecolor("#F0EFEA")
-        for sname in STRIP_ORDER:
-            try:
-                b = gpd.read_file(site_paths(sname)["boundary"]).to_crs(31983)
-                if sname == site:
-                    b.plot(ax=loc_ax, facecolor=ACCENT, edgecolor=INK,
-                           linewidth=0.6, zorder=3)
-                else:
-                    b.plot(ax=loc_ax, facecolor="#BFC4BD", edgecolor=INK,
-                           linewidth=0.3, zorder=2)
-            except Exception:
-                pass
-        loc_ax.set_aspect("equal")
-        loc_ax.set_xticks([])
-        loc_ax.set_yticks([])
-        for spine in loc_ax.spines.values():
-            spine.set_linewidth(0.5)
-            spine.set_color(INK)
-        loc_ax.set_title("Rio metro · 5 sites", fontsize=6.5, pad=2,
-                         color=INK)
-    except Exception:
-        pass
+    cb.ax.tick_params(labelsize=6, length=2, pad=1)
+    cb.set_label(unit, fontsize=7, color=INK, labelpad=2)
 
 
-def draw_hero_legend(ax, counts: dict | None = None) -> None:
-    ax.axis("off")
-    counts = counts or {}
-
-    def _lab(base, key):
-        c = counts.get(key)
-        return f"{base}  (n={c:,})" if c is not None else base
-
-    handles = [
-        Line2D([0], [0], marker="o", color="w",
-               markerfacecolor="#2C5F8D", markersize=5,
-               label=_lab("resolved observer", "resolved")),
-        Line2D([0], [0], marker="o", color="w",
-               markerfacecolor="none", markeredgecolor="#2C5F8D",
-               markeredgewidth=0.8, markersize=6,
-               label=_lab("offset > 2.5 m (low-confidence)", "offset")),
-        Line2D([0], [0], marker="+", color=MAGENTA,
-               markersize=8, linestyle="None",
-               label=_lab("SVF == 0 (unresolved)", "unresolved")),
-        mpatches.Patch(facecolor="#D9D9D6", edgecolor="none",
-                       label="building footprints"),
-        mpatches.Patch(facecolor="none", edgecolor=INK, hatch="////",
-                       label="15 m edge-halo zone"),
-    ]
-    ax.legend(handles=handles, loc="center left", fontsize=8,
-              frameon=False, ncol=2, columnspacing=1.2,
-              handletextpad=0.6)
+def draw_grid_row(fig, gs_cell, d: dict, lat: dict, X: np.ndarray, Y: np.ndarray,
+                   layer_arrays: dict, panel_norms: dict, windows: dict) -> list:
+    """The sheet's new spine: terrain, density, SVF, sunlight — same 10 m
+    lattice, same extent, aligned axes, one shared boundary outline, in the
+    PI's own causal order (docs/folha_v3_spec.md)."""
+    sub = gs_cell.subgridspec(1, len(GRID_LAYERS), wspace=0.12)
+    n_built = len(d["grid"])
+    axes = []
+    for i, layer in enumerate(GRID_LAYERS):
+        ax = fig.add_subplot(sub[0, i])
+        cov = 100.0 * d["grid"][layer["col"]].notna().sum() / n_built if n_built else None
+        draw_grid_panel(
+            ax, X, Y, layer_arrays[layer["key"]], d["boundary"], d["buildings"],
+            layer["cmap"], *panel_norms[layer["key"]], layer["title"], layer["unit"],
+            scalebar=(i == 0), zoom_bounds=windows, coverage_pct=cov,
+        )
+        axes.append(ax)
+    return axes
 
 
-def _ridge_panel(ax, data_by_class, x_range, fill_color, x_label,
-                 metric_label=None, metric_by_class=None) -> None:
-    ax.set_facecolor(PAPER)
-    keys = [k for k, v in data_by_class.items() if len(v) >= 30]
-    sparse = {k: v for k, v in data_by_class.items() if 10 <= len(v) < 30}
-    absent = {k: v for k, v in data_by_class.items() if len(v) < 10}
+def draw_zoom_row(fig, gs_cell, d: dict, X: np.ndarray, Y: np.ndarray,
+                   layer_arrays: dict, panel_norms: dict, windows: dict) -> None:
+    """Two (at most three) code-selected zoom inlets, each re-rendering the
+    two grid layers most relevant to why that cluster was flagged, at the
+    same colour scale as the grid row above so the two read as one
+    analysis. A dropped inlet states the gap in one line — never a
+    fabricated window (docs/folha_v3_spec.md §4)."""
+    outer = fig.add_subplot(gs_cell)
+    outer.axis("off")
+    bbox = outer.get_position()
+    half_w = bbox.width / 2.0
 
-    # order by descending count
-    keys = sorted(keys, key=lambda k: -len(data_by_class[k]))
-    sparse_keys = sorted(sparse.keys(), key=lambda k: -len(sparse[k]))
-    absent_keys = sorted(absent.keys(), key=lambda k: -len(absent[k]))
+    for j, key in enumerate(("A", "B")):
+        h_x0 = bbox.x0 + j * half_w
+        fig.text(h_x0 + half_w * 0.02, bbox.y0 + bbox.height * 0.97,
+                 f"Zoom {key} · {ZOOM_LABELS[key]}", fontsize=8.5,
+                 fontweight="bold", color=ZOOM_COLORS[key], ha="left", va="top")
 
-    rows = keys + sparse_keys + absent_keys
-    n_rows = max(len(rows), 1)
-    ax.set_xlim(*x_range)
-    ax.set_ylim(-0.5, n_rows)
+        z = windows.get(key, {})
+        if not z.get("ok"):
+            fig.text(h_x0 + half_w / 2, bbox.y0 + bbox.height * 0.45,
+                     f"no qualifying cluster —\n{z.get('reason', 'n/a')}",
+                     fontsize=7.5, style="italic", color=MUTED,
+                     ha="center", va="center", wrap=True)
+            continue
 
-    # Row labels anchor inside the axes (right-aligned at the data edge)
-    # rather than past it — text drawn past x_range[1] sits in the ~3%
-    # figure margin outside the axes and gets cut by the page edge on the
-    # rightmost gridspec column (round-1 finding 1).
-    label_x = x_range[1] - (x_range[1] - x_range[0]) * 0.01
-    label_bbox = dict(boxstyle="round,pad=0.15", facecolor=PAPER,
-                       edgecolor="none", alpha=0.78)
-
-    x = np.linspace(x_range[0], x_range[1], 400)
-    for i, k in enumerate(rows):
-        y0 = n_rows - 1 - i
-        vals = data_by_class[k]
-        label = CLASS_LABELS.get(k, k)
-        n = len(vals)
-        if n >= 30:
-            try:
-                kde = gaussian_kde(vals, bw_method=0.25)
-                y = kde(x)
-                y = y / y.max() * 0.85
-                ax.fill_between(x, y0, y0 + y, color=fill_color, alpha=0.35,
-                                linewidth=0)
-                ax.plot(x, y0 + y, color=INK, lw=1.0)
-                med = float(np.median(vals))
-                ax.plot([med, med], [y0, y0 + 0.18], color=INK, lw=1.6)
-                ax.text(label_x, y0 + 0.45,
-                        f"{label}  n={n}", fontsize=7.5,
-                        family="DejaVu Sans", va="center", ha="right",
-                        color=INK, bbox=label_bbox, zorder=8)
-                if metric_by_class and k in metric_by_class:
-                    ax.text(x_range[0] + (x_range[1]-x_range[0]) * 0.02,
-                            y0 + 0.6,
-                            f"{metric_label}={metric_by_class[k]:.2f}",
-                            fontsize=6.5, family="DejaVu Sans Mono",
-                            color=MUTED, va="center", ha="left")
-            except Exception:
-                pass
-        elif n >= 10:
-            try:
-                kde = gaussian_kde(vals, bw_method=0.3)
-                y = kde(x)
-                y = y / y.max() * 0.7
-                ax.plot(x, y0 + y, color=MUTED, lw=0.8, linestyle="--")
-                ax.text(label_x, y0 + 0.45,
-                        f"{label}  n={n} — sparse",
-                        fontsize=7, color=MUTED, va="center", ha="right",
-                        style="italic", bbox=label_bbox, zorder=8)
-            except Exception:
-                pass
-        else:
-            ax.plot([x_range[0], x_range[1]], [y0, y0],
-                    color=MUTED, lw=0.4, linestyle="--")
-            ax.text((x_range[0] + x_range[1]) / 2, y0 + 0.12,
-                    f"{label}: n<10 — not sampled" if n > 0 else
-                    f"{label}: absent",
-                    fontsize=7, color=MUTED, va="center", ha="center",
-                    style="italic")
-
-    ax.set_xlabel(x_label, fontsize=9)
-    ax.set_yticks([])
-    for spine in ("top", "right", "left"):
-        ax.spines[spine].set_visible(False)
-    ax.spines["bottom"].set_color(INK)
-    ax.tick_params(axis="x", labelsize=7)
+        layer_keys = ZOOM_INLET_LAYER_KEYS[key]
+        sub_w = half_w * 0.94 / len(layer_keys)
+        for k, lkey in enumerate(layer_keys):
+            layer = GRID_LAYERS_BY_KEY[lkey]
+            sub_x0 = h_x0 + half_w * 0.02 + k * sub_w
+            sub_y0 = bbox.y0 + bbox.height * 0.04
+            sub_h = bbox.height * 0.80
+            ax = fig.add_axes([sub_x0, sub_y0, sub_w * 0.94, sub_h])
+            draw_grid_panel(
+                ax, X, Y, layer_arrays[lkey], d["boundary"], d["buildings"],
+                layer["cmap"], *panel_norms[lkey], layer["title"], layer["unit"],
+                window=z["bounds"],
+            )
 
 
 def _uses_quadrant_fallback(d: dict) -> bool:
-    """True when the ridgeline panels fall back to compass quadrants
-    because no usable street-class column is present (the Maré case).
-    Mirrors the condition inside draw_svf_ridgeline/draw_solar_ridgeline
-    so the panel titles built in build_dashboard() can stay honest about
-    what is actually plotted (round-1 finding 3)."""
+    """True when a per-street-class panel would have to fall back to compass
+    quadrants because no usable street-class column is present (the Maré
+    case: no tipo_logra column). round-1 finding 3 was a panel titled
+    "street class" while it actually plotted NE/SE/SW/NW — this predicate
+    is what made that title conditional and honest.
+
+    The v3 restructure (docs/folha_v3_spec.md) drops the ridgeline panels
+    that used to call this (grid_row + the hexbin cover the same ground
+    without a text-heavy per-class breakdown — see build_dashboard's
+    docstring for the full reasoning). Kept and tested regardless: it is a
+    "do not regress" honesty fix per the v3 spec's non-negotiables, and
+    stays correct/available if a future cycle reinstates a per-class
+    panel."""
     seg = d.get("seg")
     return not (seg is not None and "tipo_logra" in seg.columns)
 
 
-def _quadrant_groups(svf_or_solar, boundary, value_col: str):
-    """Bin observers into NE/SE/SW/NW from boundary centroid; return dict of arrays."""
-    bg = boundary.geometry
-    centroid = (bg.union_all() if hasattr(bg, "union_all") else bg.unary_union).centroid
-    cx = centroid.x
-    cy = centroid.y
-    dx = svf_or_solar.geometry.x.values - cx
-    dy = svf_or_solar.geometry.y.values - cy
-    # azimuth: 0 = N (+y), clockwise → E
-    ang = (np.degrees(np.arctan2(dx, dy))) % 360.0
-    bins = [("NE", 0, 90), ("SE", 90, 180), ("SW", 180, 270), ("NW", 270, 360)]
-    vals = svf_or_solar[value_col].values
-    out = {}
-    for lab, lo, hi in bins:
-        m = (ang >= lo) & (ang < hi) & np.isfinite(vals)
-        if m.sum() > 0:
-            out[lab] = vals[m]
-    return out
+def _dynamic_hexbin_gridsize(x: np.ndarray, y: np.ndarray, x_range: tuple,
+                              y_range: tuple, lo: int = 12, hi: int = 45) -> tuple:
+    """Bin count from the data (n, IQR), not a constant tuned to one site
+    (docs/folha_v3_spec.md's standing residual: gridsize=30 read as
+    near-blank on Rocinha/Alemão's lower N and tighter SVF range). One
+    Freedman-Diaconis bin width per axis: bin_w = 2*IQR*n^(-1/3), gridsize =
+    axis span / bin_w, clamped to [lo, hi] so a very small or very
+    degenerate sample still renders a legible hexbin rather than one giant
+    or thousands of empty cells."""
+    def fd_bins(v: np.ndarray, span: float) -> int:
+        v = v[np.isfinite(v)]
+        if len(v) < 5 or span <= 0:
+            return lo
+        iqr = float(np.subtract(*np.percentile(v, [75, 25])))
+        if iqr <= 0:
+            return lo
+        bin_w = 2.0 * iqr * len(v) ** (-1.0 / 3.0)
+        if bin_w <= 0:
+            return lo
+        return int(np.clip(round(span / bin_w), lo, hi))
 
-
-def draw_svf_ridgeline(ax, d: dict) -> None:
-    svf = d["svf"]
-    seg = d["seg"]
-    if seg is not None and "tipo_logra" in seg.columns:
-        cls_by_seg = seg.set_index("street_id")["tipo_logra"].to_dict()
-        svf_local = svf.copy()
-        svf_local["cls"] = svf_local["street_id"].map(cls_by_seg)
-        by_class = {
-            k: v["svf"].dropna().values
-            for k, v in svf_local.dropna(subset=["cls"]).groupby("cls")
-        }
-        _ridge_panel(ax, by_class, (0, 1.0), SVF_FILL, "SVF")
-        ax.set_xticks(np.arange(0, 1.01, 0.1))
-        return
-    # Fallback: compass quadrants (Maré case — no usable highway class column)
-    by_class = _quadrant_groups(svf, d["boundary"], "svf")
-    _ridge_panel(ax, by_class, (0, 1.0), SVF_FILL, "SVF")
-    ax.set_xticks(np.arange(0, 1.01, 0.1))
-
-
-def draw_solar_ridgeline(ax, d: dict, site: str) -> None:
-    seg = d["seg"]
-    solar = d["solar"]
-    if solar is None or "solar_hours_annual" not in solar.columns:
-        ax.text(0.5, 0.5, "solar data unavailable",
-                ha="center", va="center", color=MUTED, fontsize=9)
-        ax.axis("off")
-        return
-
-    if seg is not None and "tipo_logra" in seg.columns:
-        cls_by_seg = seg.set_index("street_id")["tipo_logra"].to_dict()
-        s = solar.copy()
-        s["cls"] = s["street_id"].map(cls_by_seg)
-        by_class = {
-            k: v["solar_hours_annual"].dropna().values
-            for k, v in s.dropna(subset=["cls"]).groupby("cls")
-        }
-        median_ratio_by_class = {
-            k: float(v["sunshine_ratio_mean"].dropna().median())
-            for k, v in s.dropna(subset=["cls"]).groupby("cls")
-            if v["sunshine_ratio_mean"].notna().any()
-        }
-    else:
-        # Compass-quadrant fallback for Maré
-        by_class = _quadrant_groups(solar, d["boundary"], "solar_hours_annual")
-        sun_by_class = _quadrant_groups(solar, d["boundary"], "sunshine_ratio_mean")
-        median_ratio_by_class = {
-            k: float(np.nanmedian(v)) for k, v in sun_by_class.items()
-        }
-    # solar_hours_annual is daily-averaged (range ~0–12 h/day), not an annual sum
-    _ridge_panel(ax, by_class, (0, 12), SOLAR_FILL, "solar hours / day (annual mean)",
-                 metric_label="r̄", metric_by_class=median_ratio_by_class)
-    ax.set_xticks(np.arange(0, 13, 2))
-
-    # Sunshine-ratio badge. r̄ = mean(solar_hours/day) / available daylight.
-    # Rio's ~22.9°S → ~11–13.5 h daylight, so an open observer should sit
-    # in [0.40, 0.85]. Deep canyons and flat-dense alleys legitimately fall
-    # below 0.40 from mutual shading; that's a shaded regime, not a unit
-    # bug. >0.85 site median would be suspicious.
-    overall = solar["sunshine_ratio_mean"].dropna()
-    if len(overall) > 0:
-        med = float(overall.median())
-        # Own row above the axes (transAxes y > 1, clip_on=False) rather
-        # than anchored inline at the top ridge's y-position (0.96, 0.97 in
-        # the old code): that position sits inside the data area at the
-        # same height as the top-ranked class's "label n=" text, so the two
-        # were drawn on top of each other on every sheet once round-1's
-        # clipping fix moved those labels fully inside the axes (round-2
-        # finding C). Sitting just under the panel title instead collides
-        # with nothing at A3 or at web1200.
-        badge_kw = dict(transform=ax.transAxes, fontsize=7, ha="right",
-                        va="bottom", clip_on=False,
-                        bbox=dict(boxstyle="round,pad=0.2",
-                        facecolor=PAPER, edgecolor="none", alpha=0.78))
-        badge_y = 1.045
-        if 0.40 <= med <= 0.85:
-            ax.text(0.995, badge_y, f"open-sky regime ✓ (r̄={med:.2f})",
-                    color=GREEN, **badge_kw)
-        elif med < 0.40:
-            ax.text(0.995, badge_y, f"shaded regime ✓ (r̄={med:.2f})",
-                    color=SVF_FILL, **badge_kw)
-        else:
-            ax.text(0.995, badge_y, f"check (r̄={med:.2f})",
-                    color=RED, **badge_kw)
+    nx = fd_bins(np.asarray(x, dtype=float), x_range[1] - x_range[0])
+    ny = fd_bins(np.asarray(y, dtype=float), y_range[1] - y_range[0])
+    return (nx, ny)
 
 
 def draw_hexbin(ax, d: dict, stats: dict) -> None:
@@ -712,18 +710,42 @@ def draw_hexbin(ax, d: dict, stats: dict) -> None:
     pct_excl = n_excl / len(merged) * 100
     sub = merged.loc[keep]
 
+    y_top = float(sub["solar_hours_annual"].max()) * 1.05 if len(sub) else 12.0
+    y_range = (0.0, min(12.5, y_top))
+    gridsize = _dynamic_hexbin_gridsize(
+        sub["svf"].to_numpy(), sub["solar_hours_annual"].to_numpy(),
+        (0.0, 1.0), y_range,
+    )
+
     # PowerNorm (gamma<1) lifts low-count bins' visual weight instead of
     # leaving them near-white against the paper background — a linear norm
     # made Vidigal (smallest N) and especially Rocinha (lowest mean SVF, so
     # its cloud sits tightly near the origin) read as near-blank even
     # though both panels were rendering real, non-broken data (round-2
-    # finding D).
-    hb = ax.hexbin(sub["svf"], sub["solar_hours_annual"], gridsize=30,
-                   cmap="Greys", mincnt=1, linewidths=0.0,
-                   norm=mpl.colors.PowerNorm(gamma=0.45))
+    # finding D). gridsize is now data-driven (see _dynamic_hexbin_gridsize)
+    # rather than the flat 30 that under-resolved Rocinha/Alemão.
+    hb = ax.hexbin(sub["svf"], sub["solar_hours_annual"], gridsize=gridsize,
+                   cmap="Greys", mincnt=1, linewidths=0.0)
+
+    # The gridsize fix alone still left Rocinha washed out: its single
+    # densest bin (~4,400 points, a sharp canyon-floor peak) is >4x any
+    # other site's peak while its OWN median bin sits at 6 — a PowerNorm
+    # scaled to the true max compresses every other bin toward zero. Fixed
+    # from this panel's own dynamic range: cap the norm at the 98th
+    # percentile of its OWN nonzero bin counts (never a constant that
+    # happens to suit one site) and let the colorbar's ">" arrow disclose
+    # that the densest bins are clipped, rather than let them define the
+    # scale for everyone else.
+    counts = hb.get_array()
+    vmax = float(np.percentile(counts, 98)) if len(counts) else 1.0
+    vmax = max(vmax, 1.0)
+    hexbin_norm = mpl.colors.PowerNorm(gamma=0.45, vmin=1.0, vmax=vmax)
+    hb.set_norm(hexbin_norm)
+    hb.set_clim(1.0, vmax)
+    cbar_extend = "max" if len(counts) and counts.max() > vmax else "neither"
+
     ax.set_xlim(0, 1)
-    y_top = float(sub["solar_hours_annual"].max()) * 1.05 if len(sub) else 12.0
-    ax.set_ylim(0, min(12.5, y_top))
+    ax.set_ylim(*y_range)
     ax.set_xlabel("SVF", fontsize=9)
     ax.set_ylabel("solar hours / day (annual mean)", fontsize=9)
     ax.tick_params(labelsize=7)
@@ -749,8 +771,15 @@ def draw_hexbin(ax, d: dict, stats: dict) -> None:
         r, _ = pearsonr(sub["svf"], sub["solar_hours_annual"])
         ax.text(0.98, 0.97, f"r = {r:.2f}", transform=ax.transAxes,
                 fontsize=10, family="DejaVu Sans Mono", ha="right", va="top")
-    ax.text(0.02, -0.18, f"edge n={int(n_excl)} excluded ({pct_excl:.1f}% of network)",
-            transform=ax.transAxes, fontsize=7, color=MUTED, ha="left", va="top")
+    # Fixed point offset, not an axes-fraction one: the hexbin panel's own
+    # height now varies a lot by context (full-width sheet row vs a small
+    # atom export), and a fraction like the old -0.18 scales with it —
+    # on the v3 sheet's taller hexbin row that pushed this caption down
+    # into the caveat strip below.
+    ax.annotate(f"edge n={int(n_excl)} excluded ({pct_excl:.1f}% of network)",
+                xy=(0.0, 0.0), xycoords="axes fraction",
+                xytext=(0, -22), textcoords="offset points",
+                fontsize=7, color=MUTED, ha="left", va="top")
 
     # GMM bimodality check — skip when SVF×solar is strongly linear
     # (|r| > 0.9 implies a single elongated cluster, not two modes)
@@ -785,72 +814,9 @@ def draw_hexbin(ax, d: dict, stats: dict) -> None:
         pass
 
     cb_ax = ax.inset_axes([1.02, 0.0, 0.025, 1.0])
-    cb = plt.colorbar(hb, cax=cb_ax)
+    cb = plt.colorbar(hb, cax=cb_ax, extend=cbar_extend)
     cb.ax.tick_params(labelsize=6)
     cb.set_label("count", fontsize=7)
-
-
-def draw_small_multiples(ax, current_site: str, issues: list) -> None:
-    n = len(STRIP_ORDER)
-    # subaxes
-    ax.axis("off")
-    fig = ax.figure
-    bbox = ax.get_position()
-    width = bbox.width / n * 0.95
-    # 0.84 (not 0.92): leaves headroom above every thumbnail for the fixed
-    # fig.text label below, clear of the row's own "Cross-site comparison"
-    # title sitting just above ax_strip's box.
-    h = bbox.height * 0.84
-    for i, site in enumerate(STRIP_ORDER):
-        x0 = bbox.x0 + (bbox.width / n) * i + (bbox.width / n - width) / 2
-        y0 = bbox.y0 + bbox.height * 0.03
-        sub = fig.add_axes([x0, y0, width, h])
-        sub.set_facecolor(PAPER)
-        try:
-            paths_i = site_paths(site)
-            b = gpd.read_file(paths_i["boundary"]).to_crs(31983)
-            try:
-                buildings = gpd.read_file(paths_i["buildings"]).to_crs(31983)
-                buildings.plot(ax=sub, color="#D9D9D6", linewidth=0, zorder=1)
-            except Exception:
-                pass
-            b.boundary.plot(ax=sub, color=INK, linewidth=0.4, zorder=2)
-            sv = gpd.read_file(paths_i["svf"])
-            sub.scatter(sv.geometry.x, sv.geometry.y,
-                        c=sv["svf"].values, cmap="YlGnBu_r",
-                        vmin=0, vmax=1, s=0.18, alpha=0.7, linewidths=0,
-                        zorder=3)
-            minx, miny, maxx, maxy = b.total_bounds
-            pad = 0.04 * max(maxx - minx, maxy - miny)
-            sub.set_xlim(minx - pad, maxx + pad)
-            sub.set_ylim(miny - pad, maxy + pad)
-        except Exception as e:
-            issues.append(f"small_multiples:{site}: {e}")
-        sub.set_aspect("equal")
-        sub.set_xticks([])
-        sub.set_yticks([])
-        for spine in sub.spines.values():
-            spine.set_visible(True)
-            spine.set_linewidth(0.4)
-            spine.set_color(INK)
-        if site == current_site:
-            for spine in sub.spines.values():
-                spine.set_linewidth(2.8)
-                spine.set_color(ACCENT)
-            # 1 pt inner white halo so the orange "you are here" border
-            # pops against neighbours of similar dark-ink stroke.
-            sub.patch.set_edgecolor(PAPER)
-            sub.patch.set_linewidth(0.0)
-        # fig.text at the pre-shrink box top, not sub.set_title(): each
-        # thumbnail's set_aspect("equal") shrinks its *active* box by a
-        # different amount depending on that site's own data aspect ratio,
-        # so a title anchored to the (now-shrunk) axes box lands at a
-        # different height per site — a ragged label baseline across the
-        # row (round-1 finding 9). x0/y0/width/h are the fixed pre-shrink
-        # cell for this thumbnail, identical in geometry for every site.
-        fig.text(x0 + width / 2, y0 + h + 0.006,
-                 SITE_DISPLAY.get(site, site), fontsize=8, color=INK,
-                 ha="center", va="bottom")
 
 
 def draw_caveats(ax, site: str, stats: dict) -> None:
@@ -923,8 +889,7 @@ def draw_caveats_v2(ax, site: str, stats: dict) -> None:
         ("[H1] EDGE HALO",
          f"{edge_pct:.1f}% of observers fall within 15 m of the "
          "boundary; external footprints beyond the site are not "
-         "modelled, so perimeter SVF and solar are biased high. "
-         "Affected zone is hatched on the hero map."),
+         "modelled, so perimeter SVF and solar are biased high."),
         ("[H2] OBSERVER DENSITY",
          f"{obs_per_km2:.0f} obs/km² ({road_km:.1f} km of "
          f"network, n={n_obs:,}). Cross-site density spreads up "
@@ -936,8 +901,8 @@ def draw_caveats_v2(ax, site: str, stats: dict) -> None:
         ("[M3/L1] MEAN SVF · OFFSET",
          "Mean SVF is length-weighted segment-level; pre-1bffc3e "
          f"runs were observer-weighted. {offset_pct:.1f}% of "
-         "observers were repositioned > 2.5 m (low-confidence "
-         "glyphs on map)."),
+         "observers were repositioned > 2.5 m from their original "
+         "sample location (low-confidence)."),
     ]
     n = len(caveats)
     col_w = 1.0 / n
@@ -969,6 +934,29 @@ def _save_atom(out_dir: Path, name: str, renderer, figsize, **kwargs):
 
 
 def build_dashboard(site: str) -> dict:
+    """v3 layout (docs/folha_v3_spec.md): masthead, identity card, the grid
+    row (terrain/density/SVF/sunlight, PI's own order), two code-selected
+    zoom inlets, the SVF×solar graph, the caveat strip.
+
+    Two panels from the pre-v3 sheet are gone, both decided this cycle:
+
+    - The street-level SVF "hero" map + its legend are superseded by the
+      grid row's own SVF panel. Keeping both would draw SVF twice at full
+      sheet width for no new information, exactly the "unnecessary" the PI
+      asked to cut; the grid row is also the more current column
+      (svf_c_p50, WP-04's C' engine) and it now carries the north
+      arrow/scalebar/200 m bar the hero map used to.
+    - The two ridgeline panels (SVF and solar by street class / orientation
+      quadrant) are DROPPED. They were the standing "text-heavy panels"
+      critic residual (per-class n=, median ticks, sunshine-ratio badges —
+      exactly the prose the v3 text budget forbids), and once the grid row
+      exists they are largely redundant with it: the grid's SVF panel + the
+      hexbin below already show the SVF/solar distribution and their
+      relationship, just without an artificial street-class partition. The
+      underlying functions were NOT deleted — only unreferenced here — and
+      _uses_quadrant_fallback (the honesty helper their titles depended on)
+      is kept intact and tested, in case a future cycle reinstates them.
+    """
     issues: list = []
     panels: list = []
 
@@ -976,6 +964,14 @@ def build_dashboard(site: str) -> dict:
     atoms = out_dir / "atoms"
     out_dir.mkdir(parents=True, exist_ok=True)
     atoms.mkdir(parents=True, exist_ok=True)
+    # Clear atoms of panels the v3 restructure removed (hero map/legend,
+    # both ridgelines, the cross-site strip) — a stale prior-cycle PNG left
+    # sitting next to this run's fresh ones would be the same "fabricated/
+    # placeholder" trap the spec warns against, just one directory listing
+    # away instead of on the sheet itself.
+    for stale in ("hero_map.png", "hero_legend.png", "svf_ridgeline.png",
+                  "solar_ridgeline.png", "small_multiples_strip.png"):
+        (atoms / stale).unlink(missing_ok=True)
 
     d = load_site(site, issues)
     stats = compute_stats(d)
@@ -983,73 +979,52 @@ def build_dashboard(site: str) -> dict:
     build_date = datetime.date.today().isoformat()
     folha_nn = SHEET_NUMBER.get(site, "00")
 
+    grid = d["grid"]
+    lat = _grid_lattice(grid)
+    X, Y = _grid_coords(lat)
+    layer_arrays = {
+        layer["key"]: _grid_to_2d(lat, grid[layer["col"]].to_numpy())
+        for layer in GRID_LAYERS
+    }
+    panel_norms = {
+        key: _panel_norm(key, arr) for key, arr in layer_arrays.items()
+    }
+    windows = select_zoom_windows(grid, lat)
+    for key, z in windows.items():
+        if not z.get("ok"):
+            issues.append(f"{site}: zoom inlet {key} dropped — {z['reason']}")
+    provenance = provenance_line(windows)
+
     # A3 portrait: 297 x 420 mm → 11.69 x 16.54 in
     fig = plt.figure(figsize=(11.69, 16.54), dpi=200, facecolor=PAPER)
     gs = fig.add_gridspec(
-        nrows=8, ncols=2,
-        height_ratios=[1.1, 0.7, 6.0, 0.6, 2.2, 2.2, 2.6, 1.2],
-        width_ratios=[1, 1],
+        nrows=6, ncols=1,
+        height_ratios=[1.3, 0.75, 2.3, 2.3, 6.0, 1.7],
         left=0.04, right=0.97, top=0.985, bottom=0.015,
-        hspace=0.35, wspace=0.20,
+        hspace=0.30,
     )
 
-    ax_mast = fig.add_subplot(gs[0, :])
-    draw_masthead(ax_mast, site, stats, sha, build_date, folha_nn)
+    ax_mast = fig.add_subplot(gs[0, 0])
+    draw_masthead(ax_mast, site, stats, sha, build_date, folha_nn, provenance)
     panels.append("masthead")
 
-    ax_id = fig.add_subplot(gs[1, :])
+    ax_id = fig.add_subplot(gs[1, 0])
     draw_identity_card(ax_id, site, stats)
     panels.append("identity_card")
 
-    ax_hero = fig.add_subplot(gs[2, :])
-    draw_hero_map(ax_hero, site, d, stats)
-    ax_hero.set_title("Street-level SVF — observer network on building fabric",
-                      fontsize=11, color=INK, pad=8, loc="left")
-    panels.append("hero_map")
+    draw_grid_row(fig, gs[2, 0], d, lat, X, Y, layer_arrays, panel_norms, windows)
+    panels.append("grid_row")
 
-    ax_legend = fig.add_subplot(gs[3, :])
-    svf_for_counts = d["svf"]
-    _zero = (svf_for_counts["svf"] == 0.0)
-    _off = (svf_for_counts["offset_distance"] > 2.5) & ~_zero
-    hero_counts = {
-        "resolved": int((~_zero & ~_off).sum()),
-        "offset": int(_off.sum()),
-        "unresolved": int(_zero.sum()),
-    }
-    draw_hero_legend(ax_legend, counts=hero_counts)
+    draw_zoom_row(fig, gs[3, 0], d, X, Y, layer_arrays, panel_norms, windows)
+    panels.append("zoom_inlets")
 
-    # Title honestly reflects what the ridgeline panels group by: a real
-    # street-type vocabulary (Rua/Travessa/Beco/...) when available, or the
-    # compass-quadrant fallback when it isn't (Maré has no tipo_logra
-    # column) — round-1 finding 3 was the title saying "street class" while
-    # the panel showed NE/SE/SW/NW.
-    ridge_grouping = "orientation quadrant" if _uses_quadrant_fallback(d) else "street class"
-
-    ax_svf = fig.add_subplot(gs[4, 0])
-    draw_svf_ridgeline(ax_svf, d)
-    ax_svf.set_title(f"SVF distribution by {ridge_grouping}",
-                     fontsize=10, color=INK, pad=4, loc="left")
-    panels.append("svf_ridgeline")
-
-    ax_sol = fig.add_subplot(gs[4, 1])
-    draw_solar_ridgeline(ax_sol, d, site)
-    ax_sol.set_title(f"Annual solar access by {ridge_grouping}",
-                     fontsize=10, color=INK, pad=4, loc="left")
-    panels.append("solar_ridgeline")
-
-    ax_hex = fig.add_subplot(gs[5, :])
+    ax_hex = fig.add_subplot(gs[4, 0])
     draw_hexbin(ax_hex, d, stats)
     ax_hex.set_title("SVF × solar — physical consistency check",
                      fontsize=10, color=INK, pad=4, loc="left")
     panels.append("svf_solar_hexbin")
 
-    ax_strip = fig.add_subplot(gs[6, :])
-    draw_small_multiples(ax_strip, site, issues)
-    ax_strip.set_title("Cross-site comparison — shared SVF ramp",
-                       fontsize=10, color=INK, pad=4, loc="left")
-    panels.append("small_multiples_strip")
-
-    ax_cav = fig.add_subplot(gs[7, :])
+    ax_cav = fig.add_subplot(gs[5, 0])
     draw_caveats_v2(ax_cav, site, stats)
     panels.append("caveat_strip")
 
@@ -1068,8 +1043,8 @@ def build_dashboard(site: str) -> dict:
     # Atomic exports — render each panel into its own figure
     try:
         _save_atom(atoms, "masthead", lambda ax: draw_masthead(
-            ax, site, stats, sha, build_date, folha_nn),
-                  figsize=(11.69, 1.1))
+            ax, site, stats, sha, build_date, folha_nn, provenance),
+                  figsize=(11.69, 1.3))
     except Exception as e:
         issues.append(f"atom masthead: {e}")
 
@@ -1080,34 +1055,22 @@ def build_dashboard(site: str) -> dict:
         issues.append(f"atom identity_card: {e}")
 
     try:
-        fig2 = plt.figure(figsize=(11.69, 9.0), dpi=200, facecolor=PAPER)
-        ax2 = fig2.add_subplot(111)
-        draw_hero_map(ax2, site, d, stats)
-        fig2.savefig(atoms / "hero_map.png", dpi=200, facecolor=PAPER,
-                     bbox_inches="tight")
+        fig2 = plt.figure(figsize=(11.69, 4.5), dpi=200, facecolor=PAPER)
+        gs2 = fig2.add_gridspec(1, 1, left=0.02, right=0.98, top=0.90, bottom=0.05)
+        draw_grid_row(fig2, gs2[0, 0], d, lat, X, Y, layer_arrays, panel_norms, windows)
+        fig2.savefig(atoms / "grid_row.png", dpi=200, facecolor=PAPER)
         plt.close(fig2)
     except Exception as e:
-        issues.append(f"atom hero_map: {e}")
+        issues.append(f"atom grid_row: {e}")
 
     try:
-        fig2 = plt.figure(figsize=(5.85, 3.5), dpi=200, facecolor=PAPER)
-        ax2 = fig2.add_subplot(111)
-        draw_svf_ridgeline(ax2, d)
-        fig2.savefig(atoms / "svf_ridgeline.png", dpi=200,
-                     facecolor=PAPER, bbox_inches="tight")
+        fig2 = plt.figure(figsize=(11.69, 3.2), dpi=200, facecolor=PAPER)
+        gs2 = fig2.add_gridspec(1, 1, left=0.02, right=0.98, top=0.92, bottom=0.05)
+        draw_zoom_row(fig2, gs2[0, 0], d, X, Y, layer_arrays, panel_norms, windows)
+        fig2.savefig(atoms / "zoom_inlets.png", dpi=200, facecolor=PAPER)
         plt.close(fig2)
     except Exception as e:
-        issues.append(f"atom svf_ridgeline: {e}")
-
-    try:
-        fig2 = plt.figure(figsize=(5.85, 3.5), dpi=200, facecolor=PAPER)
-        ax2 = fig2.add_subplot(111)
-        draw_solar_ridgeline(ax2, d, site)
-        fig2.savefig(atoms / "solar_ridgeline.png", dpi=200,
-                     facecolor=PAPER, bbox_inches="tight")
-        plt.close(fig2)
-    except Exception as e:
-        issues.append(f"atom solar_ridgeline: {e}")
+        issues.append(f"atom zoom_inlets: {e}")
 
     try:
         fig2 = plt.figure(figsize=(10.0, 5.0), dpi=200, facecolor=PAPER)
@@ -1118,17 +1081,6 @@ def build_dashboard(site: str) -> dict:
         plt.close(fig2)
     except Exception as e:
         issues.append(f"atom svf_solar_hexbin: {e}")
-
-    try:
-        fig2 = plt.figure(figsize=(11.69, 3.0), dpi=200, facecolor=PAPER)
-        ax2 = fig2.add_subplot(111)
-        ax2.set_position([0.02, 0.05, 0.96, 0.85])
-        draw_small_multiples(ax2, site, issues)
-        fig2.savefig(atoms / "small_multiples_strip.png", dpi=200,
-                     facecolor=PAPER)
-        plt.close(fig2)
-    except Exception as e:
-        issues.append(f"atom small_multiples: {e}")
 
     try:
         _save_atom(atoms, "caveat_strip",
@@ -1144,8 +1096,16 @@ def build_dashboard(site: str) -> dict:
         "build_date": build_date,
         "git_sha7": sha,
         "panels_built": panels,
+        "zoom_windows_provenance": provenance,
+        "zoom_windows": {
+            key: {k: v for k, v in z.items() if k != "bounds"} | (
+                {"bounds": list(z["bounds"])} if z.get("ok") else {}
+            )
+            for key, z in windows.items()
+        },
         "stats": {
             "n_obs": int(stats["n_obs"]),
+            "n_grid_cells": int(stats["n_grid_cells"]),
             "road_km": float(stats["road_km"]),
             "area_km2": float(stats["area_km2"]),
             "obs_per_km2": float(stats["obs_per_km2"]),
