@@ -34,7 +34,13 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-REPO = Path(__file__).resolve().parents[1]
+# Hard-coded, not Path(__file__).resolve().parents[1]: this script runs
+# from a git worktree whose own outputs/ and data/ dirs are untracked and
+# empty (each worktree gets its own filesystem copy of gitignored paths).
+# Matches build_site_dashboard.py's ROOT so both builders read/write the
+# real pipeline outputs in the main checkout regardless of which worktree
+# invokes them (per docs/folha_refresh_spec.md's "Live constants").
+REPO = Path("/home/theo/SCL/SCR/MorphoFavela")
 DIST = REPO / "outputs" / "_distribution" / "html_dashboards"
 
 SITE_META = {
@@ -2140,10 +2146,13 @@ LANDING_HTML = r"""<!DOCTYPE html>
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--site", required=True, help="site slug (rocinha, vidigal, ...)")
+    parser.add_argument("--site", help="site slug (rocinha, vidigal, ...)")
+    parser.add_argument("--all", action="store_true", help="build every site")
     parser.add_argument("--all-stats", action="store_true",
                         help="also compute cross-site stats for all sites (cheap)")
     args = parser.parse_args()
+    if not args.site and not args.all:
+        parser.error("must pass --site <name> or --all")
 
     # always (re)build shared assets and cross-site stats — cheap
     site_stats_by_site = {}
@@ -2159,15 +2168,31 @@ def main():
 
     write_shared_assets({}, site_stats_by_site)
     build_landing(site_stats_by_site)
-    stats = build_site(args.site)
 
-    out = DIST / args.site / "index.html"
-    print(f"\nWrote {out} ({out.stat().st_size:,} bytes)")
-    print(f"Length-weighted mean SVF: {stats['length_weighted_mean_svf']:.4f}")
-    print(f"Count-weighted mean SVF:  {stats['count_weighted_mean_svf']:.4f}")
-    print(f"Pearson r SVF↔solar:      {stats['pearson_svf_solar_annual']:.4f}")
-    print(f"Observers in GeoJSON:     {stats['observer_count_in_geojson']:,}")
+    sites = list(SITE_META.keys()) if args.all else [args.site]
+    failed = []
+    for site in sites:
+        try:
+            stats = build_site(site)
+        except Exception as e:
+            print(f"[{site}] FAILED: {e}")
+            failed.append(site)
+            continue
+        out = DIST / site / "index.html"
+        print(f"[{site}] OK — wrote {out} ({out.stat().st_size:,} bytes)")
+        if not args.all:
+            print(f"Length-weighted mean SVF: {stats['length_weighted_mean_svf']:.4f}")
+            print(f"Count-weighted mean SVF:  {stats['count_weighted_mean_svf']:.4f}")
+            print(f"Pearson r SVF↔solar:      {stats['pearson_svf_solar_annual']:.4f}")
+            print(f"Observers in GeoJSON:     {stats['observer_count_in_geojson']:,}")
+
+    if args.all:
+        print(f"\n{len(sites) - len(failed)}/{len(sites)} sites built")
+        if failed:
+            print(f"FAILED: {', '.join(failed)}")
+
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
