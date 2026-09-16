@@ -20,6 +20,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import BoundaryNorm, ListedColormap
+from matplotlib.patches import Patch
 
 HERE = Path(__file__).resolve().parent
 SITE = "maré"
@@ -58,6 +59,14 @@ def _band_classes(values, edges):
     return BoundaryNorm(edges, len(edges) - 1), labels
 
 
+def _legend_patches(cmap, edges, suffix=""):
+    return [
+        Patch(facecolor=cmap.colors[i], edgecolor="#999999", linewidth=0.4,
+              label=f"{edges[i]:.2g}–{edges[i+1]:.2g}{suffix}")
+        for i in range(len(edges) - 1)
+    ]
+
+
 def _plot_grid_layer(ax, gdf, col, edges, cmap, title):
     norm, labels = _band_classes(gdf[col], edges)
     gdf.plot(column=col, ax=ax, cmap=cmap, norm=norm, edgecolor="none", missing_kwds={"color": "#f2f2f2"})
@@ -68,21 +77,36 @@ def _plot_grid_layer(ax, gdf, col, edges, cmap, title):
 
 
 def render_built_form_maps(grid: gpd.GeoDataFrame, out_path: Path) -> dict:
-    fig, axes = plt.subplots(2, 2, figsize=(6.3, 5.6))
+    fig, axes = plt.subplots(2, 2, figsize=(6.3, 6.4))
+    common_edges = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
     layers = [
-        ("lambda_p", [0, 0.2, 0.4, 0.6, 0.8, 1.0], BAND_CMAP_5, "Plan density (λp)"),
+        ("lambda_p", common_edges, BAND_CMAP_5, "Plan density (λp)"),
         ("H_mean", None, BAND_CMAP_5, "Mean building height"),
-        ("porosity", [0, 0.2, 0.4, 0.6, 0.8, 1.0], BAND_CMAP_5, "Porosity"),
-        ("svf", [0, 0.2, 0.4, 0.6, 0.8, 1.0], BAND_CMAP_5, "Sky View Factor"),
+        ("porosity", common_edges, BAND_CMAP_5, "Porosity"),
+        ("svf", common_edges, BAND_CMAP_5, "Sky View Factor"),
     ]
     h_vals = grid.loc[grid["H_mean"].notna(), "H_mean"]
     h_edges = list(np.quantile(h_vals, [0, 0.2, 0.4, 0.6, 0.8, 1.0]))
     for ax, (col, edges, cmap, title) in zip(axes.flat, layers):
         e = edges if edges is not None else h_edges
         _plot_grid_layer(ax, grid, col, e, cmap, title)
+        ax.set_title(title, fontsize=10)
     _scale_bar_and_north(axes.flat[0], grid)
-    fig.suptitle("Maré — built-form indicators (10 m grid)", fontsize=10)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+
+    axes.flat[1].legend(
+        handles=_legend_patches(BAND_CMAP_5, [round(x, 2) for x in h_edges], " m"),
+        loc="upper left", bbox_to_anchor=(1.0, 1.0), fontsize=6.5,
+        frameon=False, title="H classes", title_fontsize=6.5,
+        handlelength=1.0, handleheight=1.0, labelspacing=0.3,
+    )
+    fig.legend(
+        handles=_legend_patches(BAND_CMAP_5, common_edges),
+        loc="lower center", ncol=5, fontsize=7.5, frameon=False,
+        bbox_to_anchor=(0.5, 0.005), columnspacing=1.0, handlelength=1.1,
+        title="λp / porosity / SVF classes", title_fontsize=7.5,
+    )
+    fig.suptitle("Maré — built-form indicators (10 m grid)", fontsize=11)
+    fig.tight_layout(rect=[0, 0.06, 1, 0.95])
     fig.savefig(out_path, dpi=200)
     plt.close(fig)
     return {
@@ -97,13 +121,18 @@ def render_built_form_maps(grid: gpd.GeoDataFrame, out_path: Path) -> dict:
 
 def render_street_svf_map(segments: gpd.GeoDataFrame, out_path: Path) -> dict:
     edges = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
-    fig, ax = plt.subplots(figsize=(6.3, 3.5))
+    fig, ax = plt.subplots(figsize=(6.3, 3.9))
     norm, labels = _band_classes(segments["svf_median"], edges)
     segments.plot(column="svf_median", ax=ax, cmap=BAND_CMAP_5, norm=norm, linewidth=1.2)
-    ax.set_title("Maré — street-segment Sky View Factor", fontsize=9)
+    ax.set_title("Maré — street-segment Sky View Factor", fontsize=10)
     ax.set_aspect("equal")
     _no_coord_axes(ax)
     _scale_bar_and_north(ax, segments, length_m=500)
+    ax.legend(
+        handles=_legend_patches(BAND_CMAP_5, edges),
+        loc="lower center", bbox_to_anchor=(0.5, -0.10), ncol=5, fontsize=7,
+        frameon=False, title="SVF classes", title_fontsize=7, handlelength=1.1,
+    )
     fig.tight_layout()
     fig.savefig(out_path, dpi=200)
     plt.close(fig)
@@ -111,20 +140,20 @@ def render_street_svf_map(segments: gpd.GeoDataFrame, out_path: Path) -> dict:
 
 
 def render_distributions(grid: gpd.GeoDataFrame, segments: gpd.GeoDataFrame, out_path: Path) -> dict:
-    fig, axes = plt.subplots(1, 4, figsize=(10.5, 2.6))
+    fig, axes = plt.subplots(2, 2, figsize=(6.3, 5.8))
     panels = [
-        (grid["lambda_p"], "λp (grid)"),
-        (grid.loc[grid["H_mean"].notna(), "H_mean"], "Mean height, m (grid)"),
-        (grid["svf"], "SVF (grid)"),
-        (segments["svf_median"], "SVF (street segments)"),
+        (grid["lambda_p"], "λp (grid)", "cells"),
+        (grid.loc[grid["H_mean"].notna(), "H_mean"], "Mean height, m (grid)", "cells"),
+        (grid["svf"], "SVF (grid)", "cells"),
+        (segments["svf_median"], "SVF (street segments)", "segments"),
     ]
-    for ax, (series, title) in zip(axes, panels):
+    for ax, (series, title, unit) in zip(axes.flat, panels):
         ax.hist(series.dropna(), bins=24, color=ACCENT, alpha=0.85)
-        ax.set_title(title, fontsize=8)
-        ax.tick_params(labelsize=6)
-        ax.set_ylabel("cells" if "grid" in title else "segments", fontsize=6)
-    fig.suptitle("Maré — indicator distributions", fontsize=9)
-    fig.tight_layout(rect=[0, 0, 1, 0.90])
+        ax.set_title(title, fontsize=10)
+        ax.tick_params(labelsize=8.5)
+        ax.set_ylabel(unit, fontsize=8.5)
+    fig.suptitle("Maré — indicator distributions", fontsize=11)
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
     fig.savefig(out_path, dpi=200)
     plt.close(fig)
     return {}

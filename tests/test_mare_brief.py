@@ -21,7 +21,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
-import string
 import os
 import shutil
 import subprocess
@@ -99,21 +98,27 @@ TEMPLATE_TEXT = SRC_MD.read_text()
 PLACEHOLDER_RE = re.compile(r"\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
 
+# Placeholders filled by build_brief.fill_template() from computed markdown
+# (e.g. the morphotype table + narrative, which differs by --named-morphotypes)
+# rather than directly from a mare_numbers.json entry.
+SYNTHESISED_PLACEHOLDERS = {"morphotype_composition"}
+
+
 def test_a_all_placeholders_resolve(built):
     ids_in_template = set(PLACEHOLDER_RE.findall(TEMPLATE_TEXT))
     assert "pi_contact" in ids_in_template, "template must keep ${pi_contact} as a literal placeholder"
-    required = ids_in_template - {"pi_contact"}
+    required = ids_in_template - {"pi_contact"} - SYNTHESISED_PLACEHOLDERS
     missing = required - set(built.keys())
     assert not missing, f"template placeholders with no mare_numbers.json entry: {sorted(missing)}"
     # and every one actually formats without raising
     for id_ in required:
         format_entry(built[id_])
-    # confirm the built PDF/markdown really did leave ${pi_contact} unfilled
-    filled = string.Template(TEMPLATE_TEXT).substitute(
-        {k: format_entry(v) for k, v in built.items() if k != "pi_contact"}
-        | {"pi_contact": "${pi_contact}"}
-    )
-    assert "${pi_contact}" in filled
+    # the real fill (as build_brief.build() uses it) must leave nothing
+    # unresolved except ${pi_contact} — this also covers synthesised
+    # placeholders like morphotype_composition, not just JSON-backed ones.
+    filled = build_brief.fill_template(built)
+    remaining = set(PLACEHOLDER_RE.findall(filled))
+    assert remaining == {"pi_contact"}, f"unresolved placeholders after fill: {remaining}"
 
 
 def test_b_no_typed_numbers_outside_placeholders():
@@ -169,7 +174,28 @@ def test_e_pdf_exists_and_page_count(built):
     assert TRACKED_PDF.exists(), f"the committed brief PDF is missing: {TRACKED_PDF}"
     n_pages = _pdf_page_count(PDF)
     assert n_pages is not None, "could not determine PDF page count (no pypdf, no pdfinfo)"
-    assert n_pages <= 8, f"PDF has {n_pages} pages, spec caps at 8"
+    assert n_pages <= 6, f"PDF has {n_pages} pages, v2 spec caps at 6"
+
+
+SPELLED_OUT_FIGURE_RE = re.compile(r"\bFigure (One|Two|Three|Four|Five)\b")
+
+
+def test_f_no_spelled_out_figure_numbers(built):
+    filled = build_brief.fill_template(built)
+    hits = SPELLED_OUT_FIGURE_RE.findall(filled)
+    assert not hits, f"spelled-out figure number(s) in rendered markdown: {hits}"
+
+
+def test_g_default_build_has_no_morphotype_codes(built):
+    # provisional disclosure default: T0-T5 morphotype labels/names are
+    # generalised away unless --named-morphotypes is passed.
+    filled = build_brief.fill_template(built, named_morphotypes=False)
+    assert not re.search(r"\bT[0-5]\b", filled), "default (unnamed) build leaks a T0-T5 morphotype code"
+    for _, name in build_brief.NAMED_MORPHOTYPES:
+        assert name not in filled, f"default (unnamed) build leaks morphotype name {name!r}"
+
+    named = build_brief.fill_template(built, named_morphotypes=True)
+    assert re.search(r"\bT[0-5]\b", named), "--named-morphotypes build should restore T0-T5 codes"
 
 
 def _pdf_page_count(pdf_path: Path) -> int | None:
