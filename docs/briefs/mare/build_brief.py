@@ -138,6 +138,9 @@ th, td {{
   text-align: left;
   vertical-align: top;
 }}
+.keep-together {{
+  page-break-inside: avoid;
+}}
 th {{
   background: {ACCENT_TINT};
   color: {ACCENT};
@@ -148,11 +151,9 @@ img {{
   height: auto;
   display: block;
   margin: 0.3em auto;
-  page-break-inside: avoid;
 }}
 figure {{
   margin: 0.5em 0;
-  page-break-inside: avoid;
   counter-increment: brief-figure;
 }}
 figcaption {{ font-size: 7.5pt; color: #555; text-align: center; padding: 0 4mm; }}
@@ -259,15 +260,18 @@ def _morphotype_composition_md(numbers_by_id: dict, named_morphotypes: bool) -> 
     # algorithm does not stretch short-content tables to fill width:100% even
     # with table-layout:fixed set, so column widths are pinned explicitly via
     # <colgroup> here rather than left to the layout algorithm.
-    table = (
+    intro_and_table = (
+        '<div class="keep-together">\n'
+        f"<p>{intro}</p>\n"
         "<table>\n"
         '<colgroup><col style="width:55%"><col style="width:45%"></colgroup>\n'
         f"<thead><tr><th>{header}</th><th>Share of built cells</th></tr></thead>\n"
         "<tbody>\n" + "\n".join(rows) + "\n</tbody>\n"
-        "</table>"
+        "</table>\n"
+        "</div>"
     )
     narrative = NAMED_MORPHOTYPE_NARRATIVE if named_morphotypes else GENERALISED_MORPHOTYPE_NARRATIVE
-    return f"{intro}\n\n{table}\n\n{narrative}"
+    return f"{intro_and_table}\n\n{narrative}"
 
 
 def fill_template(numbers_by_id: dict, named_morphotypes: bool = False) -> str:

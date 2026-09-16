@@ -18,8 +18,8 @@ brisaverse tasks.json `_meta.provisional_default_policy`: reversible, no externa
 | 107 | `λf` | vertical enclosure (λf regime), lateral depth into contiguous fabric, and | INCLUDE (proposed) — standard published morphometric notation (Oke 1988; Stewart & Oke 2012), not project-internal. |
 | 110 | `λf` | threshold on frontal-area density λf (vertical constraint), | INCLUDE (proposed) — standard published morphometric notation (Oke 1988; Stewart & Oke 2012), not project-internal. |
 | 144 | `MorphoFavela` | MorphoFavela's five-site campaign spans hillside and flatland informal | FLAG for PI (proposed INCLUDE) — names the analysis tool/pipeline that produced this brief's numbers; low sensitivity, but confirm MorphoFavela is an acceptable external-facing name before this brief leaves the repo. |
-| 184 | `Oke` | - Frontal-area density and enclosure-threshold classification: Oke (1988); | INCLUDE (proposed) — standard published morphometric notation (Oke 1988; Stewart & Oke 2012), not project-internal. |
-| 185 | `Oke` | Stewart & Oke (2012), local climate zones. | INCLUDE (proposed) — standard published morphometric notation (Oke 1988; Stewart & Oke 2012), not project-internal. |
+| 185 | `Oke` | - Frontal-area density and enclosure-threshold classification: Oke (1988); | INCLUDE (proposed) — standard published morphometric notation (Oke 1988; Stewart & Oke 2012), not project-internal. |
+| 186 | `Oke` | Stewart & Oke (2012), local climate zones. | INCLUDE (proposed) — standard published morphometric notation (Oke 1988; Stewart & Oke 2012), not project-internal. |
 
 ## Additional codename / method-neologism / result-parameter check
 
