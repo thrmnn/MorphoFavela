@@ -544,7 +544,7 @@ def render_site_html(site: str, stats: dict) -> str:
     site_display = stats["site_display"]
     typology = stats["typology"]
 
-    def kpi(label, value, anchor, lineage_key, fmt=None):
+    def kpi(label, value, anchor, lineage_key, fmt=None, extra_html=""):
         l = stats["lineage"].get(lineage_key, {})
         formula = l.get("formula", "")
         col = l.get("column", "")
@@ -553,6 +553,7 @@ def render_site_html(site: str, stats: dict) -> str:
         <div class="kpi" id="{anchor}">
           <div class="kpi-label">{label}</div>
           <div class="kpi-value" data-key="{lineage_key}">{value}</div>
+          {extra_html}
           <div class="kpi-lineage">
             <span class="kpi-badge" tabindex="0">i</span>
             <div class="kpi-tooltip">
@@ -576,12 +577,46 @@ def render_site_html(site: str, stats: dict) -> str:
         _cls = "chip" if _ratio > 1.5 else "chip neutral"
         density_chip = f' <span class="{_cls}">H2 · {_ratio:.2f}× {_label}</span>'
 
+    # Map-sample note for the N observers tile. state.js's recomputeKPIs()
+    # only ever sees the decimated GeoJSON loaded into the browser (~8,000
+    # points, per write_observers_geojson's `target`), never the true
+    # dataset total — it used to overwrite this KPI tile's textContent
+    # directly, so the headline number silently dropped to the map's
+    # sample size (round-2 finding A: Maré showed 7,997 instead of
+    # 84,147). The tile below is now pinned to the true total from
+    # stats.json and never touched by JS; the sample size gets its own
+    # explicit, JS-updated line so a reader can't mistake one for the
+    # other.
+    sample_total = stats.get("observer_count_in_geojson", stats["n_observers"])
+    if sample_total >= stats["n_observers"]:
+        sample_note_text = (
+            f'<span class="sample-n">{sample_total:,}</span> of {sample_total:,} '
+            "shown on map (no decimation needed)"
+        )
+    else:
+        sample_note_text = (
+            f'map shows <span class="sample-n">{sample_total:,}</span> of '
+            f'{sample_total:,} sampled points'
+        )
+    n_obs_sample_note = (
+        f'<div class="kpi-samplenote" data-key="n_observers_sample">{sample_note_text}</div>'
+    )
+
+    obs_per_road_km = (
+        stats["n_observers"] / stats["road_km"] if stats.get("road_km") else float("nan")
+    )
+    density_sample_note = (
+        f'<div class="kpi-samplenote">{obs_per_road_km:,.0f} / road-km</div>'
+        if not math.isnan(obs_per_road_km) else ""
+    )
+
     kpi_strip = "".join([
-        kpi("N observers", f'{stats["n_observers"]:,}', "kpi-n", "n_observers"),
+        kpi("N observers", f'{stats["n_observers"]:,}', "kpi-n", "n_observers",
+            extra_html=n_obs_sample_note),
         kpi("Road km", f'{stats["road_km"]:.1f}', "kpi-roadkm", "road_km"),
         kpi("Observers / km²" + density_chip,
             f'{stats["density_per_km2"]:.0f}' if not math.isnan(stats["density_per_km2"]) else "—",
-            "kpi-density", "density_per_km2"),
+            "kpi-density", "density_per_km2", extra_html=density_sample_note),
         kpi('Edge observers (≤15 m) <small class="kpi-hint">toggle the "Exclude edge" mask on the map to see them removed</small>',
             f'{edge_pct:.1f}%' if edge_pct else "—",
             "kpi-edge", "edge_share"),
@@ -1099,6 +1134,14 @@ footer{padding:2rem; font-size:0.85rem; color:var(--ink-muted);}
   font-style:italic;
 }
 
+/* secondary line under a KPI value — always distinct from the primary
+   figure (e.g. "map shows X of Y sampled points") so a reader can't
+   mistake a live map-sample count for the true dataset total. */
+.kpi-samplenote{
+  display:block; margin-top:0.3rem; font-size:0.7rem; color:var(--ink-muted);
+}
+.kpi-samplenote .sample-n{font-feature-settings:"tnum"; font-weight:600;}
+
 /* TOC */
 .toc{
   display:flex; flex-wrap:wrap; gap:0.8rem; padding:0.7rem 2rem;
@@ -1237,7 +1280,14 @@ JS_STATE = r"""
   function recomputeKPIs(){
     const feats = maskObservers();
     const n = feats.length;
-    document.querySelectorAll('[data-key="n_observers"]').forEach(el => el.textContent = n.toLocaleString());
+    // n is the count within the browser's decimated map SAMPLE (state.observers
+    // is never the full dataset — see write_observers_geojson's `target`), so
+    // it must never overwrite the true-total "N observers" tile, which is
+    // rendered server-side from stats.json and keyed only by the plain
+    // n_observers lineage key (no _sample suffix). This only updates the
+    // map-sample line's numerator; the denominator (sample size) is fixed
+    // and rendered server-side too.
+    document.querySelectorAll('[data-key="n_observers_sample"] .sample-n').forEach(el => el.textContent = n.toLocaleString());
     // mean SVF (observer-mean here; length-weighted true mean stays fixed since we don't carry per-segment lengths to JS — chip shows delta)
     if(feats.length){
       let sum = 0, c = 0;
@@ -1266,7 +1316,12 @@ JS_STATE = r"""
         // mixes semantics — the value would be unintelligible. Suppress.
         const isBrushing = state.brushRange != null;
         const isAllShown = n === window.mfState.observers.features.length;
-        chip.textContent = (isAllShown || isBrushing) ? '' : `${sign}${delta.toFixed(3)} (edge mask)`;
+        // "map sample" is load-bearing here: this delta is computed over
+        // the decimated map sample (state.observers), not the true
+        // length-weighted total shown as the tile's base value — the two
+        // are different statistics (round-2 finding A adjacent: keep the
+        // live recompute, but never let it read as the true figure).
+        chip.textContent = (isAllShown || isBrushing) ? '' : `${sign}${delta.toFixed(3)} (edge mask, map sample)`;
       }
     }
     window.dispatchEvent(new CustomEvent('mf:filtered', {detail:{features:feats}}));

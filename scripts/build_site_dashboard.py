@@ -24,6 +24,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import patches as mpatches
+from matplotlib import patheffects
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from scipy.stats import gaussian_kde, pearsonr
@@ -316,22 +317,28 @@ def draw_hero_map(ax, site: str, d: dict, stats: dict) -> None:
         except Exception:
             pass
 
-    # Boundary
-    boundary.boundary.plot(ax=ax, color=INK, linewidth=0.6, zorder=3)
-
-    # Edge halo: 15 m inward buffer — hatched ring + dashed inner outline
-    # (the hatch is too quiet alone at A3 print scale, per audit feedback).
-    # For a narrow site (Rio das Pedras, edge_share 11.5%) the halo ring is
-    # a large fraction of the visible polygon, so the hatch reads as
-    # covering far more than its true area share — drop the alpha once
-    # edge_share crosses ~10% (round-1 finding 10).
+    # Boundary + 15 m edge-halo, drawn as a single ticked/hachured stroke
+    # along the boundary line rather than a filled hatch polygon. A filled
+    # "////" hatch on the true 15 m ring collapses to a sub-pixel sliver
+    # for an elongated/narrow site — at web1200 the ring is ~0.10 px/m for
+    # Maré (edge_share 5.1%), so the hatch rendered nothing there even
+    # though the ring geometry was present and non-empty; the same
+    # happened for Rocinha/Alemão/Rio das Pedras's multi-part boundaries
+    # (round-2 finding B: hatch visible on only 1 of 5 sheets). TickedStroke
+    # draws tick length/spacing in points (screen space), so the mark stays
+    # visible regardless of a site's absolute size or aspect ratio. Density
+    # — not an alpha on/off toggle — addresses the original "too much hatch
+    # on Rio das Pedras" complaint (round-1 finding 10): wider spacing and
+    # shorter ticks once edge_share crosses ~10%.
     try:
-        halo_alpha = 0.20 if stats.get("edge_share", 0.0) <= 0.10 else 0.10
+        busy = stats.get("edge_share", 0.0) > 0.10
+        tick_spacing = 9.0 if busy else 6.5
+        tick_length = 0.5 if busy else 0.7
+        halo_pe = [patheffects.withTickedStroke(angle=-45, length=tick_length,
+                                                spacing=tick_spacing)]
+        boundary.boundary.plot(ax=ax, color=INK, linewidth=0.7,
+                               zorder=3, path_effects=halo_pe)
         inner = boundary.buffer(-15.0)
-        halo = boundary.difference(inner)
-        halo_gs = gpd.GeoSeries(halo, crs=boundary.crs)
-        halo_gs.plot(ax=ax, facecolor="none", edgecolor=INK,
-                     linewidth=0.0, hatch="////", alpha=halo_alpha, zorder=2)
         inner_gs = gpd.GeoSeries(inner, crs=boundary.crs)
         inner_gs.boundary.plot(ax=ax, color=INK, linewidth=0.5,
                                linestyle="--", zorder=2.5, alpha=0.6)
@@ -368,9 +375,15 @@ def draw_hero_map(ax, site: str, d: dict, stats: dict) -> None:
             marker="o", facecolors=MAGENTA, edgecolors="none",
             s=3.0, alpha=0.30, linewidths=0, zorder=6,
         )
+        # Smaller, partly-transparent cross than round-1's s=20/alpha=1.0 —
+        # at sites where unresolved SVF is a double-digit share of
+        # observers (Rocinha 12.4%, Alemão 3.9%) the full-opacity glyph
+        # overplotted and hid the street-SVF line underneath it (round-2
+        # finding E).
         ax.scatter(
             svf.loc[is_zero].geometry.x, svf.loc[is_zero].geometry.y,
-            marker="+", c=MAGENTA, s=20.0, linewidths=0.9, zorder=7,
+            marker="+", c=MAGENTA, s=11.0, linewidths=0.8, alpha=0.7,
+            zorder=7,
         )
 
     minx, miny, maxx, maxy = boundary.total_bounds
@@ -662,22 +675,27 @@ def draw_solar_ridgeline(ax, d: dict, site: str) -> None:
     overall = solar["sunshine_ratio_mean"].dropna()
     if len(overall) > 0:
         med = float(overall.median())
-        # 0.96 (not 0.985): keeps the badge text clear of the page edge —
-        # transAxes is already inside the axes, but the previous anchor sat
-        # close enough to the rightmost gridspec column's edge that long
-        # badge strings ("open-sky regime (r̄=0.40)") read as clipped
-        # (round-1 finding 1).
+        # Own row above the axes (transAxes y > 1, clip_on=False) rather
+        # than anchored inline at the top ridge's y-position (0.96, 0.97 in
+        # the old code): that position sits inside the data area at the
+        # same height as the top-ranked class's "label n=" text, so the two
+        # were drawn on top of each other on every sheet once round-1's
+        # clipping fix moved those labels fully inside the axes (round-2
+        # finding C). Sitting just under the panel title instead collides
+        # with nothing at A3 or at web1200.
         badge_kw = dict(transform=ax.transAxes, fontsize=7, ha="right",
-                        va="top", bbox=dict(boxstyle="round,pad=0.2",
+                        va="bottom", clip_on=False,
+                        bbox=dict(boxstyle="round,pad=0.2",
                         facecolor=PAPER, edgecolor="none", alpha=0.78))
+        badge_y = 1.045
         if 0.40 <= med <= 0.85:
-            ax.text(0.96, 0.97, f"open-sky regime ✓ (r̄={med:.2f})",
+            ax.text(0.995, badge_y, f"open-sky regime ✓ (r̄={med:.2f})",
                     color=GREEN, **badge_kw)
         elif med < 0.40:
-            ax.text(0.96, 0.97, f"shaded regime ✓ (r̄={med:.2f})",
+            ax.text(0.995, badge_y, f"shaded regime ✓ (r̄={med:.2f})",
                     color=SVF_FILL, **badge_kw)
         else:
-            ax.text(0.96, 0.97, f"check (r̄={med:.2f})",
+            ax.text(0.995, badge_y, f"check (r̄={med:.2f})",
                     color=RED, **badge_kw)
 
 
@@ -694,8 +712,15 @@ def draw_hexbin(ax, d: dict, stats: dict) -> None:
     pct_excl = n_excl / len(merged) * 100
     sub = merged.loc[keep]
 
+    # PowerNorm (gamma<1) lifts low-count bins' visual weight instead of
+    # leaving them near-white against the paper background — a linear norm
+    # made Vidigal (smallest N) and especially Rocinha (lowest mean SVF, so
+    # its cloud sits tightly near the origin) read as near-blank even
+    # though both panels were rendering real, non-broken data (round-2
+    # finding D).
     hb = ax.hexbin(sub["svf"], sub["solar_hours_annual"], gridsize=30,
-                   cmap="Greys", mincnt=1, linewidths=0.0)
+                   cmap="Greys", mincnt=1, linewidths=0.0,
+                   norm=mpl.colors.PowerNorm(gamma=0.45))
     ax.set_xlim(0, 1)
     y_top = float(sub["solar_hours_annual"].max()) * 1.05 if len(sub) else 12.0
     ax.set_ylim(0, min(12.5, y_top))
