@@ -302,6 +302,9 @@ def build_ledger(repo_root: Path) -> dict:
             "sampling_run_design": "config/params.yaml#/sampling/run_design",
             "sampling_cell_m_status": "config/params.yaml#/sampling/cell_m_status",
         },
+        "definition_of_record": {
+            "wp06.*": "docs/ventaxis_canonical.md",
+        },
         "runs_of_record": RUN_OF_RECORD,
     }
 
@@ -337,6 +340,9 @@ def render_markdown(ledger: dict) -> str:
     lines.append(f"- **sky_patches**: {meta['sky_patches']}")
     lines.append("- **decision_provenance_pointers**:")
     for k, v in meta["decision_provenance_pointers"].items():
+        lines.append(f"  - {k}: `{v}`")
+    lines.append("- **definition_of_record**:")
+    for k, v in meta["definition_of_record"].items():
         lines.append(f"  - {k}: `{v}`")
     lines.append("- **runs_of_record**:")
     for k, v in meta["runs_of_record"].items():

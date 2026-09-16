@@ -34,6 +34,7 @@ P1_SOURCE_GLOBS = [
     "src/brisa_solar/**/*.py",
     "scripts/lint_p1_*.py",
     "docs/p1_column_allowlist.json",
+    "docs/*_canonical.md",
     "runs/wp07_*/**/*.md",
     "runs/wp07_*/**/*.json",
 ]
