@@ -163,7 +163,7 @@ def render_wind_rose(wind_rose: dict, out_path: Path) -> dict:
     sectors = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
     freqs = [wind_rose["frequencies"][s] for s in sectors]
     angles = np.deg2rad(np.linspace(0, 360, len(sectors), endpoint=False))
-    fig = plt.figure(figsize=(3.6, 3.6))
+    fig = plt.figure(figsize=(2.5, 2.5))
     ax = fig.add_subplot(111, projection="polar")
     ax.bar(angles, freqs, width=2 * np.pi / len(sectors) * 0.85, color=ACCENT, alpha=0.85, edgecolor="white")
     ax.set_theta_zero_location("N")
