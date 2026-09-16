@@ -1,8 +1,8 @@
 {
   "schema": "cockpit/v1",
   "repo": "MorphoFavela",
-  "generated_utc": "2026-09-16T07:26:58Z",
-  "source_sha": "8f5c7dab",
+  "generated_utc": "2026-09-16T16:24:40Z",
+  "source_sha": "1b52c52d",
   "status": {
     "phase": "consolidation — 12 tracks (1 approved, 2 deferred, 2 shipped, 7 unclear); 7 stale >14d; statuses from a heuristic index, partly unclear",
     "gate": "unknown — gate is `python -m pytest tests/ -q` (.claude/verify-cmd); no last-run state is recorded on disk",
