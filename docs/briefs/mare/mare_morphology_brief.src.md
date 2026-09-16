@@ -22,7 +22,7 @@ morphological base.
 | Typology | ${mare_typology} |
 | Buildings (site + context) | ${mare_buildings_extended} |
 | ${mare_grid_resolution_m} m grid cells | ${mare_cells_10m} (${mare_built_cells_share_pct}% built) |
-| Mean building height | ${mare_mean_H_m} m |
+| Mean building height (grid mean, built cells) | ${mare_mean_H_m} m |
 | Annual mean street-level sun | ${mare_annual_mean_sun_h} h/day |
 | Dominant wind sector | ${mare_wind_dominant_sector} (${mare_wind_dominant_freq_pct}% of observations) |
 
@@ -57,11 +57,7 @@ building footprint), mean building height, porosity (the complement of λp),
 and Sky View Factor (SVF, the fraction of hemispheric sky visible at
 pedestrian height).
 
-![Maré's four built-form indicators, band-classed at grid resolution.](figures/fig_built_form_maps.png)
-
-**Figure One.** Plan density, mean height, porosity, and Sky View Factor
-across Maré's grid, each in five discrete classes. No basemap; scale bar
-and north arrow only.
+![Plan density, mean height, porosity, and Sky View Factor across Maré's grid, each band-classed in five discrete classes with class edges in the legend. No basemap; scale bar and north arrow only.](figures/fig_built_form_maps.png)
 
 Across all ${mare_cells_10m} grid cells (built and unbuilt), median λp is
 ${mare_lambda_p_median} (IQR ${mare_lambda_p_iqr_lo}–${mare_lambda_p_iqr_hi})
@@ -82,10 +78,7 @@ Maré's structure: large, near-saturated housing-project block interiors
 land, canals, and the settlement's low-density fringes — that pulls the
 whole-grid density figure down.
 
-![Distributions of the four built-form and sky-access indicators.](figures/fig_distributions.png)
-
-**Figure Two.** Histograms of λp, mean height, SVF (grid) and street-level
-SVF (segments) across Maré.
+![Distributions of λp, mean height, SVF (grid), and street-level SVF (segments) across Maré, as histograms.](figures/fig_distributions.png)
 
 ## Sky access and sun
 
@@ -95,10 +88,7 @@ ${mare_svf_street_n_segments} street segments) via ray-casting and
 sun-position accumulation on four reference dates. Median street-segment SVF
 is ${mare_svf_street_median}.
 
-![Street-segment Sky View Factor, band-classed.](figures/fig_street_svf_map.png)
-
-**Figure Three.** Sky View Factor by street segment, five discrete classes;
-no basemap, no coordinates.
+![Sky View Factor by street segment, five discrete classes with class edges in the legend. No basemap, no coordinates.](figures/fig_street_svf_map.png)
 
 Mean street-level direct-sun hours are ${mare_sun_winter_mean_h} h/day at
 the winter reference date, ${mare_sun_annual_mean_h} h/day on the
@@ -136,9 +126,7 @@ observations; the median directional wind-exposure ratio across Maré's
 built cells sits near the isotropic baseline, at
 ${mare_exposure_ratio_median}.
 
-![Maré wind-direction frequency rose.](figures/fig_wind_rose.png)
-
-**Figure Five.** Measured wind-direction frequency, ${mare_wind_station}.
+![Measured wind-direction frequency at ${mare_wind_station}.](figures/fig_wind_rose.png)
 
 A morphometric roughness-length estimate is also available per patch, but
 its published method envelope is wide at Maré's density: across
@@ -159,25 +147,7 @@ campaign, distinguished among them by its scale and by the near-uniform
 block interiors of its planned-housing sections. This section positions
 Maré within that typology; it is not a ranking of the five sites.
 
-The campaign's fabric-vector clustering assigns each built cell to one of
-six recurring morphotypes. Maré's composition:
-
-| Morphotype | Share of built cells |
-|---|---:|
-| T0 — Open Fringe | ${mare_morphotype_T0_pct}% |
-| T1 — Flatland Consolidated | ${mare_morphotype_T1_pct}% |
-| T2 — Hillside Fringe | ${mare_morphotype_T2_pct}% |
-| T3 — Shaded Consolidated | ${mare_morphotype_T3_pct}% |
-| T4 — Hillside Core | ${mare_morphotype_T4_pct}% |
-| T5 — Saturated Core | ${mare_morphotype_T5_pct}% |
-
-Maré's fabric is dominated by T5 Saturated Core (λp near its maximum), the
-flatland-conditional type associated with the tight, near-fully-covered
-block interiors of the original housing-project layout; T4 Hillside Core,
-the type universal across all five campaign sites, is present as a
-secondary component. T1 and T5 are present only where flat buildable land
-exists, which is why they concentrate at the two flatland sites rather than
-recurring campaign-wide.
+${morphotype_composition}
 
 ## Availability and terms
 
