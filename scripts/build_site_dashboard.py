@@ -256,7 +256,11 @@ def draw_identity_card(ax, site: str, stats: dict) -> None:
         ("obs / road-km", f"{obs_per_road_km:,.0f}"),
         ("edge share %", f"{stats['edge_share']*100:.1f}"),
         ("mean SVF", f"{stats['mean_svf']:.3f}"),
-        ("ρ(SVF, sol_h)", f"{stats['pearson']:.2f}" if not np.isnan(stats['pearson']) else "n/a"),
+        # "r(SVF, sol)" — matches the "r = 0.88" notation already used on
+        # the hexbin panel below; the prior "ρ(...)" reads ambiguously
+        # close to a probability notation for a reader who hasn't reached
+        # the hexbin yet (round-1 finding 8).
+        ("r(SVF, sol)", f"{stats['pearson']:.2f}" if not np.isnan(stats['pearson']) else "n/a"),
     ]
     n = len(cells)
     for i, (lab, val) in enumerate(cells):
@@ -289,6 +293,16 @@ def draw_identity_card(ax, site: str, stats: dict) -> None:
 
 
 def draw_hero_map(ax, site: str, d: dict, stats: dict) -> None:
+    fig = ax.figure
+    # Capture the panel's full gridspec cell now, before set_aspect("equal")
+    # (below) shrinks the axes' *active* box to match the data's aspect
+    # ratio. Insets anchored with ax.inset_axes() are relative to that
+    # shrunk active box, so for a tall/narrow site (Maré) they collapse
+    # onto the narrow data column instead of sitting in the panel's actual
+    # blank margin — round-1 finding 2 (colorbar drawn over the street
+    # network). Anchoring fig.add_axes() to this original cell instead
+    # keeps the colorbar/locator in a fixed panel corner for every site.
+    cell_bbox = ax.get_position()
     ax.set_facecolor(PAPER)
     boundary = d["boundary"]
     buildings = d["buildings"]
@@ -306,13 +320,18 @@ def draw_hero_map(ax, site: str, d: dict, stats: dict) -> None:
     boundary.boundary.plot(ax=ax, color=INK, linewidth=0.6, zorder=3)
 
     # Edge halo: 15 m inward buffer — hatched ring + dashed inner outline
-    # (the hatch is too quiet alone at A3 print scale, per audit feedback)
+    # (the hatch is too quiet alone at A3 print scale, per audit feedback).
+    # For a narrow site (Rio das Pedras, edge_share 11.5%) the halo ring is
+    # a large fraction of the visible polygon, so the hatch reads as
+    # covering far more than its true area share — drop the alpha once
+    # edge_share crosses ~10% (round-1 finding 10).
     try:
+        halo_alpha = 0.20 if stats.get("edge_share", 0.0) <= 0.10 else 0.10
         inner = boundary.buffer(-15.0)
         halo = boundary.difference(inner)
         halo_gs = gpd.GeoSeries(halo, crs=boundary.crs)
         halo_gs.plot(ax=ax, facecolor="none", edgecolor=INK,
-                     linewidth=0.0, hatch="////", alpha=0.20, zorder=2)
+                     linewidth=0.0, hatch="////", alpha=halo_alpha, zorder=2)
         inner_gs = gpd.GeoSeries(inner, crs=boundary.crs)
         inner_gs.boundary.plot(ax=ax, color=INK, linewidth=0.5,
                                linestyle="--", zorder=2.5, alpha=0.6)
@@ -355,9 +374,15 @@ def draw_hero_map(ax, site: str, d: dict, stats: dict) -> None:
         )
 
     minx, miny, maxx, maxy = boundary.total_bounds
-    pad = 0.04 * max(maxx - minx, maxy - miny)
-    ax.set_xlim(minx - pad, maxx + pad)
-    ax.set_ylim(miny - pad, maxy + pad)
+    # Per-axis padding (4% of each axis' own extent), not 4% of the larger
+    # of the two — the old single `pad` used the tall dimension's larger
+    # absolute value on the narrow axis too, baking extra blank margin
+    # into the already-narrow rendered width for elongated sites like Maré
+    # (round-1 finding 6).
+    pad_x = 0.04 * (maxx - minx)
+    pad_y = 0.04 * (maxy - miny)
+    ax.set_xlim(minx - pad_x, maxx + pad_x)
+    ax.set_ylim(miny - pad_y, maxy + pad_y)
     ax.set_aspect("equal")
     ax.set_xticks([])
     ax.set_yticks([])
@@ -365,8 +390,8 @@ def draw_hero_map(ax, site: str, d: dict, stats: dict) -> None:
         spine.set_visible(False)
 
     # Scalebar 200 m bottom-left
-    bar_y = miny - pad + (maxy - miny) * 0.02
-    bar_x0 = minx - pad + (maxx - minx) * 0.04
+    bar_y = miny - pad_y + (maxy - miny) * 0.02
+    bar_x0 = minx - pad_x + (maxx - minx) * 0.04
     bar_x1 = bar_x0 + 200.0
     ax.plot([bar_x0, bar_x1], [bar_y, bar_y], color=INK, lw=1.4)
     ax.text((bar_x0 + bar_x1) / 2, bar_y + (maxy - miny) * 0.012,
@@ -382,11 +407,20 @@ def draw_hero_map(ax, site: str, d: dict, stats: dict) -> None:
             fontsize=7, family="DejaVu Sans Mono", color=INK,
             ha="left", va="center")
 
-    # colorbar inset for SVF
-    cbar_ax = ax.inset_axes([0.02, 0.86, 0.30, 0.025])
+    # colorbar inset for SVF — anchored to the panel's full cell (see
+    # cell_bbox note above), not ax.inset_axes(), so it stays in the fixed
+    # top-left corner margin instead of collapsing onto the data column.
+    cbar_w = cell_bbox.width * 0.30
+    cbar_h = cell_bbox.height * 0.018
+    cbar_x0 = cell_bbox.x0 + cell_bbox.width * 0.02
+    cbar_y0 = cell_bbox.y1 - cell_bbox.height * 0.05
+    cbar_ax = fig.add_axes([cbar_x0, cbar_y0, cbar_w, cbar_h])
     sm = mpl.cm.ScalarMappable(norm=norm_v, cmap=cmap)
     sm.set_array([])
-    cb = plt.colorbar(sm, cax=cbar_ax, orientation="horizontal")
+    # Fixed ticks + 1-decimal format for every site (round-1 finding 7 —
+    # tick precision/position previously drifted across stale renders).
+    cb = plt.colorbar(sm, cax=cbar_ax, orientation="horizontal",
+                      format="%.1f", ticks=[0.0, 0.5, 1.0])
     cb.outline.set_linewidth(0.3)
     cb.ax.tick_params(labelsize=6, length=2, pad=2)
     cb.set_label("SVF", fontsize=7, color=INK)
@@ -394,8 +428,13 @@ def draw_hero_map(ax, site: str, d: dict, stats: dict) -> None:
     # Locator inset top-right: all five site boundaries in their geographic
     # Rio-metro positions, current site filled orange. No external coastline
     # tile dependency — works offline from the data already on disk.
+    # Anchored to cell_bbox for the same reason as the colorbar above.
     try:
-        loc_ax = ax.inset_axes([0.78, 0.78, 0.20, 0.20])
+        loc_w = cell_bbox.width * 0.16
+        loc_h = cell_bbox.height * 0.13
+        loc_x0 = cell_bbox.x1 - cell_bbox.width * 0.03 - loc_w
+        loc_y0 = cell_bbox.y1 - cell_bbox.height * 0.03 - loc_h
+        loc_ax = fig.add_axes([loc_x0, loc_y0, loc_w, loc_h])
         loc_ax.set_facecolor("#F0EFEA")
         for sname in STRIP_ORDER:
             try:
@@ -466,6 +505,14 @@ def _ridge_panel(ax, data_by_class, x_range, fill_color, x_label,
     ax.set_xlim(*x_range)
     ax.set_ylim(-0.5, n_rows)
 
+    # Row labels anchor inside the axes (right-aligned at the data edge)
+    # rather than past it — text drawn past x_range[1] sits in the ~3%
+    # figure margin outside the axes and gets cut by the page edge on the
+    # rightmost gridspec column (round-1 finding 1).
+    label_x = x_range[1] - (x_range[1] - x_range[0]) * 0.01
+    label_bbox = dict(boxstyle="round,pad=0.15", facecolor=PAPER,
+                       edgecolor="none", alpha=0.78)
+
     x = np.linspace(x_range[0], x_range[1], 400)
     for i, k in enumerate(rows):
         y0 = n_rows - 1 - i
@@ -482,10 +529,10 @@ def _ridge_panel(ax, data_by_class, x_range, fill_color, x_label,
                 ax.plot(x, y0 + y, color=INK, lw=1.0)
                 med = float(np.median(vals))
                 ax.plot([med, med], [y0, y0 + 0.18], color=INK, lw=1.6)
-                ax.text(x_range[1] * 1.005, y0 + 0.45,
+                ax.text(label_x, y0 + 0.45,
                         f"{label}  n={n}", fontsize=7.5,
-                        family="DejaVu Sans", va="center", ha="left",
-                        color=INK)
+                        family="DejaVu Sans", va="center", ha="right",
+                        color=INK, bbox=label_bbox, zorder=8)
                 if metric_by_class and k in metric_by_class:
                     ax.text(x_range[0] + (x_range[1]-x_range[0]) * 0.02,
                             y0 + 0.6,
@@ -500,10 +547,10 @@ def _ridge_panel(ax, data_by_class, x_range, fill_color, x_label,
                 y = kde(x)
                 y = y / y.max() * 0.7
                 ax.plot(x, y0 + y, color=MUTED, lw=0.8, linestyle="--")
-                ax.text(x_range[1] * 1.005, y0 + 0.45,
+                ax.text(label_x, y0 + 0.45,
                         f"{label}  n={n} — sparse",
-                        fontsize=7, color=MUTED, va="center", ha="left",
-                        style="italic")
+                        fontsize=7, color=MUTED, va="center", ha="right",
+                        style="italic", bbox=label_bbox, zorder=8)
             except Exception:
                 pass
         else:
@@ -521,6 +568,16 @@ def _ridge_panel(ax, data_by_class, x_range, fill_color, x_label,
         ax.spines[spine].set_visible(False)
     ax.spines["bottom"].set_color(INK)
     ax.tick_params(axis="x", labelsize=7)
+
+
+def _uses_quadrant_fallback(d: dict) -> bool:
+    """True when the ridgeline panels fall back to compass quadrants
+    because no usable street-class column is present (the Maré case).
+    Mirrors the condition inside draw_svf_ridgeline/draw_solar_ridgeline
+    so the panel titles built in build_dashboard() can stay honest about
+    what is actually plotted (round-1 finding 3)."""
+    seg = d.get("seg")
+    return not (seg is not None and "tipo_logra" in seg.columns)
 
 
 def _quadrant_groups(svf_or_solar, boundary, value_col: str):
@@ -605,18 +662,23 @@ def draw_solar_ridgeline(ax, d: dict, site: str) -> None:
     overall = solar["sunshine_ratio_mean"].dropna()
     if len(overall) > 0:
         med = float(overall.median())
+        # 0.96 (not 0.985): keeps the badge text clear of the page edge —
+        # transAxes is already inside the axes, but the previous anchor sat
+        # close enough to the rightmost gridspec column's edge that long
+        # badge strings ("open-sky regime (r̄=0.40)") read as clipped
+        # (round-1 finding 1).
+        badge_kw = dict(transform=ax.transAxes, fontsize=7, ha="right",
+                        va="top", bbox=dict(boxstyle="round,pad=0.2",
+                        facecolor=PAPER, edgecolor="none", alpha=0.78))
         if 0.40 <= med <= 0.85:
-            ax.text(0.985, 0.97, f"open-sky regime ✓ (r̄={med:.2f})",
-                    transform=ax.transAxes,
-                    fontsize=7, color=GREEN, ha="right", va="top")
+            ax.text(0.96, 0.97, f"open-sky regime ✓ (r̄={med:.2f})",
+                    color=GREEN, **badge_kw)
         elif med < 0.40:
-            ax.text(0.985, 0.97, f"shaded regime ✓ (r̄={med:.2f})",
-                    transform=ax.transAxes,
-                    fontsize=7, color=SVF_FILL, ha="right", va="top")
+            ax.text(0.96, 0.97, f"shaded regime ✓ (r̄={med:.2f})",
+                    color=SVF_FILL, **badge_kw)
         else:
-            ax.text(0.985, 0.97, f"check (r̄={med:.2f})",
-                    transform=ax.transAxes,
-                    fontsize=7, color=RED, ha="right", va="top")
+            ax.text(0.96, 0.97, f"check (r̄={med:.2f})",
+                    color=RED, **badge_kw)
 
 
 def draw_hexbin(ax, d: dict, stats: dict) -> None:
@@ -710,7 +772,10 @@ def draw_small_multiples(ax, current_site: str, issues: list) -> None:
     fig = ax.figure
     bbox = ax.get_position()
     width = bbox.width / n * 0.95
-    h = bbox.height * 0.92
+    # 0.84 (not 0.92): leaves headroom above every thumbnail for the fixed
+    # fig.text label below, clear of the row's own "Cross-site comparison"
+    # title sitting just above ax_strip's box.
+    h = bbox.height * 0.84
     for i, site in enumerate(STRIP_ORDER):
         x0 = bbox.x0 + (bbox.width / n) * i + (bbox.width / n - width) / 2
         y0 = bbox.y0 + bbox.height * 0.03
@@ -751,8 +816,16 @@ def draw_small_multiples(ax, current_site: str, issues: list) -> None:
             # pops against neighbours of similar dark-ink stroke.
             sub.patch.set_edgecolor(PAPER)
             sub.patch.set_linewidth(0.0)
-        sub.set_title(SITE_DISPLAY.get(site, site), fontsize=8,
-                      color=INK, pad=2)
+        # fig.text at the pre-shrink box top, not sub.set_title(): each
+        # thumbnail's set_aspect("equal") shrinks its *active* box by a
+        # different amount depending on that site's own data aspect ratio,
+        # so a title anchored to the (now-shrunk) axes box lands at a
+        # different height per site — a ragged label baseline across the
+        # row (round-1 finding 9). x0/y0/width/h are the fixed pre-shrink
+        # cell for this thumbnail, identical in geometry for every site.
+        fig.text(x0 + width / 2, y0 + h + 0.006,
+                 SITE_DISPLAY.get(site, site), fontsize=8, color=INK,
+                 ha="center", va="bottom")
 
 
 def draw_caveats(ax, site: str, stats: dict) -> None:
@@ -920,15 +993,22 @@ def build_dashboard(site: str) -> dict:
     }
     draw_hero_legend(ax_legend, counts=hero_counts)
 
+    # Title honestly reflects what the ridgeline panels group by: a real
+    # street-type vocabulary (Rua/Travessa/Beco/...) when available, or the
+    # compass-quadrant fallback when it isn't (Maré has no tipo_logra
+    # column) — round-1 finding 3 was the title saying "street class" while
+    # the panel showed NE/SE/SW/NW.
+    ridge_grouping = "orientation quadrant" if _uses_quadrant_fallback(d) else "street class"
+
     ax_svf = fig.add_subplot(gs[4, 0])
     draw_svf_ridgeline(ax_svf, d)
-    ax_svf.set_title("SVF distribution by street class",
+    ax_svf.set_title(f"SVF distribution by {ridge_grouping}",
                      fontsize=10, color=INK, pad=4, loc="left")
     panels.append("svf_ridgeline")
 
     ax_sol = fig.add_subplot(gs[4, 1])
     draw_solar_ridgeline(ax_sol, d, site)
-    ax_sol.set_title("Annual solar access by street class",
+    ax_sol.set_title(f"Annual solar access by {ridge_grouping}",
                      fontsize=10, color=INK, pad=4, loc="left")
     panels.append("solar_ridgeline")
 
@@ -1070,19 +1150,40 @@ def build_dashboard(site: str) -> dict:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--site", required=True)
+    p.add_argument("--site")
+    p.add_argument("--all", action="store_true", help="build every site")
     args = p.parse_args()
-    site = args.site
-    result = build_dashboard(site)
-    print(f"A3 PNG: {result['a3_path']}")
-    print(f"PDF:    {result['pdf']}")
-    print(f"web1200: {result['web']}")
-    print(f"metadata: {result['metadata']}")
-    if result["issues"]:
-        print("ISSUES:")
-        for i in result["issues"]:
-            print(f"  - {i}")
+    if not args.site and not args.all:
+        p.error("must pass --site <name> or --all")
+
+    sites = STRIP_ORDER if args.all else [args.site]
+    failed = []
+    for site in sites:
+        try:
+            result = build_dashboard(site)
+        except Exception as e:
+            print(f"[{site}] FAILED: {e}")
+            failed.append(site)
+            continue
+        n_issues = len(result["issues"])
+        print(f"[{site}] OK — {result['web']} ({n_issues} issue(s))")
+        if not args.all:
+            print(f"A3 PNG: {result['a3_path']}")
+            print(f"PDF:    {result['pdf']}")
+            print(f"web1200: {result['web']}")
+            print(f"metadata: {result['metadata']}")
+        if result["issues"]:
+            print("ISSUES:")
+            for i in result["issues"]:
+                print(f"  - {i}")
+
+    if args.all:
+        print(f"\n{len(sites) - len(failed)}/{len(sites)} sites built")
+        if failed:
+            print(f"FAILED: {', '.join(failed)}")
+
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
