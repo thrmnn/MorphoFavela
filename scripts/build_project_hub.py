@@ -312,6 +312,11 @@ def build_callout(prov):
     # TR section it documents — never a bare on-page anchor that duplicates a
     # section below. (date, label, url, gloss); existence-gated at render.
     latest = [
+        ("2026-09-16", "Maré deliverables for PI review — brief, deck, Folha de Rua refresher",
+         f"{hub}/mare_review/index.html",
+         "the morphology brief (6 pp), the companion slide deck, and the five refreshed "
+         "Folha de Rua sheets with their interactive dashboards, each through a critic "
+         "loop; drafts, with the disclosure decisions still open"),
         ("2026-07-28", "Health probe update — out-of-sample favela weakens TB × sun-deficit",
          f"{hub}/health.html#health-probe",
          "the first out-of-sample favela (Cidade de Deus) drops the rank correlation from "
@@ -923,6 +928,18 @@ def health_section(prov):
 
 def deliverables_section(prov):
     cards = []
+    brief = ROOT / "outputs/_hub/mare_review/mare_morphology_brief_v2.pdf"
+    if brief.exists():
+        cards.append(card(
+            "Maré morphology brief",
+            "What has already been measured in Maré — built form, sky access, sun, "
+            "geometry-derived ventilation tendencies, the data inventory and the "
+            "sharing terms — written for teams scoping new research on Maré. "
+            "Draft for PI review, alongside its slide deck and the refreshed "
+            "Folha de Rua sheets.",
+            "mare_review/index.html", kind="info", badge_label="Site report",
+            meta="6 pages · every number read by code from the outputs of record",
+            new_tab=False))
     tr_md = ROOT / "docs/technical_report/technical_report.md"
     tr_pdf = ROOT / "docs/technical_report/technical_report.pdf"
     if tr_md.exists():

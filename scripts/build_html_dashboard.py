@@ -43,6 +43,15 @@ import pandas as pd
 REPO = Path("/home/theo/SCL/SCR/MorphoFavela")
 DIST = REPO / "outputs" / "_distribution" / "html_dashboards"
 
+# A site's own written report, when one exists — linked from the dashboard so the
+# interactive view, the printed sheet and the report are one set, not three finds.
+SITE_REPORT = {
+    "maré": ("Maré morphology brief (PDF, 6 pp)",
+             "../../../_hub/mare_review/mare_morphology_brief_v2.pdf"),
+    "mare": ("Maré morphology brief (PDF, 6 pp)",
+             "../../../_hub/mare_review/mare_morphology_brief_v2.pdf"),
+}
+
 SITE_META = {
     "vidigal": dict(
         display="Vidigal",
@@ -801,7 +810,23 @@ def render_site_html(site: str, stats: dict) -> str:
     else:
         c1_softener = ""
 
+    # Reports row: the site's own written report (where one exists), the printed
+    # A3 sheet, and the project technical report — relative to
+    # outputs/_distribution/html_dashboards/<site>/.
+    atoms_subdir = SITE_META[site]["atoms_subdir"]
+    report_bits = []
+    if site in SITE_REPORT:
+        label, href = SITE_REPORT[site]
+        report_bits.append(f'<a href="{href}">{label}</a>')
+    report_bits.append(
+        f'<a href="../../site_dashboards/{atoms_subdir}/folha_{atoms_subdir}.pdf">'
+        f'Printed sheet — Folha de Rua (PDF)</a>')
+    report_bits.append('<a href="../../../_hub/docs/technical_report.html">'
+                       'Project technical report</a>')
+    report_links = "\n  ".join(report_bits)
+
     rendered = SITE_HTML_TEMPLATE.format(
+        report_links=report_links,
         site=site,
         site_display=site_display,
         site_display_lower=site_display.lower(),
@@ -1149,6 +1174,14 @@ footer{padding:2rem; font-size:0.85rem; color:var(--ink-muted);}
 }
 .toc a{color:var(--ink-muted); border-bottom:1px dotted transparent;}
 .toc a:hover{color:var(--accent-primary); border-bottom-color:var(--accent-primary);}
+.reports{
+  display:flex; flex-wrap:wrap; gap:0.9rem; align-items:center;
+  padding:0.7rem 2rem; font-size:0.82rem;
+  border-bottom:1px solid var(--rule); background:#f7f9fc;
+}
+.reports .reports-label{font-family:var(--mono); font-size:0.72rem; letter-spacing:0.06em;
+  text-transform:uppercase; color:var(--ink-muted);}
+.reports a{color:var(--accent-primary); font-weight:600; min-height:44px; display:inline-flex; align-items:center;}
 
 /* action button distinct from toggle */
 .action-btn{
@@ -1931,6 +1964,10 @@ __INLINE_CSS__
 <section id="dek-section" class="dek-section">
   <p class="dek">{dek}</p>
 </section>
+
+<nav class="reports" aria-label="reports for this site">
+  <span class="reports-label">Reports</span>{report_links}
+</nav>
 
 <nav class="toc" aria-label="section navigation">
   <a href="#how-to-read">How to read</a>
