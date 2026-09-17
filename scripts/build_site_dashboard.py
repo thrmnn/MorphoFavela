@@ -96,6 +96,10 @@ ZOOM_LABELS = {"A": "constraint cluster", "B": "low-SVF cluster"}
 ZOOM_INLET_LAYER_KEYS = {"A": ["density", "svf"], "B": ["svf", "sunlight"]}
 ZOOM_COLORS = {"A": "#B91C1C", "B": "#C026D3"}
 ZOOM_MIN_CLUSTER_CELLS = 3
+# Below this the crop is ~4x4 cells: blocky, and it tells the reader nothing the
+# locator rectangle on the grid row did not already (critic round 1, finding 3).
+# Dropping it and saying so beats drawing a decoration.
+ZOOM_MIN_USEFUL_CELLS = 25
 ZOOM_SVF_DECILE = 0.10
 ZOOM_PAD_CELLS = 3.0
 
@@ -423,6 +427,10 @@ def select_zoom_windows(grid: pd.DataFrame, lat: dict) -> dict:
         out["A"] = dict(ok=False, reason=(
             f"no cluster of >= {ZOOM_MIN_CLUSTER_CELLS} connected n_constraints=3 "
             f"cells ({int(mask_a.sum())} such cell(s) total)"))
+    elif cluster_a["n_cells"] < ZOOM_MIN_USEFUL_CELLS:
+        out["A"] = dict(ok=False, reason=(
+            f"largest n_constraints=3 cluster is {cluster_a["n_cells"]} cells, below the "
+            f"{ZOOM_MIN_USEFUL_CELLS}-cell floor at which a crop shows more than its locator box"))
     else:
         out["A"] = dict(ok=True, bounds=_cluster_bounds_xy(lat, cluster_a), **cluster_a)
 
@@ -437,6 +445,10 @@ def select_zoom_windows(grid: pd.DataFrame, lat: dict) -> dict:
             out["B"] = dict(ok=False, reason=(
                 f"no cluster of >= {ZOOM_MIN_CLUSTER_CELLS} connected cells at/below "
                 f"svf_c_p50's {ZOOM_SVF_DECILE:.0%} decile (p10={p10:.2f})"))
+        elif cluster_b["n_cells"] < ZOOM_MIN_USEFUL_CELLS:
+            out["B"] = dict(ok=False, reason=(
+                f"largest bottom-decile cluster is {cluster_b["n_cells"]} cells, below the "
+                f"{ZOOM_MIN_USEFUL_CELLS}-cell floor"))
         else:
             out["B"] = dict(ok=True, bounds=_cluster_bounds_xy(lat, cluster_b), p10=p10, **cluster_b)
 
@@ -807,8 +819,11 @@ def draw_hexbin(ax, d: dict, stats: dict) -> None:
                 ax.scatter(centroids_real[:, 0], centroids_real[:, 1],
                            marker="+", c=MAGENTA, s=80, linewidths=1.5,
                            zorder=10)
-                ax.text(0.02, 0.97, "2 modes — canyon / open",
-                        transform=ax.transAxes, fontsize=8, style="italic",
+                dbic = g1.bic(X) - g2.bic(X)
+                ax.text(0.02, 0.97,
+                        "+ 2-component Gaussian mixture (\u0394BIC "
+                        f"{dbic:.0f} vs 1) \u2014 canyon / open",
+                        transform=ax.transAxes, fontsize=7.5, style="italic",
                         color=MAGENTA, va="top", ha="left")
     except Exception:
         pass
@@ -997,9 +1012,25 @@ def build_dashboard(site: str) -> dict:
 
     # A3 portrait: 297 x 420 mm → 11.69 x 16.54 in
     fig = plt.figure(figsize=(11.69, 16.54), dpi=200, facecolor=PAPER)
+
+    # Aspect-aware row heights. A fixed near-square frame per grid panel wasted
+    # most of its box on the two shape extremes: Vidigal (bbox ~0.45 tall/wide)
+    # rendered as a horizontal wisp a few pixels high, Maré (~2.06) as a narrow
+    # ribbon with white margins on both sides — the requested spine came out the
+    # least legible thing on the sheet (critic round 1, findings 1 and 2). Each
+    # panel is one quarter of the row's width, so the height that actually fits
+    # the footprint is that width times the site's own bbox aspect. The scatter
+    # shrinks at the same time: it had been taking as much height as the spine
+    # and both zoom rows together, for a secondary consistency check.
+    bx0, by0, bx1, by1 = d["boundary"].total_bounds
+    site_aspect = (by1 - by0) / (bx1 - bx0) if (bx1 - bx0) else 1.0
+    panel_w_frac = (0.97 - 0.04) / len(GRID_LAYERS)
+    grid_row = panel_w_frac * site_aspect * (11.69 / 16.54) * 16.54
+    grid_row = float(np.clip(grid_row, 1.6, 4.6))   # keep the sheet balanced at the extremes
+    zoom_row = float(np.clip(grid_row * 0.85, 1.5, 3.4))
     gs = fig.add_gridspec(
         nrows=6, ncols=1,
-        height_ratios=[1.3, 0.75, 2.3, 2.3, 6.0, 1.7],
+        height_ratios=[1.3, 0.75, grid_row, zoom_row, 4.0, 1.7],
         left=0.04, right=0.97, top=0.985, bottom=0.015,
         hspace=0.30,
     )
