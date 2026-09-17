@@ -1,0 +1,21 @@
+{
+ "_utc": "2026-09-17T04:56:26Z",
+ "n_matched": 8402056,
+ "n_consolidated": 8402056,
+ "n_record": 8402056,
+ "svf": {
+  "corr": 1.0,
+  "max_abs_diff": 0.0,
+  "corr_min": 0.9999,
+  "max_abs_diff_max": 0.01,
+  "pass": true
+ },
+ "kwh_m2": {
+  "corr": 0.9999999999999999,
+  "max_abs_diff": 0.0,
+  "corr_min": 0.9999,
+  "max_abs_diff_max": 0.01,
+  "pass": true
+ },
+ "pass": true
+}

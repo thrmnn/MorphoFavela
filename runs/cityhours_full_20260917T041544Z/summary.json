@@ -1,0 +1,179 @@
+{
+ "_utc": "2026-09-17T04:56:59Z",
+ "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+ "sky_patches": 145,
+ "n_cells": 8402056,
+ "reference_days": {
+  "winter_solstice": "2026-06-21",
+  "equinox": "2026-03-20"
+ },
+ "duration_thresholds_h": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "citywide": {
+  "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+  "sun_h_winter_solstice": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 8402056,
+   "p1": 0.0,
+   "p5": 0.0,
+   "p10": 0.1666666716337204,
+   "p25": 3.1666667461395264,
+   "p50": 6.333333492279053,
+   "p75": 8.333333015441895,
+   "p90": 9.5,
+   "p95": 9.833333015441895,
+   "p99": 10.333333015441895
+  },
+  "share_ge_winter_solstice": {
+   "share_ge_1h": 0.8701520199341685,
+   "share_ge_2h": 0.8202999361108757,
+   "share_ge_3h": 0.7654891850280455,
+   "share_ge_4h": 0.7044300823512721
+  },
+  "sun_h_equinox": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 8402056,
+   "p1": 0.0,
+   "p5": 1.6666666269302368,
+   "p10": 3.1666667461395264,
+   "p25": 5.833333492279053,
+   "p50": 8.166666984558105,
+   "p75": 10.0,
+   "p90": 11.0,
+   "p95": 11.333333015441895,
+   "p99": 11.833333015441895
+  },
+  "share_ge_equinox": {
+   "share_ge_1h": 0.9667301669972207,
+   "share_ge_2h": 0.9420829854026205,
+   "share_ge_3h": 0.9093254079715727,
+   "share_ge_4h": 0.8656613333688802
+  }
+ },
+ "study_favelas": {
+  "Vidigal": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "match_method": "nome_exact_unique",
+   "sun_h_winter_solstice": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 4949,
+    "median": 2.3333332538604736,
+    "iqr": [
+     0.0,
+     5.5
+    ],
+    "citywide_percentile_position": 20.114648128981766
+   },
+   "sun_h_equinox": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 4949,
+    "median": 6.5,
+    "iqr": [
+     3.6666667461395264,
+     8.5
+    ],
+    "citywide_percentile_position": 31.233706369012538
+   }
+  },
+  "Rocinha": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "match_method": "nome_exact_unique",
+   "sun_h_winter_solstice": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 10410,
+    "median": 1.5,
+    "iqr": [
+     0.0,
+     5.333333492279053
+    ],
+    "citywide_percentile_position": 15.803935370104652
+   },
+   "sun_h_equinox": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 10410,
+    "median": 5.0,
+    "iqr": [
+     2.0,
+     7.833333492279053
+    ],
+    "citywide_percentile_position": 19.56162277423526
+   }
+  },
+  "Complexo do Alem\u00e3o": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "match_method": "complexo_exact",
+   "sun_h_winter_solstice": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 29510,
+    "median": 4.333333492279053,
+    "iqr": [
+     1.1666666269302368,
+     7.166666507720947
+    ],
+    "citywide_percentile_position": 32.33341934402723
+   },
+   "sun_h_equinox": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 29510,
+    "median": 7.166666507720947,
+    "iqr": [
+     4.5,
+     9.166666984558105
+    ],
+    "citywide_percentile_position": 38.14253320853848
+   }
+  },
+  "Mar\u00e9": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "match_method": "complexo_exact",
+   "sun_h_winter_solstice": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 9924,
+    "median": 1.0,
+    "iqr": [
+     0.0,
+     3.0
+    ],
+    "citywide_percentile_position": 13.417073154475524
+   },
+   "sun_h_equinox": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 9924,
+    "median": 2.8333332538604736,
+    "iqr": [
+     1.1666666269302368,
+     5.0
+    ],
+    "citywide_percentile_position": 8.74863842849893
+   }
+  },
+  "Rio das Pedras": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "match_method": "complexo_exact",
+   "sun_h_winter_solstice": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 6039,
+    "median": 2.0,
+    "iqr": [
+     0.3333333432674408,
+     5.166666507720947
+    ],
+    "citywide_percentile_position": 18.342599716069497
+   },
+   "sun_h_equinox": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 6039,
+    "median": 4.166666507720947,
+    "iqr": [
+     2.0,
+     7.0
+    ],
+    "citywide_percentile_position": 14.763422190949454
+   }
+  }
+ }
+}
