@@ -1,0 +1,44 @@
+# WP-07Z zoom windows — docs/wp07_zoom_spec.md.
+#
+# The PI owns this list. `id`/`label` for the five study favelas are the
+# slug/display pair src.brisa_solar.wp07_ledger.FAVELAS already carries
+# (never re-typed elsewhere); `source` says how the window is resolved:
+#   favela_boundary:<name>  -> src.brisa_solar.wp05_full.match_favela_group
+#                               against data/RJ/Favelas_Limit_2019.shp
+#   bairro:<name>           -> a neighbourhood boundary layer (none on disk
+#                               today: status becomes missing_boundary)
+#   bbox_epsg31983: [...]   -> a literal extent the PI supplies directly
+#
+# An agent never adds an entry here. `pad_m` is a rendering choice (context
+# margin around the matched boundary), not a measured quantity.
+
+windows:
+  - id: vidigal
+    label: Vidigal
+    source: "favela_boundary:Vidigal"
+    pad_m: 120.0
+
+  - id: rocinha
+    label: Rocinha
+    source: "favela_boundary:Rocinha"
+    pad_m: 120.0
+
+  - id: complexo_do_alemao
+    label: "Complexo do Alemão"
+    source: "favela_boundary:Complexo do Alemão"
+    pad_m: 120.0
+
+  - id: mare
+    label: "Maré"
+    source: "favela_boundary:Maré"
+    pad_m: 120.0
+
+  - id: riodaspedras
+    label: "Rio das Pedras"
+    source: "favela_boundary:Rio das Pedras"
+    pad_m: 120.0
+
+  - id: ipanema
+    label: Ipanema
+    source: "bairro:Ipanema"
+    pad_m: 120.0
