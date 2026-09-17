@@ -1,0 +1,96 @@
+{
+ "_utc": "2026-09-17T03:23:40Z",
+ "git_sha": "a36d464",
+ "ledger_source": "runs/wp07_ledger_20260916T164906Z/ledger.json",
+ "figures": {
+  "f5_citywide_svf_map": {
+   "id": "f5_citywide_svf_map",
+   "status": "produced",
+   "svg_path": "f5_citywide_svf_map.svg",
+   "png_path": "f5_citywide_svf_map.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per output pixel (never a per-cell scatter)",
+    "pixel_m": 67.1044921875,
+    "grid_shape_rows_cols": [
+     526,
+     1024
+    ],
+    "target_max_px": 1024,
+    "n_cells_aggregated": 8402056
+   },
+   "colormap": {
+    "panel_A_svf": "cividis",
+    "panel_B_kwh_m2": "inferno"
+   },
+   "favela_boundaries": {
+    "matched_favelas": [
+     "complexo_do_alemao",
+     "mare",
+     "riodaspedras",
+     "rocinha",
+     "vidigal"
+    ],
+    "missing_favelas": [],
+    "source": "data/RJ/Favelas_Limit_2019.shp"
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 80,
+    "banned_tokens_absent": true
+   }
+  },
+  "f5b_citywide_svf_map_coarse": {
+   "id": "f5b_citywide_svf_map_coarse",
+   "status": "produced",
+   "svg_path": "f5b_citywide_svf_map_coarse.svg",
+   "png_path": "f5b_citywide_svf_map_coarse.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per coarse cell (never a per-cell scatter)",
+    "cell_m": 20.0,
+    "cell_m_source": "src.brisa_solar.g3_domain.FABRIC_FOOTPRINT_DISTANCE_GRID_M, the coarsest of the {5, 10, 20} m sensitivity sweep already defended for the locked 10 m domain parameter (config/params.yaml domain.fabric_footprint_distance_m)",
+    "grid_shape_rows_cols": [
+     1765,
+     3436
+    ],
+    "n_cells_aggregated": 8402056
+   },
+   "colormap": {
+    "svf": "cividis"
+   },
+   "favela_boundaries": {
+    "matched_favelas": [
+     "complexo_do_alemao",
+     "mare",
+     "riodaspedras",
+     "rocinha",
+     "vidigal"
+    ],
+    "missing_favelas": []
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 41,
+    "banned_tokens_absent": true
+   },
+   "release_class_note": "release_class is withheld here, as for f5 — whether this coarser aggregation instead reads as reviewer-defence-only is the ethics gate's call, then the PI's; not decided by this manifest."
+  }
+ }
+}
