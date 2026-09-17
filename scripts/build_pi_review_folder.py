@@ -313,7 +313,9 @@ the paper or shared figures without your own tap.</p></header>"""]
             parts.append('<h2 class="divider">Everything else on disk</h2>'
                          '<p class="blurb">Every other figure under outputs/, deduplicated by content and '
                          'grouped by the folder it came from. These are earlier and ongoing analyses, not a '
-                         'curated set, and some predate the current reframe.</p>')
+                         'curated set, and some predate the current reframe. On the hub only the previews of '
+                         'this part are mirrored, because the originals are 1.5 GB and the server has 12 GB '
+                         'free; open the local folder to reach them at full size.</p>')
         parts.append(f'<h2 id="{anchor(s["slug"])}">{s["title"]}</h2>'
                      + (f'<p class="blurb">{s["blurb"]}</p>' if s["blurb"] else "")
                      + f'<p class="prov">{s["provenance"]}</p><div class="grid">')
