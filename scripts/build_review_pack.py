@@ -49,6 +49,12 @@ for title, docs in SECTIONS:
         dst = OUT / (src.stem + ".html")
         subprocess.run(["pandoc", str(src), "-f", "gfm", "-t", "html5", "-s",
                         "--metadata", f"title={src.stem}", "-o", str(dst)], check=True)
+        # pandoc's standalone template adds an IE conditional loading html5shiv
+        # from a protocol-relative CDN URL; the hub build's no-root-absolute
+        # guard refuses it (correctly — the mirror must be self-contained).
+        html_txt = dst.read_text()
+        html_txt = "\n".join(l for l in html_txt.splitlines() if "html5shiv" not in l and "<!--[if" not in l and "<![endif]" not in l)
+        dst.write_text(html_txt)
         rel = src.relative_to(ROOT)
         rows.append(f'<li><a href="{dst.name}">{html.escape(blurb)}</a><br>'
                     f'<small><code>{html.escape(str(rel))}</code></small></li>')
