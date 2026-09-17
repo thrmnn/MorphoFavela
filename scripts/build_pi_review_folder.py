@@ -26,6 +26,37 @@ def _latest(glob: str) -> Path:
     return hits[-1]
 
 
+def _wp_by_figure(run_dir: Path) -> dict[str, str]:
+    """Which work package each figure's numbers come from — derived, never typed:
+    a figure cites ledger ids, each ledger entry names its source run, and the
+    ledger's own runs_of_record maps a run back to its WP. The PI asked "what
+    about WP4 and WP6 figures?" precisely because f2 and f4 never said so."""
+    manifest = run_dir / "figure_manifest.json"
+    if not manifest.exists():
+        return {}
+    man = json.loads(manifest.read_text())
+    ledger_rel = man.get("ledger_source")
+    if not ledger_rel:
+        return {}
+    ledger_path = ROOT / ledger_rel
+    if not ledger_path.exists():
+        return {}
+    ledger = json.loads(ledger_path.read_text())
+    entries = ledger.get("entries", {})
+    run_to_wp = {run: wp.upper() for wp, run in
+                 ledger.get("_meta", {}).get("runs_of_record", {}).items()}
+    out = {}
+    for fig in man.get("figures", {}).values():
+        if fig.get("status") != "produced" or not fig.get("png_path"):
+            continue
+        wps = sorted({run_to_wp[r] for r in
+                      (entries.get(i, {}).get("source", {}).get("run_id") for i in fig.get("ledger_ids_used", []))
+                      if r in run_to_wp})
+        if wps:
+            out[Path(fig["png_path"]).name] = " + ".join(wps)
+    return out
+
+
 def _manifest_classes(run_dir: Path) -> dict[str, dict]:
     path = run_dir / "figure_manifest.json"
     if not path.exists():
@@ -44,7 +75,13 @@ def _manifest_classes(run_dir: Path) -> dict[str, dict]:
 
 SECTIONS = [
     ("01_p1_solar_figures", "P1 solar figures (f1-f4)",
-     "The four figures staged for the paper. Your promotion ruling is the only thing between these and shared/figures.",
+     "The four figures staged for the paper, each tagged with the work package its numbers come from. "
+     "Your promotion ruling is the only thing between these and shared/figures. The numbers behind them, "
+     "per work package, are at "
+     "<a href=\"/morphofavela-dash/outputs/_hub/wp07_staged/review/_results_wp04.html\">WP04</a>, "
+     "<a href=\"/morphofavela-dash/outputs/_hub/wp07_staged/review/_results_wp05.html\">WP05</a>, "
+     "<a href=\"/morphofavela-dash/outputs/_hub/wp07_staged/review/_results_wp06.html\">WP06</a> and "
+     "<a href=\"/morphofavela-dash/outputs/_hub/wp07_staged/review/_results_g3.html\">G3</a>.",
      lambda: _latest("wp07_figures_*")),
     ("02_citywide_maps", "Citywide maps (f5, f5b, f6)",
      "Sky-view and irradiation across the whole 8.4 M-cell domain. Withheld under red line L1 — yours to read, not to circulate.",
@@ -112,8 +149,12 @@ def build(out_root: Path) -> dict:
     for slug, title, blurb, resolve in SECTIONS:
         run_dir = resolve()
         classes = _manifest_classes(run_dir)
+        wps = _wp_by_figure(run_dir)
         for name in sorted(classes):
-            _copy(run_dir / name, out_root / slug, classes[name], entries, slug)
+            meta = dict(classes[name])
+            if name in wps:
+                meta["work_package"] = wps[name]
+            _copy(run_dir / name, out_root / slug, meta, entries, slug)
         sections.append({"slug": slug, "title": title, "blurb": blurb,
                          "provenance": str(run_dir.relative_to(ROOT))})
 
@@ -156,6 +197,7 @@ figcaption{padding:9px 11px;font-size:13px}
 .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:99px;
 border:1px solid var(--line);margin-right:5px}
 .withheld{color:var(--warn);border-color:var(--warn)}
+.wp{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
 a{color:inherit}.nolink{padding:9px 11px;font-size:13px}
 </style>
 <header><h1>Figure review</h1>
@@ -173,6 +215,8 @@ the paper or shared figures without your own tap.</p></header>"""]
                 parts.append(f'<figure><div class="nolink">missing: <span class="name">{e["file"]}</span></div></figure>')
                 continue
             tags = ""
+            if e.get("work_package"):
+                tags += f'<span class="tag wp">{e["work_package"]}</span>'
             if e.get("release_class") == "withheld":
                 tags += f'<span class="tag withheld">withheld · {e.get("red_line","L1")}</span>'
             elif e.get("release_class"):
