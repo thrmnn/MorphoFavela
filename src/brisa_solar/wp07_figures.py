@@ -36,6 +36,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.ticker import FuncFormatter  # noqa: E402
 import numpy as np  # noqa: E402
 import pyarrow.parquet as pq  # noqa: E402
+import yaml  # noqa: E402
 
 from .constants import REPO_ROOT  # noqa: E402
 from .wp07_ledger import FAVELAS, LOCKED_VARIANT, RUN_OF_RECORD, SITE_DIRS  # noqa: E402
@@ -547,12 +548,22 @@ def _nice_scalebar_length(span_m: float) -> float:
 
 
 def _plot_map_panel(ax, grid: np.ndarray, bounds: tuple[float, float, float, float],
-                     boundaries: dict, cmap: str, label: str):
+                     boundaries: dict, cmap: str, label: str,
+                     vmin: float | None = None, vmax: float | None = None):
+    """`vmin`/`vmax` default to None (matplotlib auto-scales per axes, the
+    original f5/f5b behaviour); WP-07Z's zoom family passes explicit limits
+    derived once from the citywide pair so every window shares the citywide
+    figure's own colour ramp (docs/wp07_zoom_spec.md item 3)."""
     xmin, xmax, ymin, ymax = bounds
     im = ax.imshow(grid, extent=(xmin, xmax, ymin, ymax), origin="upper",
-                    cmap=cmap, aspect="equal", interpolation="nearest")
+                    cmap=cmap, aspect="equal", interpolation="nearest",
+                    vmin=vmin, vmax=vmax)
     for slug, gdf in boundaries.items():
-        gdf.boundary.plot(ax=ax, color=COLORS[slug], linewidth=0.8)
+        # .get(..., "white"): the zoom family can draw a boundary keyed by a
+        # window id outside the five-favela COLORS palette (never hit today —
+        # only resolved favela_boundary windows reach this loop — but a
+        # KeyError here is a wrong failure mode for a rendering choice).
+        gdf.boundary.plot(ax=ax, color=COLORS.get(slug, "white"), linewidth=0.8)
     ax.set_xticks([])
     ax.set_yticks([])
     for spine in ax.spines.values():
@@ -630,7 +641,11 @@ def _produced_map(fig, fig_id: str, out_dir: Path, source_parquets: list[str],
     }
 
 
-def render_f5(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
+def render_f5(ledger: dict, repo_root: Path, out_dir: Path, pixel_m: float | None = None) -> dict:
+    """`pixel_m`: explicit output pixel size in metres. Default None preserves
+    the original auto-sizing (span / MAP_TARGET_MAX_PX) exactly — WP-07Z's
+    `--pixel-m` CLI flag (docs/wp07_zoom_spec.md item 2) is the only caller
+    that ever passes a value, and only for `--target map`."""
     path = citywide_parquet_path(repo_root)
     if not path.exists():
         return _skip_map("f5_citywide_svf_map", f"citywide parquet absent: {path}")
@@ -644,7 +659,8 @@ def render_f5(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
 
     bounds = _map_bounds(path)
     xmin, xmax, ymin, ymax = bounds
-    pixel_m = max(xmax - xmin, ymax - ymin) / MAP_TARGET_MAX_PX
+    if pixel_m is None:
+        pixel_m = max(xmax - xmin, ymax - ymin) / MAP_TARGET_MAX_PX
     means, (nx, ny) = _streaming_pixel_mean(path, ["svf", "kwh_m2"], pixel_m, bounds)
     n_cells = pq.ParquetFile(path).metadata.num_rows
 
@@ -735,11 +751,13 @@ def render_f5b(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
     return result
 
 
-def stage_map(repo_root: Path, out_dir: Path | None = None) -> dict:
+def stage_map(repo_root: Path, out_dir: Path | None = None, pixel_m: float | None = None) -> dict:
     """WP-07M orchestration — separate run dir and manifest from stage_all's
     f1-f4 (docs/wp07_map_spec.md: 'produced into runs/wp07_map_<UTC>/'), same
     manifest shape (figures: {id: {...}}) so a generator glob extended to
-    also match wp07_map_* would pick this file up unchanged."""
+    also match wp07_map_* would pick this file up unchanged. `pixel_m` is
+    forwarded to render_f5 only (f5b's coarse cell stays sensitivity-swept,
+    docs/wp07_zoom_spec.md item 2); default None changes nothing."""
     repo_root = Path(repo_root)
     ledger_path = find_latest_ledger(repo_root)
     ledger = json.loads(ledger_path.read_text())
@@ -750,7 +768,7 @@ def stage_map(repo_root: Path, out_dir: Path | None = None) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     figures = {
-        "f5_citywide_svf_map": render_f5(ledger, repo_root, out_dir),
+        "f5_citywide_svf_map": render_f5(ledger, repo_root, out_dir, pixel_m=pixel_m),
         "f5b_citywide_svf_map_coarse": render_f5b(ledger, repo_root, out_dir),
     }
 
@@ -767,6 +785,311 @@ def stage_map(repo_root: Path, out_dir: Path | None = None) -> dict:
         "_utc": _utc_now(),
         "git_sha": _git_sha(repo_root),
         "ledger_source": str(ledger_path.relative_to(repo_root)),
+        "figures": figures,
+    }
+    (out_dir / "figure_manifest.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
+    return manifest
+
+
+# ---------------------------------------------------------------------------
+# WP-07Z: high-resolution citywide pair + per-window zoom extracts. Spec:
+# docs/wp07_zoom_spec.md. A third family, own run dir (runs/wp07_zoom_<UTC>/),
+# same withheld/L1 discipline as f5/f5b above and the same "no favela beside
+# a non-favela" boundary: every window is its own figure, never a composite.
+# Window identity comes only from config/zoom_windows.yaml, which the PI
+# owns — an unresolvable name (or a source with no boundary layer on disk,
+# e.g. Ipanema's bairro:) yields status missing_boundary, never a guess.
+# ---------------------------------------------------------------------------
+
+ZOOM_TARGET_PIXEL_M = 10.0  # the citywide pair's default resolution (item 2)
+ZOOM_NATIVE_PIXEL_M = 1.0   # window renders: the run-of-record's native cell
+
+
+def zoom_windows_path(repo_root: Path) -> Path:
+    return Path(repo_root) / "config" / "zoom_windows.yaml"
+
+
+def load_zoom_windows(repo_root: Path) -> list[dict]:
+    path = zoom_windows_path(repo_root)
+    data = yaml.safe_load(path.read_text())
+    return data["windows"]
+
+
+def resolve_window_boundary(window: dict, repo_root: Path) -> dict:
+    """One window entry -> {"status": "resolved", "boundary"|"bbox", "method"}
+    or {"status": "missing_boundary", "reason", "input_needed"}. Never guesses
+    an extent: a `favela_boundary:` name that doesn't match, a `bairro:` name
+    (no neighbourhood layer exists on disk today), or an unrecognised source
+    scheme all resolve to missing_boundary with a stated reason."""
+    repo_root = Path(repo_root)
+    source = window["source"]
+
+    if source.startswith("favela_boundary:"):
+        name = source[len("favela_boundary:"):]
+        shp_path = map_favela_boundary_path(repo_root)
+        if not shp_path.exists():
+            return {"status": "missing_boundary",
+                    "reason": f"favela boundary shapefile absent: {shp_path}",
+                    "input_needed": str(shp_path)}
+        from src.config import EXPECTED_CRS
+        from .wp05_full import match_favela_group
+
+        favelas_gdf = gpd.read_file(shp_path)
+        if favelas_gdf.crs is not None:
+            favelas_gdf = favelas_gdf.to_crs(EXPECTED_CRS)
+        matched, method = match_favela_group(favelas_gdf, name)
+        if len(matched) == 0:
+            return {"status": "missing_boundary",
+                    "reason": f"{name!r} matched no polygon in {shp_path.name} "
+                              f"(complexo/nome exact match, method={method})",
+                    "input_needed": f"a corrected name for {name!r} in "
+                                     f"config/zoom_windows.yaml, or a "
+                                     f"bbox_epsg31983 the PI supplies directly"}
+        return {"status": "resolved", "boundary": matched, "method": method}
+
+    if source.startswith("bairro:"):
+        name = source[len("bairro:"):]
+        return {"status": "missing_boundary",
+                "reason": f"no neighbourhood/bairro boundary layer exists on "
+                          f"disk for {name!r} (Favelas_Limit_2019.shp carries "
+                          f"a 'bairro' attribute column on favela polygons "
+                          f"only, not a bairro polygon layer)",
+                "input_needed": f"a bairro polygon layer (e.g. an IPP/IBGE "
+                                 f"bairros shapefile) covering {name!r}, or "
+                                 f"a bbox_epsg31983 the PI supplies directly"}
+
+    if source.startswith("bbox_epsg31983:"):
+        bbox = window.get("bbox_epsg31983")
+        if not bbox or len(bbox) != 4:
+            return {"status": "missing_boundary",
+                    "reason": "source declares bbox_epsg31983 but this "
+                              "window entry carries no bbox_epsg31983 field",
+                    "input_needed": "bbox_epsg31983: [xmin, ymin, xmax, ymax] "
+                                     "on this window's config/zoom_windows.yaml entry"}
+        xmin, ymin, xmax, ymax = bbox
+        return {"status": "resolved", "bbox": (float(xmin), float(ymin), float(xmax), float(ymax)),
+                "method": "bbox_epsg31983"}
+
+    return {"status": "missing_boundary",
+            "reason": f"unrecognised source scheme: {source!r}",
+            "input_needed": "a favela_boundary:, bairro:, or bbox_epsg31983 source"}
+
+
+def _window_bounds(resolution: dict, pad_m: float) -> tuple[float, float, float, float]:
+    if "boundary" in resolution:
+        xmin, ymin, xmax, ymax = resolution["boundary"].total_bounds
+    else:
+        xmin, ymin, xmax, ymax = resolution["bbox"]
+    return (xmin - pad_m, xmax + pad_m, ymin - pad_m, ymax + pad_m)
+
+
+def _add_locator_inset(ax, citywide_bounds: tuple[float, float, float, float],
+                        window_bounds: tuple[float, float, float, float]) -> None:
+    """A small citywide-position inset in the panel's bottom-left corner:
+    the citywide frame as an outline, the window as a filled rectangle —
+    position only, never a value, so it carries nothing the no-contrast
+    grep needs to catch."""
+    cxmin, cxmax, cymin, cymax = citywide_bounds
+    wxmin, wxmax, wymin, wymax = window_bounds
+    inset = ax.inset_axes([0.02, 0.02, 0.24, 0.24])
+    inset.set_xlim(cxmin, cxmax)
+    inset.set_ylim(cymin, cymax)
+    inset.set_aspect("equal")
+    inset.add_patch(plt.Rectangle((cxmin, cymin), cxmax - cxmin, cymax - cymin,
+                                   fill=False, edgecolor="0.35", linewidth=0.5))
+    inset.add_patch(plt.Rectangle((wxmin, wymin), wxmax - wxmin, wymax - wymin,
+                                   fill=True, facecolor="#D6604D", edgecolor="#D6604D", linewidth=0.8))
+    inset.set_xticks([])
+    inset.set_yticks([])
+    for spine in inset.spines.values():
+        spine.set_linewidth(0.4)
+
+
+def _png_dims_bytes(path: Path) -> dict:
+    from PIL import Image
+    with Image.open(path) as im:
+        w, h = im.size
+    return {"png_width_px": w, "png_height_px": h, "png_bytes": path.stat().st_size}
+
+
+def render_citywide_zoom(ledger: dict, repo_root: Path, out_dir: Path,
+                          pixel_m: float = ZOOM_TARGET_PIXEL_M):
+    """The WP-07Z citywide SVF + irradiation pair at an explicit `pixel_m`
+    (item 2). Returns (manifest_dict, citywide_bounds, color_limits) — the
+    latter two feed render_zoom_window so every window shares this figure's
+    own extent (locator inset) and colour ramp (item 3)."""
+    repo_root = Path(repo_root)
+    path = citywide_parquet_path(repo_root)
+    fig_id = "f6_citywide"
+    if not path.exists():
+        skip = _skip_map(fig_id, f"citywide parquet absent: {path}")
+        skip["release_class"] = "withheld"
+        skip["red_line"] = "L1"
+        return skip, None, None
+    boundaries = _load_favela_boundaries(repo_root)
+    if not boundaries:
+        skip = _skip_map(
+            fig_id,
+            f"favela boundary shapefile absent or matched none of the five study favelas: "
+            f"{map_favela_boundary_path(repo_root)}",
+        )
+        skip["release_class"] = "withheld"
+        skip["red_line"] = "L1"
+        return skip, None, None
+
+    bounds = _map_bounds(path)
+    means, (nx, ny) = _streaming_pixel_mean(path, ["svf", "kwh_m2"], pixel_m, bounds)
+    n_cells = pq.ParquetFile(path).metadata.num_rows
+
+    color_limits = {
+        "svf": (float(np.nanmin(means["svf"])), float(np.nanmax(means["svf"]))),
+        "kwh_m2": (float(np.nanmin(means["kwh_m2"])), float(np.nanmax(means["kwh_m2"]))),
+    }
+
+    fig, (axA, axB) = plt.subplots(1, 2, figsize=(9.6, 4.8))
+    panels = (
+        (axA, "svf", "sky-view factor (fraction)", MAP_CMAP_SVF),
+        (axB, "kwh_m2", "annual ground irradiation (kWh m$^{-2}$)", MAP_CMAP_KWH),
+    )
+    for tag, (ax, metric, label, cmap) in zip("AB", panels):
+        vmin, vmax = color_limits[metric]
+        _plot_map_panel(ax, means[metric], bounds, boundaries, cmap, label, vmin=vmin, vmax=vmax)
+        _add_scalebar_north(ax, bounds)
+        ax.set_title(tag, loc="left", fontsize=8)
+    fig.suptitle(
+        f"{n_cells:,} citywide ground cells · {pixel_m:.1f} m output pixel · "
+        f"mean per pixel (WP-07Z high-resolution pair)",
+        fontsize=6.5,
+    )
+
+    aggregation = {
+        "method": "streamed mean per output pixel (never a per-cell scatter)",
+        "pixel_m": pixel_m,
+        "grid_shape_rows_cols": [ny, nx],
+        "n_cells_aggregated": int(n_cells),
+    }
+    boundary_note = {
+        "matched_favelas": sorted(boundaries),
+        "missing_favelas": sorted(set(FAVELAS) - set(boundaries)),
+        "source": "data/RJ/Favelas_Limit_2019.shp",
+    }
+    result = _produced_map(fig, fig_id, out_dir, [str(path.relative_to(repo_root))],
+                            aggregation, {"panel_A_svf": MAP_CMAP_SVF, "panel_B_kwh_m2": MAP_CMAP_KWH},
+                            boundary_note)
+    result["color_limits"] = {"svf": list(color_limits["svf"]), "kwh_m2": list(color_limits["kwh_m2"])}
+    result.update(_png_dims_bytes(out_dir / result["png_path"]))
+    return result, bounds, color_limits
+
+
+def render_zoom_window(repo_root: Path, out_dir: Path, window: dict,
+                        citywide_bounds, color_limits) -> list[dict]:
+    """One window -> two manifest rows (`f6_zoom_<id>_svf`, `f6_zoom_<id>_kwh`)
+    at the native 1 m cell, or two `skipped`/missing_boundary rows when the
+    window's source doesn't resolve. Never both a favela window and a
+    non-favela window in one figure — each call renders exactly one window."""
+    repo_root = Path(repo_root)
+    path = citywide_parquet_path(repo_root)
+    wid = window["id"]
+    resolution = resolve_window_boundary(window, repo_root)
+    window_meta = {"id": wid, "label": window["label"], "source": window["source"],
+                    "pad_m": window["pad_m"]}
+    metrics = (
+        ("svf", "svf", "sky-view factor (fraction)", MAP_CMAP_SVF),
+        ("kwh_m2", "kwh", "annual ground irradiation (kWh m$^{-2}$)", MAP_CMAP_KWH),
+    )
+    results = []
+    for metric, suffix, label, cmap in metrics:
+        fig_id = f"f6_zoom_{wid}_{suffix}"
+        if resolution["status"] != "resolved":
+            results.append({
+                "id": fig_id, "status": "skipped",
+                "release_class": "withheld", "red_line": "L1",
+                "reason": resolution["reason"],
+                "window": window_meta,
+                "resolution": {"status": "missing_boundary", "input_needed": resolution["input_needed"]},
+            })
+            continue
+        if not path.exists() or citywide_bounds is None or color_limits is None:
+            results.append({
+                "id": fig_id, "status": "skipped",
+                "release_class": "withheld", "red_line": "L1",
+                "reason": f"citywide parquet absent or the citywide pair did not "
+                          f"produce (never rendering a window without it): {path}",
+                "window": window_meta,
+            })
+            continue
+
+        bounds = _window_bounds(resolution, window["pad_m"])
+        means, (nx, ny) = _streaming_pixel_mean(path, [metric], ZOOM_NATIVE_PIXEL_M, bounds)
+        boundary_gdf = resolution.get("boundary")
+        boundaries = {wid: boundary_gdf} if boundary_gdf is not None else {}
+        vmin, vmax = color_limits[metric]
+        n_cells = int(np.sum(~np.isnan(means[metric])))
+
+        fig, ax = plt.subplots(figsize=(5.8, 5.4))
+        _plot_map_panel(ax, means[metric], bounds, boundaries, cmap, label, vmin=vmin, vmax=vmax)
+        _add_scalebar_north(ax, bounds)
+        _add_locator_inset(ax, citywide_bounds, bounds)
+        ax.set_title(window["label"], loc="left", fontsize=8)
+        fig.suptitle(f"{n_cells:,} ground cells · {ZOOM_NATIVE_PIXEL_M:.0f} m native pixel", fontsize=6.5)
+
+        aggregation = {
+            "method": "streamed mean per native pixel (never a per-cell scatter)",
+            "pixel_m": ZOOM_NATIVE_PIXEL_M,
+            "grid_shape_rows_cols": [ny, nx],
+            "n_cells_aggregated": n_cells,
+            "window_bounds_epsg31983": list(bounds),
+        }
+        result = _produced_map(fig, fig_id, out_dir, [str(path.relative_to(repo_root))],
+                                aggregation, {metric: cmap}, {"resolution_method": resolution["method"]})
+        result["window"] = window_meta
+        result["pixel_m"] = ZOOM_NATIVE_PIXEL_M
+        result["color_limits"] = {"lo": vmin, "hi": vmax}
+        result.update(_png_dims_bytes(out_dir / result["png_path"]))
+        results.append(result)
+    return results
+
+
+def stage_zoom(repo_root: Path, out_dir: Path | None = None,
+                pixel_m: float = ZOOM_TARGET_PIXEL_M) -> dict:
+    """WP-07Z orchestration — own run dir runs/wp07_zoom_<UTC>/, same
+    manifest shape (figures: {id: {...}}) as stage_map. The citywide pair
+    renders first so its bounds and colour limits can be handed to every
+    window render (item 3: 'same colour ramps and limits as the citywide
+    figure')."""
+    repo_root = Path(repo_root)
+    ledger_path = find_latest_ledger(repo_root)
+    ledger = json.loads(ledger_path.read_text())
+    windows = load_zoom_windows(repo_root)
+
+    if out_dir is None:
+        out_dir = repo_root / "runs" / ("wp07_zoom_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    figures: dict = {}
+    citywide, citywide_bounds, color_limits = render_citywide_zoom(ledger, repo_root, out_dir, pixel_m=pixel_m)
+    figures["f6_citywide"] = citywide
+
+    for window in windows:
+        for result in render_zoom_window(repo_root, out_dir, window, citywide_bounds, color_limits):
+            figures[result["id"]] = result
+
+    produced_pngs = [out_dir / f["png_path"] for f in figures.values() if f["status"] == "produced"]
+    if produced_pngs:
+        subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts" / "critic_sheet.py"), "sheet",
+             str(out_dir / "contact.png"), *[str(p) for p in produced_pngs],
+             "--cols", "3", "--tile-w", "420"],
+            check=True,
+        )
+
+    manifest = {
+        "_utc": _utc_now(),
+        "git_sha": _git_sha(repo_root),
+        "ledger_source": str(ledger_path.relative_to(repo_root)),
+        "pixel_m_citywide": pixel_m,
+        "zoom_windows_source": "config/zoom_windows.yaml",
         "figures": figures,
     }
     (out_dir / "figure_manifest.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
@@ -813,15 +1136,31 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-root", default=str(REPO_ROOT))
     ap.add_argument("--out-dir", default=None)
-    ap.add_argument("--target", choices=("figures", "map"), default="figures",
+    ap.add_argument("--target", choices=("figures", "map", "zoom"), default="figures",
                      help="'figures' (default, unchanged): f1-f4 into runs/wp07_figures_<UTC>/. "
-                          "'map': WP-07M f5/f5b into runs/wp07_map_<UTC>/ (docs/wp07_map_spec.md).")
+                          "'map': WP-07M f5/f5b into runs/wp07_map_<UTC>/ (docs/wp07_map_spec.md). "
+                          "'zoom': WP-07Z citywide pair + per-window renders into "
+                          "runs/wp07_zoom_<UTC>/ (docs/wp07_zoom_spec.md).")
+    ap.add_argument("--pixel-m", type=float, default=None,
+                     help="Output pixel size in metres. '--target map': overrides f5's default "
+                          "auto-sizing (~span/1024 px) when set; omit to leave map's behaviour "
+                          "unchanged. '--target zoom': the citywide pair's pixel size (default "
+                          f"{ZOOM_TARGET_PIXEL_M:g} m); window renders always use the native "
+                          f"{ZOOM_NATIVE_PIXEL_M:g} m cell regardless of this flag. Ignored for "
+                          "'--target figures'.")
     args = ap.parse_args()
     repo_root = Path(args.repo_root)
     out_dir = Path(args.out_dir) if args.out_dir else None
-    stager = stage_map if args.target == "map" else stage_all
-    label = "map figures" if args.target == "map" else "figures"
-    manifest = stager(repo_root, out_dir)
+    if args.target == "map":
+        manifest = stage_map(repo_root, out_dir, pixel_m=args.pixel_m)
+        label = "map figures"
+    elif args.target == "zoom":
+        pixel_m = args.pixel_m if args.pixel_m is not None else ZOOM_TARGET_PIXEL_M
+        manifest = stage_zoom(repo_root, out_dir, pixel_m=pixel_m)
+        label = "zoom figures"
+    else:
+        manifest = stage_all(repo_root, out_dir)
+        label = "figures"
     n_produced = sum(1 for f in manifest["figures"].values() if f["status"] == "produced")
     print(f"Staged {n_produced}/{len(manifest['figures'])} {label}.")
     return 0

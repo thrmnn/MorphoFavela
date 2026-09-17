@@ -429,3 +429,215 @@ def test_stage_map_writes_its_own_manifest_and_contact_sheet(tmp_path, ledger):
         assert f["release_class"] == "withheld"
         assert f["red_line"] == "L1"
     assert (out_dir / "contact.png").exists()
+
+
+# ---------------------------------------------------------------------------
+# WP-07Z (docs/wp07_zoom_spec.md): the high-resolution citywide pair +
+# per-window zoom extracts. Own run family (runs/wp07_zoom_<UTC>/), same
+# withheld/L1 discipline as f5/f5b. Window identity comes only from
+# config/zoom_windows.yaml (never a typed name); an unresolvable source
+# yields missing_boundary, never a guessed extent.
+# ---------------------------------------------------------------------------
+
+def _write_synthetic_zoom_windows(repo_root: Path, extra: list[dict] | None = None) -> None:
+    windows = [
+        {"id": "vidigal", "label": "Vidigal", "source": "favela_boundary:Vidigal", "pad_m": 0.1},
+        {"id": "rocinha", "label": "Rocinha", "source": "favela_boundary:Rocinha", "pad_m": 0.1},
+        {"id": "ipanema", "label": "Ipanema", "source": "bairro:Ipanema", "pad_m": 0.1},
+    ]
+    if extra:
+        windows.extend(extra)
+    cfg_dir = repo_root / "config"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    (cfg_dir / "zoom_windows.yaml").write_text(
+        __import__("yaml").safe_dump({"windows": windows}, allow_unicode=True))
+
+
+def test_load_zoom_windows_reads_the_real_config_five_favelas_plus_ipanema():
+    windows = figs.load_zoom_windows(ROOT)
+    ids = {w["id"] for w in windows}
+    assert ids == {"vidigal", "rocinha", "complexo_do_alemao", "mare", "riodaspedras", "ipanema"}
+    ipanema = next(w for w in windows if w["id"] == "ipanema")
+    assert ipanema["source"] == "bairro:Ipanema"
+    for slug, display in ledger_mod.FAVELAS.items():
+        w = next(w for w in windows if w["id"] == slug)
+        assert w["source"] == f"favela_boundary:{display}"
+
+
+def test_resolve_window_boundary_matches_a_known_favela(tmp_path):
+    repo_root = tmp_path / "repo"
+    _write_synthetic_favela_shapefile(repo_root)
+    window = {"id": "vidigal", "label": "Vidigal", "source": "favela_boundary:Vidigal", "pad_m": 1.0}
+    resolution = figs.resolve_window_boundary(window, repo_root)
+    assert resolution["status"] == "resolved"
+    assert len(resolution["boundary"]) > 0
+
+
+def test_resolve_window_boundary_unknown_name_never_guesses(tmp_path):
+    repo_root = tmp_path / "repo"
+    _write_synthetic_favela_shapefile(repo_root)
+    window = {"id": "nowhere", "label": "Nowhere", "source": "favela_boundary:Not A Real Place", "pad_m": 1.0}
+    resolution = figs.resolve_window_boundary(window, repo_root)
+    assert resolution["status"] == "missing_boundary"
+    assert "reason" in resolution and resolution["reason"]
+    assert "input_needed" in resolution and resolution["input_needed"]
+    assert "boundary" not in resolution and "bbox" not in resolution
+
+
+def test_resolve_window_boundary_bairro_source_is_always_missing_boundary(tmp_path):
+    repo_root = tmp_path / "repo_empty"
+    window = {"id": "ipanema", "label": "Ipanema", "source": "bairro:Ipanema", "pad_m": 1.0}
+    resolution = figs.resolve_window_boundary(window, repo_root)
+    assert resolution["status"] == "missing_boundary"
+    assert "bairro" in resolution["reason"].lower()
+
+
+def test_resolve_window_boundary_unrecognised_source_is_missing_boundary(tmp_path):
+    window = {"id": "x", "label": "X", "source": "nonsense:Foo", "pad_m": 1.0}
+    resolution = figs.resolve_window_boundary(window, tmp_path)
+    assert resolution["status"] == "missing_boundary"
+
+
+def test_stage_zoom_writes_its_own_manifest_all_rows_withheld_L1(tmp_path, ledger):
+    repo_root = tmp_path / "repo"
+    _write_synthetic_map_parquet(repo_root, n=6000)
+    _write_synthetic_favela_shapefile(repo_root)
+    _write_synthetic_zoom_windows(repo_root, extra=[
+        {"id": "unresolvable", "label": "Unresolvable Place", "source": "favela_boundary:Not Real", "pad_m": 0.1},
+    ])
+    ledger_src = figs.find_latest_ledger(ROOT)
+    ledger_dst = repo_root / "runs" / ledger_src.parent.name
+    ledger_dst.mkdir(parents=True, exist_ok=True)
+    (ledger_dst / "ledger.json").write_text(ledger_src.read_text())
+
+    out_dir = tmp_path / "wp07_zoom_out"
+    manifest = figs.stage_zoom(repo_root, out_dir=out_dir, pixel_m=0.05)
+
+    assert (out_dir / "figure_manifest.json").exists()
+    figures = manifest["figures"]
+    assert "f6_citywide" in figures
+    assert figures["f6_citywide"]["status"] == "produced"
+
+    for wid in ("vidigal", "rocinha"):
+        for suffix in ("svf", "kwh"):
+            fid = f"f6_zoom_{wid}_{suffix}"
+            assert fid in figures, fid
+            assert figures[fid]["status"] == "produced"
+            assert (out_dir / figures[fid]["png_path"]).exists()
+
+    for suffix in ("svf", "kwh"):
+        fid = f"f6_zoom_ipanema_{suffix}"
+        assert figures[fid]["status"] == "skipped"
+        assert figures[fid]["resolution"]["status"] == "missing_boundary"
+        fid2 = f"f6_zoom_unresolvable_{suffix}"
+        assert figures[fid2]["status"] == "skipped"
+        assert figures[fid2]["resolution"]["status"] == "missing_boundary"
+
+    for fid, f in figures.items():
+        assert f.get("release_class") == "withheld", f"{fid}: not withheld"
+        assert f.get("red_line") == "L1", f"{fid}: not L1"
+
+    assert (out_dir / "contact.png").exists()
+
+
+def test_stage_zoom_windows_share_the_citywide_colour_limits(tmp_path, ledger):
+    repo_root = tmp_path / "repo"
+    _write_synthetic_map_parquet(repo_root, n=6000)
+    _write_synthetic_favela_shapefile(repo_root)
+    _write_synthetic_zoom_windows(repo_root)
+    ledger_src = figs.find_latest_ledger(ROOT)
+    ledger_dst = repo_root / "runs" / ledger_src.parent.name
+    ledger_dst.mkdir(parents=True, exist_ok=True)
+    (ledger_dst / "ledger.json").write_text(ledger_src.read_text())
+
+    out_dir = tmp_path / "wp07_zoom_out"
+    manifest = figs.stage_zoom(repo_root, out_dir=out_dir, pixel_m=0.05)
+    figures = manifest["figures"]
+    citywide_limits = figures["f6_citywide"]["color_limits"]
+    for wid in ("vidigal", "rocinha"):
+        for metric, suffix in (("svf", "svf"), ("kwh_m2", "kwh")):
+            row = figures[f"f6_zoom_{wid}_{suffix}"]
+            assert row["color_limits"] == {"lo": citywide_limits[metric][0], "hi": citywide_limits[metric][1]}
+
+
+def test_stage_zoom_never_pairs_a_favela_window_with_a_non_favela_window(tmp_path, ledger):
+    """The hard boundary carried over from WP-07M: no figure or manifest row
+    ever names two different windows, and no favela-vs-formal quantity."""
+    repo_root = tmp_path / "repo"
+    _write_synthetic_map_parquet(repo_root, n=6000)
+    _write_synthetic_favela_shapefile(repo_root)
+    _write_synthetic_zoom_windows(repo_root)
+    ledger_src = figs.find_latest_ledger(ROOT)
+    ledger_dst = repo_root / "runs" / ledger_src.parent.name
+    ledger_dst.mkdir(parents=True, exist_ok=True)
+    (ledger_dst / "ledger.json").write_text(ledger_src.read_text())
+
+    out_dir = tmp_path / "wp07_zoom_out"
+    manifest = figs.stage_zoom(repo_root, out_dir=out_dir, pixel_m=0.05)
+    figures = manifest["figures"]
+
+    window_ids = {w["id"] for w in figs.load_zoom_windows(repo_root)}
+    for fid, f in figures.items():
+        if fid == "f6_citywide":
+            continue
+        window = f.get("window")
+        assert window is not None and window["id"] in window_ids
+        # exactly one window id named in this row's own id
+        others = window_ids - {window["id"]}
+        assert not any(f"_{other}_" in fid or fid.endswith(f"_{other}") for other in others)
+
+    banned = ("formal", "non_favela", "deficit", "difference", "ratio")
+    blob = json.dumps(manifest).lower()
+    for token in banned:
+        assert token not in blob, f"manifest carries banned token {token!r}"
+    for fid, f in figures.items():
+        if f["status"] != "produced":
+            continue
+        raw_svg = (out_dir / f["svg_path"]).read_text().lower()
+        for token in banned:
+            assert token not in raw_svg, f"{fid}: SVG carries banned token {token!r}"
+
+
+def test_stage_zoom_manifest_banned_tokens_absent(tmp_path, ledger):
+    import lint_p1_tokens as lt
+    importlib.reload(lt)
+
+    repo_root = tmp_path / "repo"
+    _write_synthetic_map_parquet(repo_root, n=6000)
+    _write_synthetic_favela_shapefile(repo_root)
+    _write_synthetic_zoom_windows(repo_root)
+    ledger_src = figs.find_latest_ledger(ROOT)
+    ledger_dst = repo_root / "runs" / ledger_src.parent.name
+    ledger_dst.mkdir(parents=True, exist_ok=True)
+    (ledger_dst / "ledger.json").write_text(ledger_src.read_text())
+
+    out_dir = tmp_path / "wp07_zoom_out"
+    manifest = figs.stage_zoom(repo_root, out_dir=out_dir, pixel_m=0.05)
+
+    hits = lt._scan_lines(json.dumps(manifest).split("\n"), "figure_manifest.json")
+    assert not hits, hits
+    for fid, f in manifest["figures"].items():
+        if f["status"] != "produced":
+            continue
+        raw = (out_dir / f["svg_path"]).read_text()
+        text = figs._svg_text_content(raw)
+        hits = lt._scan_lines(text.split("\n"), fid)
+        assert not hits, hits
+
+
+def test_render_f5_pixel_m_override_changes_aggregation_but_default_is_unchanged(tmp_path, ledger):
+    repo_root = tmp_path / "repo"
+    _write_synthetic_map_parquet(repo_root, n=4000)
+    _write_synthetic_favela_shapefile(repo_root)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    default_result = figs.render_f5(ledger, repo_root, out_dir)
+    assert default_result["status"] == "produced"
+    default_pixel_m = default_result["aggregation"]["pixel_m"]
+
+    out_dir2 = tmp_path / "out2"
+    out_dir2.mkdir()
+    explicit_result = figs.render_f5(ledger, repo_root, out_dir2, pixel_m=0.05)
+    assert explicit_result["aggregation"]["pixel_m"] == 0.05
+    assert explicit_result["aggregation"]["pixel_m"] != default_pixel_m
