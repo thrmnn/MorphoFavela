@@ -17,12 +17,14 @@ import html
 import json
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+import audit_hub_graph  # the same reachability walk backs outputs/_hub/map.html
 from hubkit import (
     badge,
     breadcrumb,
@@ -207,6 +209,185 @@ HEADLINE_FIGS = [
 ]
 
 
+# ── Work packages — learned from the ledger, never hand-typed (HUBWP Ph.2) ──
+# The ledger's own `_meta.runs_of_record` map is the source of truth for which
+# runs are "of record" and what their ids are (docs/hub_wp_structure_spec.md).
+# WP_RUN_ORDER/WP_TASK_ID/WP_LABEL are category labels this project already
+# uses everywhere (WP-02, WP-04, ... in specs/tasks.json) — not run ids, not
+# measured values — so declaring them here to fix display order + which
+# tasks.json id backs each card's title does not violate "never type a
+# number/run id/path that exists in a file"; every id, UTC, status and number
+# on the cards below is read from ledger.json / the run's own manifest.
+WP_RUN_ORDER = ["wp02_crossref", "wp04", "wp05", "g3", "wp06"]
+WP_TASK_ID = {
+    "wp02_crossref": "WP02", "wp04": "WP04", "wp05": "WP05FULL",
+    "g3": "G3CARD", "wp06": "WP06",
+}
+WP_LABEL = {
+    "wp02_crossref": "WP-02", "wp04": "WP-04", "wp05": "WP-05",
+    "g3": "G3", "wp06": "WP-06",
+}
+BRISAVERSE_TASKS = Path.home() / "SCL" / "SCR" / "brisaverse" / "shared" / "facts" / "tasks.json"
+
+
+def _latest_ledger_path() -> Path | None:
+    hits = sorted(ROOT.glob("runs/wp07_ledger_*/ledger.json"))
+    return hits[-1] if hits else None
+
+
+def _tasks_titles() -> dict:
+    """{task id: title} from brisaverse/shared/facts/tasks.json, read not
+    written. Empty dict (cards degrade to the manifest-only description) if
+    the sibling repo isn't checked out on this machine."""
+    if not BRISAVERSE_TASKS.exists():
+        return {}
+    try:
+        tasks = json.loads(BRISAVERSE_TASKS.read_text()).get("tasks", [])
+    except (json.JSONDecodeError, OSError):
+        return {}
+    return {t["id"]: t.get("title", "") for t in tasks if "id" in t}
+
+
+def _entries_for_run(entries: dict, run_id: str) -> dict:
+    return {eid: e for eid, e in entries.items()
+            if e.get("source", {}).get("run_id") == run_id}
+
+
+def _fmt_num(v) -> str:
+    if isinstance(v, bool):
+        return str(v)
+    if isinstance(v, float):
+        return f"{v:.4g}"
+    return str(v)
+
+
+def _headline_sample(run_entries: dict, k: int = 6) -> list:
+    """Up to `k` entries spread evenly across the sorted id list — a
+    deterministic, data-driven sample (never a hand-picked id) so every run's
+    card shows real, spread-out headline numbers instead of always the same
+    alphabetically-first handful."""
+    ids = sorted(run_entries)
+    if len(ids) <= k:
+        chosen = ids
+    else:
+        step = len(ids) / k
+        chosen = [ids[int(i * step)] for i in range(k)]
+    return [(eid, run_entries[eid]["value"], run_entries[eid].get("unit", ""))
+            for eid in chosen]
+
+
+def _run_utc(run_dir: Path, run_entries: dict) -> str:
+    for name in ("manifest.json", "summary.json"):
+        f = run_dir / name
+        if f.exists():
+            try:
+                utc = json.loads(f.read_text()).get("_utc")
+            except (json.JSONDecodeError, OSError):
+                utc = None
+            if utc:
+                return utc
+    return next((e["source"]["run_utc"] for e in run_entries.values()), "")
+
+
+WP_REPORTS_DIR = "wp_reports"  # never name this (or a segment of it) "runs" —
+# build_mirror_manifest()/_is_withheld() blanket-forbids that exact path
+# segment anywhere under outputs/_hub/ as a per-cell-layer guard (L1), and a
+# root-absolute href into runs/ would otherwise auto-mirror to exactly that
+# segment. So every run report is copied/rendered explicitly into this
+# repo-owned, already-"outputs/"-prefixed directory instead.
+
+
+def _copy_report_file(src: Path, run_name: str) -> str:
+    dst = DOCS / WP_REPORTS_DIR / f"{run_name}__{src.name}"
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if not dst.exists() or dst.stat().st_mtime < src.stat().st_mtime:
+        shutil.copy2(src, dst)
+    return f"/outputs/_hub/docs/{WP_REPORTS_DIR}/{dst.name}"
+
+
+def _run_report_link(run_dir: Path, prov) -> tuple:
+    """(filename, href) for the run's own report: its first *.md (rendered to
+    HTML like any other doc, so it reads like the rest of the hub) if one
+    exists, else summary.json, else the largest non-manifest *.json, else
+    manifest.json — discovered by glob, never a hand-typed filename."""
+    mds = sorted(run_dir.glob("*.md"))
+    if mds:
+        src = mds[0]
+        out = DOCS / WP_REPORTS_DIR / f"{run_dir.name}__{src.stem}.html"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        back = breadcrumb([("← Project hub", "../../index.html"), (src.stem, None)])
+        render_doc_page(src, out, crumb=back, provenance=prov,
+                        base=_doc_base(src), root=ROOT, mirror_dir=None)
+        return src.name, f"/outputs/_hub/docs/{WP_REPORTS_DIR}/{run_dir.name}__{src.stem}.html"
+    summary = run_dir / "summary.json"
+    if summary.exists():
+        return "summary.json", _copy_report_file(summary, run_dir.name)
+    others = sorted(p for p in run_dir.glob("*.json") if p.name != "manifest.json")
+    if others:
+        return others[0].name, _copy_report_file(others[0], run_dir.name)
+    manifest = run_dir / "manifest.json"
+    if manifest.exists():
+        return "manifest.json", _copy_report_file(manifest, run_dir.name)
+    return run_dir.name, None
+
+
+def _wp_gate_note(meta: dict, run_id: str, run_entries: dict, ledger_path: Path) -> str:
+    """What this run feeds downstream — read from the ledger's own _meta
+    pointers (definition_of_record, engine_acceptance_source) plus the plain
+    fact that it feeds this ledger, never an invented claim."""
+    prefixes = {eid.split(".", 1)[0] for eid in run_entries}
+    parts = []
+    for k, v in meta.get("definition_of_record", {}).items():
+        if k.split(".", 1)[0] in prefixes:
+            parts.append(f"definition of record: {v}")
+    eas = meta.get("engine_acceptance_source", "")
+    if run_id and run_id in eas:
+        parts.append(f"engine acceptance source: {eas}")
+    parts.append(f"feeds {ledger_path.relative_to(ROOT)} ({len(run_entries)} numbers)")
+    return " · ".join(parts)
+
+
+def work_packages_section(prov):
+    """One card per run of record, in C′ causal order, sourced entirely from
+    the ledger's own `_meta.runs_of_record` map (docs/hub_wp_structure_spec.md
+    Ph.2 item 1) — never a hand-typed run id or number."""
+    ledger_path = _latest_ledger_path()
+    if ledger_path is None:
+        return ""
+    ledger = json.loads(ledger_path.read_text())
+    meta = ledger.get("_meta", {})
+    runs_of_record = meta.get("runs_of_record", {})
+    entries = ledger.get("entries", {})
+    titles = _tasks_titles()
+
+    cards = []
+    for key in WP_RUN_ORDER:
+        run_id = runs_of_record.get(key)
+        if not run_id:
+            continue
+        run_dir = ROOT / "runs" / run_id
+        if not run_dir.exists():
+            continue
+        run_entries = _entries_for_run(entries, run_id)
+        label = WP_LABEL.get(key, key)
+        title = titles.get(WP_TASK_ID.get(key, ""), "")
+        status = next((e.get("status") for e in run_entries.values()), ledger.get("status", ""))
+        utc = _run_utc(run_dir, run_entries)
+        report_name, report_href = _run_report_link(run_dir, prov)
+        nums = _headline_sample(run_entries)
+        nums_txt = " · ".join(f"{eid}={_fmt_num(v)}{(' ' + u) if u else ''}"
+                              for eid, v, u in nums)
+        desc = title or f"{len(run_entries)} ledger numbers sourced from this run."
+        if nums_txt:
+            desc += f" Headline: {nums_txt}."
+        meta_txt = (f"{run_id} · {utc} · status: {status} · report: {report_name} · "
+                    f"{_wp_gate_note(meta, run_id, run_entries, ledger_path)}")
+        cards.append(card(f"{label} — run of record", desc, report_href,
+                          meta=meta_txt, kind="ok", badge_label=label, new_tab=False))
+    return section("Work packages — runs of record (C′ causal order)", cards,
+                   anchor="work-packages")
+
+
 def headline_section(prov):
     """Hero: the headline figure(s) as zoomable image cards, deep-linked to their
     captioned place in the signature gallery."""
@@ -373,9 +554,9 @@ def build_callout(prov):
     ]
     items = "".join(_render_latest_item(n, u, d, date=date)
                     for date, n, u, d in latest if _latest_target_exists(u))
-    wq = ('<p class="more"><a href="/outputs/_hub/docs/work_queue.html">'
+    wq = ('<nav class="more"><a href="/outputs/_hub/docs/work_queue.html">'
           '📋 Full work queue →</a> <span class="gloss">what is in progress, '
-          'queued, and gated.</span></p>'
+          'queued, and gated.</span></nav>'
           if (ROOT / "docs/work_queue.md").exists() else "")
     heading = "Latest" if wq else "Latest results"
     glossary = (
@@ -926,6 +1107,60 @@ def health_section(prov):
     return section("Planetary health — exposure pathways", [c], anchor="health")
 
 
+def _latest_wp07_figures_dir() -> Path | None:
+    hits = sorted(ROOT.glob("runs/wp07_figures_*"))
+    return hits[-1] if hits else None
+
+
+def write_staged_figures_page(prov):
+    """The WP07B staged C′ figures, discovered from the latest
+    runs/wp07_figures_<UTC>/figure_manifest.json and existence-gated per PNG
+    (docs/hub_wp_structure_spec.md Ph.2 item 2) — degrades to (None, None)
+    wherever the figure images (gitignored) haven't been generated in this
+    checkout. Nothing here is promoted: this is the PI's staging view: each
+    card shows the run's own *proposed* release class, never an asserted one,
+    and links through to the promotion review pack. Returns (url, thumb)."""
+    run_dir = _latest_wp07_figures_dir()
+    if run_dir is None:
+        return None, None
+    manifest_path = run_dir / "figure_manifest.json"
+    if not manifest_path.exists():
+        return None, None
+    figures = json.loads(manifest_path.read_text()).get("figures", {})
+    cards, thumb = [], None
+    for fig_id in sorted(figures):
+        fig = figures[fig_id]
+        png = fig.get("png_path")
+        if not png or not (run_dir / png).exists():
+            continue
+        img_url = "/" + str((run_dir / png).relative_to(ROOT))
+        thumb = thumb or img_url
+        n_used = len(fig.get("ledger_ids_used", []))
+        cards.append(card(
+            fig_id.replace("_", " "),
+            f"Staged C′ figure · status {fig.get('status', '?')} · proposed "
+            f"release class {fig.get('release_class_proposed', '?')} (not "
+            f"promoted — awaiting the ethics gate + the PI's "
+            f"wp07_figure_promotion decision) · {n_used} ledger numbers "
+            f"behind it.",
+            img_url, img=img_url, kind="amber", badge_label="Staged",
+            meta=f"{run_dir.name} · {fig_id}", **_img_attrs(img_url)))
+    if not cards:
+        return None, None
+    crumb = breadcrumb([("← Project hub", "../index.html"), ("WP-07 staged figures", None)])
+    body = ('<p class="lead">Staged candidates from the latest WP-07 figure run — '
+            'not promoted. See the '
+            '<a href="review/index.html">promotion review pack</a> for the numbers, '
+            'methodology and validation behind them.</p>'
+            + section("Staged figures", cards, anchor="staged-figures"))
+    out = OUT / "wp07_staged" / "index.html"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(_relativize(page(
+        "WP-07 staged figures", badge("amber", f"{len(cards)} staged · not promoted"),
+        body, crumb=crumb, provenance=prov), out.parent))
+    return "/outputs/_hub/wp07_staged/index.html", thumb
+
+
 def deliverables_section(prov):
     cards = []
     brief = ROOT / "outputs/_hub/mare_review/mare_morphology_brief_v2.pdf"
@@ -956,6 +1191,25 @@ def deliverables_section(prov):
                           "Canonical typeset PDF; large file, opens in a new tab.",
                           "/docs/technical_report/technical_report.pdf", kind="info",
                           badge_label=f"PDF · {mb} MB"))
+    review_index = OUT / "wp07_staged" / "review" / "index.html"
+    if review_index.exists():
+        cards.append(card(
+            "WP-07 promotion review pack",
+            "The numbers behind every staged figure (the ledger), the "
+            "methodology, and the validation/sensitivity results that bound "
+            "the claims — nine pages, read in order. Nothing here is "
+            "promoted; the decision itself is wp07_figure_promotion on /ops.",
+            "wp07_staged/review/index.html", kind="info", badge_label="Review pack",
+            meta="generated by scripts/build_review_pack.py", new_tab=False))
+    sf_url, sf_thumb = write_staged_figures_page(prov)
+    if sf_url:
+        cards.append(card(
+            "WP-07 staged figures",
+            "The C′ figure candidates behind the ledger's headline numbers — "
+            "staged for review, not promoted.",
+            sf_url, img=sf_thumb, kind="amber", badge_label="Staged",
+            meta="generated from the latest runs/wp07_figures_<UTC>/figure_manifest.json",
+            new_tab=False, **(_img_attrs(sf_thumb) if sf_thumb else {})))
     return section("Deliverables", cards, anchor="deliverables")
 
 
@@ -1010,8 +1264,9 @@ def build_mirror_manifest(out_dir: Path, root: Path) -> list[str]:
         targets += re.findall(r"zoom\('([^']+)'", text)
         for t in targets:
             base, _, _frag = t.partition("#")
-            if not base or base.startswith(("http:", "https:", "mailto:")):
-                continue
+            if not base or base.startswith(("http:", "https:", "mailto:", "//")):
+                continue  # "//" = protocol-relative external (e.g. pandoc's
+                          # html5shiv CDN boilerplate in the review-pack pages)
             assert not base.startswith("/"), (
                 f"root-absolute target leaked into {html_file}: {base}")
             abspath = (html_file.parent / base).resolve()
@@ -1026,6 +1281,71 @@ def build_mirror_manifest(out_dir: Path, root: Path) -> list[str]:
     for ref in refs:
         assert not _is_withheld(ref), f"withheld per-cell layer referenced by hub: {ref}"
     return sorted(segments)
+
+
+def _group_for(rel_parts: tuple) -> str:
+    """Which map.html group a page belongs to: top level, or its first path
+    segment under outputs/_hub/ (docs, wp07_staged, prints, ...)."""
+    return rel_parts[0] if len(rel_parts) > 1 else "(top level)"
+
+
+def write_map_page(prov):
+    """Site map, generated from the exact same walk scripts/audit_hub_graph.py
+    performs (docs/hub_wp_structure_spec.md Ph.2 item 3) — imported, not
+    reimplemented, so the map can never drift from what the gate actually
+    checked. Must be called after every other page (incl. index.html, with
+    its nav link to this one) has been written, so the walk sees the real
+    tree; must itself be written before build_mirror_manifest runs."""
+    result = audit_hub_graph.audit(OUT)
+    groups: dict = {}
+    for p, d in result.depth.items():
+        rel = p.relative_to(OUT)
+        groups.setdefault(_group_for(rel.parts), []).append((d, rel))
+
+    body_parts = [
+        f'<p class="lead">{len(result.depth)} pages reachable from the index, '
+        f'walked breadth-first over card/nav links — the same walk '
+        f'<code>scripts/audit_hub_graph.py</code> gates on. Regenerated on '
+        f'every hub build, so this can never go stale the way a hand-written '
+        f'map would.</p>']
+    for grp in sorted(groups):
+        cards = [
+            card(str(rel), f"depth {d} from the index", str(rel), kind="doc",
+                new_tab=False)
+            for d, rel in sorted(groups[grp])]
+        body_parts.append(section(f"{grp} ({len(cards)} pages)", cards,
+                                  anchor=f"map-{_slug_ascii(grp)}"))
+
+    problems = []
+    if result.prose_only:
+        problems.append('<p><b>PROSE-ONLY</b> (linked, but never from a card or nav): '
+                        + ", ".join(str(p.relative_to(OUT)) for p in result.prose_only)
+                        + "</p>")
+    if result.orphan:
+        problems.append('<p><b>ORPHAN</b> (no inbound link at all): '
+                        + ", ".join(str(p.relative_to(OUT)) for p in result.orphan)
+                        + "</p>")
+    if result.dangling:
+        problems.append('<p><b>DANGLING LINKS</b>: '
+                        + "; ".join(f"{src.relative_to(OUT)} → {raw}"
+                                    for src, raw in result.dangling)
+                        + "</p>")
+    if problems:
+        body_parts.insert(1, '<div class="callout" style="border-left-color:var(--warn)">'
+                          '<p class="lead">This build is NOT fully reachable — '
+                          '`python3 scripts/audit_hub_graph.py` fails on it:</p>'
+                          + "".join(problems) + "</div>")
+
+    crumb = breadcrumb([("← Project hub", "index.html"), ("Site map", None)])
+    sub = badge("ok", f"{len(result.depth)} reachable") + (
+        " " + badge("warn", f"{len(result.prose_only) + len(result.orphan) + len(result.dangling)} issues")
+        if problems else "")
+    (OUT / "map.html").write_text(_relativize(page(
+        "Site map", sub, "".join(body_parts), crumb=crumb, provenance=prov)))
+
+
+def _slug_ascii(s: str) -> str:
+    return re.sub(r"[^a-z0-9-]+", "-", s.lower()).strip("-") or "group"
 
 
 def main(root: Path | None = None):
@@ -1045,6 +1365,7 @@ def main(root: Path | None = None):
     sections = [
         ("latest", "Latest & work queue", build_callout(prov)),
         ("headline", "Headline result", headline_section(prov)),
+        ("work-packages", "Work packages (runs of record)", work_packages_section(prov)),
         ("deliverables", "Deliverables", deliverables_section(prov)),
         ("ventilation", "Ventilation tendencies (§5.6)", ventilation_section(prov)),
         ("maup", "Grid sensitivity (MAUP)", maup_section(prov)),
@@ -1065,7 +1386,11 @@ def main(root: Path | None = None):
 
     sections = [(a, lbl, h) for a, lbl, h in sections if h]  # degrade-by-existence
     body = "".join(h for _, _, h in sections)
-    sidebar = toc_sections([(a, lbl) for a, lbl, _ in sections])
+    # The map link sits in its own <nav> (not the #-anchor toc) so it is a
+    # real navigable edge to a real page, not an in-page anchor — the same
+    # distinction scripts/audit_hub_graph.py's gate enforces.
+    sidebar = (toc_sections([(a, lbl) for a, lbl, _ in sections])
+              + '<nav class="hubmap"><a href="/outputs/_hub/map.html">🗺 Site map</a></nav>')
 
     n_sites = sum((DASH / s / "index.html").exists() for s in SITE_NAMES)
     # a finding-bearing stat, not a raw glob count of a gitignored dir
@@ -1074,6 +1399,11 @@ def main(root: Path | None = None):
     (OUT / "index.html").write_text(_relativize(
         page("MorphoFavela — project hub", sub, body,
              provenance=prov, sidebar=sidebar)))
+
+    # Generated last, from the same walk the gate performs, over the tree as
+    # it now stands (incl. index.html's own new map nav link) — the map is a
+    # by-product of the check, so it cannot drift from what exists.
+    write_map_page(prov)
 
     manifest = build_mirror_manifest(OUT, ROOT)
     (OUT / "mirror_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")

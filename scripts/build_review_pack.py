@@ -44,7 +44,9 @@ SECTIONS = [
 OUT.mkdir(parents=True, exist_ok=True)
 rows = []
 for title, docs in SECTIONS:
-    rows.append(f"<h2>{html.escape(title)}</h2><ul>")
+    # <nav>, not a bare <ul> — a link outside a real nav/card is PROSE-ONLY to
+    # scripts/audit_hub_graph.py's reachability gate (docs/hub_wp_structure_spec.md).
+    rows.append(f"<h2>{html.escape(title)}</h2><nav><ul>")
     for src, blurb in docs:
         dst = OUT / (src.stem + ".html")
         subprocess.run(["pandoc", str(src), "-f", "gfm", "-t", "html5", "-s",
@@ -52,7 +54,7 @@ for title, docs in SECTIONS:
         rel = src.relative_to(ROOT)
         rows.append(f'<li><a href="{dst.name}">{html.escape(blurb)}</a><br>'
                     f'<small><code>{html.escape(str(rel))}</code></small></li>')
-    rows.append("</ul>")
+    rows.append("</ul></nav>")
 
 index = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
