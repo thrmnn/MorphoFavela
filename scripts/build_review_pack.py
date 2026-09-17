@@ -41,6 +41,50 @@ SECTIONS = [
     ]),
 ]
 
+
+
+# ── Per-work-package results pages, generated from the ledger ─────────────────
+# The PI asked for "the results of WP4 and 6": the cards linked a manifest JSON,
+# which is not a result for a reader. One page per run of record, every entry
+# the ledger attributes to that run, one table with all sites as columns where
+# the id has a site segment. Nothing typed; regenerated with the pack.
+import json, re
+LEDGER = latest("runs/wp07_ledger_*/ledger.json")
+led = json.loads(LEDGER.read_text())
+runs_of_record = led["_meta"].get("runs_of_record", {})
+SITES = ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras", "mare"]
+WP_TITLES = {
+    "wp04": "WP-04 — site decomposition: direct-sun hours and the 2 h floor (Athens Charter 1943, Point 26), ground and street, both reference days",
+    "wp06": "WP-06 — the second axis: geometry-constraint count shares per site",
+    "wp05": "WP-05 — citywide distribution and each favela's percentile position",
+    "g3": "G3 — domain sensitivity across nine grid variants",
+    "wp02": "WP-02 — engine acceptance against the CPU reference",
+}
+wp_pages = []
+for wp, run_id in runs_of_record.items():
+    ents = {k: v for k, v in led["entries"].items() if v.get("source", {}).get("run_id") == run_id}
+    if not ents:
+        continue
+    # rows keyed by the id with the site segment removed, columns = sites
+    table = {}
+    for k, v in ents.items():
+        parts = k.split(".")
+        site = next((s for s in parts if s in SITES), None)
+        key = ".".join(x for x in parts if x != site) if site else k
+        table.setdefault(key, {})[site or "value"] = v["value"]
+    cols = SITES if any(any(s in r for s in SITES) for r in table.values()) else ["value"]
+    md = [f"# {WP_TITLES.get(wp.split('_')[0], wp)}", "",
+          f"Run of record: `{run_id}` · {len(ents)} ledger entries, every one `status: final` · ledger `{LEDGER.parent.name}`", "",
+          "| id | " + " | ".join(cols) + " |", "|---|" + "---|" * len(cols)]
+    for key in sorted(table):
+        vals = [table[key].get(c) for c in cols]
+        fmt = lambda x: "" if x is None else (f"{x:.4g}" if isinstance(x, float) else str(x))
+        md.append(f"| `{key}` | " + " | ".join(fmt(x) for x in vals) + " |")
+    src = OUT / f"_results_{wp}.md"; src.write_text("\n".join(md) + "\n")
+    wp_pages.append((src, f"{wp.upper()} results — {len(ents)} numbers, all sites, from run {run_id}"))
+SECTIONS.insert(0, ("Results by work package", wp_pages))
+
+
 OUT.mkdir(parents=True, exist_ok=True)
 rows = []
 for title, docs in SECTIONS:
