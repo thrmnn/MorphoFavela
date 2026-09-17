@@ -1,0 +1,178 @@
+{
+ "_utc": "2026-09-17T13:06:21Z",
+ "git_sha": "9eb9b08",
+ "run_manifest": "manifest.json",
+ "figures": {
+  "t2_map_vidigal": {
+   "id": "t2_map_vidigal",
+   "status": "produced",
+   "svg_path": "t2_map_vidigal.svg",
+   "png_path": "t2_map_vidigal.png",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "reference_day": "winter_solstice",
+   "raster": {
+    "bbox_row_col": [
+     700,
+     1229,
+     700,
+     1884
+    ],
+    "shape": [
+     530,
+     1185
+    ],
+    "pitch_m": "the WP-04 run-of-record's own cell_m (read from its manifest.json, never typed)",
+    "fill_fraction": {
+     "terrain": 0.22488496138842448,
+     "real": 0.22488496138842448,
+     "diff": 0.22488496138842448
+    },
+    "min_fill_fraction_floor": 0.03,
+    "boundary_stroke_px": 0.6,
+    "boundary_stroke_source": "src.brisa_solar.wp07_figures.BOUNDARY_STROKE_PX (reused, never a second convention)"
+   },
+   "source_cells_parquet": "vidigal/cells.parquet"
+  },
+  "t2_map_rocinha": {
+   "id": "t2_map_rocinha",
+   "status": "produced",
+   "svg_path": "t2_map_rocinha.svg",
+   "png_path": "t2_map_rocinha.png",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "reference_day": "winter_solstice",
+   "raster": {
+    "bbox_row_col": [
+     700,
+     1800,
+     700,
+     2292
+    ],
+    "shape": [
+     1101,
+     1593
+    ],
+    "pitch_m": "the WP-04 run-of-record's own cell_m (read from its manifest.json, never typed)",
+    "fill_fraction": {
+     "terrain": 0.1771544786369522,
+     "real": 0.1771544786369522,
+     "diff": 0.1771544786369522
+    },
+    "min_fill_fraction_floor": 0.03,
+    "boundary_stroke_px": 0.6,
+    "boundary_stroke_source": "src.brisa_solar.wp07_figures.BOUNDARY_STROKE_PX (reused, never a second convention)"
+   },
+   "source_cells_parquet": "rocinha/cells.parquet"
+  },
+  "t2_map_complexo_do_alemao": {
+   "id": "t2_map_complexo_do_alemao",
+   "status": "produced",
+   "svg_path": "t2_map_complexo_do_alemao.svg",
+   "png_path": "t2_map_complexo_do_alemao.png",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "reference_day": "winter_solstice",
+   "raster": {
+    "bbox_row_col": [
+     700,
+     2328,
+     700,
+     3743
+    ],
+    "shape": [
+     1629,
+     3044
+    ],
+    "pitch_m": "the WP-04 run-of-record's own cell_m (read from its manifest.json, never typed)",
+    "fill_fraction": {
+     "terrain": 0.17061328467518347,
+     "real": 0.17061328467518347,
+     "diff": 0.17061328467518347
+    },
+    "min_fill_fraction_floor": 0.03,
+    "boundary_stroke_px": 0.6,
+    "boundary_stroke_source": "src.brisa_solar.wp07_figures.BOUNDARY_STROKE_PX (reused, never a second convention)"
+   },
+   "source_cells_parquet": "complexo_do_alemao/cells.parquet"
+  },
+  "t2_map_riodaspedras": {
+   "id": "t2_map_riodaspedras",
+   "status": "produced",
+   "svg_path": "t2_map_riodaspedras.svg",
+   "png_path": "t2_map_riodaspedras.png",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "reference_day": "winter_solstice",
+   "raster": {
+    "bbox_row_col": [
+     700,
+     2151,
+     700,
+     2009
+    ],
+    "shape": [
+     1452,
+     1310
+    ],
+    "pitch_m": "the WP-04 run-of-record's own cell_m (read from its manifest.json, never typed)",
+    "fill_fraction": {
+     "terrain": 0.08814428111791055,
+     "real": 0.08814428111791055,
+     "diff": 0.08814428111791055
+    },
+    "min_fill_fraction_floor": 0.03,
+    "boundary_stroke_px": 0.6,
+    "boundary_stroke_source": "src.brisa_solar.wp07_figures.BOUNDARY_STROKE_PX (reused, never a second convention)"
+   },
+   "source_cells_parquet": "riodaspedras/cells.parquet"
+  },
+  "t2_map_mare": {
+   "id": "t2_map_mare",
+   "status": "produced",
+   "svg_path": "t2_map_mare.svg",
+   "png_path": "t2_map_mare.png",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "reference_day": "winter_solstice",
+   "raster": {
+    "bbox_row_col": [
+     2028,
+     3960,
+     1594,
+     2542
+    ],
+    "shape": [
+     1933,
+     949
+    ],
+    "pitch_m": "the WP-04 run-of-record's own cell_m (read from its manifest.json, never typed)",
+    "fill_fraction": {
+     "terrain": 0.1407411728085817,
+     "real": 0.1407411728085817,
+     "diff": 0.1407411728085817
+    },
+    "min_fill_fraction_floor": 0.03,
+    "boundary_stroke_px": 0.6,
+    "boundary_stroke_source": "src.brisa_solar.wp07_figures.BOUNDARY_STROKE_PX (reused, never a second convention)"
+   },
+   "source_cells_parquet": "mare/cells.parquet"
+  },
+  "t1_terrain_buildings_split": {
+   "id": "t1_terrain_buildings_split",
+   "status": "produced",
+   "svg_path": "t1_terrain_buildings_split.svg",
+   "png_path": "t1_terrain_buildings_split.png",
+   "release_class": "publishable-candidate",
+   "attribution_choice_headline": "terrain_first",
+   "reference_day": "winter_solstice",
+   "sources": [
+    "vidigal/summary.json",
+    "rocinha/summary.json",
+    "complexo_do_alemao/summary.json",
+    "riodaspedras/summary.json",
+    "mare/summary.json"
+   ]
+  }
+ }
+}

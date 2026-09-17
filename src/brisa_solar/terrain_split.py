@@ -514,19 +514,40 @@ def render_split_bars(summaries: dict[str, dict], label: str, out_dir: Path) -> 
             ax.text(th + bh / 2, i, f"{bh / tot * 100:.0f}%", va="center", ha="center",
                     color="white", fontsize=8)
         ax.text(tot + max(total_h) * 0.03, i, FAVELAS[order[i]], va="center", fontsize=8.5, color="#333")
+    # The reverse ordering belongs ON the figure, not only in the manifest. The two
+    # orderings disagree by up to 62 percentage points, so a single stacked bar read
+    # alone invites exactly the wrong conclusion about what drives the loss.
+    bf_boundary = []
+    for sl in order:
+        bf = summaries[sl][label].get("buildings_first_sensitivity") or {}
+        tl = bf.get("terrain_loss_h_mean")
+        bl = bf.get("buildings_loss_h_mean")
+        bf_boundary.append(None if tl is None or bl is None else (bl + tl) - tl)
+    drawn = False
+    for i, (b, tot) in enumerate(zip(bf_boundary, total_h)):
+        if b is None or tot <= 0:
+            continue
+        ax.plot([b, b], [i - 0.42, i + 0.42], color="#1c1a17", lw=1.6,
+                solid_capstyle="butt", zorder=5,
+                label="terrain/buildings split under the reverse ordering" if not drawn else None)
+        drawn = True
     ax.set_yticks(y)
     ax.set_yticklabels([])
     ax.set_xlabel(f"Sun-hours lost vs open-flat terrain, {label.replace('_', ' ')} (h, mean per site)")
-    ax.set_title("Terrain- vs buildings-driven sun-hours lost — C′ study favelas", fontsize=11, fontweight="bold")
-    ax.legend(loc="lower right", fontsize=9, frameon=False)
+    ax.set_title("Terrain- vs buildings-driven sun-hours lost — C′ study favelas",
+                 fontsize=11, fontweight="bold", pad=30)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 1.02), ncol=3,
+              fontsize=8.5, frameon=False, handlelength=1.6, columnspacing=1.6)
     ax.margins(x=0.32)
     ax.spines[["top", "right"]].set_visible(False)
     fig.text(
         0.5, -0.02,
         f"Attribution ordering: terrain-first ({ATTRIBUTION_CHOICE}) — terrain assessed against the open-flat "
-        "reference first, buildings the residual against terrain-only. The reverse (buildings-first) ordering "
-        "gives different numbers (interaction between slope shading and building shading is not additive) and "
-        "is reported in this run's manifest.json, not shown here.",
+        "reference first, buildings the residual against terrain-only. Slope shading and building shading are "
+        "not additive, so the reverse (buildings-first) ordering splits the same total very differently — the "
+        "vertical rule marks where it puts the boundary. Treat the split as a range, not a value; the totals "
+        "are ordering-independent, the shares are not. Both orderings are in this run's per-site summary.json.",
         ha="center", va="top", fontsize=6.8, color="#555", wrap=True,
     )
     fig.tight_layout()

@@ -21,12 +21,18 @@ ROOT = Path(__file__).resolve().parents[1]
 THUMB_W = 1100
 
 
+def _image_dir(run_dir: Path) -> Path:
+    """Where a run keeps its PNGs. Most write them beside the manifest; some use
+    a figures/ subdirectory. Resolve it rather than assuming either."""
+    return run_dir / "figures" if (run_dir / "figures").is_dir() else run_dir
+
+
 def _latest(glob: str) -> Path | None:
     """Newest run holding images. Returns None rather than raising: a family
     still being produced should leave its section out, not break the folder."""
     hits = sorted(d for d in (ROOT / "runs").glob(glob)
                   if d.is_dir() and (d / "figure_manifest.json").is_file()
-                  and list(d.glob("*.png")))
+                  and list(_image_dir(d).glob("*.png")))
     return hits[-1] if hits else None
 
 
@@ -212,11 +218,12 @@ def build(out_root: Path) -> dict:
             continue
         classes = _manifest_classes(run_dir)
         wps = _wp_by_figure(run_dir)
+        img_dir = _image_dir(run_dir)
         for name in sorted(classes):
             meta = dict(classes[name])
             if name in wps:
                 meta["work_package"] = wps[name]
-            _copy(run_dir / name, out_root / slug, meta, entries, slug)
+            _copy(img_dir / name, out_root / slug, meta, entries, slug)
         sections.append({"slug": slug, "title": title, "blurb": blurb,
                          "provenance": str(run_dir.relative_to(ROOT))})
 
