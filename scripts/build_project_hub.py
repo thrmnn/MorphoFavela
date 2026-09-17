@@ -1409,15 +1409,21 @@ def figure_review_section(prov):
         if not n:
             continue
         anchor_id = "s-" + sec["slug"].replace("/", "-").replace("__", "-")
-        withheld = any(e.get("release_class") == "withheld"
-                       for e in manifest["files"] if e["section"] == sec["slug"])
+        classes = [e.get("release_class") for e in manifest["files"]
+                   if e["section"] == sec["slug"]]
+        n_withheld = sum(1 for c in classes if c == "withheld")
+        withheld = n_withheld > 0
+        # "Withheld" on a card whose bar chart is publishable would be a lie in the
+        # safe direction, but still a lie — say which it is.
+        badge_txt = ("Withheld · L1" if n_withheld == len(classes)
+                     else f"{n_withheld} of {len(classes)} withheld · L1") if withheld else None
         cards.append(card(
             sec["title"],
             f"{n} figure{'s' if n != 1 else ''}. " + _strip_tags(sec.get("blurb", "")),
             f"{base}/index.html#{anchor_id}",
             img=thumbs.get(sec["slug"]),
             kind="terra" if withheld else "info",
-            badge_label="Withheld · L1" if withheld else None,
+            badge_label=badge_txt,
             meta=sec.get("provenance", ""), new_tab=False))
     return section("Figure review", cards, anchor="figure-review")
 

@@ -490,6 +490,21 @@ def _save_figure(fig, fig_id: str, out_dir: Path) -> tuple[str, str]:
     return svg_path.name, png_path.name
 
 
+def _max_share_gap(summaries: dict[str, dict], label: str) -> float:
+    """Largest disagreement between the two attribution orderings, in percentage
+    points of terrain share — computed from the run, never written by hand."""
+    gaps = []
+    for site in summaries.values():
+        blk = site.get(label) or {}
+        bf = blk.get("buildings_first_sensitivity") or {}
+        tl, bl = bf.get("terrain_loss_h_mean"), bf.get("buildings_loss_h_mean")
+        tf = (blk.get("terrain_first") or {}).get("terrain_share")
+        if tl is None or bl is None or tf is None or (tl + bl) == 0:
+            continue
+        gaps.append(abs(tf * 100 - 100 * tl / (tl + bl)))
+    return max(gaps) if gaps else 0.0
+
+
 def render_split_bars(summaries: dict[str, dict], label: str, out_dir: Path) -> dict:
     """Horizontal stacked bars, terrain-first split, fixed site order (never
     ranked by value — same convention wp07_figures.FIGURE_SITE_ORDER uses).
@@ -515,14 +530,18 @@ def render_split_bars(summaries: dict[str, dict], label: str, out_dir: Path) -> 
                     color="white", fontsize=8)
         ax.text(tot + max(total_h) * 0.03, i, FAVELAS[order[i]], va="center", fontsize=8.5, color="#333")
     # The reverse ordering belongs ON the figure, not only in the manifest. The two
-    # orderings disagree by up to 62 percentage points, so a single stacked bar read
-    # alone invites exactly the wrong conclusion about what drives the loss.
+    # orderings disagree materially on the shares, so a single stacked bar read alone
+    # overstates how settled the split is. The rule marks where the buildings-first
+    # ordering ends TERRAIN, matching this bar's terrain-on-the-left layout — an
+    # earlier version drew it at the buildings length, i.e. the wrong end entirely
+    # (caught by the guardian read, 2026-09-17). The magnitude is computed below,
+    # never typed: a wrong "62 points" sat in this comment for exactly that reason.
     bf_boundary = []
     for sl in order:
         bf = summaries[sl][label].get("buildings_first_sensitivity") or {}
         tl = bf.get("terrain_loss_h_mean")
         bl = bf.get("buildings_loss_h_mean")
-        bf_boundary.append(None if tl is None or bl is None else (bl + tl) - tl)
+        bf_boundary.append(None if tl is None or bl is None else tl)
     drawn = False
     for i, (b, tot) in enumerate(zip(bf_boundary, total_h)):
         if b is None or tot <= 0:
@@ -543,7 +562,8 @@ def render_split_bars(summaries: dict[str, dict], label: str, out_dir: Path) -> 
     ax.spines[["top", "right"]].set_visible(False)
     fig.text(
         0.5, -0.02,
-        f"Attribution ordering: terrain-first ({ATTRIBUTION_CHOICE}) — terrain assessed against the open-flat "
+        f"Attribution ordering: terrain-first ({ATTRIBUTION_CHOICE}); the two orderings put terrain's share "
+        f"up to {_max_share_gap(summaries, label):.0f} percentage points apart. Terrain is assessed against the open-flat "
         "reference first, buildings the residual against terrain-only. Slope shading and building shading are "
         "not additive, so the reverse (buildings-first) ordering splits the same total very differently — the "
         "vertical rule marks where it puts the boundary. Treat the split as a range, not a value; the totals "

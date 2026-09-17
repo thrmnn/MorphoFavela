@@ -282,7 +282,8 @@ a{color:inherit}.nolink{padding:9px 11px;font-size:13px}
 .toc ul{list-style:none;margin:8px 0 16px;padding:0;display:grid;
 grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:2px 18px}
 .toc.cols ul,.toc ul.cols{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
-.toc li{font-size:13px;padding:2px 0}
+.toc li{font-size:13px;padding:2px 0;min-width:0;overflow-wrap:anywhere}
+.toc li .dim{color:var(--dim)}
 .toc .n{color:var(--dim);font-variant-numeric:tabular-nums}
 h2.divider{margin-top:56px;padding-top:22px;border-top:2px solid var(--line)}
 </style>
@@ -307,7 +308,9 @@ the paper or shared figures without your own tap.</p></header>"""]
         parts.append(f'<strong>Everything else on disk</strong> '
                      f'<span class="n">{n} figures in {len(other)} folders</span><ul class="cols">')
         for s in other:
-            parts.append(f'<li><a href="#{anchor(s["slug"])}">{s["title"]}</a> '
+            head, _, tail = s["title"].rpartition("/")
+            shown = (f'<span class="dim">{head}/</span>{tail}' if head else tail)
+            parts.append(f'<li><a href="#{anchor(s["slug"])}">{shown}</a> '
                          f'<span class="n">{len(by_section[s["slug"]])}</span></li>')
         parts.append('</ul>')
     parts.append('</nav>')
