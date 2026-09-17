@@ -324,18 +324,23 @@ def _write_synthetic_favela_shapefile(repo_root: Path) -> None:
     gdf.to_file(out_dir / "Favelas_Limit_2019.shp")
 
 
+SYNTHETIC_FRAME_PITCH_M = 0.1
+
+
 def _write_synthetic_map_parquet(repo_root: Path, n: int = 6000, seed: int = 0) -> None:
     rng = np.random.default_rng(seed)
     df = pd.DataFrame({
         "svf": rng.uniform(0.0, 1.0, n).astype("float32"),
         "kwh_m2": rng.uniform(0.0, 1800.0, n).astype("float32"),
-        "x": rng.uniform(0.0, 5.0, n),
-        "y": rng.uniform(0.0, 5.0, n),
+        "x": rng.integers(0, 50, n) * SYNTHETIC_FRAME_PITCH_M,
+        "y": rng.integers(0, 50, n) * SYNTHETIC_FRAME_PITCH_M,
         "favela_id": rng.integers(0, 2, n).astype("int32"),
     })
     run_dir = repo_root / "runs" / ledger_mod.RUN_OF_RECORD["wp05"]
     run_dir.mkdir(parents=True, exist_ok=True)
     df.to_parquet(run_dir / "wp05_full.parquet")
+    (run_dir / "frame_diagnostics.json").write_text(
+        json.dumps({"grid_cell_m": SYNTHETIC_FRAME_PITCH_M}))
 
 
 def test_f5_skips_cleanly_when_citywide_parquet_absent(tmp_path, ledger):
@@ -641,3 +646,43 @@ def test_render_f5_pixel_m_override_changes_aggregation_but_default_is_unchanged
     explicit_result = figs.render_f5(ledger, repo_root, out_dir2, pixel_m=0.05)
     assert explicit_result["aggregation"]["pixel_m"] == 0.05
     assert explicit_result["aggregation"]["pixel_m"] != default_pixel_m
+
+
+# ---------------------------------------------------------------------------
+# The blank-raster class (2026-09-17): a window rendered at a finer pixel than
+# the run-of-record's sampling lattice is ~99% NaN and looks empty, and no gate
+# caught it. The pitch is read from the run, never typed.
+# ---------------------------------------------------------------------------
+
+def test_citywide_frame_pitch_is_read_from_the_run_not_typed(tmp_path):
+    repo_root = tmp_path / "repo"
+    _write_synthetic_map_parquet(repo_root)
+    assert figs.citywide_frame_pitch_m(repo_root) == SYNTHETIC_FRAME_PITCH_M
+
+
+def test_citywide_frame_pitch_raises_rather_than_guessing(tmp_path):
+    with pytest.raises((FileNotFoundError, KeyError, ValueError)):
+        figs.citywide_frame_pitch_m(tmp_path / "no_such_repo")
+
+
+def test_zoom_windows_render_at_the_frame_pitch_and_are_not_blank(tmp_path, ledger):
+    repo_root = tmp_path / "repo"
+    _write_synthetic_map_parquet(repo_root, n=6000)
+    _write_synthetic_favela_shapefile(repo_root)
+    _write_synthetic_zoom_windows(repo_root)
+    ledger_src = figs.find_latest_ledger(ROOT)
+    ledger_dst = repo_root / "runs" / ledger_src.parent.name
+    ledger_dst.mkdir(parents=True, exist_ok=True)
+    (ledger_dst / "ledger.json").write_text(ledger_src.read_text())
+
+    manifest = figs.stage_zoom(repo_root, out_dir=tmp_path / "out", pixel_m=0.5)
+    produced = [f for f in manifest["figures"].values()
+                if f["status"] == "produced" and f["id"] != "f6_citywide"]
+    assert produced, "no window rendered"
+    for row in produced:
+        agg = row["aggregation"]
+        assert agg["pixel_m"] == SYNTHETIC_FRAME_PITCH_M, row["id"]
+        assert "frame_diagnostics" in agg["pixel_m_source"], row["id"]
+        ny, nx = agg["grid_shape_rows_cols"]
+        fill = agg["n_cells_aggregated"] / float(ny * nx)
+        assert fill > 0.05, f"{row['id']}: raster only {fill:.2%} filled — the blank-render class"

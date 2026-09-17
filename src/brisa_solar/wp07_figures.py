@@ -169,6 +169,14 @@ def citywide_parquet_path(repo_root: Path) -> Path:
     return Path(repo_root) / "runs" / RUN_OF_RECORD["wp05"] / "wp05_full.parquet"
 
 
+def citywide_frame_pitch_m(repo_root: Path) -> float:
+    """The spacing of the run-of-record's sampling lattice, read from its own
+    frame diagnostics. Raises rather than guessing: a window rendered at the
+    wrong pitch is silently blank, which no gate would have caught."""
+    path = Path(repo_root) / "runs" / RUN_OF_RECORD["wp05"] / "frame_diagnostics.json"
+    return float(json.loads(path.read_text())["grid_cell_m"])
+
+
 def site_ground_parquet_path(repo_root: Path, slug: str) -> Path:
     return Path(repo_root) / "runs" / RUN_OF_RECORD["wp04"] / SITE_DIRS[slug] / "ground.parquet"
 
@@ -802,7 +810,10 @@ def stage_map(repo_root: Path, out_dir: Path | None = None, pixel_m: float | Non
 # ---------------------------------------------------------------------------
 
 ZOOM_TARGET_PIXEL_M = 10.0  # the citywide pair's default resolution (item 2)
-ZOOM_NATIVE_PIXEL_M = 1.0   # window renders: the run-of-record's native cell
+# Window renders use the run-of-record's own sampling pitch, read from its
+# frame diagnostics — never the `cell_m` column, which is the per-sample SVF
+# computation resolution (1 m) and not the lattice the frame is drawn on. At
+# 1 m a window raster came out 0.8-1.4% filled, i.e. visually blank (2026-09-17).
 # The citywide pair's point is a PNG a reader can zoom into, so its panels are
 # sized so ~1 output pixel maps to ~1 aggregated grid cell (unlike f5/f5b,
 # whose fixed MAP_TARGET_MAX_PX=1024 is a print-size choice). Both numbers
@@ -1004,6 +1015,7 @@ def render_zoom_window(repo_root: Path, out_dir: Path, window: dict,
     non-favela window in one figure — each call renders exactly one window."""
     repo_root = Path(repo_root)
     path = citywide_parquet_path(repo_root)
+    pitch_m = citywide_frame_pitch_m(repo_root)
     wid = window["id"]
     resolution = resolve_window_boundary(window, repo_root)
     window_meta = {"id": wid, "label": window["label"], "source": window["source"],
@@ -1035,7 +1047,7 @@ def render_zoom_window(repo_root: Path, out_dir: Path, window: dict,
             continue
 
         bounds = _window_bounds(resolution, window["pad_m"])
-        means, (nx, ny) = _streaming_pixel_mean(path, [metric], ZOOM_NATIVE_PIXEL_M, bounds)
+        means, (nx, ny) = _streaming_pixel_mean(path, [metric], pitch_m, bounds)
         boundary_gdf = resolution.get("boundary")
         boundaries = {wid: boundary_gdf} if boundary_gdf is not None else {}
         vmin, vmax = color_limits[metric]
@@ -1046,11 +1058,12 @@ def render_zoom_window(repo_root: Path, out_dir: Path, window: dict,
         _add_scalebar_north(ax, bounds)
         _add_locator_inset(ax, citywide_bounds, bounds)
         ax.set_title(window["label"], loc="left", fontsize=8)
-        fig.suptitle(f"{n_cells:,} ground cells · {ZOOM_NATIVE_PIXEL_M:.0f} m native pixel", fontsize=6.5)
+        fig.suptitle(f"{n_cells:,} ground cells · {pitch_m:g} m sampling pitch", fontsize=6.5)
 
         aggregation = {
             "method": "streamed mean per native pixel (never a per-cell scatter)",
-            "pixel_m": ZOOM_NATIVE_PIXEL_M,
+            "pixel_m": pitch_m,
+            "pixel_m_source": "runs/<wp05 run of record>/frame_diagnostics.json#/grid_cell_m",
             "grid_shape_rows_cols": [ny, nx],
             "n_cells_aggregated": n_cells,
             "window_bounds_epsg31983": list(bounds),
@@ -1058,7 +1071,7 @@ def render_zoom_window(repo_root: Path, out_dir: Path, window: dict,
         result = _produced_map(fig, fig_id, out_dir, [str(path.relative_to(repo_root))],
                                 aggregation, {metric: cmap}, {"resolution_method": resolution["method"]})
         result["window"] = window_meta
-        result["pixel_m"] = ZOOM_NATIVE_PIXEL_M
+        result["pixel_m"] = pitch_m
         result["color_limits"] = {"lo": vmin, "hi": vmax}
         result.update(_png_dims_bytes(out_dir / result["png_path"]))
         results.append(result)
@@ -1161,7 +1174,7 @@ def main() -> int:
                           "auto-sizing (~span/1024 px) when set; omit to leave map's behaviour "
                           "unchanged. '--target zoom': the citywide pair's pixel size (default "
                           f"{ZOOM_TARGET_PIXEL_M:g} m); window renders always use the native "
-                          f"{ZOOM_NATIVE_PIXEL_M:g} m cell regardless of this flag. Ignored for "
+                          "sampling pitch of the run of record regardless of this flag. Ignored for "
                           "'--target figures'.")
     args = ap.parse_args()
     repo_root = Path(args.repo_root)
