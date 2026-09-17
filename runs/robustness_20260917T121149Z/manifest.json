@@ -1,0 +1,17 @@
+{
+ "_utc": "2026-09-17T12:11:49Z",
+ "git_sha": "e00add6",
+ "main_root_used": "/home/theo/SCL/SCR/MorphoFavela",
+ "ledger_used": {
+  "path": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+  "run_utc": "2026-09-17T04:59:10Z",
+  "n_entries": 437,
+  "status": "final"
+ },
+ "sky": {
+  "patches": 145
+ },
+ "n_sources_read": 15,
+ "staged_only": true,
+ "spec": "docs/robustness_dossier_spec.md"
+}

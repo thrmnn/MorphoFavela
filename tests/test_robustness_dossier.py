@@ -36,6 +36,24 @@ def dossier():
     return brd.build_dossier(MAIN_ROOT)
 
 
+def _newest_persisted_run() -> Path | None:
+    hits = sorted(d for d in (MAIN_ROOT / "runs").glob("robustness_*")
+                  if (d / "dossier.json").is_file())
+    return hits[-1] if hits else None
+
+
+@pytest.fixture(scope="module")
+def persisted_dossier():
+    """The dossier ON DISK — the artifact a reviewer actually opens. The
+    `dossier` fixture rebuilds in memory, so it can only ever agree with
+    itself: a value edited by hand in the committed dossier.json would pass
+    every assertion written against it (refuted 2026-09-17)."""
+    run_dir = _newest_persisted_run()
+    if run_dir is None:
+        pytest.skip("no runs/robustness_*/dossier.json on disk")
+    return run_dir, json.loads((run_dir / "dossier.json").read_text())
+
+
 def _all_rows(dossier):
     for sec_name, sec in dossier["sections"].items():
         for r in sec.get("rows", []):
@@ -303,3 +321,56 @@ def test_write_dossier_writes_json_md_manifest_and_is_token_clean(tmp_path):
 def test_robustness_output_globs_are_covered_by_lint_p1_tokens():
     assert "runs/robustness_*/**/*.md" in lt.P1_SOURCE_GLOBS
     assert "runs/robustness_*/**/*.json" in lt.P1_SOURCE_GLOBS
+
+
+# ---------------------------------------------------------------------------
+# The persisted artifact, not a fresh rebuild (2026-09-17). An adversarial
+# verifier found that nothing in this file ever opened the committed
+# dossier.json, so hand-editing a value in it would break no test.
+# ---------------------------------------------------------------------------
+
+def test_persisted_dossier_rows_match_their_cited_sources(persisted_dossier):
+    run_dir, doc = persisted_dossier
+    file_cache: dict[str, object] = {}
+
+    def _read_json(file_str: str):
+        if file_str not in file_cache:
+            file_cache[file_str] = json.loads(
+                brd._resolve_cited_path(MAIN_ROOT, file_str).read_text())
+        return file_cache[file_str]
+
+    checked = 0
+    for sec_name, r in _all_rows(doc):
+        src = r["source"]
+        if "computed_from" in src:
+            inputs = [resolve_pointer(_read_json(f["file"]), f["json_pointer"])
+                      for f in src["computed_from"]]
+            expected = brd.COMPUTE_FNS[src["fn"]](*inputs)
+        elif "text_substring_of" in src:
+            text = brd._resolve_cited_path(MAIN_ROOT, src["text_substring_of"]).read_text()
+            assert r["value"] in text, f"{run_dir.name}/{sec_name}/{r['id']}"
+            checked += 1
+            continue
+        else:
+            expected = resolve_pointer(_read_json(src["file"]), src["json_pointer"])
+        assert _values_equal(expected, r["value"]), (
+            f"{run_dir.name} {sec_name}/{r['id']}: source = {expected!r} != "
+            f"persisted value {r['value']!r} — the committed artifact drifted from its source"
+        )
+        checked += 1
+    assert checked > 50, f"only {checked} rows re-resolved from the persisted dossier"
+
+
+def test_persisted_markdown_prints_the_persisted_json_values(persisted_dossier):
+    """dossier.md is what a reviewer reads; it must not disagree with dossier.json."""
+    run_dir, doc = persisted_dossier
+    md = (run_dir / "dossier.md").read_text()
+    missing = []
+    for _sec, r in _all_rows(doc):
+        v = r["value"]
+        if not isinstance(v, (int, float)) or isinstance(v, bool):
+            continue
+        rendered = f"{v:,}" if isinstance(v, int) else None
+        if rendered is not None and rendered not in md and str(v) not in md:
+            missing.append((r["id"], v))
+    assert not missing, f"{run_dir.name}: integer rows absent from dossier.md: {missing[:5]}"

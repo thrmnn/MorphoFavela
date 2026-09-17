@@ -1,0 +1,1013 @@
+{
+ "_utc": "2026-09-17T12:11:49Z",
+ "status": "staged",
+ "_meta": {
+  "purpose": "Reviewer robustness dossier for P1 v2 — assembly by code of every acceptance and sensitivity number already final in a run of record. Nothing recomputed; nothing new claimed. STAGED — no promotion to shared/figures, papers/, or anything the public hub serves.",
+  "spec": "docs/robustness_dossier_spec.md",
+  "main_root_used": "/home/theo/SCL/SCR/MorphoFavela",
+  "ledger_used": {
+   "path": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+   "run_utc": "2026-09-17T04:59:10Z",
+   "n_entries": 437,
+   "status": "final"
+  },
+  "sky_patches": 145,
+  "l1_contrast_check": {
+   "flagged_ids": [],
+   "clear": true
+  },
+  "sources_read": [
+   "/home/theo/SCL/SCR/brisaverse/papers/p1-nature-cities/proposal/cprime_reframe_plan.md",
+   "data/epw/epw_inventory.json",
+   "docs/ventaxis_canonical.md",
+   "runs/wp02_horizon_20260914T195630Z/crossref_diagnostic.json",
+   "runs/wp03_tls_20260915T205422Z/registration.json",
+   "runs/wp03_tls_20260915T215720Z/g2_result_v3.json",
+   "runs/wp03_tls_20260915T215720Z/report_v3.md",
+   "runs/wp04_sites_20260914T230606Z/complexo_do_alemao/summary.json",
+   "runs/wp04_sites_20260914T230606Z/maré/summary.json",
+   "runs/wp04_sites_20260914T230606Z/riodaspedras/summary.json",
+   "runs/wp04_sites_20260914T230606Z/rocinha/summary.json",
+   "runs/wp04_sites_20260914T230606Z/vidigal/summary.json",
+   "runs/wp04f2_facade_2026-09-15T07:50:07Z/crossref.json",
+   "runs/wp05_full_20260914T215419Z/manifest.json",
+   "runs/wp07_ledger_20260917T045910Z/ledger.json"
+  ]
+ },
+ "sections": {
+  "engine_acceptance": {
+   "narrative": "Engine acceptance rests on two independent legs: (1) three analytic self-checks against closed-form geometry (no data dependency), and (2) a measured cross-reference against the CPU raycaster's street SVF at Rio das Pedras (16,905 reference points, of which 16,018 are matched by the nearest-sampling variant the cited statistics come from). Both are read here, not recomputed.",
+   "rows": [
+    {
+     "id": "engine.crossref.r",
+     "value": 0.9945170429856711,
+     "unit": "dimensionless",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/engine.crossref.r/value"
+     }
+    },
+    {
+     "id": "engine.crossref.median_abs_delta",
+     "value": 0.013715461132694826,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/engine.crossref.median_abs_delta/value"
+     }
+    },
+    {
+     "id": "engine.crossref.p95_abs_delta",
+     "value": 0.047382805278647175,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/engine.crossref.p95_abs_delta/value"
+     }
+    },
+    {
+     "id": "engine.crossref.n_reference_points",
+     "value": 16905,
+     "unit": "points",
+     "source": {
+      "file": "runs/wp02_horizon_20260914T195630Z/crossref_diagnostic.json",
+      "json_pointer": "/n_points"
+     }
+    },
+    {
+     "id": "engine.crossref.n",
+     "value": 16018,
+     "unit": "points",
+     "source": {
+      "file": "runs/wp02_horizon_20260914T195630Z/crossref_diagnostic.json",
+      "json_pointer": "/variants/A_nearest_sampling/n"
+     }
+    }
+   ],
+   "chosen_variant_quote": {
+    "id": "engine.crossref.chosen_variant_quote",
+    "value": "runs/wp02_horizon_20260914T195630Z/crossref_diagnostic.json#/variants/A_nearest_sampling — chosen because march_sampling='nearest' is the nearest-cell march named in docs/wp07_ledger_spec.md (r≈0.995), not the bilinear-march baseline in the same file (r≈0.988) nor the sibling run's single-site crossref (also bilinear-march, r≈0.988).",
+    "unit": "text",
+    "source": {
+     "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+     "json_pointer": "/_meta/engine_acceptance_source"
+    }
+   },
+   "analytic_self_checks": [
+    {
+     "name": "unobstructed identity",
+     "predicate": "flat surface -> every patch visible -> sky.svf == 1 for every observer",
+     "defined_in": "docs/wp02_horizon_engine_spec.md#Acceptance (item 1)",
+     "verified_by": "tests/test_wp02_horizon.py::test_flat_surface_identity"
+    },
+    {
+     "name": "infinite canyon, exact mask",
+     "predicate": "analytic closed form 'visible iff dz/|dy| > 2H/W' must equal the engine's mask patch-for-patch for H/W in {0.25, 0.5, 1, 2, 3}, allowing only patches within one step's angular quantum of the horizon",
+     "defined_in": "docs/wp02_horizon_engine_spec.md#Acceptance (item 2)",
+     "verified_by": "tests/test_wp02_horizon.py::test_infinite_canyon_exact_mask"
+    },
+    {
+     "name": "isolated wall shadow",
+     "predicate": "one wall of height H at distance D: blocked patches are exactly those with alt < atan(H/D) inside the wall's azimuth span",
+     "defined_in": "docs/wp02_horizon_engine_spec.md#Acceptance (item 3)",
+     "verified_by": "tests/test_wp02_horizon.py::test_isolated_wall_shadow"
+    }
+   ]
+  },
+  "domain_sensitivity_g3": {
+   "narrative": "Across the 9 grid variants swept, each favela's SVF-percentile position moves — by 1.27 to 8.28 percentile points (min-max spread across the five favelas) — but the ORDERING of the five favelas does not: rank_invariant_across_grid = True (every one of the 9 variants yields the same descending order). Position moves with the grid; ordering does not.",
+   "n_grid_variants": 9,
+   "rows": [
+    {
+     "id": "g3.spread.complexo_do_alemao.svf_percentile",
+     "value": 8.28344065240968,
+     "unit": "percentile points",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/derived/spread/complexo_do_alemao/svf_percentile_spread_max_minus_min"
+     }
+    },
+    {
+     "id": "g3.spread.mare.svf_percentile",
+     "value": 3.5686443125085026,
+     "unit": "percentile points",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/derived/spread/mare/svf_percentile_spread_max_minus_min"
+     }
+    },
+    {
+     "id": "g3.spread.riodaspedras.svf_percentile",
+     "value": 3.194585321618936,
+     "unit": "percentile points",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/derived/spread/riodaspedras/svf_percentile_spread_max_minus_min"
+     }
+    },
+    {
+     "id": "g3.spread.rocinha.svf_percentile",
+     "value": 1.2748779477221284,
+     "unit": "percentile points",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/derived/spread/rocinha/svf_percentile_spread_max_minus_min"
+     }
+    },
+    {
+     "id": "g3.spread.vidigal.svf_percentile",
+     "value": 4.280405763708185,
+     "unit": "percentile points",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/derived/spread/vidigal/svf_percentile_spread_max_minus_min"
+     }
+    },
+    {
+     "id": "g3.rank_under_locked_domain",
+     "value": [
+      "complexo_do_alemao",
+      "rocinha",
+      "vidigal",
+      "riodaspedras",
+      "mare"
+     ],
+     "unit": "ordered list",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/derived/rank_under_locked_domain"
+     }
+    },
+    {
+     "id": "g3.rank_invariant_across_grid",
+     "value": true,
+     "unit": "boolean",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/derived/rank_invariant_across_grid"
+     }
+    },
+    {
+     "id": "g3.spread.min_across_favelas",
+     "value": 1.2748779477221284,
+     "unit": "percentile points",
+     "source": {
+      "computed_from": [
+       {
+        "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+        "json_pointer": "/derived/spread/vidigal/svf_percentile_spread_max_minus_min"
+       },
+       {
+        "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+        "json_pointer": "/derived/spread/rocinha/svf_percentile_spread_max_minus_min"
+       },
+       {
+        "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+        "json_pointer": "/derived/spread/complexo_do_alemao/svf_percentile_spread_max_minus_min"
+       },
+       {
+        "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+        "json_pointer": "/derived/spread/mare/svf_percentile_spread_max_minus_min"
+       },
+       {
+        "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+        "json_pointer": "/derived/spread/riodaspedras/svf_percentile_spread_max_minus_min"
+       }
+      ],
+      "fn": "min"
+     }
+    },
+    {
+     "id": "g3.spread.max_across_favelas",
+     "value": 8.28344065240968,
+     "unit": "percentile points",
+     "source": {
+      "computed_from": [
+       {
+        "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+        "json_pointer": "/derived/spread/vidigal/svf_percentile_spread_max_minus_min"
+       },
+       {
+        "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+        "json_pointer": "/derived/spread/rocinha/svf_percentile_spread_max_minus_min"
+       },
+       {
+        "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+        "json_pointer": "/derived/spread/complexo_do_alemao/svf_percentile_spread_max_minus_min"
+       },
+       {
+        "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+        "json_pointer": "/derived/spread/mare/svf_percentile_spread_max_minus_min"
+       },
+       {
+        "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+        "json_pointer": "/derived/spread/riodaspedras/svf_percentile_spread_max_minus_min"
+       }
+      ],
+      "fn": "max"
+     }
+    }
+   ]
+  },
+  "sky_resolution": {
+   "narrative": "P1_SKY_PATCHES = 145 (imported from src/brisa_solar/constants.py, never typed as a literal in any P1 module — tests/test_p1_sky_resolution_consistency.py enforces this by AST). Scanning every run manifest under the main checkout (97 manifests, 97 carrying a sky.patches field): exactly one resolution appears — [145]. No second resolution exists in any code path feeding a pooled number.",
+   "p1_sky_patches": 145,
+   "n_manifests_scanned": 97,
+   "distinct_patch_counts": [
+    145
+   ],
+   "single_resolution": true,
+   "manifests_by_patch_count": {
+    "145": [
+     "runs/cityhours_full_20260917T041544Z",
+     "runs/cityhours_pilot_20260917T041322Z",
+     "runs/g3_domain_20260915T042927Z",
+     "runs/robustness_20260917T044306Z",
+     "runs/wp02_horizon_20260914T194354Z",
+     "runs/wp02_horizon_20260914T194437Z",
+     "runs/wp02_horizon_20260914T194612Z",
+     "runs/wp02_horizon_20260914T194910Z",
+     "runs/wp02_horizon_20260914T195630Z",
+     "runs/wp02_horizon_20260914T195746Z",
+     "runs/wp02_horizon_20260914T195807Z",
+     "runs/wp02_horizon_20260914T195824Z",
+     "runs/wp02_horizon_20260914T200132Z",
+     "runs/wp02_horizon_20260914T201730Z",
+     "runs/wp02_horizon_20260914T201750Z",
+     "runs/wp02_horizon_20260914T201827Z",
+     "runs/wp02_horizon_20260914T202600Z",
+     "runs/wp02_horizon_20260914T213921Z",
+     "runs/wp02_horizon_20260914T213946Z",
+     "runs/wp02_horizon_20260914T214254Z",
+     "runs/wp02_horizon_20260914T223152Z",
+     "runs/wp02_horizon_20260914T223443Z",
+     "runs/wp02_horizon_20260914T230131Z",
+     "runs/wp02_horizon_20260914T230157Z",
+     "runs/wp02_horizon_20260915T040059Z",
+     "runs/wp02_horizon_20260915T040123Z",
+     "runs/wp02_horizon_20260915T040605Z",
+     "runs/wp02_horizon_20260915T042719Z",
+     "runs/wp02_horizon_20260915T050025Z",
+     "runs/wp02_horizon_20260915T050308Z",
+     "runs/wp02_horizon_20260915T052813Z",
+     "runs/wp02_horizon_20260915T053140Z",
+     "runs/wp02_horizon_20260915T053556Z",
+     "runs/wp02_horizon_20260915T055531Z",
+     "runs/wp02_horizon_20260915T055603Z",
+     "runs/wp02_horizon_20260915T055630Z",
+     "runs/wp02_horizon_20260915T073346Z",
+     "runs/wp02_horizon_20260915T073423Z",
+     "runs/wp02_horizon_20260915T073647Z",
+     "runs/wp02_horizon_20260915T073824Z",
+     "runs/wp02_horizon_20260915T075749Z",
+     "runs/wp02_horizon_20260915T080112Z",
+     "runs/wp02_horizon_20260915T184358Z",
+     "runs/wp02_horizon_20260915T184749Z",
+     "runs/wp02_horizon_20260915T190556Z",
+     "runs/wp02_horizon_20260915T191014Z",
+     "runs/wp02_horizon_20260915T191651Z",
+     "runs/wp02_horizon_20260915T195102Z",
+     "runs/wp02_horizon_20260915T195513Z",
+     "runs/wp02_horizon_20260915T200326Z",
+     "runs/wp02_horizon_20260915T201027Z",
+     "runs/wp02_horizon_20260915T201746Z",
+     "runs/wp02_horizon_20260915T210247Z",
+     "runs/wp02_horizon_20260915T210310Z",
+     "runs/wp02_horizon_20260915T210733Z",
+     "runs/wp02_horizon_20260915T212620Z",
+     "runs/wp02_horizon_20260915T213106Z",
+     "runs/wp02_horizon_20260915T213130Z",
+     "runs/wp02_horizon_20260915T213819Z",
+     "runs/wp02_horizon_20260915T214109Z",
+     "runs/wp02_horizon_20260915T215701Z",
+     "runs/wp02_horizon_20260915T215857Z",
+     "runs/wp02_horizon_20260915T220108Z",
+     "runs/wp02_horizon_20260915T220626Z",
+     "runs/wp02_horizon_20260915T221011Z",
+     "runs/wp02_horizon_20260915T221035Z",
+     "runs/wp02_horizon_20260915T221109Z",
+     "runs/wp02_horizon_20260915T221803Z",
+     "runs/wp02_horizon_20260916T035130Z",
+     "runs/wp02_horizon_20260916T061218Z",
+     "runs/wp02_horizon_20260916T061458Z",
+     "runs/wp02_horizon_20260916T061826Z",
+     "runs/wp02_horizon_20260916T062105Z",
+     "runs/wp02_horizon_20260916T062647Z",
+     "runs/wp02_horizon_20260916T065830Z",
+     "runs/wp02_horizon_20260916T070430Z",
+     "runs/wp02_horizon_20260916T070449Z",
+     "runs/wp02_horizon_20260916T071208Z",
+     "runs/wp02_horizon_20260916T071749Z",
+     "runs/wp02_horizon_20260916T161818Z",
+     "runs/wp02_horizon_20260916T165051Z",
+     "runs/wp02_horizon_20260916T165827Z",
+     "runs/wp02_horizon_20260916T174440Z",
+     "runs/wp02_horizon_20260916T180342Z",
+     "runs/wp02_horizon_20260917T031645Z",
+     "runs/wp02_horizon_20260917T033409Z",
+     "runs/wp02_horizon_20260917T050152Z",
+     "runs/wp03_tls_20260915T205422Z",
+     "runs/wp03_tls_20260915T213422Z",
+     "runs/wp03_tls_20260915T215720Z",
+     "runs/wp04_sites_20260914T230606Z",
+     "runs/wp04_sites_20260915T063553Z",
+     "runs/wp05_full_20260914T215419Z",
+     "runs/wp05_pilot_20260914T202113Z",
+     "runs/wp07_ledger_20260915T184619Z",
+     "runs/wp07_ledger_20260916T164906Z",
+     "runs/wp07_ledger_20260917T045910Z"
+    ]
+   }
+  },
+  "irradiance_input": {
+   "narrative": "Two EPW stations feed P1: Galeão (primary, 1732 kWh/m2/yr) and Santos Dumont (1790 kWh/m2/yr). Santos Dumont reads +3.34% relative to Galeão — computed here from the two annual GHI values, never copied from epw_inventory.json's own _crosscheck field.",
+   "rows": [
+    {
+     "id": "epw.galeao.annual_ghi_kwh_m2",
+     "value": 1732.4,
+     "unit": "kWh/m2",
+     "source": {
+      "file": "data/epw/epw_inventory.json",
+      "json_pointer": "/galeao/annual_ghi_kwh_m2"
+     }
+    },
+    {
+     "id": "epw.santos_dumont.annual_ghi_kwh_m2",
+     "value": 1790.2,
+     "unit": "kWh/m2",
+     "source": {
+      "file": "data/epw/epw_inventory.json",
+      "json_pointer": "/santos_dumont/annual_ghi_kwh_m2"
+     }
+    },
+    {
+     "id": "epw.primary_station",
+     "value": "galeao",
+     "unit": "text",
+     "source": {
+      "file": "data/epw/epw_inventory.json",
+      "json_pointer": "/_meta/primary"
+     }
+    },
+    {
+     "id": "epw.santos_vs_galeao_ghi_pct_diff",
+     "value": 3.336411914107593,
+     "unit": "percent",
+     "source": {
+      "computed_from": [
+       {
+        "file": "data/epw/epw_inventory.json",
+        "json_pointer": "/galeao/annual_ghi_kwh_m2"
+       },
+       {
+        "file": "data/epw/epw_inventory.json",
+        "json_pointer": "/santos_dumont/annual_ghi_kwh_m2"
+       }
+      ],
+      "fn": "pct_diff_b_over_a"
+     }
+    }
+   ]
+  },
+  "second_axis_validity": {
+   "narrative": "Definition of record: docs/ventaxis_canonical.md (VENTAXIS). The second axis is a per-cell checklist count in {0,1,2,3} of three independent geometry predicates (vertical, lateral, directional) — never a weighted continuous index, never a measurement of air exchange itself. Shares below are the fraction of each site's cells at each count, from the wp06.* ledger entries.",
+   "rows": [
+    {
+     "id": "wp06.definition_of_record_quote",
+     "value": "For each built 10 m cell, `n_constraints` is a **checklist count** (an\ninteger in {0, 1, 2, 3}) of how many of three independent geometry\npredicates the cell triggers.",
+     "unit": "text",
+     "source": {
+      "text_substring_of": "docs/ventaxis_canonical.md"
+     }
+    },
+    {
+     "id": "wp06.vidigal.n",
+     "value": 2756,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.vidigal.n/value"
+     }
+    },
+    {
+     "id": "wp06.vidigal.share_n0",
+     "value": 0.20319303338171263,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.vidigal.share_n0/value"
+     }
+    },
+    {
+     "id": "wp06.vidigal.share_n1",
+     "value": 0.39876632801161105,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.vidigal.share_n1/value"
+     }
+    },
+    {
+     "id": "wp06.vidigal.share_n2",
+     "value": 0.32946298984034833,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.vidigal.share_n2/value"
+     }
+    },
+    {
+     "id": "wp06.vidigal.share_n3",
+     "value": 0.068577648766328,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.vidigal.share_n3/value"
+     }
+    },
+    {
+     "id": "wp06.rocinha.n",
+     "value": 8031,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.rocinha.n/value"
+     }
+    },
+    {
+     "id": "wp06.rocinha.share_n0",
+     "value": 0.10496824803884945,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.rocinha.share_n0/value"
+     }
+    },
+    {
+     "id": "wp06.rocinha.share_n1",
+     "value": 0.2958535674262234,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.rocinha.share_n1/value"
+     }
+    },
+    {
+     "id": "wp06.rocinha.share_n2",
+     "value": 0.5300709749719835,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.rocinha.share_n2/value"
+     }
+    },
+    {
+     "id": "wp06.rocinha.share_n3",
+     "value": 0.0691072095629436,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.rocinha.share_n3/value"
+     }
+    },
+    {
+     "id": "wp06.complexo_do_alemao.n",
+     "value": 17768,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.complexo_do_alemao.n/value"
+     }
+    },
+    {
+     "id": "wp06.complexo_do_alemao.share_n0",
+     "value": 0.17379558757316524,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.complexo_do_alemao.share_n0/value"
+     }
+    },
+    {
+     "id": "wp06.complexo_do_alemao.share_n1",
+     "value": 0.3790522287257992,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.complexo_do_alemao.share_n1/value"
+     }
+    },
+    {
+     "id": "wp06.complexo_do_alemao.share_n2",
+     "value": 0.3438766321476812,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.complexo_do_alemao.share_n2/value"
+     }
+    },
+    {
+     "id": "wp06.complexo_do_alemao.share_n3",
+     "value": 0.10327555155335434,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.complexo_do_alemao.share_n3/value"
+     }
+    },
+    {
+     "id": "wp06.riodaspedras.n",
+     "value": 6605,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.riodaspedras.n/value"
+     }
+    },
+    {
+     "id": "wp06.riodaspedras.share_n0",
+     "value": 0.032096896290688876,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.riodaspedras.share_n0/value"
+     }
+    },
+    {
+     "id": "wp06.riodaspedras.share_n1",
+     "value": 0.12566237698713095,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.riodaspedras.share_n1/value"
+     }
+    },
+    {
+     "id": "wp06.riodaspedras.share_n2",
+     "value": 0.2882664647993944,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.riodaspedras.share_n2/value"
+     }
+    },
+    {
+     "id": "wp06.riodaspedras.share_n3",
+     "value": 0.5539742619227858,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.riodaspedras.share_n3/value"
+     }
+    },
+    {
+     "id": "wp06.mare.n",
+     "value": 29229,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.mare.n/value"
+     }
+    },
+    {
+     "id": "wp06.mare.share_n0",
+     "value": 0.09832700400287386,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.mare.share_n0/value"
+     }
+    },
+    {
+     "id": "wp06.mare.share_n1",
+     "value": 0.24325156522631633,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.mare.share_n1/value"
+     }
+    },
+    {
+     "id": "wp06.mare.share_n2",
+     "value": 0.3384994354921482,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.mare.share_n2/value"
+     }
+    },
+    {
+     "id": "wp06.mare.share_n3",
+     "value": 0.3199219952786616,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+      "json_pointer": "/entries/wp06.mare.share_n3/value"
+     }
+    }
+   ]
+  },
+  "ground_truth_g2": {
+   "narrative": "What was compared: TLS-derived DSM vs the 2.5D model's ALS-DTM+footprint surface, in three vertical-clearance classes (<1.5 m, 1.5-3 m, >3 m), for shared-observer-cell SVF and for street/alley points specifically. This is a NEGATIVE result with a confirmed confound, reported as it is: the baseline comparison (variant a, no shared observer elevation) shows essentially no correlation for the <1.5 m class (r ~ 0.015); forcing a SHARED observer elevation (variants e/f) raises that to r >= 0.5 for at least one variant, confirming an observer-elevation confound. Agreement holds only for STREET points in alleys below the 1.5 m height threshold (floor class = '<1.5m', r = 0.504, median |delta SVF| = 0.0501). The open decision this bears on — the 2.5D model's validity floor — is card `g2_validity_floor`. The PI has not ruled; this dossier states the finding and names the open card, and does not resolve it.",
+   "rows": [
+    {
+     "id": "g2.registration.median_delta_m",
+     "value": 1.561149806826549,
+     "unit": "meters",
+     "source": {
+      "file": "runs/wp03_tls_20260915T205422Z/registration.json",
+      "json_pointer": "/median_delta_m"
+     }
+    },
+    {
+     "id": "g2.registration.p95_abs_delta_m",
+     "value": 9.619940685086304,
+     "unit": "meters",
+     "source": {
+      "file": "runs/wp03_tls_20260915T205422Z/registration.json",
+      "json_pointer": "/p95_abs_delta_m"
+     }
+    },
+    {
+     "id": "g2.registration.n",
+     "value": 7384,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp03_tls_20260915T205422Z/registration.json",
+      "json_pointer": "/n"
+     }
+    },
+    {
+     "id": "g2.street.floor_class",
+     "value": "<1.5m",
+     "unit": "text",
+     "source": {
+      "file": "runs/wp03_tls_20260915T215720Z/g2_result_v3.json",
+      "json_pointer": "/street/floor"
+     }
+    },
+    {
+     "id": "g2.street.lt1p5m.r",
+     "value": 0.5044031671435972,
+     "unit": "dimensionless",
+     "source": {
+      "file": "runs/wp03_tls_20260915T215720Z/g2_result_v3.json",
+      "json_pointer": "/street/classes/0/r"
+     }
+    },
+    {
+     "id": "g2.street.lt1p5m.median_abs_delta",
+     "value": 0.050076393706798186,
+     "unit": "fraction (SVF)",
+     "source": {
+      "file": "runs/wp03_tls_20260915T215720Z/g2_result_v3.json",
+      "json_pointer": "/street/classes/0/median_abs_delta"
+     }
+    },
+    {
+     "id": "g2.street.lt1p5m.share_within_tol",
+     "value": 0.6735366859027205,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp03_tls_20260915T215720Z/g2_result_v3.json",
+      "json_pointer": "/street/classes/0/share_within_tol"
+     }
+    },
+    {
+     "id": "g2.street.lt1p5m.n",
+     "value": 1213,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp03_tls_20260915T215720Z/g2_result_v3.json",
+      "json_pointer": "/street/classes/0/n"
+     }
+    },
+    {
+     "id": "g2.confound.baseline_variant_a.lt1p5m.r",
+     "value": 0.01507604543529259,
+     "unit": "dimensionless",
+     "source": {
+      "file": "runs/wp03_tls_20260915T215720Z/g2_result_v3.json",
+      "json_pointer": "/variants/a_dtm_fill_merged/classes/0/r"
+     }
+    },
+    {
+     "id": "g2.confound.shared_elevation_variant_e.lt1p5m.r",
+     "value": 0.18504963809489094,
+     "unit": "dimensionless",
+     "source": {
+      "file": "runs/wp03_tls_20260915T215720Z/g2_result_v3.json",
+      "json_pointer": "/variants/e_shared_obs_z_als_dtm/classes/0/r"
+     }
+    },
+    {
+     "id": "g2.confound.shared_elevation_variant_f.lt1p5m.r",
+     "value": 0.5279777278482671,
+     "unit": "dimensionless",
+     "source": {
+      "file": "runs/wp03_tls_20260915T215720Z/g2_result_v3.json",
+      "json_pointer": "/variants/f_shared_obs_z_smrf_ground/classes/0/r"
+     }
+    },
+    {
+     "id": "g2.verdict_quote",
+     "value": "at least one class in variant (e) or (f) reads r >= 0.5 with the shared observer elevation -- the confound was (at least partly) real; see the per-class table for which class(es) cleared the bar.",
+     "unit": "text",
+     "source": {
+      "text_substring_of": "runs/wp03_tls_20260915T215720Z/report_v3.md"
+     }
+    }
+   ],
+   "open_card": "g2_validity_floor"
+  },
+  "coverage": {
+   "narrative": "Citywide: 8,402,056 cells at 1.0 m (WP-05 full run, exhaustive — every fabric cell, no sampling error). Per-site ground-cell counts below are WP-04's (1 m). The methods epoch table is generated from each input file's own filesystem metadata (last-modified timestamp, size), never typed — per the C' plan §1.6. This is a proxy for acquisition vintage, not a claim about it: no embedded raster datetime tag was found on the citywide DTM (confirmed via gdalinfo), consistent with the C' plan's own note that DTM_RJ.tif's true survey vintage is UNVERIFIED.",
+   "rows": [
+    {
+     "id": "coverage.citywide.n_cells",
+     "value": 8402056,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp05_full_20260914T215419Z/manifest.json",
+      "json_pointer": "/n_cells_consolidated"
+     }
+    },
+    {
+     "id": "coverage.citywide.cell_m",
+     "value": 1.0,
+     "unit": "meters",
+     "source": {
+      "file": "runs/wp05_full_20260914T215419Z/manifest.json",
+      "json_pointer": "/cell_m"
+     }
+    },
+    {
+     "id": "coverage.site.vidigal.ground_n",
+     "value": 141239,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp04_sites_20260914T230606Z/vidigal/summary.json",
+      "json_pointer": "/ground/n"
+     }
+    },
+    {
+     "id": "coverage.site.rocinha.ground_n",
+     "value": 310710,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp04_sites_20260914T230606Z/rocinha/summary.json",
+      "json_pointer": "/ground/n"
+     }
+    },
+    {
+     "id": "coverage.site.complexo_do_alemao.ground_n",
+     "value": 846016,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp04_sites_20260914T230606Z/complexo_do_alemao/summary.json",
+      "json_pointer": "/ground/n"
+     }
+    },
+    {
+     "id": "coverage.site.riodaspedras.ground_n",
+     "value": 167661,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp04_sites_20260914T230606Z/riodaspedras/summary.json",
+      "json_pointer": "/ground/n"
+     }
+    },
+    {
+     "id": "coverage.site.mare.ground_n",
+     "value": 258178,
+     "unit": "count",
+     "source": {
+      "file": "runs/wp04_sites_20260914T230606Z/maré/summary.json",
+      "json_pointer": "/ground/n"
+     }
+    }
+   ],
+   "epoch_table": [
+    {
+     "scope": "citywide",
+     "category": "boundary",
+     "path": "data/RJ/Favelas_Limit_2019.shp",
+     "mtime_utc": "2026-02-11T14:59:50Z",
+     "size_bytes": 1091852
+    },
+    {
+     "scope": "citywide",
+     "category": "footprints",
+     "path": "data/RJ/buildings_RJ_2019_utm.gpkg",
+     "mtime_utc": "2026-09-09T07:33:06Z",
+     "size_bytes": 1197740032
+    },
+    {
+     "scope": "citywide",
+     "category": "dtm",
+     "path": "data/RJ/DTM_RJ.tif",
+     "mtime_utc": "2026-02-19T14:39:00Z",
+     "size_bytes": 425306880
+    },
+    {
+     "scope": "vidigal",
+     "category": "boundary",
+     "path": "data/vidigal/raw/Vidigal_Limit.shp",
+     "mtime_utc": "2026-03-05T18:40:08Z",
+     "size_bytes": 2460
+    },
+    {
+     "scope": "vidigal",
+     "category": "footprints",
+     "path": "data/vidigal/buildings_extended_300m.gpkg",
+     "mtime_utc": "2026-06-14T08:32:35Z",
+     "size_bytes": 2539520
+    },
+    {
+     "scope": "vidigal",
+     "category": "dtm",
+     "path": "data/vidigal/dtm_extended_300m.tif",
+     "mtime_utc": "2026-04-09T19:49:32Z",
+     "size_bytes": 279866
+    },
+    {
+     "scope": "rocinha",
+     "category": "boundary",
+     "path": "data/rocinha/raw/rocinha_boundary.shp",
+     "mtime_utc": "2026-02-19T14:40:53Z",
+     "size_bytes": 9056
+    },
+    {
+     "scope": "rocinha",
+     "category": "footprints",
+     "path": "data/rocinha/buildings_extended_300m.gpkg",
+     "mtime_utc": "2026-06-14T08:32:27Z",
+     "size_bytes": 7704576
+    },
+    {
+     "scope": "rocinha",
+     "category": "dtm",
+     "path": "data/rocinha/dtm_extended_300m.tif",
+     "mtime_utc": "2026-04-09T19:58:53Z",
+     "size_bytes": 624042
+    },
+    {
+     "scope": "complexo_do_alemao",
+     "category": "boundary",
+     "path": "data/complexo_do_alemao/raw/complexo_do_alemao_boundary.shp",
+     "mtime_utc": "2026-03-25T14:12:24Z",
+     "size_bytes": 25756
+    },
+    {
+     "scope": "complexo_do_alemao",
+     "category": "footprints",
+     "path": "data/complexo_do_alemao/buildings_extended_300m.gpkg",
+     "mtime_utc": "2026-04-09T19:53:56Z",
+     "size_bytes": 15843328
+    },
+    {
+     "scope": "complexo_do_alemao",
+     "category": "dtm",
+     "path": "data/complexo_do_alemao/dtm_extended_300m.tif",
+     "mtime_utc": "2026-04-09T19:54:00Z",
+     "size_bytes": 1365701
+    },
+    {
+     "scope": "riodaspedras",
+     "category": "boundary",
+     "path": "data/riodaspedras/raw/riodaspedras_boundary.shp",
+     "mtime_utc": "2026-03-25T14:13:43Z",
+     "size_bytes": 7776
+    },
+    {
+     "scope": "riodaspedras",
+     "category": "footprints",
+     "path": "data/riodaspedras/buildings_extended_300m.gpkg",
+     "mtime_utc": "2026-04-09T19:53:08Z",
+     "size_bytes": 5664768
+    },
+    {
+     "scope": "riodaspedras",
+     "category": "dtm",
+     "path": "data/riodaspedras/dtm_extended_300m.tif",
+     "mtime_utc": "2026-04-09T19:53:09Z",
+     "size_bytes": 669809
+    },
+    {
+     "scope": "mare",
+     "category": "boundary",
+     "path": "data/maré/raw/mare_boundary.shp",
+     "mtime_utc": "2026-03-23T17:03:25Z",
+     "size_bytes": 16172
+    },
+    {
+     "scope": "mare",
+     "category": "footprints",
+     "path": "data/maré/buildings_extended_300m.gpkg",
+     "mtime_utc": "2026-06-14T08:32:00Z",
+     "size_bytes": 19185664
+    },
+    {
+     "scope": "mare",
+     "category": "dtm",
+     "path": "data/maré/dtm_extended_300m.tif",
+     "mtime_utc": "2026-04-09T19:55:38Z",
+     "size_bytes": 2404915
+    }
+   ]
+  },
+  "declared_limitations": {
+   "narrative": "Vegetation/canopy: descoped 2026-09-10 (PI decision, quoted below); this dossier confirms mechanically that no DSM-named file exists under data/ in the main checkout (0 matches) and states plainly that this limitation may not be used to explain any shortfall. Façade: NOT accepted — cross-reference r = 0.884 (Rio das Pedras) / 0.644 (Vidigal), both below the floor (r >= 0.95, median |delta| <= 0.03); the ledger carries 0 façade-derived entries (must be zero — confirmed). The 2.5D model's validity floor is the open G2 question above (card g2_validity_floor, not resolved here).",
+   "rows": [
+    {
+     "id": "limitations.canopy.descope_quote",
+     "value": "PI dropped canopy/vegetation from P1 rather than hold the critical path on it. Solar and the ventilation index are computed on terrain + buildings only; vegetation shading is a stated limitation in the methods, and the discussion may not attribute any shortfall to trees.",
+     "unit": "text",
+     "source": {
+      "text_substring_of": "/home/theo/SCL/SCR/brisaverse/papers/p1-nature-cities/proposal/cprime_reframe_plan.md"
+     }
+    },
+    {
+     "id": "limitations.facade.floor_r",
+     "value": 0.95,
+     "unit": "dimensionless",
+     "source": {
+      "file": "runs/wp04f2_facade_2026-09-15T07:50:07Z/crossref.json",
+      "json_pointer": "/floor/r"
+     }
+    },
+    {
+     "id": "limitations.facade.floor_median_abs_delta",
+     "value": 0.03,
+     "unit": "fraction",
+     "source": {
+      "file": "runs/wp04f2_facade_2026-09-15T07:50:07Z/crossref.json",
+      "json_pointer": "/floor/median_abs_delta"
+     }
+    },
+    {
+     "id": "limitations.facade.riodaspedras_r",
+     "value": 0.8838875680320564,
+     "unit": "dimensionless",
+     "source": {
+      "file": "runs/wp04f2_facade_2026-09-15T07:50:07Z/crossref.json",
+      "json_pointer": "/sites/riodaspedras/variants/unweighted/overall/r"
+     }
+    },
+    {
+     "id": "limitations.facade.vidigal_r",
+     "value": 0.6436550781228578,
+     "unit": "dimensionless",
+     "source": {
+      "file": "runs/wp04f2_facade_2026-09-15T07:50:07Z/crossref.json",
+      "json_pointer": "/sites/vidigal/variants/unweighted/overall/r"
+     }
+    }
+   ],
+   "n_dsm_files_on_disk": 0,
+   "n_facade_entries_in_ledger": 0,
+   "cprime_plan_cited": "/home/theo/SCL/SCR/brisaverse/papers/p1-nature-cities/proposal/cprime_reframe_plan.md",
+   "cprime_plan_readable": true
+  }
+ }
+}

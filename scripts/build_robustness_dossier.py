@@ -157,6 +157,15 @@ def build_engine_acceptance(main_root: Path, ledger_path: Path, ledger: dict) ->
                    ledger["entries"]["engine.crossref.p95_abs_delta"]["value"],
                    "fraction", ledger_rel, "engine.crossref.p95_abs_delta"),
     ]
+    # The narrative used to type "16,905 points" — the raw reference set — while the
+    # cited r/median/p95 come from the nearest-sampling variant, computed over fewer
+    # points. Both are sourced rows now so neither can drift in prose (2026-09-17).
+    crossref_rel = f"runs/{ledger['_meta']['runs_of_record']['wp02_crossref']}/crossref_diagnostic.json"
+    crossref = json.loads((main_root / crossref_rel).read_text())
+    rows.append(row("engine.crossref.n_reference_points", crossref["n_points"], "points",
+                    file=crossref_rel, json_pointer="/n_points"))
+    rows.append(row("engine.crossref.n", crossref["variants"]["A_nearest_sampling"]["n"], "points",
+                    file=crossref_rel, json_pointer="/variants/A_nearest_sampling/n"))
     # Checkable the same way as a numeric row: exact value equality against a
     # JSON pointer (into the ledger's own _meta), not a hand-copied string.
     variant_quote = row(
@@ -192,7 +201,10 @@ def build_engine_acceptance(main_root: Path, ledger_path: Path, ledger: dict) ->
             "Engine acceptance rests on two independent legs: (1) three analytic "
             "self-checks against closed-form geometry (no data dependency), and "
             "(2) a measured cross-reference against the CPU raycaster's street SVF "
-            "at Rio das Pedras (16,905 points). Both are read here, not recomputed."
+            f"at Rio das Pedras ({crossref['n_points']:,} reference points, of which "
+            f"{crossref['variants']['A_nearest_sampling']['n']:,} are matched by the "
+            "nearest-sampling variant the cited statistics come from). Both are read "
+            "here, not recomputed."
         ),
         "rows": rows,
         "chosen_variant_quote": variant_quote,
