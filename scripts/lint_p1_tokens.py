@@ -37,6 +37,8 @@ P1_SOURCE_GLOBS = [
     "docs/*_canonical.md",
     "runs/wp07_*/**/*.md",
     "runs/wp07_*/**/*.json",
+    "runs/robustness_*/**/*.md",
+    "runs/robustness_*/**/*.json",
 ]
 # P1's own written artifacts (WP-06's table). Only the header/leading-comment
 # lines matter — a banned word could not appear in numeric cell data anyway.
