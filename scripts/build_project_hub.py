@@ -1150,6 +1150,33 @@ def write_staged_figures_page(prov):
             f"behind it.",
             img_url, img=img_url, kind="amber", badge_label="Staged",
             meta=f"{run_dir.name} · {fig_id}", **_img_attrs(img_url)))
+    # The WP-07M citywide maps are a second family: producer-declared withheld
+    # under red line L1 and not yet read by the ethics guardian. The PI may SEE
+    # them here; nothing may promote them. Their images are copied into the
+    # mirror (same repo, PI-only) because the L1 guard forbids a runs/ segment.
+    import shutil
+    map_dirs = sorted(d for d in (ROOT / "runs").glob("wp07_map_*") if d.is_dir() and list(d.glob("*.png")))
+    if map_dirs:
+        map_dir = map_dirs[-1]
+        mp = map_dir / "figure_manifest.json"
+        map_figs = json.loads(mp.read_text()).get("figures", {}) if mp.exists() else {}
+        for fig_id in sorted(map_figs):
+            fig = map_figs[fig_id]; png = fig.get("png_path")
+            if not png or not (map_dir / png).exists():
+                continue
+            dst = OUT / "wp07_staged" / Path(png).name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            if not dst.exists() or dst.stat().st_mtime < (map_dir / png).stat().st_mtime:
+                shutil.copy2(map_dir / png, dst)
+            img_url = f"/outputs/_hub/wp07_staged/{dst.name}"
+            thumb = thumb or img_url
+            cards.append(card(
+                fig_id.replace("_", " "),
+                f"Citywide map · release class {fig.get('release_class', 'withheld')} under "
+                f"{fig.get('red_line', 'L1')} — producer-declared, not yet read by the ethics "
+                f"guardian. Visible to the PI here; never promoted by an agent.",
+                img_url, img=img_url, kind="terra", badge_label="Withheld · L1",
+                meta=f"{map_dir.name} · {fig_id}", **_img_attrs(img_url)))
     if not cards:
         return None, None
     crumb = breadcrumb([("← Project hub", "../index.html"), ("WP-07 staged figures", None)])
