@@ -18,9 +18,11 @@ import json
 import sys
 from pathlib import Path
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pytest
+from shapely.geometry import box
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -296,3 +298,134 @@ def test_f3_and_f4_render_for_real_in_this_worktree(ledger, tmp_path):
     assert r4["status"] == "produced"
     assert r3["source_parquets"] == []
     assert r4["source_parquets"] == []
+
+
+# ---------------------------------------------------------------------------
+# WP-07M (docs/wp07_map_spec.md): f5/f5b, the citywide map. Staged into its
+# own runs/wp07_map_<UTC>/ (separate manifest from f1-f4 above — see
+# wp07_figures.stage_map's docstring), release_class "withheld" under red
+# line L1, so no promotion path exists no matter what this manifest says.
+# Same skip-cleanly-on-missing-input discipline as f1/f2: both the citywide
+# parquet and the favela boundary shapefile are gitignored and absent from a
+# bare worktree, so real rendering is exercised here against synthetic
+# fixtures shaped like the real (but locally absent) inputs.
+# ---------------------------------------------------------------------------
+
+def _write_synthetic_favela_shapefile(repo_root: Path) -> None:
+    from src.config import EXPECTED_CRS
+
+    rows = []
+    for i, display in enumerate(figs.FAVELAS.values()):
+        x0 = float(i)
+        rows.append({"complexo": display, "nome": display, "geometry": box(x0, x0, x0 + 0.4, x0 + 0.4)})
+    gdf = gpd.GeoDataFrame(rows, crs=EXPECTED_CRS)
+    out_dir = repo_root / "data" / "RJ"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    gdf.to_file(out_dir / "Favelas_Limit_2019.shp")
+
+
+def _write_synthetic_map_parquet(repo_root: Path, n: int = 6000, seed: int = 0) -> None:
+    rng = np.random.default_rng(seed)
+    df = pd.DataFrame({
+        "svf": rng.uniform(0.0, 1.0, n).astype("float32"),
+        "kwh_m2": rng.uniform(0.0, 1800.0, n).astype("float32"),
+        "x": rng.uniform(0.0, 5.0, n),
+        "y": rng.uniform(0.0, 5.0, n),
+        "favela_id": rng.integers(0, 2, n).astype("int32"),
+    })
+    run_dir = repo_root / "runs" / ledger_mod.RUN_OF_RECORD["wp05"]
+    run_dir.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(run_dir / "wp05_full.parquet")
+
+
+def test_f5_skips_cleanly_when_citywide_parquet_absent(tmp_path, ledger):
+    repo_root = tmp_path / "repo_empty"
+    (repo_root / "runs").mkdir(parents=True)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    result = figs.render_f5(ledger, repo_root, out_dir)
+    assert result["status"] == "skipped"
+    assert "reason" in result
+
+
+def test_f5_skips_cleanly_when_favela_boundaries_absent(tmp_path, ledger):
+    repo_root = tmp_path / "repo_no_boundaries"
+    _write_synthetic_map_parquet(repo_root)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    result = figs.render_f5(ledger, repo_root, out_dir)
+    assert result["status"] == "skipped"
+    assert "reason" in result
+
+
+def test_f5_and_f5b_render_from_synthetic_citywide_data(tmp_path, ledger):
+    repo_root = tmp_path / "repo"
+    _write_synthetic_map_parquet(repo_root)
+    _write_synthetic_favela_shapefile(repo_root)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    r5 = figs.render_f5(ledger, repo_root, out_dir)
+    r5b = figs.render_f5b(ledger, repo_root, out_dir)
+
+    for fid, result in (("f5_citywide_svf_map", r5), ("f5b_citywide_svf_map_coarse", r5b)):
+        assert result["status"] == "produced", result
+        assert (out_dir / result["svg_path"]).exists()
+        assert (out_dir / result["png_path"]).exists()
+        assert result["release_class"] == "withheld"
+        assert result["red_line"] == "L1"
+        raw = (out_dir / result["svg_path"]).read_text()
+        text = figs._svg_text_content(raw)
+        hit = figs._COORD_RE.search(text)
+        assert hit is None, f"{fid}: looks like a UTM coordinate leaked into SVG text: {hit}"
+        assert result["checklist"]["no_coordinates"] is True
+
+    from src.brisa_solar.g3_domain import FABRIC_FOOTPRINT_DISTANCE_GRID_M
+    assert r5b["aggregation"]["cell_m"] == max(FABRIC_FOOTPRINT_DISTANCE_GRID_M)
+
+
+def test_f5_never_computes_a_favela_vs_non_favela_quantity(tmp_path, ledger):
+    """The hard boundary (docs/wp07_map_spec.md 'The boundary'): no favela-vs-
+    non-favela contrast, difference, ratio or deficit — not as a layer, not
+    as a legend, not as an annotation. Boundaries are positions only."""
+    repo_root = tmp_path / "repo"
+    _write_synthetic_map_parquet(repo_root)
+    _write_synthetic_favela_shapefile(repo_root)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    r5 = figs.render_f5(ledger, repo_root, out_dir)
+    r5b = figs.render_f5b(ledger, repo_root, out_dir)
+    assert r5["status"] == "produced" and r5b["status"] == "produced"
+
+    banned = ("formal", "non_favela", "deficit", "difference", "ratio")
+    for result in (r5, r5b):
+        blob = json.dumps(result).lower()
+        for token in banned:
+            assert token not in blob, f"{result['id']}: manifest carries banned token {token!r}"
+        raw_svg = (out_dir / result["svg_path"]).read_text().lower()
+        for token in banned:
+            assert token not in raw_svg, f"{result['id']}: SVG carries banned token {token!r}"
+
+
+def test_stage_map_writes_its_own_manifest_and_contact_sheet(tmp_path, ledger):
+    repo_root = tmp_path / "repo"
+    _write_synthetic_map_parquet(repo_root)
+    _write_synthetic_favela_shapefile(repo_root)
+    # stage_map re-derives its own ledger via find_latest_ledger(repo_root);
+    # give the synthetic repo a copy of the real worktree ledger to read.
+    ledger_src = figs.find_latest_ledger(ROOT)
+    ledger_dst = repo_root / "runs" / ledger_src.parent.name
+    ledger_dst.mkdir(parents=True, exist_ok=True)
+    (ledger_dst / "ledger.json").write_text(ledger_src.read_text())
+
+    out_dir = tmp_path / "wp07_map_out"
+    manifest = figs.stage_map(repo_root, out_dir=out_dir)
+
+    assert (out_dir / "figure_manifest.json").exists()
+    produced = {fid: f for fid, f in manifest["figures"].items() if f["status"] == "produced"}
+    assert set(produced) == {"f5_citywide_svf_map", "f5b_citywide_svf_map_coarse"}
+    for f in produced.values():
+        assert f["release_class"] == "withheld"
+        assert f["red_line"] == "L1"
+    assert (out_dir / "contact.png").exists()
