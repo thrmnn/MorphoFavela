@@ -1,0 +1,18 @@
+{
+ "_utc": "2026-09-17T04:15:01Z",
+ "n_pilot_tiles": 8,
+ "n_pilot_cells": 139883,
+ "pilot_fraction_of_frame": 0.016648663136737008,
+ "measured_build_s_total": 27.70397024002159,
+ "measured_engine_s_total": 12.252998986106832,
+ "measured_hours_s_total": 0.4083343980018981,
+ "build_s_per_tile_measured": 3.4629962800026988,
+ "engine_s_per_cell_measured": 8.759462540914072e-05,
+ "hours_s_per_cell_measured": 2.9191138165602546e-06,
+ "peak_gb_measured": 0.129325568,
+ "n_active_tiles_in_frame": 325,
+ "city_total_cells": 8402056,
+ "projected_hours_full_run": 0.5238820268735037,
+ "go_no_go": "GO",
+ "note": "Per-tile model, same shape as wp05_pilot.compute_extrapolation: build_s is charged once per tile against the tile ceiling (n_active_tiles_in_frame, the SAME 325 measured by the WP-05 FULL run of record's own frame), engine_s and hours_s (the two costs CITYHOURS adds/changes over the WP-05 FULL run: return_horizon=True and direct_sun_hours on both reference days) are charged per cell against the full 8,402,056-cell frame."
+}

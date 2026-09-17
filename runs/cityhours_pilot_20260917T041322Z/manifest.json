@@ -1,0 +1,14 @@
+{
+ "_utc": "2026-09-17T04:15:01Z",
+ "mode": "pilot",
+ "sky": {
+  "patches": 145
+ },
+ "pilot_rule": "config/params.yaml#/sampling/pilot_rule",
+ "pilot_target_fraction": 0.015,
+ "frame_source": "runs/wp05_full_20260914T215419Z/frame_cells.parquet (reused verbatim)",
+ "device": "cuda",
+ "torch_version": "2.4.1+cu121",
+ "git_sha": "ccfd644",
+ "n_active_tiles_in_frame": 325
+}
