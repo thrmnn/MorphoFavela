@@ -1,0 +1,662 @@
+{
+ "_utc": "2026-09-17T12:05:56Z",
+ "git_sha": "08e6aed",
+ "ledger_source": "runs/wp07_ledger_20260917T045910Z/ledger.json",
+ "pixel_m_citywide": 10.0,
+ "zoom_windows_source": "config/zoom_windows.yaml",
+ "figures": {
+  "f6_citywide": {
+   "id": "f6_citywide",
+   "status": "produced",
+   "svg_path": "f6_citywide.svg",
+   "png_path": "f6_citywide.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per output pixel (never a per-cell scatter)",
+    "pixel_m": 10.0,
+    "grid_shape_rows_cols": [
+     3529,
+     6872
+    ],
+    "n_cells_aggregated": 8402056,
+    "save_dpi": 100.0,
+    "max_panel_inches": 45.0
+   },
+   "colormap": {
+    "panel_A_svf": "cividis",
+    "panel_B_kwh_m2": "inferno"
+   },
+   "favela_boundaries": {
+    "matched_favelas": [
+     "complexo_do_alemao",
+     "mare",
+     "riodaspedras",
+     "rocinha",
+     "vidigal"
+    ],
+    "missing_favelas": [],
+    "source": "data/RJ/Favelas_Limit_2019.shp"
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 80,
+    "banned_tokens_absent": true
+   },
+   "color_limits": {
+    "svf": [
+     0.010896517003188564,
+     1.0000000000000002
+    ],
+    "kwh_m2": [
+     46.494533707478844,
+     1715.892083725129
+    ]
+   },
+   "png_width_px": 7129,
+   "png_height_px": 3142,
+   "png_bytes": 6106048
+  },
+  "f6_zoom_vidigal_svf": {
+   "id": "f6_zoom_vidigal_svf",
+   "status": "produced",
+   "svg_path": "f6_zoom_vidigal_svf.svg",
+   "png_path": "f6_zoom_vidigal_svf.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per native pixel (never a per-cell scatter)",
+    "pixel_m": 5.0,
+    "pixel_m_source": "runs/<wp05 run of record>/frame_diagnostics.json#/grid_cell_m",
+    "grid_shape_rows_cols": [
+     155,
+     286
+    ],
+    "n_cells_aggregated": 8728,
+    "window_bounds_epsg31983": [
+     679578.6863000002,
+     681004.0555999996,
+     7455492.6547,
+     7456262.7349
+    ]
+   },
+   "colormap": {
+    "svf": "cividis"
+   },
+   "favela_boundaries": {
+    "resolution_method": "nome_exact_unique"
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 14,
+    "banned_tokens_absent": true
+   },
+   "window": {
+    "id": "vidigal",
+    "label": "Vidigal",
+    "source": "favela_boundary:Vidigal",
+    "pad_m": 120.0
+   },
+   "pixel_m": 5.0,
+   "color_limits": {
+    "lo": 0.010896517003188564,
+    "hi": 1.0000000000000002
+   },
+   "png_width_px": 1511,
+   "png_height_px": 1452,
+   "png_bytes": 136497
+  },
+  "f6_zoom_vidigal_kwh": {
+   "id": "f6_zoom_vidigal_kwh",
+   "status": "produced",
+   "svg_path": "f6_zoom_vidigal_kwh.svg",
+   "png_path": "f6_zoom_vidigal_kwh.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per native pixel (never a per-cell scatter)",
+    "pixel_m": 5.0,
+    "pixel_m_source": "runs/<wp05 run of record>/frame_diagnostics.json#/grid_cell_m",
+    "grid_shape_rows_cols": [
+     155,
+     286
+    ],
+    "n_cells_aggregated": 8728,
+    "window_bounds_epsg31983": [
+     679578.6863000002,
+     681004.0555999996,
+     7455492.6547,
+     7456262.7349
+    ]
+   },
+   "colormap": {
+    "kwh_m2": "inferno"
+   },
+   "favela_boundaries": {
+    "resolution_method": "nome_exact_unique"
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 14,
+    "banned_tokens_absent": true
+   },
+   "window": {
+    "id": "vidigal",
+    "label": "Vidigal",
+    "source": "favela_boundary:Vidigal",
+    "pad_m": 120.0
+   },
+   "pixel_m": 5.0,
+   "color_limits": {
+    "lo": 46.494533707478844,
+    "hi": 1715.892083725129
+   },
+   "png_width_px": 1539,
+   "png_height_px": 1452,
+   "png_bytes": 149918
+  },
+  "f6_zoom_rocinha_svf": {
+   "id": "f6_zoom_rocinha_svf",
+   "status": "produced",
+   "svg_path": "f6_zoom_rocinha_svf.svg",
+   "png_path": "f6_zoom_rocinha_svf.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per native pixel (never a per-cell scatter)",
+    "pixel_m": 5.0,
+    "pixel_m_source": "runs/<wp05 run of record>/frame_diagnostics.json#/grid_cell_m",
+    "grid_shape_rows_cols": [
+     269,
+     367
+    ],
+    "n_cells_aggregated": 19185,
+    "window_bounds_epsg31983": [
+     678606.6831,
+     680440.3113000002,
+     7456102.9846,
+     7457444.2437
+    ]
+   },
+   "colormap": {
+    "svf": "cividis"
+   },
+   "favela_boundaries": {
+    "resolution_method": "nome_exact_unique"
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 15,
+    "banned_tokens_absent": true
+   },
+   "window": {
+    "id": "rocinha",
+    "label": "Rocinha",
+    "source": "favela_boundary:Rocinha",
+    "pad_m": 120.0
+   },
+   "pixel_m": 5.0,
+   "color_limits": {
+    "lo": 0.010896517003188564,
+    "hi": 1.0000000000000002
+   },
+   "png_width_px": 1511,
+   "png_height_px": 1452,
+   "png_bytes": 242831
+  },
+  "f6_zoom_rocinha_kwh": {
+   "id": "f6_zoom_rocinha_kwh",
+   "status": "produced",
+   "svg_path": "f6_zoom_rocinha_kwh.svg",
+   "png_path": "f6_zoom_rocinha_kwh.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per native pixel (never a per-cell scatter)",
+    "pixel_m": 5.0,
+    "pixel_m_source": "runs/<wp05 run of record>/frame_diagnostics.json#/grid_cell_m",
+    "grid_shape_rows_cols": [
+     269,
+     367
+    ],
+    "n_cells_aggregated": 19185,
+    "window_bounds_epsg31983": [
+     678606.6831,
+     680440.3113000002,
+     7456102.9846,
+     7457444.2437
+    ]
+   },
+   "colormap": {
+    "kwh_m2": "inferno"
+   },
+   "favela_boundaries": {
+    "resolution_method": "nome_exact_unique"
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 15,
+    "banned_tokens_absent": true
+   },
+   "window": {
+    "id": "rocinha",
+    "label": "Rocinha",
+    "source": "favela_boundary:Rocinha",
+    "pad_m": 120.0
+   },
+   "pixel_m": 5.0,
+   "color_limits": {
+    "lo": 46.494533707478844,
+    "hi": 1715.892083725129
+   },
+   "png_width_px": 1539,
+   "png_height_px": 1452,
+   "png_bytes": 259957
+  },
+  "f6_zoom_complexo_do_alemao_svf": {
+   "id": "f6_zoom_complexo_do_alemao_svf",
+   "status": "produced",
+   "svg_path": "f6_zoom_complexo_do_alemao_svf.svg",
+   "png_path": "f6_zoom_complexo_do_alemao_svf.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per native pixel (never a per-cell scatter)",
+    "pixel_m": 5.0,
+    "pixel_m_source": "runs/<wp05 run of record>/frame_diagnostics.json#/grid_cell_m",
+    "grid_shape_rows_cols": [
+     374,
+     657
+    ],
+    "n_cells_aggregated": 88157,
+    "window_bounds_epsg31983": [
+     675523.4466000004,
+     678808.0339000002,
+     7469938.1867,
+     7471808.0388
+    ]
+   },
+   "colormap": {
+    "svf": "cividis"
+   },
+   "favela_boundaries": {
+    "resolution_method": "complexo_exact"
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 35,
+    "banned_tokens_absent": true
+   },
+   "window": {
+    "id": "complexo_do_alemao",
+    "label": "Complexo do Alemão",
+    "source": "favela_boundary:Complexo do Alemão",
+    "pad_m": 120.0
+   },
+   "pixel_m": 5.0,
+   "color_limits": {
+    "lo": 0.010896517003188564,
+    "hi": 1.0000000000000002
+   },
+   "png_width_px": 1511,
+   "png_height_px": 1452,
+   "png_bytes": 591929
+  },
+  "f6_zoom_complexo_do_alemao_kwh": {
+   "id": "f6_zoom_complexo_do_alemao_kwh",
+   "status": "produced",
+   "svg_path": "f6_zoom_complexo_do_alemao_kwh.svg",
+   "png_path": "f6_zoom_complexo_do_alemao_kwh.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per native pixel (never a per-cell scatter)",
+    "pixel_m": 5.0,
+    "pixel_m_source": "runs/<wp05 run of record>/frame_diagnostics.json#/grid_cell_m",
+    "grid_shape_rows_cols": [
+     374,
+     657
+    ],
+    "n_cells_aggregated": 88157,
+    "window_bounds_epsg31983": [
+     675523.4466000004,
+     678808.0339000002,
+     7469938.1867,
+     7471808.0388
+    ]
+   },
+   "colormap": {
+    "kwh_m2": "inferno"
+   },
+   "favela_boundaries": {
+    "resolution_method": "complexo_exact"
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 35,
+    "banned_tokens_absent": true
+   },
+   "window": {
+    "id": "complexo_do_alemao",
+    "label": "Complexo do Alemão",
+    "source": "favela_boundary:Complexo do Alemão",
+    "pad_m": 120.0
+   },
+   "pixel_m": 5.0,
+   "color_limits": {
+    "lo": 46.494533707478844,
+    "hi": 1715.892083725129
+   },
+   "png_width_px": 1539,
+   "png_height_px": 1452,
+   "png_bytes": 616162
+  },
+  "f6_zoom_mare_svf": {
+   "id": "f6_zoom_mare_svf",
+   "status": "produced",
+   "svg_path": "f6_zoom_mare_svf.svg",
+   "png_path": "f6_zoom_mare_svf.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per native pixel (never a per-cell scatter)",
+    "pixel_m": 5.0,
+    "pixel_m_source": "runs/<wp05 run of record>/frame_diagnostics.json#/grid_cell_m",
+    "grid_shape_rows_cols": [
+     436,
+     238
+    ],
+    "n_cells_aggregated": 27151,
+    "window_bounds_epsg31983": [
+     679704.6029000003,
+     680893.2275999999,
+     7470201.8447,
+     7472377.2285
+    ]
+   },
+   "colormap": {
+    "svf": "cividis"
+   },
+   "favela_boundaries": {
+    "resolution_method": "complexo_exact"
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 19,
+    "banned_tokens_absent": true
+   },
+   "window": {
+    "id": "mare",
+    "label": "Maré",
+    "source": "favela_boundary:Maré",
+    "pad_m": 120.0
+   },
+   "pixel_m": 5.0,
+   "color_limits": {
+    "lo": 0.010896517003188564,
+    "hi": 1.0000000000000002
+   },
+   "png_width_px": 1137,
+   "png_height_px": 1469,
+   "png_bytes": 269292
+  },
+  "f6_zoom_mare_kwh": {
+   "id": "f6_zoom_mare_kwh",
+   "status": "produced",
+   "svg_path": "f6_zoom_mare_kwh.svg",
+   "png_path": "f6_zoom_mare_kwh.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per native pixel (never a per-cell scatter)",
+    "pixel_m": 5.0,
+    "pixel_m_source": "runs/<wp05 run of record>/frame_diagnostics.json#/grid_cell_m",
+    "grid_shape_rows_cols": [
+     436,
+     238
+    ],
+    "n_cells_aggregated": 27151,
+    "window_bounds_epsg31983": [
+     679704.6029000003,
+     680893.2275999999,
+     7470201.8447,
+     7472377.2285
+    ]
+   },
+   "colormap": {
+    "kwh_m2": "inferno"
+   },
+   "favela_boundaries": {
+    "resolution_method": "complexo_exact"
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 19,
+    "banned_tokens_absent": true
+   },
+   "window": {
+    "id": "mare",
+    "label": "Maré",
+    "source": "favela_boundary:Maré",
+    "pad_m": 120.0
+   },
+   "pixel_m": 5.0,
+   "color_limits": {
+    "lo": 46.494533707478844,
+    "hi": 1715.892083725129
+   },
+   "png_width_px": 1165,
+   "png_height_px": 1469,
+   "png_bytes": 286973
+  },
+  "f6_zoom_riodaspedras_svf": {
+   "id": "f6_zoom_riodaspedras_svf",
+   "status": "produced",
+   "svg_path": "f6_zoom_riodaspedras_svf.svg",
+   "png_path": "f6_zoom_riodaspedras_svf.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per native pixel (never a per-cell scatter)",
+    "pixel_m": 5.0,
+    "pixel_m_source": "runs/<wp05 run of record>/frame_diagnostics.json#/grid_cell_m",
+    "grid_shape_rows_cols": [
+     339,
+     310
+    ],
+    "n_cells_aggregated": 13839,
+    "window_bounds_epsg31983": [
+     669791.1742000002,
+     671340.8309000004,
+     7457342.5901,
+     7459037.4093
+    ]
+   },
+   "colormap": {
+    "svf": "cividis"
+   },
+   "favela_boundaries": {
+    "resolution_method": "complexo_exact"
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 15,
+    "banned_tokens_absent": true
+   },
+   "window": {
+    "id": "riodaspedras",
+    "label": "Rio das Pedras",
+    "source": "favela_boundary:Rio das Pedras",
+    "pad_m": 120.0
+   },
+   "pixel_m": 5.0,
+   "color_limits": {
+    "lo": 0.010896517003188564,
+    "hi": 1.0000000000000002
+   },
+   "png_width_px": 1391,
+   "png_height_px": 1469,
+   "png_bytes": 224012
+  },
+  "f6_zoom_riodaspedras_kwh": {
+   "id": "f6_zoom_riodaspedras_kwh",
+   "status": "produced",
+   "svg_path": "f6_zoom_riodaspedras_kwh.svg",
+   "png_path": "f6_zoom_riodaspedras_kwh.png",
+   "ledger_ids_used": [],
+   "ledger_ids_plotted": [],
+   "source_parquets": [
+    "runs/wp05_full_20260914T215419Z/wp05_full.parquet"
+   ],
+   "source_run_of_record": "wp05_full_20260914T215419Z",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "aggregation": {
+    "method": "streamed mean per native pixel (never a per-cell scatter)",
+    "pixel_m": 5.0,
+    "pixel_m_source": "runs/<wp05 run of record>/frame_diagnostics.json#/grid_cell_m",
+    "grid_shape_rows_cols": [
+     339,
+     310
+    ],
+    "n_cells_aggregated": 13839,
+    "window_bounds_epsg31983": [
+     669791.1742000002,
+     671340.8309000004,
+     7457342.5901,
+     7459037.4093
+    ]
+   },
+   "colormap": {
+    "kwh_m2": "inferno"
+   },
+   "favela_boundaries": {
+    "resolution_method": "complexo_exact"
+   },
+   "checklist": {
+    "no_coordinates": true,
+    "data_raster_present": true,
+    "svg_path_count": 15,
+    "banned_tokens_absent": true
+   },
+   "window": {
+    "id": "riodaspedras",
+    "label": "Rio das Pedras",
+    "source": "favela_boundary:Rio das Pedras",
+    "pad_m": 120.0
+   },
+   "pixel_m": 5.0,
+   "color_limits": {
+    "lo": 46.494533707478844,
+    "hi": 1715.892083725129
+   },
+   "png_width_px": 1419,
+   "png_height_px": 1469,
+   "png_bytes": 237474
+  },
+  "f6_zoom_ipanema_svf": {
+   "id": "f6_zoom_ipanema_svf",
+   "status": "skipped",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "reason": "no neighbourhood/bairro boundary layer exists on disk for 'Ipanema' (Favelas_Limit_2019.shp carries a 'bairro' attribute column on favela polygons only, not a bairro polygon layer)",
+   "window": {
+    "id": "ipanema",
+    "label": "Ipanema",
+    "source": "bairro:Ipanema",
+    "pad_m": 120.0
+   },
+   "resolution": {
+    "status": "missing_boundary",
+    "input_needed": "a bairro polygon layer (e.g. an IPP/IBGE bairros shapefile) covering 'Ipanema', or a bbox_epsg31983 the PI supplies directly"
+   }
+  },
+  "f6_zoom_ipanema_kwh": {
+   "id": "f6_zoom_ipanema_kwh",
+   "status": "skipped",
+   "release_class": "withheld",
+   "red_line": "L1",
+   "reason": "no neighbourhood/bairro boundary layer exists on disk for 'Ipanema' (Favelas_Limit_2019.shp carries a 'bairro' attribute column on favela polygons only, not a bairro polygon layer)",
+   "window": {
+    "id": "ipanema",
+    "label": "Ipanema",
+    "source": "bairro:Ipanema",
+    "pad_m": 120.0
+   },
+   "resolution": {
+    "status": "missing_boundary",
+    "input_needed": "a bairro polygon layer (e.g. an IPP/IBGE bairros shapefile) covering 'Ipanema', or a bbox_epsg31983 the PI supplies directly"
+   }
+  }
+ }
+}
