@@ -1112,6 +1112,166 @@ def _latest_wp07_figures_dir() -> Path | None:
     return hits[-1] if hits else None
 
 
+# Inline pan/zoom viewer JS + CSS (no CDN — the mirror must be self-contained,
+# docs/wp07_zoom_spec.md item 4). Deliberately never named `zoom`/`lb*`: every
+# hub page ends with hubkit's own lightbox (function `zoom`, ids lb/lbx/lbi/
+# lbcap) via page()'s _LB — a name collision would silently break one or the
+# other. `.card`'s onclick (hubkit's zoom()) is unused on this page's own
+# tiles; they call pzOpen directly.
+_PZ_CSS = """
+.pzgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin:18px 0}
+.pztile{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+cursor:zoom-in;text-align:left;padding:0;font:inherit;color:inherit;display:block;width:100%}
+.pztile img{width:100%;height:160px;object-fit:cover;display:block;border-bottom:1px solid #eee}
+.pztile .pzcap{padding:10px 12px}
+.pztile .pzcap h3{margin:0 0 3px;font-size:14px}
+.pztile .pzcap p{margin:0;color:var(--mut);font-size:12px}
+.pztile.missing{cursor:default;opacity:.7}
+.pztile.missing .pzph{height:160px;display:flex;align-items:center;justify-content:center;
+background:#f3f5f7;color:var(--mut);font-size:12px;text-align:center;padding:10px}
+#pzov{display:none;position:fixed;inset:0;background:rgba(10,12,14,.94);z-index:200;overflow:hidden;touch-action:none}
+#pzov:not([hidden]){display:block}
+#pzstage{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+cursor:grab;transform-origin:center center}
+#pzstage img{max-width:92vw;max-height:80vh;width:auto;height:auto;user-select:none;-webkit-user-drag:none}
+#pzclose{position:absolute;top:12px;right:18px;background:none;border:0;color:#fff;
+font-size:34px;line-height:1;cursor:pointer;padding:2px 12px;z-index:2}
+#pzcap{position:absolute;bottom:12px;left:0;right:0;text-align:center;color:#eee;font-size:13px}
+#pzhint{position:absolute;top:14px;left:18px;color:#9fb0c0;font-size:12px}
+"""
+
+_PZ_JS = """
+let pzScale=1,pzX=0,pzY=0,pzDragging=false,pzLastX=0,pzLastY=0;
+function pzApply(){document.getElementById('pzstage').style.transform=
+'translate('+pzX+'px,'+pzY+'px) scale('+pzScale+')';}
+function pzOpen(src,label){
+var img=document.getElementById('pzimg');
+img.src=src;img.alt=label||'';
+document.getElementById('pzcap').textContent=label||'';
+pzScale=1;pzX=0;pzY=0;pzApply();
+document.getElementById('pzov').hidden=false;
+}
+function pzClose(){document.getElementById('pzov').hidden=true;}
+(function(){
+var ov=document.getElementById('pzov');
+if(!ov)return;
+var stage=document.getElementById('pzstage');
+ov.addEventListener('click',function(e){if(e.target===ov)pzClose();});
+document.getElementById('pzclose').addEventListener('click',pzClose);
+addEventListener('keydown',function(e){if(!ov.hidden&&e.key==='Escape')pzClose();});
+stage.addEventListener('wheel',function(e){
+e.preventDefault();
+var delta=e.deltaY<0?1.15:(1/1.15);
+pzScale=Math.min(16,Math.max(0.5,pzScale*delta));
+pzApply();
+},{passive:false});
+stage.addEventListener('pointerdown',function(e){
+pzDragging=true;pzLastX=e.clientX;pzLastY=e.clientY;
+stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove',function(e){
+if(!pzDragging)return;
+pzX+=e.clientX-pzLastX;pzY+=e.clientY-pzLastY;
+pzLastX=e.clientX;pzLastY=e.clientY;pzApply();
+});
+stage.addEventListener('pointerup',function(){pzDragging=false;});
+stage.addEventListener('pointercancel',function(){pzDragging=false;});
+stage.addEventListener('dblclick',function(){pzScale=1;pzX=0;pzY=0;pzApply();});
+})();
+"""
+
+
+def _pz_js_attr(s: str) -> str:
+    """Escape a string for a JS single-quoted literal inside pzOpen('...','...')
+    (same rule as hubkit._js_attr, not imported since it's a private name)."""
+    return html.escape(s.replace("\\", "\\\\").replace("'", "\\'"), quote=True)
+
+
+def _latest_wp07_zoom_dir() -> Path | None:
+    hits = sorted(d for d in (ROOT / "runs").glob("wp07_zoom_*") if d.is_dir() and list(d.glob("*.png")))
+    return hits[-1] if hits else None
+
+
+def write_zoom_viewer_page(prov):
+    """The WP-07Z pan/zoom viewer: docs/wp07_zoom_spec.md item 4. Discovers
+    the latest runs/wp07_zoom_<UTC>/figure_manifest.json, mirrors its PNGs
+    into outputs/_hub/wp07_staged/zoom/ (same L1-guard reason as the map
+    family: no `runs/` segment may appear under `_hub/`), and lists the
+    citywide pair, every resolved window (opens in the inline pan/zoom
+    view), and every missing_boundary window as a disabled card carrying its
+    stated reason — cards throughout, never a prose-only link, so the hub's
+    reachability gate sees them. Returns (url, thumb)."""
+    run_dir = _latest_wp07_zoom_dir()
+    if run_dir is None:
+        return None, None
+    manifest_path = run_dir / "figure_manifest.json"
+    if not manifest_path.exists():
+        return None, None
+    figures = json.loads(manifest_path.read_text()).get("figures", {})
+
+    zoom_out = OUT / "wp07_staged" / "zoom"
+    zoom_out.mkdir(parents=True, exist_ok=True)
+
+    tiles, thumb = [], None
+    # Citywide pair first, then one tile per window per metric (produced or
+    # missing_boundary), in a stable order (sorted fig_id — never ranked).
+    for fig_id in sorted(figures):
+        fig = figures[fig_id]
+        title = fig_id.replace("f6_", "").replace("_", " ")
+        if fig["status"] != "produced":
+            reason = fig.get("reason", "not produced")
+            tiles.append(
+                f'<div class="pztile missing"><div class="pzph">{html.escape(reason)}</div>'
+                f'<div class="pzcap"><h3>{html.escape(title)}</h3>'
+                f'<p>{badge("amber", "missing_boundary")}</p></div></div>'
+            )
+            continue
+        png = fig.get("png_path")
+        if not png:
+            continue
+        dst = zoom_out / Path(png).name
+        if not dst.exists() or dst.stat().st_mtime < (run_dir / png).stat().st_mtime:
+            shutil.copy2(run_dir / png, dst)
+        img_url = f"/outputs/_hub/wp07_staged/zoom/{dst.name}"
+        thumb = thumb or img_url
+        attrs = _img_attrs(img_url)
+        thumb_src = attrs.get("thumb", img_url)
+        dims = f'{fig.get("png_width_px", "?")}×{fig.get("png_height_px", "?")} px'
+        window = fig.get("window")
+        meta = f'{dims} · {window["label"]}' if window else f'{dims} · citywide · {fig["aggregation"]["pixel_m"]:g} m/px'
+        cap = _pz_js_attr(title)
+        tiles.append(
+            f'<button type="button" class="pztile" '
+            f'onclick="pzOpen(\'{img_url}\',\'{cap}\')">'
+            f'<img src="{thumb_src}" alt="{html.escape(title)}" loading="lazy">'
+            f'<div class="pzcap"><h3>{html.escape(title)}</h3>'
+            f'<p>{html.escape(meta)}</p></div></button>'
+        )
+
+    if not tiles:
+        return None, None
+
+    crumb = breadcrumb([("← Project hub", "../../index.html"), ("WP-07 staged figures", "../index.html"),
+                        ("Zoom viewer", None)])
+    body = (
+        f'<style>{_PZ_CSS}</style>'
+        '<p class="lead">High-resolution citywide SVF/irradiation pair (docs/wp07_zoom_spec.md) plus '
+        'one native-resolution zoom extract per resolvable window from '
+        '<code>config/zoom_windows.yaml</code> — click any tile to pan/zoom (drag, scroll/pinch, '
+        'double-click to reset). Withheld under red line L1; nothing here is promoted.</p>'
+        + section("Zoom windows", tiles, anchor="zoom-windows")
+        + '<div id="pzov" hidden><button id="pzclose" aria-label="Close (Esc)">&times;</button>'
+        '<div id="pzstage"><img id="pzimg" alt=""></div><p id="pzcap"></p>'
+        '<p id="pzhint">drag to pan · scroll/pinch to zoom · double-click to reset · Esc to close</p></div>'
+        f'<script>{_PZ_JS}</script>'
+    )
+    out = zoom_out / "index.html"
+    out.write_text(_relativize(page(
+        "WP-07Z zoom viewer", badge("terra", f"{len(tiles)} windows · withheld · L1"),
+        body, crumb=crumb, provenance=prov), out.parent))
+    return "/outputs/_hub/wp07_staged/zoom/index.html", thumb
+
+
 def write_staged_figures_page(prov):
     """The WP07B staged C′ figures, discovered from the latest
     runs/wp07_figures_<UTC>/figure_manifest.json and existence-gated per PNG
@@ -1242,6 +1402,16 @@ def deliverables_section(prov):
             sf_url, img=sf_thumb, kind="amber", badge_label="Staged",
             meta="generated from the latest runs/wp07_figures_<UTC>/figure_manifest.json",
             new_tab=False, **(_img_attrs(sf_thumb) if sf_thumb else {})))
+    zv_url, zv_thumb = write_zoom_viewer_page(prov)
+    if zv_url:
+        cards.append(card(
+            "WP-07Z zoom viewer",
+            "High-resolution citywide SVF/irradiation pair plus a native-resolution "
+            "pan/zoom extract per study favela (Ipanema pending a bairro boundary layer) — "
+            "producer-declared withheld under red line L1.",
+            zv_url, img=zv_thumb, kind="terra", badge_label="Withheld · L1",
+            meta="generated from the latest runs/wp07_zoom_<UTC>/figure_manifest.json",
+            new_tab=False, **(_img_attrs(zv_thumb) if zv_thumb else {})))
     return section("Deliverables", cards, anchor="deliverables")
 
 
