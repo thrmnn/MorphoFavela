@@ -26,6 +26,7 @@ import re
 import subprocess
 import sys
 from datetime import datetime, timezone
+from itertools import groupby
 from pathlib import Path
 
 import matplotlib
@@ -34,11 +35,12 @@ matplotlib.use("Agg")
 import geopandas as gpd  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.ticker import FuncFormatter  # noqa: E402
+from matplotlib.transforms import blended_transform_factory  # noqa: E402
 import numpy as np  # noqa: E402
 import pyarrow.parquet as pq  # noqa: E402
 import yaml  # noqa: E402
 
-from .constants import REPO_ROOT  # noqa: E402
+from .constants import LAMBDA_F_CONSTRAINT_MIN, REPO_ROOT  # noqa: E402
 from .wp07_ledger import FAVELAS, LOCKED_VARIANT, RUN_OF_RECORD, SITE_DIRS  # noqa: E402
 from scripts import lint_p1_tokens as _lint  # noqa: E402
 
@@ -89,6 +91,15 @@ TABLE_H_SEARCH_NOTE = (
 # Athens Charter (1943), Point 26 — a fixed normative reference constant (an
 # external citation, not a pipeline measurement), so it is not a ledger read.
 ATHENS_CHARTER_FLOOR_HOURS = 2.0
+
+# WP-06's own geometry grid cell size — scripts/run_lateral_connectivity.py's
+# CELL_M, which src/brisa_solar/wp06_geometry.py imports and computes f4's
+# n_constraints on. Reproduced here rather than imported: that module chains
+# into outputs/paper_figures/fig_style (mkdir side effect on import), exactly
+# what this file's own module docstring says WP-07B avoids. f4's grid is
+# independent of the citywide 5 m sampling lattice used elsewhere in this
+# module — same repo, two different grids, not a discrepancy.
+WP06_GEOMETRY_CELL_M = 10.0
 
 _FORBIDDEN_COLUMNS = {"x", "y", "row", "col"}
 _COORD_RE = re.compile(r"(?<!\d)\d{6,7}(?!\d)")
@@ -175,6 +186,16 @@ def citywide_frame_pitch_m(repo_root: Path) -> float:
     wrong pitch is silently blank, which no gate would have caught."""
     path = Path(repo_root) / "runs" / RUN_OF_RECORD["wp05"] / "frame_diagnostics.json"
     return float(json.loads(path.read_text())["grid_cell_m"])
+
+
+def wp06_depth_median_m(repo_root: Path) -> float:
+    """The pooled median `open_edge_dist_m` across the five study sites —
+    src/brisa_solar/wp06_geometry.py::pooled_depth_median's own output, read
+    from the run of record rather than typed (docs/ventaxis_canonical.md
+    §2 "Lateral"). This is the threshold f4's `constraint_lateral` predicate
+    tests against."""
+    path = Path(repo_root) / "runs" / RUN_OF_RECORD["wp06"] / "summary.json"
+    return float(json.loads(path.read_text())["depth_median_m"])
 
 
 def site_ground_parquet_path(repo_root: Path, slug: str) -> Path:
@@ -327,7 +348,7 @@ def render_f2(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
                       f"ground.parquet absent for site(s): {', '.join(missing)}")
 
     ledger_ids: list[str] = []
-    fig, (axA, axB) = plt.subplots(1, 2, figsize=(7.6, 3.4), sharey=True)
+    fig, (axA, axB) = plt.subplots(1, 2, figsize=(7.6, 3.7), sharey=True)
     panels = (("A", "winter_solstice", "winter solstice", axA), ("B", "equinox", "equinox", axB))
     for tag, day_key, day_label, ax in panels:
         for slug in FIGURE_SITE_ORDER:
@@ -339,15 +360,27 @@ def render_f2(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
             share_val, _ = get_value(ledger, share_id)
             ledger_ids.append(share_id)
             ax.plot(frac, vals, color=COLORS[slug], linewidth=1.0,
-                    label=f"{display} (≥{fmt3(ATHENS_CHARTER_FLOOR_HOURS)} h: {fmt3(share_val)})")
+                    label=f"{display}: {fmt3(share_val)}")
         ax.axhline(ATHENS_CHARTER_FLOOR_HOURS, color="black", linewidth=0.8, linestyle=":")
         ax.text(0.01, ATHENS_CHARTER_FLOOR_HOURS, "Athens Charter (1943), Point 26",
                 fontsize=5.5, va="bottom")
         ax.set_xlabel("cumulative fraction of ground cells")
-        ax.set_title(tag, loc="left", fontsize=8)
-        ax.set_ylabel(f"direct-sun hours, {day_label} (h)" if tag == "A" else "")
-    axA.legend(fontsize=5, loc="upper left", frameon=False)
-    axB.legend(fontsize=5, loc="upper left", frameon=False)
+        # each panel titled with its own reference day — previously only "A"/
+        # "B", which told the reader nothing without cross-checking the code
+        # (PI review 2026-09-17: panel B carried no day label at all).
+        ax.set_title(f"{tag} — {day_label}", loc="left", fontsize=8)
+        ax.set_ylabel("direct-sun hours (h)" if tag == "A" else "")
+        # the legend's numbers are each site's share of ground cells at/above
+        # the floor below — say that once via the legend title rather than
+        # repeating it in every entry.
+        ax.legend(title=f"share ≥ {fmt3(ATHENS_CHARTER_FLOOR_HOURS)} h floor",
+                   fontsize=5, title_fontsize=5.5, loc="upper left", frameon=False)
+    # how to read the curve: sorted ascending, so a point (x, y) means "x
+    # fraction of this site's ground cells receive at most y hours of direct
+    # sun" — an inverted empirical CDF (fraction on x, value on y), which is
+    # not the conventional orientation.
+    fig.suptitle("Reading the curve: at fraction x, y is the direct-sun hours that fraction of "
+                 "ground cells receive at most (sorted ascending).", fontsize=6.5, y=1.01)
 
     source_parquets = [str(paths[slug].relative_to(repo_root)) for slug in FIGURE_SITE_ORDER]
     return _produced(fig, "f2_direct_sun_reference_days", out_dir, ledger_ids, source_parquets,
@@ -365,7 +398,7 @@ def render_f3(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
 
     ledger_ids: list[str] = []
     plotted_ids: list[str] = []
-    fig, ax = plt.subplots(figsize=(7.2, 3.6))
+    fig, ax = plt.subplots(figsize=(7.2, 4.0))
     x = np.arange(len(variants))
     locked_idx = next((i for i, (_, t, d) in enumerate(variants) if (t, d) == LOCKED_VARIANT), None)
 
@@ -381,19 +414,44 @@ def render_f3(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
         spread_val, _ = get_value(ledger, spread_id)
         ledger_ids.append(spread_id)
         ax.plot(x, ys, marker="o", markersize=3, linewidth=1.0, color=COLORS[slug],
-                label=f"{display} (spread {fmt3(spread_val)} pts)")
+                label=f"{display} (spread {fmt3(spread_val)} percentile points)")
         if locked_idx is not None:
             ax.annotate(fmt3(ys[locked_idx]), (x[locked_idx], ys[locked_idx]), xytext=(6, -2),
                         textcoords="offset points", ha="left", fontsize=5, color=COLORS[slug])
 
     if locked_idx is not None:
         ax.axvline(locked_idx, color="black", linewidth=0.8, linestyle=":")
-        ax.text(locked_idx, ax.get_ylim()[1], "locked domain", fontsize=5.5, ha="center", va="bottom")
+        ax.text(locked_idx, ax.get_ylim()[1],
+                 f"{LOCKED_VARIANT[0]:.0%} / {LOCKED_VARIANT[1]:g} m — variant of record (locked)",
+                 fontsize=5.5, ha="center", va="bottom")
 
+    # Two-level x-axis: each point is one (coverage threshold, footprint
+    # distance) grid variant from config/params.yaml's `domain` section
+    # (src/brisa_solar/g3_domain.py FABRIC_COVERAGE_GRID x
+    # FABRIC_FOOTPRINT_DISTANCE_GRID_M) — never re-typed here, both grouping
+    # and tick values come straight out of `variants`, itself parsed from the
+    # ledger ids actually present. A flat "0.05/5 m" tick reads as a
+    # fraction, not a pair, and gives no hint that 3 points share one
+    # coverage threshold — group by threshold and label each level
+    # separately instead (PI review 2026-09-17).
     ax.set_xticks(x)
-    ax.set_xticklabels([f"{t:g}/{d:g} m" for _, t, d in variants], rotation=45, ha="right")
-    ax.set_xlabel("grid variant (fabric coverage threshold / footprint distance)")
+    ax.set_xticklabels([f"{d:g} m" for _, _t, d in variants], rotation=0, ha="center", fontsize=6)
+    groups = [(t, [i for i, _ in idxs]) for t, idxs in
+              groupby(enumerate(variants), key=lambda iv: iv[1][1])]
+    trans = blended_transform_factory(ax.transData, ax.transAxes)
+    for t, idxs in groups:
+        center = sum(idxs) / len(idxs)
+        ax.text(center, -0.16, f"{t:.0%} fabric coverage", transform=trans,
+                fontsize=6, ha="center", va="top")
+        if idxs[0] > 0:
+            ax.axvline(idxs[0] - 0.5, color="0.85", linewidth=0.6, zorder=0)
+    ax.set_xlabel("footprint distance (m), grouped by fabric coverage threshold", labelpad=14)
     ax.set_ylabel("SVF percentile of citywide median")
+    ax.set_title(
+        "Coverage threshold and footprint distance jointly decide which ground cells count as\n"
+        "urban fabric (the citywide SVF denominator) — site ranking is stable across all "
+        f"{len(variants)} variants, only position shifts.",
+        fontsize=6.5, loc="left")
     ax.legend(fontsize=5, loc="best", frameon=False)
 
     return _produced(fig, "f3_domain_sensitivity", out_dir, ledger_ids, [], "publishable-candidate",
@@ -406,10 +464,13 @@ def render_f3(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
 
 def render_f4(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
     ledger_ids: list[str] = []
-    fig, ax = plt.subplots(figsize=(6.2, 3.6))
+    fig, ax = plt.subplots(figsize=(6.2, 4.1))
     x = np.arange(len(FIGURE_SITE_ORDER))
     bottoms = np.zeros(len(FIGURE_SITE_ORDER))
-    shades = ["#E8E8E8", "#B8B8D0", "#7878A8", "#383868"]
+    shades = ["#E8E8E8", "#B8B8D0", "#7878A8", "#383868"]  # light -> dark == 0 -> 3 constraints
+    # labels spell out both ends so "0" and "3" never need inferring from shade alone
+    k_labels = {0: "0 of 3 (none triggered)", 1: "1 of 3", 2: "2 of 3",
+                3: "3 of 3 (all triggered)"}
 
     for k in range(4):
         vals = []
@@ -420,7 +481,7 @@ def render_f4(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
             vals.append(val)
         vals = np.array(vals)
         ax.bar(x, vals, bottom=bottoms, color=shades[k], edgecolor="white", linewidth=0.4,
-               label=f"{k} constraint{'s' if k != 1 else ''}")
+               label=k_labels[k])
         for xi, (v, b) in enumerate(zip(vals, bottoms)):
             if v > 0:
                 ax.text(xi, b + v / 2, fmt3(v), ha="center", va="center", fontsize=5.5)
@@ -434,9 +495,21 @@ def render_f4(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
 
     ax.set_xticks(x)
     ax.set_xticklabels([FAVELAS[s] for s in FIGURE_SITE_ORDER], rotation=20, ha="right")
-    ax.set_ylabel("share of built 10 m grid cells (fraction)")
+    # WP06_GEOMETRY_CELL_M names this figure's own grid explicitly so it
+    # reads as a different (and independent) grid from the citywide 5 m
+    # sampling lattice, not a discrepancy between the two (PI review
+    # 2026-09-17).
+    ax.set_ylabel(f"share of built {WP06_GEOMETRY_CELL_M:g} m grid cells (WP-06's own geometry grid)")
     ax.set_ylim(0, 1.14)
-    ax.legend(fontsize=5.5, loc="upper center", ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.22))
+    ax.legend(title="constraints triggered", fontsize=5.5, title_fontsize=6, loc="upper center",
+              ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.22))
+
+    depth_median_m = wp06_depth_median_m(repo_root)
+    ax.set_title(
+        "Constraints (docs/ventaxis_canonical.md): vertical — "
+        f"$\\lambda_f$ mean $\\geq$ {LAMBDA_F_CONSTRAINT_MIN:g} · lateral — open-edge distance "
+        f"$\\geq$ {depth_median_m:.1f} m (pooled median) · directional — exposure ratio $\\geq$ 1.0",
+        fontsize=6, loc="left")
 
     return _produced(fig, "f4_geometry_constraints", out_dir, ledger_ids, [], "publishable-candidate")
 
