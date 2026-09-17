@@ -19,11 +19,13 @@ ROOT = Path(__file__).resolve().parents[1]
 THUMB_W = 1100
 
 
-def _latest(glob: str) -> Path:
-    hits = sorted(d for d in (ROOT / "runs").glob(glob) if d.is_dir())
-    if not hits:
-        raise FileNotFoundError(f"no run matching runs/{glob}")
-    return hits[-1]
+def _latest(glob: str) -> Path | None:
+    """Newest run holding images. Returns None rather than raising: a family
+    still being produced should leave its section out, not break the folder."""
+    hits = sorted(d for d in (ROOT / "runs").glob(glob)
+                  if d.is_dir() and (d / "figure_manifest.json").is_file()
+                  and list(d.glob("*.png")))
+    return hits[-1] if hits else None
 
 
 def _wp_by_figure(run_dir: Path) -> dict[str, str]:
@@ -87,12 +89,20 @@ SECTIONS = [
      "Sky-view and irradiation across the whole 8.4 M-cell domain. Withheld under red line L1 — yours to read, not to circulate.",
      lambda: _latest("wp07_map_*")),
     ("03_zoom_favelas", "Per-favela zoom extracts",
-     "Each study favela at the run's 5 m sampling pitch, sharing the citywide colour limits. Ipanema is absent: no bairro boundary exists on disk.",
+     "Each study favela at the run's sampling pitch, sharing the citywide colour limits. Ipanema is absent: no bairro boundary exists on disk.",
      lambda: _latest("wp07_zoom_*")),
+    ("04_terrain_vs_buildings", "Terrain versus buildings",
+     "How much of the sun lost to an open flat horizon is the hill, and how much is what was built on it. "
+     "The maps put terrain-only beside terrain-with-buildings on one colour scale.",
+     lambda: _latest("terrain_split_*")),
+    ("05_method_schematics", "How the method works",
+     "The obstruction surface built from terrain and building tops, the ray march that decides whether a sky "
+     "patch is blocked, and the matrix step that turns visibility into irradiation.",
+     lambda: _latest("wp07_method_*")),
 ]
 
 EXTRA = {
-    "04_morphotypes": (
+    "06_morphotypes": (
         "Morphotypes and morphotopes",
         "The cross-site signature work the weekly deck draws on.",
         [ROOT / "outputs/cross_site/signature/figures_v2" / n for n in (
@@ -103,13 +113,13 @@ EXTRA = {
             "k_selection_rigor.png", "experience_dotplots.png",
         )] + [ROOT / "outputs/cross_site/presentation_figures/fig_morpho_violins.png"],
     ),
-    "05_folha_de_rua": (
+    "07_folha_de_rua": (
         "Folha de Rua site sheets",
         "One A3 sheet per site: grid, terrain, density, then sky view and sunlight.",
         sorted(ROOT.glob("outputs/_distribution/site_dashboards/*/folha_*_A3.png"))
         + sorted(ROOT.glob("outputs/_distribution/site_dashboards/*/folha_*.pdf")),
     ),
-    "06_weekly_deck": (
+    "08_weekly_deck": (
         "Weekly update deck (W39)",
         "Tomorrow's deck and its contact sheet.",
         [Path.home() / "SCL/SCR/brisaverse/slides/brisa_wk39_update.pdf",
@@ -148,6 +158,8 @@ def build(out_root: Path) -> dict:
 
     for slug, title, blurb, resolve in SECTIONS:
         run_dir = resolve()
+        if run_dir is None:
+            continue
         classes = _manifest_classes(run_dir)
         wps = _wp_by_figure(run_dir)
         for name in sorted(classes):
@@ -163,6 +175,13 @@ def build(out_root: Path) -> dict:
             _copy(src, out_root / slug, {}, entries, slug)
         sections.append({"slug": slug, "title": title, "blurb": blurb,
                          "provenance": "existing outputs/ and slides/ products"})
+
+    # Drop section directories this build did not write. Renaming a section
+    # otherwise leaves its old copy behind and the PI sees it twice.
+    written = {s["slug"] for s in sections}
+    for child in out_root.iterdir():
+        if child.is_dir() and child.name not in written:
+            shutil.rmtree(child)
 
     manifest = {
         "_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
