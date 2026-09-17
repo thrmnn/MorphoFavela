@@ -594,11 +594,11 @@ def _add_scalebar_north(ax, bounds: tuple[float, float, float, float]) -> None:
                 arrowprops=dict(arrowstyle="-|>", color="black", lw=1.0))
 
 
-def _save_and_checklist_map(fig, fig_id: str, out_dir: Path) -> tuple[str, str, dict]:
+def _save_and_checklist_map(fig, fig_id: str, out_dir: Path, dpi: int = DPI) -> tuple[str, str, dict]:
     svg_path = out_dir / f"{fig_id}.svg"
     png_path = out_dir / f"{fig_id}.png"
     fig.savefig(svg_path, format="svg", bbox_inches="tight")
-    fig.savefig(png_path, format="png", dpi=DPI, bbox_inches="tight")
+    fig.savefig(png_path, format="png", dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
     raw = svg_path.read_text()
@@ -621,8 +621,8 @@ def _skip_map(fig_id: str, reason: str) -> dict:
 
 
 def _produced_map(fig, fig_id: str, out_dir: Path, source_parquets: list[str],
-                   aggregation: dict, colormap: dict, boundary_note: dict) -> dict:
-    svg_name, png_name, checklist = _save_and_checklist_map(fig, fig_id, out_dir)
+                   aggregation: dict, colormap: dict, boundary_note: dict, dpi: int = DPI) -> dict:
+    svg_name, png_name, checklist = _save_and_checklist_map(fig, fig_id, out_dir, dpi=dpi)
     return {
         "id": fig_id,
         "status": "produced",
@@ -803,6 +803,13 @@ def stage_map(repo_root: Path, out_dir: Path | None = None, pixel_m: float | Non
 
 ZOOM_TARGET_PIXEL_M = 10.0  # the citywide pair's default resolution (item 2)
 ZOOM_NATIVE_PIXEL_M = 1.0   # window renders: the run-of-record's native cell
+# The citywide pair's point is a PNG a reader can zoom into, so its panels are
+# sized so ~1 output pixel maps to ~1 aggregated grid cell (unlike f5/f5b,
+# whose fixed MAP_TARGET_MAX_PX=1024 is a print-size choice). Both numbers
+# below are rendering choices (DPI, a size cap bounding render time/memory
+# and file size), never measured quantities.
+ZOOM_SAVE_DPI = 100.0
+ZOOM_MAX_PANEL_INCHES = 45.0
 
 
 def zoom_windows_path(repo_root: Path) -> Path:
@@ -946,7 +953,13 @@ def render_citywide_zoom(ledger: dict, repo_root: Path, out_dir: Path,
         "kwh_m2": (float(np.nanmin(means["kwh_m2"])), float(np.nanmax(means["kwh_m2"]))),
     }
 
-    fig, (axA, axB) = plt.subplots(1, 2, figsize=(9.6, 4.8))
+    # Panels sized so the saved PNG holds close to one pixel per aggregated
+    # grid cell (capped so render time/memory/file size stay bounded) — the
+    # whole point of a 10 m citywide pair is a raster worth zooming into,
+    # unlike f5/f5b's fixed print-size MAP_TARGET_MAX_PX.
+    panel_w_in = min(nx / ZOOM_SAVE_DPI, ZOOM_MAX_PANEL_INCHES)
+    panel_h_in = min(ny / ZOOM_SAVE_DPI, ZOOM_MAX_PANEL_INCHES)
+    fig, (axA, axB) = plt.subplots(1, 2, figsize=(2 * panel_w_in + 1.2, panel_h_in + 0.6))
     panels = (
         (axA, "svf", "sky-view factor (fraction)", MAP_CMAP_SVF),
         (axB, "kwh_m2", "annual ground irradiation (kWh m$^{-2}$)", MAP_CMAP_KWH),
@@ -967,6 +980,8 @@ def render_citywide_zoom(ledger: dict, repo_root: Path, out_dir: Path,
         "pixel_m": pixel_m,
         "grid_shape_rows_cols": [ny, nx],
         "n_cells_aggregated": int(n_cells),
+        "save_dpi": ZOOM_SAVE_DPI,
+        "max_panel_inches": ZOOM_MAX_PANEL_INCHES,
     }
     boundary_note = {
         "matched_favelas": sorted(boundaries),
@@ -975,7 +990,7 @@ def render_citywide_zoom(ledger: dict, repo_root: Path, out_dir: Path,
     }
     result = _produced_map(fig, fig_id, out_dir, [str(path.relative_to(repo_root))],
                             aggregation, {"panel_A_svf": MAP_CMAP_SVF, "panel_B_kwh_m2": MAP_CMAP_KWH},
-                            boundary_note)
+                            boundary_note, dpi=int(ZOOM_SAVE_DPI))
     result["color_limits"] = {"svf": list(color_limits["svf"]), "kwh_m2": list(color_limits["kwh_m2"])}
     result.update(_png_dims_bytes(out_dir / result["png_path"]))
     return result, bounds, color_limits
