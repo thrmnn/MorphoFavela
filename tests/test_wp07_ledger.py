@@ -175,6 +175,31 @@ def test_favela_percentiles_match_wp05_and_g3_base_variant(ledger):
 
 # --- write_ledger produces a tracked-shape run folder ---
 
+# --- (h) CITYHOURS extension: new ids added, every pre-existing value held ---
+
+PREEXISTING_LEDGER = RUNS / "wp07_ledger_20260916T164906Z" / "ledger.json"
+
+
+@pytest.mark.skipif(not PREEXISTING_LEDGER.exists(), reason="pre-CITYHOURS ledger snapshot absent")
+def test_cityhours_entries_added_and_preexisting_values_unchanged(ledger):
+    preexisting = json.loads(PREEXISTING_LEDGER.read_text())
+    assert len(preexisting["entries"]) == 371, "the pre-CITYHOURS ledger this test pins against has drifted"
+
+    for entry_id, old_entry in preexisting["entries"].items():
+        assert entry_id in ledger["entries"], f"{entry_id}: dropped by the CITYHOURS extension"
+        assert ledger["entries"][entry_id]["value"] == old_entry["value"], (
+            f"{entry_id}: value changed by the CITYHOURS extension "
+            f"({old_entry['value']!r} -> {ledger['entries'][entry_id]['value']!r})"
+        )
+
+    new_ids = set(ledger["entries"]) - set(preexisting["entries"])
+    assert len(new_ids) == 437 - 371, f"expected 66 new CITYHOURS ids, got {len(new_ids)}"
+    for entry_id in new_ids:
+        assert entry_id.startswith("citywide.sun_h_") or entry_id.startswith("citywide.share_ge_") or (
+            entry_id.startswith("favela.") and ".sun_h_" in entry_id
+        ), f"unexpected new id outside the CITYHOURS families: {entry_id}"
+
+
 def test_write_ledger_writes_json_md_manifest(tmp_path):
     run_dir = w.write_ledger(ROOT, tmp_path / "wp07_ledger_test")
     assert (run_dir / "ledger.json").exists()

@@ -1,0 +1,20 @@
+{
+ "_utc": "2026-09-17T04:57:00Z",
+ "sky": {
+  "patches": 145
+ },
+ "cell_m": 1.0,
+ "max_dist_m": 500.0,
+ "tile_m": 2000.0,
+ "march_sampling": "nearest",
+ "frame_source": "runs/wp05_full_20260914T215419Z/frame_cells.parquet (reused verbatim)",
+ "device": "cuda",
+ "torch_version": "2.4.1+cu121",
+ "git_sha": "ae041aa",
+ "n_tiles_total": 325,
+ "n_tiles_done": 325,
+ "wall_s": 2430.6609103449737,
+ "n_cells_consolidated": 8402056,
+ "reproduction_check_pass": true,
+ "run_design_status": "PROVISIONAL \u2014 wp05_run_design untapped"
+}

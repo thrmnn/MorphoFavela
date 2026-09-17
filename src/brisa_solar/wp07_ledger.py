@@ -31,7 +31,15 @@ RUN_OF_RECORD = {
     "g3": "g3_domain_20260915T042927Z",
     "wp06": "wp06_geometry_20260915T052604Z",
     "wp02_crossref": "wp02_horizon_20260914T195630Z",
+    "cityhours": "cityhours_full_20260917T041544Z",
 }
+
+#: docs/cityhours_spec.md ids use "sun_h_winter"/"sun_h_equinox" (the same
+#: slug WP-04's own site.*.sun_h_winter/sun_h_equinox entries already use,
+#: below) — cityhours_full's summary.json keys its two reference days by
+#: their full config/params.yaml label instead ("winter_solstice"/"equinox");
+#: this is the one place that translates between the two spellings.
+CITYHOURS_LABELS = {"winter_solstice": "winter", "equinox": "equinox"}
 
 #: engine.crossref.* comes from this run's crossref_diagnostic.json, variant
 #: A_nearest_sampling (march_sampling="nearest", r=0.9945) — the nearest-cell
@@ -179,6 +187,36 @@ def _build_sites(entries: dict, repo_root: Path, run_id: str) -> None:
                  f"/ground/threshold_shares/{share_key}", run_id, run_utc, "fraction")
 
 
+def _build_cityhours(entries: dict, doc: dict, rel: str, run_id: str) -> None:
+    """citywide.sun_h_*, citywide.share_ge_*h_*, favela.<slug>.sun_h_*.* —
+    docs/cityhours_spec.md's "Ledger" section. Reads runs/cityhours_full_*/
+    summary.json, the route-(b) (continuous-horizon) sun-hours only — route
+    (a) never enters summary.json in the first place, so there is no way to
+    accidentally ledger it here."""
+    run_utc = doc["_utc"]
+    for label, slug in CITYHOURS_LABELS.items():
+        base = f"/citywide/sun_h_{label}"
+        for pct in CITYWIDE_PERCENTILES:
+            _add(entries, doc, rel, f"citywide.sun_h_{slug}.{pct}",
+                 f"{base}/{pct}", run_id, run_utc, "hours")
+        share_base = f"/citywide/share_ge_{label}"
+        for k in (1, 2, 3, 4):
+            _add(entries, doc, rel, f"citywide.share_ge_{k}h_{slug}",
+                 f"{share_base}/share_ge_{k}h", run_id, run_utc, "fraction")
+
+    for slug_fav, display in FAVELAS.items():
+        for label, slug in CITYHOURS_LABELS.items():
+            base = f"/study_favelas/{display}/sun_h_{label}"
+            _add(entries, doc, rel, f"favela.{slug_fav}.sun_h_{slug}.median",
+                 f"{base}/median", run_id, run_utc, "hours")
+            _add(entries, doc, rel, f"favela.{slug_fav}.sun_h_{slug}.percentile",
+                 f"{base}/citywide_percentile_position", run_id, run_utc, "percentile")
+            _add(entries, doc, rel, f"favela.{slug_fav}.sun_h_{slug}.iqr_low",
+                 f"{base}/iqr/0", run_id, run_utc, "hours")
+            _add(entries, doc, rel, f"favela.{slug_fav}.sun_h_{slug}.iqr_high",
+                 f"{base}/iqr/1", run_id, run_utc, "hours")
+
+
 def _build_g3(entries: dict, g3: dict, g3_rel: str, run_id: str) -> None:
     run_utc = g3["_utc"]
     for i, variant in enumerate(g3["variants"]):
@@ -257,6 +295,7 @@ def build_ledger(repo_root: Path) -> dict:
     g3, g3_rel = _load(repo_root, RUN_OF_RECORD["g3"], "sensitivity.json")
     wp06, wp06_rel = _load(repo_root, RUN_OF_RECORD["wp06"], "summary.json")
     crossref, crossref_rel = _load(repo_root, RUN_OF_RECORD["wp02_crossref"], CROSSREF_FILE)
+    cityhours, cityhours_rel = _load(repo_root, RUN_OF_RECORD["cityhours"], "summary.json")
 
     entries: dict[str, dict] = {}
     _build_citywide(entries, wp05, wp05_rel, RUN_OF_RECORD["wp05"])
@@ -265,6 +304,7 @@ def build_ledger(repo_root: Path) -> dict:
     _build_g3(entries, g3, g3_rel, RUN_OF_RECORD["g3"])
     _build_wp06(entries, wp06, wp06_rel, RUN_OF_RECORD["wp06"])
     _build_engine(entries, crossref, crossref_rel, RUN_OF_RECORD["wp02_crossref"])
+    _build_cityhours(entries, cityhours, cityhours_rel, RUN_OF_RECORD["cityhours"])
 
     derived = build_derived(g3)
 

@@ -1,0 +1,15 @@
+{
+ "_utc": "2026-09-17T04:56:47Z",
+ "n_matched": 8402056,
+ "never_published": true,
+ "winter_solstice": {
+  "corr_a_vs_b": 0.9900273005432307,
+  "median_abs_diff_a_vs_b_hours": 0.33333301544189453,
+  "p95_abs_diff_a_vs_b_hours": 0.8333339691162109
+ },
+ "equinox": {
+  "corr_a_vs_b": 0.9856442351554506,
+  "median_abs_diff_a_vs_b_hours": 0.33333301544189453,
+  "p95_abs_diff_a_vs_b_hours": 1.0
+ }
+}
