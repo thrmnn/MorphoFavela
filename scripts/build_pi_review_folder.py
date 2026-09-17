@@ -15,6 +15,8 @@ from pathlib import Path
 
 from PIL import Image
 
+Image.MAX_IMAGE_PIXELS = None  # the citywide pair is 21298x6211 by design
+
 ROOT = Path(__file__).resolve().parents[1]
 THUMB_W = 1100
 
@@ -133,22 +135,70 @@ def _copy(src: Path, dest_dir: Path, meta: dict, entries: list, section: str) ->
         entries.append({"section": section, "file": src.name, "status": "MISSING", "source": str(src)})
         return
     dest_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dest_dir / src.name)
+    dest = dest_dir / src.name
+    if dest.exists():
+        dest.unlink()
+    try:
+        os.link(src, dest)
+    except OSError:
+        shutil.copy2(src, dest)
     row = {"section": section, "file": src.name, "status": "ok",
            "source": str(src.relative_to(ROOT)) if ROOT in src.parents else str(src)}
     row.update({k: v for k, v in meta.items() if v is not None})
     if src.suffix.lower() == ".png":
-        with Image.open(src) as im:
-            row["pixels"] = list(im.size)
-            thumb = im.copy()
-            if im.width > THUMB_W:
+        try:
+            with Image.open(src) as im:
+                row["pixels"] = list(im.size)
+                im.draft("RGB", (THUMB_W, THUMB_W))
+                thumb = im.copy()
                 thumb.thumbnail((THUMB_W, THUMB_W * 4))
-            tdir = dest_dir / "_thumbs"
-            tdir.mkdir(exist_ok=True)
-            thumb.convert("RGB").save(tdir / (src.stem + ".jpg"), quality=86)
-        row["thumb"] = f"_thumbs/{src.stem}.jpg"
+                tdir = dest_dir / "_thumbs"
+                tdir.mkdir(exist_ok=True)
+                thumb.convert("RGB").save(tdir / (src.stem + ".jpg"), quality=84)
+            row["thumb"] = f"_thumbs/{src.stem}.jpg"
+        except Exception as exc:
+            row["thumb_error"] = type(exc).__name__
     row["bytes"] = src.stat().st_size
     entries.append(row)
+
+
+# Everything else that already exists under outputs/. Archived snapshots and the
+# audit dashboards are excluded: they are stale copies, and showing the PI the
+# same figure three times is worse than not showing it.
+SWEEP_EXCLUDE = ("_review", "_thumbs", "/thumbs/", "_archive_",
+                 "_distribution/audit", "_hub/wp07_staged", "_hub/thumbs")
+SWEEP_SUFFIXES = (".png", ".svg", ".pdf")
+
+
+def sweep_remaining(out_root: Path, already: set, entries: list) -> list:
+    """Hardlink every other figure on disk, deduplicated by content. Grouped by
+    the directory it came from, because that is what says which analysis it
+    belongs to."""
+    import hashlib
+    from collections import defaultdict
+
+    seen_hashes = set()
+    groups = defaultdict(list)
+    for src in sorted((ROOT / "outputs").rglob("*")):
+        if src.suffix.lower() not in SWEEP_SUFFIXES or not src.is_file():
+            continue
+        t = str(src)
+        if any(x in t for x in SWEEP_EXCLUDE) or src.name in already:
+            continue
+        h = hashlib.md5(src.read_bytes()).hexdigest()
+        if h in seen_hashes:
+            continue
+        seen_hashes.add(h)
+        groups[src.parent.relative_to(ROOT / "outputs").as_posix()].append(src)
+
+    sections = []
+    for i, (rel, srcs) in enumerate(sorted(groups.items())):
+        slug = "09_other/" + rel.replace("/", "__")
+        for src in srcs:
+            _copy(src, out_root / slug, {}, entries, slug)
+        sections.append({"slug": slug, "title": rel, "blurb": "",
+                         "provenance": f"outputs/{rel}", "group": "other"})
+    return sections
 
 
 def build(out_root: Path) -> dict:
@@ -178,10 +228,13 @@ def build(out_root: Path) -> dict:
 
     # Drop section directories this build did not write. Renaming a section
     # otherwise leaves its old copy behind and the PI sees it twice.
-    written = {s["slug"] for s in sections}
+    written = {s["slug"].split("/")[0] for s in sections}
     for child in out_root.iterdir():
         if child.is_dir() and child.name not in written:
             shutil.rmtree(child)
+
+    already = {e["file"] for e in entries if e["status"] == "ok"}
+    sections.extend(sweep_remaining(out_root, already, entries))
 
     manifest = {
         "_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -218,17 +271,52 @@ border:1px solid var(--line);margin-right:5px}
 .withheld{color:var(--warn);border-color:var(--warn)}
 .wp{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
 a{color:inherit}.nolink{padding:9px 11px;font-size:13px}
+.toc{border:1px solid var(--line);border-radius:8px;padding:16px 18px;background:#fff;margin-bottom:8px}
+.toc ul{list-style:none;margin:8px 0 16px;padding:0;display:grid;
+grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:2px 18px}
+.toc.cols ul,.toc ul.cols{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.toc li{font-size:13px;padding:2px 0}
+.toc .n{color:var(--dim);font-variant-numeric:tabular-nums}
+h2.divider{margin-top:56px;padding-top:22px;border-top:2px solid var(--line)}
 </style>
 <header><h1>Figure review</h1>
 <p class="blurb">Every figure this cycle produced, in one place. Cards marked
 <span class="tag withheld">withheld · L1</span> are yours to read; they do not travel into
 the paper or shared figures without your own tap.</p></header>"""]
-    for s in m["sections"]:
+    live = [s for s in m["sections"] if by_section.get(s["slug"])]
+    curated = [s for s in live if s.get("group") != "other"]
+    other = [s for s in live if s.get("group") == "other"]
+
+    def anchor(sl):
+        return "s-" + sl.replace("/", "-").replace("__", "-")
+
+    parts.append('<nav class="toc"><strong>This review</strong><ul>')
+    for s in curated:
+        parts.append(f'<li><a href="#{anchor(s["slug"])}">{s["title"]}</a> '
+                     f'<span class="n">{len(by_section[s["slug"]])}</span></li>')
+    parts.append('</ul>')
+    if other:
+        n = sum(len(by_section[s["slug"]]) for s in other)
+        parts.append(f'<strong>Everything else on disk</strong> '
+                     f'<span class="n">{n} figures in {len(other)} folders</span><ul class="cols">')
+        for s in other:
+            parts.append(f'<li><a href="#{anchor(s["slug"])}">{s["title"]}</a> '
+                         f'<span class="n">{len(by_section[s["slug"]])}</span></li>')
+        parts.append('</ul>')
+    parts.append('</nav>')
+
+    for idx, s in enumerate(curated + other):
         rows = by_section.get(s["slug"], [])
         if not rows:
             continue
-        parts.append(f'<h2>{s["title"]}</h2><p class="blurb">{s["blurb"]}</p>'
-                     f'<p class="prov">{s["provenance"]}</p><div class="grid">')
+        if other and s is other[0]:
+            parts.append('<h2 class="divider">Everything else on disk</h2>'
+                         '<p class="blurb">Every other figure under outputs/, deduplicated by content and '
+                         'grouped by the folder it came from. These are earlier and ongoing analyses, not a '
+                         'curated set, and some predate the current reframe.</p>')
+        parts.append(f'<h2 id="{anchor(s["slug"])}">{s["title"]}</h2>'
+                     + (f'<p class="blurb">{s["blurb"]}</p>' if s["blurb"] else "")
+                     + f'<p class="prov">{s["provenance"]}</p><div class="grid">')
         for e in rows:
             if e["status"] == "MISSING":
                 parts.append(f'<figure><div class="nolink">missing: <span class="name">{e["file"]}</span></div></figure>')
