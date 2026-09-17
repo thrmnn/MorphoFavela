@@ -8,7 +8,7 @@ A Python pipeline for the morphometric and CFD-coupled analysis of pedestrian-le
 - Generates a **stratified CFD sampling campaign** (119 patches across 5 sites, 12-strata SVF × slope × λp grid, 80 m maximin spacing, 250 m circular domain)
 - Ingests measured **wind input** (INMET BDMEP + Iowa ASOS METAR) into per-site `wind_rose.json` for annual weighting
 - Specifies a **CFD I/O contract** and ingests OpenFOAM-derived wind fields when they return from the simulation cluster
-- Produces the **technical report** ([`docs/technical_report/`](docs/technical_report/)) and Nature Cities paper figures
+- Produces the **technical report** ([`docs/technical_report/`](docs/technical_report/technical_report.md)) and Nature Cities paper figures
 
 **What this repo does NOT do**
 
@@ -329,7 +329,7 @@ See [`docs/README.md`](docs/README.md) for a one-line summary of each.
   with the code): [`docs/technical_report/technical_report.md`](docs/technical_report/technical_report.md)
   + [`.pdf`](docs/technical_report/technical_report.pdf). Rebuild
   with `python docs/technical_report/build_pdf.py`.
-- **Methodology** (per-feature deep dives): [`docs/methodology/`](docs/methodology/)
+- **Methodology** (per-feature deep dives): [`docs/methodology/`](docs/methodology/morphometric_indicators.md)
   — sky-exposure plane, street-level SVF, the 12 morphometric indicators.
 - **Workflow patterns**: [`docs/workflow_patterns.md`](docs/workflow_patterns.md)
   — the council-of-experts + judge-panel + per-entity build pattern
