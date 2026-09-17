@@ -8,6 +8,7 @@ Seeing an artefact and releasing it are different acts (2026-09-17).
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -193,10 +194,28 @@ the paper or shared figures without your own tap.</p></header>"""]
     return "\n".join(parts)
 
 
+# The PI browses this from a file manager, where a symlink shows up as a single
+# file rather than a folder. The repo copy is what the hub mirrors; this one is
+# a hard-linked twin, so it is a real directory that costs no extra disk.
+WEEKLY_RM = Path.home() / "SCL" / "SCR" / "weekly RM"
+
+
+def mirror_to_weekly_rm(built: Path, date_slug: str) -> Path:
+    dest = WEEKLY_RM / date_slug
+    if dest.exists():
+        shutil.rmtree(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(built, dest, copy_function=os.link)
+    return dest
+
+
 if __name__ == "__main__":
     import sys
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "outputs" / "_review" / "latest"
+    date_slug = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "outputs" / "_review" / date_slug
     man = build(out)
+    twin = mirror_to_weekly_rm(out, out.name)
+    print(f"also at {twin}")
     ok = sum(1 for e in man["files"] if e["status"] == "ok")
     missing = [e["file"] for e in man["files"] if e["status"] == "MISSING"]
     print(f"{out}: {ok} files in {len(man['sections'])} sections")
