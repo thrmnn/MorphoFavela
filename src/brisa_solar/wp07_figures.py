@@ -26,6 +26,7 @@ import re
 import subprocess
 import sys
 from datetime import datetime, timezone
+from itertools import groupby
 from pathlib import Path
 
 import matplotlib
@@ -34,11 +35,12 @@ matplotlib.use("Agg")
 import geopandas as gpd  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.ticker import FuncFormatter  # noqa: E402
+from matplotlib.transforms import blended_transform_factory  # noqa: E402
 import numpy as np  # noqa: E402
 import pyarrow.parquet as pq  # noqa: E402
 import yaml  # noqa: E402
 
-from .constants import REPO_ROOT  # noqa: E402
+from .constants import LAMBDA_F_CONSTRAINT_MIN, REPO_ROOT  # noqa: E402
 from .wp07_ledger import FAVELAS, LOCKED_VARIANT, RUN_OF_RECORD, SITE_DIRS  # noqa: E402
 from scripts import lint_p1_tokens as _lint  # noqa: E402
 
@@ -89,6 +91,15 @@ TABLE_H_SEARCH_NOTE = (
 # Athens Charter (1943), Point 26 — a fixed normative reference constant (an
 # external citation, not a pipeline measurement), so it is not a ledger read.
 ATHENS_CHARTER_FLOOR_HOURS = 2.0
+
+# WP-06's own geometry grid cell size — scripts/run_lateral_connectivity.py's
+# CELL_M, which src/brisa_solar/wp06_geometry.py imports and computes f4's
+# n_constraints on. Reproduced here rather than imported: that module chains
+# into outputs/paper_figures/fig_style (mkdir side effect on import), exactly
+# what this file's own module docstring says WP-07B avoids. f4's grid is
+# independent of the citywide 5 m sampling lattice used elsewhere in this
+# module — same repo, two different grids, not a discrepancy.
+WP06_GEOMETRY_CELL_M = 10.0
 
 _FORBIDDEN_COLUMNS = {"x", "y", "row", "col"}
 _COORD_RE = re.compile(r"(?<!\d)\d{6,7}(?!\d)")
@@ -175,6 +186,16 @@ def citywide_frame_pitch_m(repo_root: Path) -> float:
     wrong pitch is silently blank, which no gate would have caught."""
     path = Path(repo_root) / "runs" / RUN_OF_RECORD["wp05"] / "frame_diagnostics.json"
     return float(json.loads(path.read_text())["grid_cell_m"])
+
+
+def wp06_depth_median_m(repo_root: Path) -> float:
+    """The pooled median `open_edge_dist_m` across the five study sites —
+    src/brisa_solar/wp06_geometry.py::pooled_depth_median's own output, read
+    from the run of record rather than typed (docs/ventaxis_canonical.md
+    §2 "Lateral"). This is the threshold f4's `constraint_lateral` predicate
+    tests against."""
+    path = Path(repo_root) / "runs" / RUN_OF_RECORD["wp06"] / "summary.json"
+    return float(json.loads(path.read_text())["depth_median_m"])
 
 
 def site_ground_parquet_path(repo_root: Path, slug: str) -> Path:
@@ -327,7 +348,7 @@ def render_f2(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
                       f"ground.parquet absent for site(s): {', '.join(missing)}")
 
     ledger_ids: list[str] = []
-    fig, (axA, axB) = plt.subplots(1, 2, figsize=(7.6, 3.4), sharey=True)
+    fig, (axA, axB) = plt.subplots(1, 2, figsize=(7.6, 3.7), sharey=True)
     panels = (("A", "winter_solstice", "winter solstice", axA), ("B", "equinox", "equinox", axB))
     for tag, day_key, day_label, ax in panels:
         for slug in FIGURE_SITE_ORDER:
@@ -339,15 +360,27 @@ def render_f2(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
             share_val, _ = get_value(ledger, share_id)
             ledger_ids.append(share_id)
             ax.plot(frac, vals, color=COLORS[slug], linewidth=1.0,
-                    label=f"{display} (≥{fmt3(ATHENS_CHARTER_FLOOR_HOURS)} h: {fmt3(share_val)})")
+                    label=f"{display}: {fmt3(share_val)}")
         ax.axhline(ATHENS_CHARTER_FLOOR_HOURS, color="black", linewidth=0.8, linestyle=":")
         ax.text(0.01, ATHENS_CHARTER_FLOOR_HOURS, "Athens Charter (1943), Point 26",
                 fontsize=5.5, va="bottom")
         ax.set_xlabel("cumulative fraction of ground cells")
-        ax.set_title(tag, loc="left", fontsize=8)
-        ax.set_ylabel(f"direct-sun hours, {day_label} (h)" if tag == "A" else "")
-    axA.legend(fontsize=5, loc="upper left", frameon=False)
-    axB.legend(fontsize=5, loc="upper left", frameon=False)
+        # each panel titled with its own reference day — previously only "A"/
+        # "B", which told the reader nothing without cross-checking the code
+        # (PI review 2026-09-17: panel B carried no day label at all).
+        ax.set_title(f"{tag} — {day_label}", loc="left", fontsize=8)
+        ax.set_ylabel("direct-sun hours (h)" if tag == "A" else "")
+        # the legend's numbers are each site's share of ground cells at/above
+        # the floor below — say that once via the legend title rather than
+        # repeating it in every entry.
+        ax.legend(title=f"share ≥ {fmt3(ATHENS_CHARTER_FLOOR_HOURS)} h floor",
+                   fontsize=5, title_fontsize=5.5, loc="upper left", frameon=False)
+    # how to read the curve: sorted ascending, so a point (x, y) means "x
+    # fraction of this site's ground cells receive at most y hours of direct
+    # sun" — an inverted empirical CDF (fraction on x, value on y), which is
+    # not the conventional orientation.
+    fig.suptitle("Reading the curve: at fraction x, y is the direct-sun hours that fraction of "
+                 "ground cells receive at most (sorted ascending).", fontsize=6.5, y=1.01)
 
     source_parquets = [str(paths[slug].relative_to(repo_root)) for slug in FIGURE_SITE_ORDER]
     return _produced(fig, "f2_direct_sun_reference_days", out_dir, ledger_ids, source_parquets,
@@ -365,7 +398,7 @@ def render_f3(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
 
     ledger_ids: list[str] = []
     plotted_ids: list[str] = []
-    fig, ax = plt.subplots(figsize=(7.2, 3.6))
+    fig, ax = plt.subplots(figsize=(7.2, 4.0))
     x = np.arange(len(variants))
     locked_idx = next((i for i, (_, t, d) in enumerate(variants) if (t, d) == LOCKED_VARIANT), None)
 
@@ -381,19 +414,44 @@ def render_f3(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
         spread_val, _ = get_value(ledger, spread_id)
         ledger_ids.append(spread_id)
         ax.plot(x, ys, marker="o", markersize=3, linewidth=1.0, color=COLORS[slug],
-                label=f"{display} (spread {fmt3(spread_val)} pts)")
+                label=f"{display} (spread {fmt3(spread_val)} percentile points)")
         if locked_idx is not None:
             ax.annotate(fmt3(ys[locked_idx]), (x[locked_idx], ys[locked_idx]), xytext=(6, -2),
                         textcoords="offset points", ha="left", fontsize=5, color=COLORS[slug])
 
     if locked_idx is not None:
         ax.axvline(locked_idx, color="black", linewidth=0.8, linestyle=":")
-        ax.text(locked_idx, ax.get_ylim()[1], "locked domain", fontsize=5.5, ha="center", va="bottom")
+        ax.text(locked_idx, ax.get_ylim()[1],
+                 f"{LOCKED_VARIANT[0]:.0%} / {LOCKED_VARIANT[1]:g} m — variant of record (locked)",
+                 fontsize=5.5, ha="center", va="bottom")
 
+    # Two-level x-axis: each point is one (coverage threshold, footprint
+    # distance) grid variant from config/params.yaml's `domain` section
+    # (src/brisa_solar/g3_domain.py FABRIC_COVERAGE_GRID x
+    # FABRIC_FOOTPRINT_DISTANCE_GRID_M) — never re-typed here, both grouping
+    # and tick values come straight out of `variants`, itself parsed from the
+    # ledger ids actually present. A flat "0.05/5 m" tick reads as a
+    # fraction, not a pair, and gives no hint that 3 points share one
+    # coverage threshold — group by threshold and label each level
+    # separately instead (PI review 2026-09-17).
     ax.set_xticks(x)
-    ax.set_xticklabels([f"{t:g}/{d:g} m" for _, t, d in variants], rotation=45, ha="right")
-    ax.set_xlabel("grid variant (fabric coverage threshold / footprint distance)")
+    ax.set_xticklabels([f"{d:g} m" for _, _t, d in variants], rotation=0, ha="center", fontsize=6)
+    groups = [(t, [i for i, _ in idxs]) for t, idxs in
+              groupby(enumerate(variants), key=lambda iv: iv[1][1])]
+    trans = blended_transform_factory(ax.transData, ax.transAxes)
+    for t, idxs in groups:
+        center = sum(idxs) / len(idxs)
+        ax.text(center, -0.16, f"{t:.0%} fabric coverage", transform=trans,
+                fontsize=6, ha="center", va="top")
+        if idxs[0] > 0:
+            ax.axvline(idxs[0] - 0.5, color="0.85", linewidth=0.6, zorder=0)
+    ax.set_xlabel("footprint distance (m), grouped by fabric coverage threshold", labelpad=14)
     ax.set_ylabel("SVF percentile of citywide median")
+    ax.set_title(
+        "Coverage threshold and footprint distance jointly decide which ground cells count as\n"
+        "urban fabric (the citywide SVF denominator) — site ranking is stable across all "
+        f"{len(variants)} variants, only position shifts.",
+        fontsize=6.5, loc="left")
     ax.legend(fontsize=5, loc="best", frameon=False)
 
     return _produced(fig, "f3_domain_sensitivity", out_dir, ledger_ids, [], "publishable-candidate",
@@ -406,10 +464,13 @@ def render_f3(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
 
 def render_f4(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
     ledger_ids: list[str] = []
-    fig, ax = plt.subplots(figsize=(6.2, 3.6))
+    fig, ax = plt.subplots(figsize=(6.2, 4.1))
     x = np.arange(len(FIGURE_SITE_ORDER))
     bottoms = np.zeros(len(FIGURE_SITE_ORDER))
-    shades = ["#E8E8E8", "#B8B8D0", "#7878A8", "#383868"]
+    shades = ["#E8E8E8", "#B8B8D0", "#7878A8", "#383868"]  # light -> dark == 0 -> 3 constraints
+    # labels spell out both ends so "0" and "3" never need inferring from shade alone
+    k_labels = {0: "0 of 3 (none triggered)", 1: "1 of 3", 2: "2 of 3",
+                3: "3 of 3 (all triggered)"}
 
     for k in range(4):
         vals = []
@@ -420,7 +481,7 @@ def render_f4(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
             vals.append(val)
         vals = np.array(vals)
         ax.bar(x, vals, bottom=bottoms, color=shades[k], edgecolor="white", linewidth=0.4,
-               label=f"{k} constraint{'s' if k != 1 else ''}")
+               label=k_labels[k])
         for xi, (v, b) in enumerate(zip(vals, bottoms)):
             if v > 0:
                 ax.text(xi, b + v / 2, fmt3(v), ha="center", va="center", fontsize=5.5)
@@ -434,9 +495,21 @@ def render_f4(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
 
     ax.set_xticks(x)
     ax.set_xticklabels([FAVELAS[s] for s in FIGURE_SITE_ORDER], rotation=20, ha="right")
-    ax.set_ylabel("share of built 10 m grid cells (fraction)")
+    # WP06_GEOMETRY_CELL_M names this figure's own grid explicitly so it
+    # reads as a different (and independent) grid from the citywide 5 m
+    # sampling lattice, not a discrepancy between the two (PI review
+    # 2026-09-17).
+    ax.set_ylabel(f"share of built {WP06_GEOMETRY_CELL_M:g} m grid cells (WP-06's own geometry grid)")
     ax.set_ylim(0, 1.14)
-    ax.legend(fontsize=5.5, loc="upper center", ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.22))
+    ax.legend(title="constraints triggered", fontsize=5.5, title_fontsize=6, loc="upper center",
+              ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.22))
+
+    depth_median_m = wp06_depth_median_m(repo_root)
+    ax.set_title(
+        "Constraints (docs/ventaxis_canonical.md): vertical — "
+        f"$\\lambda_f$ mean $\\geq$ {LAMBDA_F_CONSTRAINT_MIN:g} · lateral — open-edge distance "
+        f"$\\geq$ {depth_median_m:.1f} m (pooled median) · directional — exposure ratio $\\geq$ 1.0",
+        fontsize=6, loc="left")
 
     return _produced(fig, "f4_geometry_constraints", out_dir, ledger_ids, [], "publishable-candidate")
 
@@ -555,6 +628,19 @@ def _nice_scalebar_length(span_m: float) -> float:
     return float(nice * (10 ** exp))
 
 
+BOUNDARY_STROKE_PX = 0.6  # target boundary linewidth in *output pixels*, not
+# points: a linewidth given in points renders to a different pixel width at
+# every dpi this shared helper is called at (300 for f5/f5b and the zoom
+# windows, 100 for the WP-07Z citywide pair), so one hardcoded point value
+# read as a hairline on one family and a masking slab on another (PI review
+# 2026-09-17: "the favelas segmentation not so wide otherwise masking the
+# analysis" — f6_zoom_rocinha_svf.png at 0.8pt/300dpi came out ~3.3 px wide).
+# Deriving points from a fixed pixel target keeps the stroke ~1 output pixel
+# everywhere, which also matches the cell size these rasters are aggregated
+# to (pixel_m == frame pitch): a sub-pixel stroke can mask at most the one
+# row of cells it traces, never a band of them.
+
+
 def _plot_map_panel(ax, grid: np.ndarray, bounds: tuple[float, float, float, float],
                      boundaries: dict, cmap: str, label: str,
                      vmin: float | None = None, vmax: float | None = None):
@@ -566,12 +652,13 @@ def _plot_map_panel(ax, grid: np.ndarray, bounds: tuple[float, float, float, flo
     im = ax.imshow(grid, extent=(xmin, xmax, ymin, ymax), origin="upper",
                     cmap=cmap, aspect="equal", interpolation="nearest",
                     vmin=vmin, vmax=vmax)
+    boundary_lw = BOUNDARY_STROKE_PX / ax.figure.dpi * 72.0
     for slug, gdf in boundaries.items():
         # .get(..., "white"): the zoom family can draw a boundary keyed by a
         # window id outside the five-favela COLORS palette (never hit today —
         # only resolved favela_boundary windows reach this loop — but a
         # KeyError here is a wrong failure mode for a rendering choice).
-        gdf.boundary.plot(ax=ax, color=COLORS.get(slug, "white"), linewidth=0.8)
+        gdf.boundary.plot(ax=ax, color=COLORS.get(slug, "white"), linewidth=boundary_lw)
     ax.set_xticks([])
     ax.set_yticks([])
     for spine in ax.spines.values():
@@ -672,7 +759,10 @@ def render_f5(ledger: dict, repo_root: Path, out_dir: Path, pixel_m: float | Non
     means, (nx, ny) = _streaming_pixel_mean(path, ["svf", "kwh_m2"], pixel_m, bounds)
     n_cells = pq.ParquetFile(path).metadata.num_rows
 
-    fig, (axA, axB) = plt.subplots(1, 2, figsize=(8.6, 4.4))
+    # dpi set at creation (not just at savefig time) so _plot_map_panel's
+    # boundary-linewidth calc, which reads ax.figure.dpi, sees the dpi this
+    # panel is actually rasterised at rather than matplotlib's 100-dpi default.
+    fig, (axA, axB) = plt.subplots(1, 2, figsize=(8.6, 4.4), dpi=DPI)
     panels = (
         (axA, "svf", "sky-view factor (fraction)", MAP_CMAP_SVF),
         (axB, "kwh_m2", "annual ground irradiation (kWh m$^{-2}$)", MAP_CMAP_KWH),
@@ -727,7 +817,7 @@ def render_f5b(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
     means, (nx, ny) = _streaming_pixel_mean(path, ["svf"], coarse_cell_m, bounds)
     n_cells = pq.ParquetFile(path).metadata.num_rows
 
-    fig, ax = plt.subplots(figsize=(5.2, 4.8))
+    fig, ax = plt.subplots(figsize=(5.2, 4.8), dpi=DPI)
     _plot_map_panel(ax, means["svf"], bounds, boundaries, MAP_CMAP_SVF, "sky-view factor (fraction)")
     _add_scalebar_north(ax, bounds)
     fig.suptitle(
@@ -809,18 +899,28 @@ def stage_map(repo_root: Path, out_dir: Path | None = None, pixel_m: float | Non
 # e.g. Ipanema's bairro:) yields status missing_boundary, never a guess.
 # ---------------------------------------------------------------------------
 
-ZOOM_TARGET_PIXEL_M = 10.0  # the citywide pair's default resolution (item 2)
 # Window renders use the run-of-record's own sampling pitch, read from its
 # frame diagnostics — never the `cell_m` column, which is the per-sample SVF
 # computation resolution (1 m) and not the lattice the frame is drawn on. At
 # 1 m a window raster came out 0.8-1.4% filled, i.e. visually blank (2026-09-17).
-# The citywide pair's point is a PNG a reader can zoom into, so its panels are
-# sized so ~1 output pixel maps to ~1 aggregated grid cell (unlike f5/f5b,
-# whose fixed MAP_TARGET_MAX_PX=1024 is a print-size choice). Both numbers
-# below are rendering choices (DPI, a size cap bounding render time/memory
-# and file size), never measured quantities.
+# The citywide pair defaults to that same frame pitch (`citywide_frame_pitch_m`,
+# never a typed number — `--pixel-m` still overrides it) so its output pixels
+# are never coarser than the lattice (real resolution thrown away) nor finer
+# than it (a near-empty raster, the same defect as the window case above). Its
+# panels are sized so ~1 output pixel maps to ~1 aggregated grid cell (unlike
+# f5/f5b, whose fixed MAP_TARGET_MAX_PX=1024 is a print-size choice).
+# ZOOM_SAVE_DPI is a rendering choice, never a measured quantity.
+# ZOOM_MAX_PANEL_INCHES is a safety cap on render time/memory/file size for a
+# pathologically large future run of record. Measured against the run of
+# record (5 m pitch, 13743x7057 output grid), it does NOT currently bind: the
+# panel needs 137.4 in (13743 px / ZOOM_SAVE_DPI) and the cap sits well above
+# that. The uncapped citywide PNG came out ~21.3k x ~6.2k px / ~37 MB in ~110 s
+# and ~13 GB peak RSS when measured (2026-09-17) — comfortably inside the
+# ~80 MB file-size and available-memory budget the PI set. If a future run of
+# record's lattice ever needs a wider panel than this cap, lower the cap only
+# with a comment stating what gets traded away, never silently.
 ZOOM_SAVE_DPI = 100.0
-ZOOM_MAX_PANEL_INCHES = 45.0
+ZOOM_MAX_PANEL_INCHES = 150.0
 
 
 def zoom_windows_path(repo_root: Path) -> Path:
@@ -931,11 +1031,15 @@ def _png_dims_bytes(path: Path) -> dict:
 
 
 def render_citywide_zoom(ledger: dict, repo_root: Path, out_dir: Path,
-                          pixel_m: float = ZOOM_TARGET_PIXEL_M):
-    """The WP-07Z citywide SVF + irradiation pair at an explicit `pixel_m`
-    (item 2). Returns (manifest_dict, citywide_bounds, color_limits) — the
-    latter two feed render_zoom_window so every window shares this figure's
-    own extent (locator inset) and colour ramp (item 3)."""
+                          pixel_m: float | None = None):
+    """The WP-07Z citywide SVF + irradiation pair. `pixel_m=None` (the
+    default) resolves to `citywide_frame_pitch_m(repo_root)` — the run of
+    record's own sampling lattice, read fresh rather than typed — so the
+    pair is never rendered coarser than the lattice (real resolution thrown
+    away) or finer than it (a near-empty raster). `--pixel-m` overrides.
+    Returns (manifest_dict, citywide_bounds, color_limits) — the latter two
+    feed render_zoom_window so every window shares this figure's own extent
+    (locator inset) and colour ramp (item 3)."""
     repo_root = Path(repo_root)
     path = citywide_parquet_path(repo_root)
     fig_id = "f6_citywide"
@@ -944,6 +1048,8 @@ def render_citywide_zoom(ledger: dict, repo_root: Path, out_dir: Path,
         skip["release_class"] = "withheld"
         skip["red_line"] = "L1"
         return skip, None, None
+    if pixel_m is None:
+        pixel_m = citywide_frame_pitch_m(repo_root)
     boundaries = _load_favela_boundaries(repo_root)
     if not boundaries:
         skip = _skip_map(
@@ -966,11 +1072,13 @@ def render_citywide_zoom(ledger: dict, repo_root: Path, out_dir: Path,
 
     # Panels sized so the saved PNG holds close to one pixel per aggregated
     # grid cell (capped so render time/memory/file size stay bounded) — the
-    # whole point of a 10 m citywide pair is a raster worth zooming into,
-    # unlike f5/f5b's fixed print-size MAP_TARGET_MAX_PX.
+    # whole point of the citywide pair is a raster worth zooming into, unlike
+    # f5/f5b's fixed print-size MAP_TARGET_MAX_PX.
     panel_w_in = min(nx / ZOOM_SAVE_DPI, ZOOM_MAX_PANEL_INCHES)
     panel_h_in = min(ny / ZOOM_SAVE_DPI, ZOOM_MAX_PANEL_INCHES)
-    fig, (axA, axB) = plt.subplots(1, 2, figsize=(2 * panel_w_in + 1.2, panel_h_in + 0.6))
+    # dpi set at creation, not just at savefig time — see the render_f5 comment.
+    fig, (axA, axB) = plt.subplots(1, 2, figsize=(2 * panel_w_in + 1.2, panel_h_in + 0.6),
+                                    dpi=ZOOM_SAVE_DPI)
     panels = (
         (axA, "svf", "sky-view factor (fraction)", MAP_CMAP_SVF),
         (axB, "kwh_m2", "annual ground irradiation (kWh m$^{-2}$)", MAP_CMAP_KWH),
@@ -1053,7 +1161,8 @@ def render_zoom_window(repo_root: Path, out_dir: Path, window: dict,
         vmin, vmax = color_limits[metric]
         n_cells = int(np.sum(~np.isnan(means[metric])))
 
-        fig, ax = plt.subplots(figsize=(5.8, 5.4))
+        # dpi set at creation, not just at savefig time — see the render_f5 comment.
+        fig, ax = plt.subplots(figsize=(5.8, 5.4), dpi=DPI)
         _plot_map_panel(ax, means[metric], bounds, boundaries, cmap, label, vmin=vmin, vmax=vmax)
         _add_scalebar_north(ax, bounds)
         _add_locator_inset(ax, citywide_bounds, bounds)
@@ -1079,12 +1188,13 @@ def render_zoom_window(repo_root: Path, out_dir: Path, window: dict,
 
 
 def stage_zoom(repo_root: Path, out_dir: Path | None = None,
-                pixel_m: float = ZOOM_TARGET_PIXEL_M) -> dict:
+                pixel_m: float | None = None) -> dict:
     """WP-07Z orchestration — own run dir runs/wp07_zoom_<UTC>/, same
     manifest shape (figures: {id: {...}}) as stage_map. The citywide pair
     renders first so its bounds and colour limits can be handed to every
     window render (item 3: 'same colour ramps and limits as the citywide
-    figure')."""
+    figure'). `pixel_m=None` (the default) lets render_citywide_zoom resolve
+    it to the run of record's own frame pitch; `--pixel-m` overrides."""
     repo_root = Path(repo_root)
     ledger_path = find_latest_ledger(repo_root)
     ledger = json.loads(ledger_path.read_text())
@@ -1116,7 +1226,11 @@ def stage_zoom(repo_root: Path, out_dir: Path | None = None,
         "_utc": _utc_now(),
         "git_sha": _git_sha(repo_root),
         "ledger_source": str(ledger_path.relative_to(repo_root)),
-        "pixel_m_citywide": pixel_m,
+        # the actual value used, read back off the citywide result rather
+        # than the `pixel_m` argument itself — that argument is None when
+        # the caller wants the run-of-record's frame pitch, and render_
+        # citywide_zoom is what resolves it.
+        "pixel_m_citywide": citywide.get("aggregation", {}).get("pixel_m", pixel_m),
         "zoom_windows_source": "config/zoom_windows.yaml",
         "figures": figures,
     }
@@ -1172,9 +1286,10 @@ def main() -> int:
     ap.add_argument("--pixel-m", type=float, default=None,
                      help="Output pixel size in metres. '--target map': overrides f5's default "
                           "auto-sizing (~span/1024 px) when set; omit to leave map's behaviour "
-                          "unchanged. '--target zoom': the citywide pair's pixel size (default "
-                          f"{ZOOM_TARGET_PIXEL_M:g} m); window renders always use the native "
-                          "sampling pitch of the run of record regardless of this flag. Ignored for "
+                          "unchanged. '--target zoom': overrides the citywide pair's pixel size; "
+                          "omit to default to the run of record's own frame pitch "
+                          "(frame_diagnostics.json#/grid_cell_m) — window renders always use that "
+                          "same native sampling pitch regardless of this flag. Ignored for "
                           "'--target figures'.")
     args = ap.parse_args()
     repo_root = Path(args.repo_root)
@@ -1183,8 +1298,7 @@ def main() -> int:
         manifest = stage_map(repo_root, out_dir, pixel_m=args.pixel_m)
         label = "map figures"
     elif args.target == "zoom":
-        pixel_m = args.pixel_m if args.pixel_m is not None else ZOOM_TARGET_PIXEL_M
-        manifest = stage_zoom(repo_root, out_dir, pixel_m=pixel_m)
+        manifest = stage_zoom(repo_root, out_dir, pixel_m=args.pixel_m)
         label = "zoom figures"
     else:
         manifest = stage_all(repo_root, out_dir)
