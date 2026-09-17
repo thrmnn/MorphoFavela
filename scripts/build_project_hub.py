@@ -1131,9 +1131,14 @@ def write_staged_figures_page(prov):
     for fig_id in sorted(figures):
         fig = figures[fig_id]
         png = fig.get("png_path")
-        if not png or not (run_dir / png).exists():
+        # Serve the copy WP-07B already staged into the mirror, never the run
+        # directory: the hub's L1 guard forbids any "runs" path segment under
+        # _hub/, and it fired on main the moment the PNGs existed (the worktree
+        # that wrote this had none, so the guard never ran there).
+        staged_copy = OUT / "wp07_staged" / Path(png).name if png else None
+        if not png or not (staged_copy.exists() or (run_dir / png).exists()):
             continue
-        img_url = "/" + str((run_dir / png).relative_to(ROOT))
+        img_url = f"/outputs/_hub/wp07_staged/{Path(png).name}" if staged_copy.exists() else "/" + str((run_dir / png).relative_to(ROOT))
         thumb = thumb or img_url
         n_used = len(fig.get("ledger_ids_used", []))
         cards.append(card(

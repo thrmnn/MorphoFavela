@@ -48,6 +48,7 @@ import sys
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -94,6 +95,7 @@ def _parse_links(page: Path) -> PageLinks:
         if not base or base.startswith(_EXTERNAL):
             continue
         target = _resolve(page, base)
+        target = Path(unquote(str(target)))  # hrefs percent-encode 'maré'; the disk does not
         out.all_targets.append((target, base))
         navigable = bool(_CARD_CLASS.search(tag)) or _in_nav(text[: m.start()])
         if navigable:
