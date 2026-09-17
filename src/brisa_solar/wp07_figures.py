@@ -555,6 +555,19 @@ def _nice_scalebar_length(span_m: float) -> float:
     return float(nice * (10 ** exp))
 
 
+BOUNDARY_STROKE_PX = 0.6  # target boundary linewidth in *output pixels*, not
+# points: a linewidth given in points renders to a different pixel width at
+# every dpi this shared helper is called at (300 for f5/f5b and the zoom
+# windows, 100 for the WP-07Z citywide pair), so one hardcoded point value
+# read as a hairline on one family and a masking slab on another (PI review
+# 2026-09-17: "the favelas segmentation not so wide otherwise masking the
+# analysis" — f6_zoom_rocinha_svf.png at 0.8pt/300dpi came out ~3.3 px wide).
+# Deriving points from a fixed pixel target keeps the stroke ~1 output pixel
+# everywhere, which also matches the cell size these rasters are aggregated
+# to (pixel_m == frame pitch): a sub-pixel stroke can mask at most the one
+# row of cells it traces, never a band of them.
+
+
 def _plot_map_panel(ax, grid: np.ndarray, bounds: tuple[float, float, float, float],
                      boundaries: dict, cmap: str, label: str,
                      vmin: float | None = None, vmax: float | None = None):
@@ -566,12 +579,13 @@ def _plot_map_panel(ax, grid: np.ndarray, bounds: tuple[float, float, float, flo
     im = ax.imshow(grid, extent=(xmin, xmax, ymin, ymax), origin="upper",
                     cmap=cmap, aspect="equal", interpolation="nearest",
                     vmin=vmin, vmax=vmax)
+    boundary_lw = BOUNDARY_STROKE_PX / ax.figure.dpi * 72.0
     for slug, gdf in boundaries.items():
         # .get(..., "white"): the zoom family can draw a boundary keyed by a
         # window id outside the five-favela COLORS palette (never hit today —
         # only resolved favela_boundary windows reach this loop — but a
         # KeyError here is a wrong failure mode for a rendering choice).
-        gdf.boundary.plot(ax=ax, color=COLORS.get(slug, "white"), linewidth=0.8)
+        gdf.boundary.plot(ax=ax, color=COLORS.get(slug, "white"), linewidth=boundary_lw)
     ax.set_xticks([])
     ax.set_yticks([])
     for spine in ax.spines.values():
@@ -672,7 +686,10 @@ def render_f5(ledger: dict, repo_root: Path, out_dir: Path, pixel_m: float | Non
     means, (nx, ny) = _streaming_pixel_mean(path, ["svf", "kwh_m2"], pixel_m, bounds)
     n_cells = pq.ParquetFile(path).metadata.num_rows
 
-    fig, (axA, axB) = plt.subplots(1, 2, figsize=(8.6, 4.4))
+    # dpi set at creation (not just at savefig time) so _plot_map_panel's
+    # boundary-linewidth calc, which reads ax.figure.dpi, sees the dpi this
+    # panel is actually rasterised at rather than matplotlib's 100-dpi default.
+    fig, (axA, axB) = plt.subplots(1, 2, figsize=(8.6, 4.4), dpi=DPI)
     panels = (
         (axA, "svf", "sky-view factor (fraction)", MAP_CMAP_SVF),
         (axB, "kwh_m2", "annual ground irradiation (kWh m$^{-2}$)", MAP_CMAP_KWH),
@@ -727,7 +744,7 @@ def render_f5b(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
     means, (nx, ny) = _streaming_pixel_mean(path, ["svf"], coarse_cell_m, bounds)
     n_cells = pq.ParquetFile(path).metadata.num_rows
 
-    fig, ax = plt.subplots(figsize=(5.2, 4.8))
+    fig, ax = plt.subplots(figsize=(5.2, 4.8), dpi=DPI)
     _plot_map_panel(ax, means["svf"], bounds, boundaries, MAP_CMAP_SVF, "sky-view factor (fraction)")
     _add_scalebar_north(ax, bounds)
     fig.suptitle(
@@ -809,18 +826,28 @@ def stage_map(repo_root: Path, out_dir: Path | None = None, pixel_m: float | Non
 # e.g. Ipanema's bairro:) yields status missing_boundary, never a guess.
 # ---------------------------------------------------------------------------
 
-ZOOM_TARGET_PIXEL_M = 10.0  # the citywide pair's default resolution (item 2)
 # Window renders use the run-of-record's own sampling pitch, read from its
 # frame diagnostics — never the `cell_m` column, which is the per-sample SVF
 # computation resolution (1 m) and not the lattice the frame is drawn on. At
 # 1 m a window raster came out 0.8-1.4% filled, i.e. visually blank (2026-09-17).
-# The citywide pair's point is a PNG a reader can zoom into, so its panels are
-# sized so ~1 output pixel maps to ~1 aggregated grid cell (unlike f5/f5b,
-# whose fixed MAP_TARGET_MAX_PX=1024 is a print-size choice). Both numbers
-# below are rendering choices (DPI, a size cap bounding render time/memory
-# and file size), never measured quantities.
+# The citywide pair defaults to that same frame pitch (`citywide_frame_pitch_m`,
+# never a typed number — `--pixel-m` still overrides it) so its output pixels
+# are never coarser than the lattice (real resolution thrown away) nor finer
+# than it (a near-empty raster, the same defect as the window case above). Its
+# panels are sized so ~1 output pixel maps to ~1 aggregated grid cell (unlike
+# f5/f5b, whose fixed MAP_TARGET_MAX_PX=1024 is a print-size choice).
+# ZOOM_SAVE_DPI is a rendering choice, never a measured quantity.
+# ZOOM_MAX_PANEL_INCHES is a safety cap on render time/memory/file size for a
+# pathologically large future run of record. Measured against the run of
+# record (5 m pitch, 13743x7057 output grid), it does NOT currently bind: the
+# panel needs 137.4 in (13743 px / ZOOM_SAVE_DPI) and the cap sits well above
+# that. The uncapped citywide PNG came out ~21.3k x ~6.2k px / ~37 MB in ~110 s
+# and ~13 GB peak RSS when measured (2026-09-17) — comfortably inside the
+# ~80 MB file-size and available-memory budget the PI set. If a future run of
+# record's lattice ever needs a wider panel than this cap, lower the cap only
+# with a comment stating what gets traded away, never silently.
 ZOOM_SAVE_DPI = 100.0
-ZOOM_MAX_PANEL_INCHES = 45.0
+ZOOM_MAX_PANEL_INCHES = 150.0
 
 
 def zoom_windows_path(repo_root: Path) -> Path:
@@ -931,11 +958,15 @@ def _png_dims_bytes(path: Path) -> dict:
 
 
 def render_citywide_zoom(ledger: dict, repo_root: Path, out_dir: Path,
-                          pixel_m: float = ZOOM_TARGET_PIXEL_M):
-    """The WP-07Z citywide SVF + irradiation pair at an explicit `pixel_m`
-    (item 2). Returns (manifest_dict, citywide_bounds, color_limits) — the
-    latter two feed render_zoom_window so every window shares this figure's
-    own extent (locator inset) and colour ramp (item 3)."""
+                          pixel_m: float | None = None):
+    """The WP-07Z citywide SVF + irradiation pair. `pixel_m=None` (the
+    default) resolves to `citywide_frame_pitch_m(repo_root)` — the run of
+    record's own sampling lattice, read fresh rather than typed — so the
+    pair is never rendered coarser than the lattice (real resolution thrown
+    away) or finer than it (a near-empty raster). `--pixel-m` overrides.
+    Returns (manifest_dict, citywide_bounds, color_limits) — the latter two
+    feed render_zoom_window so every window shares this figure's own extent
+    (locator inset) and colour ramp (item 3)."""
     repo_root = Path(repo_root)
     path = citywide_parquet_path(repo_root)
     fig_id = "f6_citywide"
@@ -944,6 +975,8 @@ def render_citywide_zoom(ledger: dict, repo_root: Path, out_dir: Path,
         skip["release_class"] = "withheld"
         skip["red_line"] = "L1"
         return skip, None, None
+    if pixel_m is None:
+        pixel_m = citywide_frame_pitch_m(repo_root)
     boundaries = _load_favela_boundaries(repo_root)
     if not boundaries:
         skip = _skip_map(
@@ -966,11 +999,13 @@ def render_citywide_zoom(ledger: dict, repo_root: Path, out_dir: Path,
 
     # Panels sized so the saved PNG holds close to one pixel per aggregated
     # grid cell (capped so render time/memory/file size stay bounded) — the
-    # whole point of a 10 m citywide pair is a raster worth zooming into,
-    # unlike f5/f5b's fixed print-size MAP_TARGET_MAX_PX.
+    # whole point of the citywide pair is a raster worth zooming into, unlike
+    # f5/f5b's fixed print-size MAP_TARGET_MAX_PX.
     panel_w_in = min(nx / ZOOM_SAVE_DPI, ZOOM_MAX_PANEL_INCHES)
     panel_h_in = min(ny / ZOOM_SAVE_DPI, ZOOM_MAX_PANEL_INCHES)
-    fig, (axA, axB) = plt.subplots(1, 2, figsize=(2 * panel_w_in + 1.2, panel_h_in + 0.6))
+    # dpi set at creation, not just at savefig time — see the render_f5 comment.
+    fig, (axA, axB) = plt.subplots(1, 2, figsize=(2 * panel_w_in + 1.2, panel_h_in + 0.6),
+                                    dpi=ZOOM_SAVE_DPI)
     panels = (
         (axA, "svf", "sky-view factor (fraction)", MAP_CMAP_SVF),
         (axB, "kwh_m2", "annual ground irradiation (kWh m$^{-2}$)", MAP_CMAP_KWH),
@@ -1053,7 +1088,8 @@ def render_zoom_window(repo_root: Path, out_dir: Path, window: dict,
         vmin, vmax = color_limits[metric]
         n_cells = int(np.sum(~np.isnan(means[metric])))
 
-        fig, ax = plt.subplots(figsize=(5.8, 5.4))
+        # dpi set at creation, not just at savefig time — see the render_f5 comment.
+        fig, ax = plt.subplots(figsize=(5.8, 5.4), dpi=DPI)
         _plot_map_panel(ax, means[metric], bounds, boundaries, cmap, label, vmin=vmin, vmax=vmax)
         _add_scalebar_north(ax, bounds)
         _add_locator_inset(ax, citywide_bounds, bounds)
@@ -1079,12 +1115,13 @@ def render_zoom_window(repo_root: Path, out_dir: Path, window: dict,
 
 
 def stage_zoom(repo_root: Path, out_dir: Path | None = None,
-                pixel_m: float = ZOOM_TARGET_PIXEL_M) -> dict:
+                pixel_m: float | None = None) -> dict:
     """WP-07Z orchestration — own run dir runs/wp07_zoom_<UTC>/, same
     manifest shape (figures: {id: {...}}) as stage_map. The citywide pair
     renders first so its bounds and colour limits can be handed to every
     window render (item 3: 'same colour ramps and limits as the citywide
-    figure')."""
+    figure'). `pixel_m=None` (the default) lets render_citywide_zoom resolve
+    it to the run of record's own frame pitch; `--pixel-m` overrides."""
     repo_root = Path(repo_root)
     ledger_path = find_latest_ledger(repo_root)
     ledger = json.loads(ledger_path.read_text())
@@ -1116,7 +1153,11 @@ def stage_zoom(repo_root: Path, out_dir: Path | None = None,
         "_utc": _utc_now(),
         "git_sha": _git_sha(repo_root),
         "ledger_source": str(ledger_path.relative_to(repo_root)),
-        "pixel_m_citywide": pixel_m,
+        # the actual value used, read back off the citywide result rather
+        # than the `pixel_m` argument itself — that argument is None when
+        # the caller wants the run-of-record's frame pitch, and render_
+        # citywide_zoom is what resolves it.
+        "pixel_m_citywide": citywide.get("aggregation", {}).get("pixel_m", pixel_m),
         "zoom_windows_source": "config/zoom_windows.yaml",
         "figures": figures,
     }
@@ -1172,9 +1213,10 @@ def main() -> int:
     ap.add_argument("--pixel-m", type=float, default=None,
                      help="Output pixel size in metres. '--target map': overrides f5's default "
                           "auto-sizing (~span/1024 px) when set; omit to leave map's behaviour "
-                          "unchanged. '--target zoom': the citywide pair's pixel size (default "
-                          f"{ZOOM_TARGET_PIXEL_M:g} m); window renders always use the native "
-                          "sampling pitch of the run of record regardless of this flag. Ignored for "
+                          "unchanged. '--target zoom': overrides the citywide pair's pixel size; "
+                          "omit to default to the run of record's own frame pitch "
+                          "(frame_diagnostics.json#/grid_cell_m) — window renders always use that "
+                          "same native sampling pitch regardless of this flag. Ignored for "
                           "'--target figures'.")
     args = ap.parse_args()
     repo_root = Path(args.repo_root)
@@ -1183,8 +1225,7 @@ def main() -> int:
         manifest = stage_map(repo_root, out_dir, pixel_m=args.pixel_m)
         label = "map figures"
     elif args.target == "zoom":
-        pixel_m = args.pixel_m if args.pixel_m is not None else ZOOM_TARGET_PIXEL_M
-        manifest = stage_zoom(repo_root, out_dir, pixel_m=pixel_m)
+        manifest = stage_zoom(repo_root, out_dir, pixel_m=args.pixel_m)
         label = "zoom figures"
     else:
         manifest = stage_all(repo_root, out_dir)
