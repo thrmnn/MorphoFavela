@@ -24,12 +24,14 @@ import argparse
 import json
 import re
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import matplotlib
 
 matplotlib.use("Agg")
+import geopandas as gpd  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.ticker import FuncFormatter  # noqa: E402
 import numpy as np  # noqa: E402
@@ -431,6 +433,347 @@ def render_f4(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# f5 / f5b — WP-07M: the citywide map (compute-but-withhold, red line L1).
+# Spec: docs/wp07_map_spec.md. Separate manifest/run dir from f1-f4 on
+# purpose: these two panels render our own aggregated data as a raster
+# gradient (a matplotlib <image> element is the point, not a leak the way it
+# would be for a basemap tile under a chart), so they carry their own
+# checklist rather than reusing _save_and_checklist's "no_basemap" gate,
+# which stays meaningful only for the chart figures above.
+# ---------------------------------------------------------------------------
+
+MAP_TARGET_MAX_PX = 1024  # a rendering choice (legible frame at screen/print
+# size), not a measured number — never claims sub-meter precision.
+MAP_CMAP_SVF = "cividis"      # perceptually uniform, colour-blind-safe
+MAP_CMAP_KWH = "inferno"
+
+
+def map_favela_boundary_path(repo_root: Path) -> Path:
+    return Path(repo_root) / "data" / "RJ" / "Favelas_Limit_2019.shp"
+
+
+def _load_favela_boundaries(repo_root: Path) -> dict:
+    """Study-favela boundary polygons in EXPECTED_CRS, matched by display
+    name. Deferred imports: wp05_full.match_favela_group is reused unmodified
+    (same rule g3_domain follows) rather than re-implemented, but pulling it
+    in also pulls wp05_full's torch/rasterio chain — kept out of this
+    module's top-level imports so f1-f4 (and the ledger-only chart path)
+    never pay that cost. Returns {} if the shapefile is absent (map figures
+    skip cleanly, same discipline as f1/f2's missing-parquet skip)."""
+    path = map_favela_boundary_path(repo_root)
+    if not path.exists():
+        return {}
+    from src.config import EXPECTED_CRS
+    from .wp05_full import match_favela_group
+
+    favelas_gdf = gpd.read_file(path)
+    if favelas_gdf.crs is not None:
+        favelas_gdf = favelas_gdf.to_crs(EXPECTED_CRS)
+    out: dict = {}
+    for slug, display in FAVELAS.items():
+        matched, _method = match_favela_group(favelas_gdf, display)
+        if len(matched) > 0:
+            out[slug] = matched
+    return out
+
+
+def _map_bounds(path: Path) -> tuple[float, float, float, float]:
+    """(xmin, xmax, ymin, ymax) of the citywide frame, from parquet row-group
+    stats where available. Map-only: x/y are the point of this figure, unlike
+    the chart functions above which refuse per-cell geometry columns
+    entirely via _read_columns's forbidden-column assertion."""
+    pf = pq.ParquetFile(path)
+    out = []
+    for col in ("x", "y"):
+        idx = pf.schema_arrow.get_field_index(col)
+        lo = hi = None
+        for rg in range(pf.num_row_groups):
+            stats = pf.metadata.row_group(rg).column(idx).statistics
+            if stats is not None and stats.has_min_max:
+                lo = stats.min if lo is None else min(lo, stats.min)
+                hi = stats.max if hi is None else max(hi, stats.max)
+        if lo is None or hi is None:
+            arr = pf.read(columns=[col]).column(0).to_numpy(zero_copy_only=False)
+            lo, hi = float(np.nanmin(arr)), float(np.nanmax(arr))
+        out.extend([float(lo), float(hi)])
+    return out[0], out[1], out[2], out[3]
+
+
+def _streaming_pixel_mean(path: Path, value_columns: list[str], pixel_m: float,
+                           bounds: tuple[float, float, float, float]):
+    """Mean-per-pixel aggregation over the citywide parquet, streamed in
+    batches of 500k rows — the frame's 8.4 M cells are never held at once and
+    never scattered; only the (ny, nx) grid of means is returned."""
+    xmin, xmax, ymin, ymax = bounds
+    nx = max(1, int(np.ceil((xmax - xmin) / pixel_m)))
+    ny = max(1, int(np.ceil((ymax - ymin) / pixel_m)))
+    n_bins = nx * ny
+    sums = {c: np.zeros(n_bins, dtype=np.float64) for c in value_columns}
+    counts = {c: np.zeros(n_bins, dtype=np.int64) for c in value_columns}
+
+    pf = pq.ParquetFile(path)
+    cols = ["x", "y"] + value_columns
+    for batch in pf.iter_batches(columns=cols, batch_size=500_000):
+        x = batch.column(0).to_numpy(zero_copy_only=False)
+        y = batch.column(1).to_numpy(zero_copy_only=False)
+        col_idx = np.clip(((x - xmin) / pixel_m).astype(np.int64), 0, nx - 1)
+        row_idx = np.clip(((ymax - y) / pixel_m).astype(np.int64), 0, ny - 1)
+        flat = row_idx * nx + col_idx
+        for i, c in enumerate(value_columns):
+            vals = batch.column(2 + i).to_numpy(zero_copy_only=False)
+            finite = np.isfinite(vals)
+            f = flat[finite]
+            counts[c] += np.bincount(f, minlength=n_bins)
+            sums[c] += np.bincount(f, weights=vals[finite], minlength=n_bins)
+
+    means = {}
+    with np.errstate(invalid="ignore", divide="ignore"):
+        for c in value_columns:
+            m = sums[c] / counts[c]
+            m[counts[c] == 0] = np.nan
+            means[c] = m.reshape(ny, nx)
+    return means, (nx, ny)
+
+
+def _nice_scalebar_length(span_m: float) -> float:
+    """Round a scalebar to a clean 1/2/5 x 10^n value near a fifth of the span."""
+    target = span_m * 0.2
+    if target <= 0:
+        return 1.0
+    exp = np.floor(np.log10(target))
+    base = target / (10 ** exp)
+    nice = min((1, 2, 5, 10), key=lambda n: abs(n - base))
+    return float(nice * (10 ** exp))
+
+
+def _plot_map_panel(ax, grid: np.ndarray, bounds: tuple[float, float, float, float],
+                     boundaries: dict, cmap: str, label: str):
+    xmin, xmax, ymin, ymax = bounds
+    im = ax.imshow(grid, extent=(xmin, xmax, ymin, ymax), origin="upper",
+                    cmap=cmap, aspect="equal", interpolation="nearest")
+    for slug, gdf in boundaries.items():
+        gdf.boundary.plot(ax=ax, color=COLORS[slug], linewidth=0.8)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    cbar = plt.colorbar(im, ax=ax, fraction=0.045, pad=0.02)
+    cbar.set_label(label, fontsize=6)
+    cbar.ax.tick_params(labelsize=5)
+    return im
+
+
+def _add_scalebar_north(ax, bounds: tuple[float, float, float, float]) -> None:
+    xmin, xmax, ymin, ymax = bounds
+    span_x, span_y = xmax - xmin, ymax - ymin
+    bar_m = _nice_scalebar_length(span_x)
+    x0 = xmin + 0.05 * span_x
+    y0 = ymin + 0.05 * span_y
+    ax.plot([x0, x0 + bar_m], [y0, y0], color="black", linewidth=1.5, solid_capstyle="butt")
+    if bar_m >= 1000:
+        label = f"{bar_m / 1000:g} km"
+    else:
+        label = f"{bar_m:g} m"
+    ax.text(x0 + bar_m / 2, y0, label, ha="center", va="bottom", fontsize=5.5)
+
+    nx0 = xmax - 0.06 * span_x
+    ny0 = ymin + 0.08 * span_y
+    ax.annotate("N", xy=(nx0, ny0 + 0.06 * span_y), xytext=(nx0, ny0), ha="center",
+                fontsize=6, fontweight="bold",
+                arrowprops=dict(arrowstyle="-|>", color="black", lw=1.0))
+
+
+def _save_and_checklist_map(fig, fig_id: str, out_dir: Path) -> tuple[str, str, dict]:
+    svg_path = out_dir / f"{fig_id}.svg"
+    png_path = out_dir / f"{fig_id}.png"
+    fig.savefig(svg_path, format="svg", bbox_inches="tight")
+    fig.savefig(png_path, format="png", dpi=DPI, bbox_inches="tight")
+    plt.close(fig)
+
+    raw = svg_path.read_text()
+    text = _svg_text_content(raw)
+    checklist = {
+        "no_coordinates": _COORD_RE.search(text) is None,
+        # this figure IS a raster of our own citywide-aggregated data by
+        # design (that is the deliverable); a basemap-style photographic
+        # tile is the thing being ruled out, and this pipeline never reads
+        # one — see the module-level note above.
+        "data_raster_present": "<image" in raw,
+        "svg_path_count": raw.count("<path "),
+        "banned_tokens_absent": not _lint._scan_lines(text.split("\n"), fig_id),
+    }
+    return svg_path.name, png_path.name, checklist
+
+
+def _skip_map(fig_id: str, reason: str) -> dict:
+    return {"id": fig_id, "status": "skipped", "reason": reason}
+
+
+def _produced_map(fig, fig_id: str, out_dir: Path, source_parquets: list[str],
+                   aggregation: dict, colormap: dict, boundary_note: dict) -> dict:
+    svg_name, png_name, checklist = _save_and_checklist_map(fig, fig_id, out_dir)
+    return {
+        "id": fig_id,
+        "status": "produced",
+        "svg_path": svg_name,
+        "png_path": png_name,
+        "ledger_ids_used": [],
+        "ledger_ids_plotted": [],
+        "source_parquets": source_parquets,
+        "source_run_of_record": RUN_OF_RECORD["wp05"],
+        "release_class": "withheld",
+        "red_line": "L1",
+        "aggregation": aggregation,
+        "colormap": colormap,
+        "favela_boundaries": boundary_note,
+        "checklist": checklist,
+    }
+
+
+def render_f5(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
+    path = citywide_parquet_path(repo_root)
+    if not path.exists():
+        return _skip_map("f5_citywide_svf_map", f"citywide parquet absent: {path}")
+    boundaries = _load_favela_boundaries(repo_root)
+    if not boundaries:
+        return _skip_map(
+            "f5_citywide_svf_map",
+            f"favela boundary shapefile absent or matched none of the five study favelas: "
+            f"{map_favela_boundary_path(repo_root)}",
+        )
+
+    bounds = _map_bounds(path)
+    xmin, xmax, ymin, ymax = bounds
+    pixel_m = max(xmax - xmin, ymax - ymin) / MAP_TARGET_MAX_PX
+    means, (nx, ny) = _streaming_pixel_mean(path, ["svf", "kwh_m2"], pixel_m, bounds)
+    n_cells = pq.ParquetFile(path).metadata.num_rows
+
+    fig, (axA, axB) = plt.subplots(1, 2, figsize=(8.6, 4.4))
+    panels = (
+        (axA, "svf", "sky-view factor (fraction)", MAP_CMAP_SVF),
+        (axB, "kwh_m2", "annual ground irradiation (kWh m$^{-2}$)", MAP_CMAP_KWH),
+    )
+    for tag, (ax, metric, label, cmap) in zip("AB", panels):
+        _plot_map_panel(ax, means[metric], bounds, boundaries, cmap, label)
+        _add_scalebar_north(ax, bounds)
+        ax.set_title(tag, loc="left", fontsize=8)
+    fig.suptitle(
+        f"{n_cells:,} citywide ground cells · {pixel_m:.1f} m output pixel · "
+        f"mean per pixel",
+        fontsize=6.5,
+    )
+
+    aggregation = {
+        "method": "streamed mean per output pixel (never a per-cell scatter)",
+        "pixel_m": pixel_m,
+        "grid_shape_rows_cols": [ny, nx],
+        "target_max_px": MAP_TARGET_MAX_PX,
+        "n_cells_aggregated": int(n_cells),
+    }
+    boundary_note = {
+        "matched_favelas": sorted(boundaries),
+        "missing_favelas": sorted(set(FAVELAS) - set(boundaries)),
+        "source": "data/RJ/Favelas_Limit_2019.shp",
+    }
+    return _produced_map(fig, "f5_citywide_svf_map", out_dir, [str(path.relative_to(repo_root))],
+                          aggregation, {"panel_A_svf": MAP_CMAP_SVF, "panel_B_kwh_m2": MAP_CMAP_KWH},
+                          boundary_note)
+
+
+def render_f5b(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
+    path = citywide_parquet_path(repo_root)
+    if not path.exists():
+        return _skip_map("f5b_citywide_svf_map_coarse", f"citywide parquet absent: {path}")
+    boundaries = _load_favela_boundaries(repo_root)
+    if not boundaries:
+        return _skip_map(
+            "f5b_citywide_svf_map_coarse",
+            f"favela boundary shapefile absent or matched none of the five study favelas: "
+            f"{map_favela_boundary_path(repo_root)}",
+        )
+
+    # Deferred import: g3_domain pulls in torch/rasterio for its own
+    # citywide-sensitivity pass; we only need the one tuple of sensitivity
+    # distances it already defends (config/params.yaml domain section, "#
+    # sensitivity 5 / 20" beside the locked 10 m), never a typed literal.
+    from .g3_domain import FABRIC_FOOTPRINT_DISTANCE_GRID_M
+
+    coarse_cell_m = max(FABRIC_FOOTPRINT_DISTANCE_GRID_M)
+    bounds = _map_bounds(path)
+    means, (nx, ny) = _streaming_pixel_mean(path, ["svf"], coarse_cell_m, bounds)
+    n_cells = pq.ParquetFile(path).metadata.num_rows
+
+    fig, ax = plt.subplots(figsize=(5.2, 4.8))
+    _plot_map_panel(ax, means["svf"], bounds, boundaries, MAP_CMAP_SVF, "sky-view factor (fraction)")
+    _add_scalebar_north(ax, bounds)
+    fig.suptitle(
+        f"{n_cells:,} citywide ground cells · {coarse_cell_m:.0f} m cell · mean per cell",
+        fontsize=6.5,
+    )
+
+    aggregation = {
+        "method": "streamed mean per coarse cell (never a per-cell scatter)",
+        "cell_m": coarse_cell_m,
+        "cell_m_source": "src.brisa_solar.g3_domain.FABRIC_FOOTPRINT_DISTANCE_GRID_M, the coarsest "
+                          "of the {5, 10, 20} m sensitivity sweep already defended for the locked "
+                          "10 m domain parameter (config/params.yaml domain.fabric_footprint_distance_m)",
+        "grid_shape_rows_cols": [ny, nx],
+        "n_cells_aggregated": int(n_cells),
+    }
+    boundary_note = {
+        "matched_favelas": sorted(boundaries),
+        "missing_favelas": sorted(set(FAVELAS) - set(boundaries)),
+    }
+    result = _produced_map(fig, "f5b_citywide_svf_map_coarse", out_dir,
+                            [str(path.relative_to(repo_root))], aggregation,
+                            {"svf": MAP_CMAP_SVF}, boundary_note)
+    result["release_class_note"] = (
+        "release_class is withheld here, as for f5 — whether this coarser aggregation instead "
+        "reads as reviewer-defence-only is the ethics gate's call, then the PI's; not decided by "
+        "this manifest."
+    )
+    return result
+
+
+def stage_map(repo_root: Path, out_dir: Path | None = None) -> dict:
+    """WP-07M orchestration — separate run dir and manifest from stage_all's
+    f1-f4 (docs/wp07_map_spec.md: 'produced into runs/wp07_map_<UTC>/'), same
+    manifest shape (figures: {id: {...}}) so a generator glob extended to
+    also match wp07_map_* would pick this file up unchanged."""
+    repo_root = Path(repo_root)
+    ledger_path = find_latest_ledger(repo_root)
+    ledger = json.loads(ledger_path.read_text())
+
+    if out_dir is None:
+        out_dir = repo_root / "runs" / ("wp07_map_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    figures = {
+        "f5_citywide_svf_map": render_f5(ledger, repo_root, out_dir),
+        "f5b_citywide_svf_map_coarse": render_f5b(ledger, repo_root, out_dir),
+    }
+
+    produced_pngs = [out_dir / f["png_path"] for f in figures.values() if f["status"] == "produced"]
+    if produced_pngs:
+        subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts" / "critic_sheet.py"), "sheet",
+             str(out_dir / "contact.png"), *[str(p) for p in produced_pngs],
+             "--cols", "2", "--tile-w", "573"],
+            check=True,
+        )
+
+    manifest = {
+        "_utc": _utc_now(),
+        "git_sha": _git_sha(repo_root),
+        "ledger_source": str(ledger_path.relative_to(repo_root)),
+        "figures": figures,
+    }
+    (out_dir / "figure_manifest.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
+    return manifest
+
+
+# ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
 
@@ -470,10 +813,17 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-root", default=str(REPO_ROOT))
     ap.add_argument("--out-dir", default=None)
+    ap.add_argument("--target", choices=("figures", "map"), default="figures",
+                     help="'figures' (default, unchanged): f1-f4 into runs/wp07_figures_<UTC>/. "
+                          "'map': WP-07M f5/f5b into runs/wp07_map_<UTC>/ (docs/wp07_map_spec.md).")
     args = ap.parse_args()
-    manifest = stage_all(Path(args.repo_root), Path(args.out_dir) if args.out_dir else None)
+    repo_root = Path(args.repo_root)
+    out_dir = Path(args.out_dir) if args.out_dir else None
+    stager = stage_map if args.target == "map" else stage_all
+    label = "map figures" if args.target == "map" else "figures"
+    manifest = stager(repo_root, out_dir)
     n_produced = sum(1 for f in manifest["figures"].values() if f["status"] == "produced")
-    print(f"Staged {n_produced}/{len(manifest['figures'])} figures.")
+    print(f"Staged {n_produced}/{len(manifest['figures'])} {label}.")
     return 0
 
 
