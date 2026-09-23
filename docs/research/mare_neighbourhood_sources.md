@@ -178,3 +178,15 @@ chronological passage, not a bullet list (none exists on the site).
 5. Not fully explored, worth a follow-up: IBGE's other two zips in the same FTP
    folder (`FCUs_nao_setorizadas`, `concentracoes_urbanas`), and the academic
    Revista de Morfologia Urbana mapping paper.
+
+## Addendum 2026-09-23 — the gap closes with SABREN's conjuntos layer
+
+The survey above missed one service in the same SABREN folder:
+`https://pgeo3.rio.rj.gov.br/arcgis/rest/services/SABREN/Conjuntos_Habitacionais/FeatureServer/0`
+(IPP / Secretaria Municipal de Habitação; VERIFIED by query on 2026-09-23). It carries 7 polygons
+in the Maré bairro: Conjunto Pinheiros, Bento Ribeiro Dantas, Salsa e Merengue, Nova Maré,
+Vila Pinheiros, Vila do João, Esperança. Together with the 2022 favela limits (layer 13) they
+cover all 16 communities, with Marcílio Dias taken from the favela layer's "Centro Social
+Marcílio Dias" (bairro Penha Circular, outside the official Maré bairro).
+`scripts/data_utils/build_mare_neighbourhoods.py` assembles the layer; the crosswalk and QA are
+in `data/maré/neighbourhoods_provenance.json`. Manual digitising from the Guia de Ruas is not needed.
