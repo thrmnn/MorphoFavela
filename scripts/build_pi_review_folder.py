@@ -110,6 +110,17 @@ SECTIONS = [
 ]
 
 EXTRA = {
+    "00_mare_territory": (
+        "Maré — territory and site deliverables",
+        "What \"Maré\" means in each product: the data extent, the 16-community study area and the citywide "
+        "definition on one map, then the site sheet and brief rebuilt on the study area. The citywide choice is "
+        "the open card <a href=\"/ops\">mare_citywide_definition</a>; the interactive twin is "
+        "<a href=\"/morphofavela-dash/outputs/_distribution/html_dashboards/maré/index.html\">here</a>.",
+        [ROOT / "outputs/maré/territory/mare_territory_map.png",
+         ROOT / "outputs/_distribution/site_dashboards/maré/folha_maré_A3.png",
+         ROOT / "outputs/_distribution/site_dashboards/maré/folha_maré.pdf",
+         ROOT / "docs/briefs/mare/mare_morphology_brief.pdf"],
+    ),
     "06_morphotypes": (
         "Morphotypes and morphotopes",
         "The cross-site signature work the weekly deck draws on.",
