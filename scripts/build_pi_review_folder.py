@@ -22,6 +22,21 @@ ethics-critical). A figure with no register row renders with the
 from the PI — ruling §2). The staged rows are pulled into a dedicated
 "Awaiting your call" block (id="s-awaiting", G3), each badge linking the
 `/ops` promotion card.
+
+Charter phase D / figure_organization_spec.md §7 O7 ("WP chips"): the sweep
+(everything not in a curated RECORDS section) is grouped on `all.html` by
+the results registry's own WP -> family -> run, one `id="wp-<KEY>"` node per
+`config/work_packages.yaml` key — including keys with nothing swept this
+cycle, so a chip never links to a missing anchor. `index.html` gets a "By
+work package" chip row above the curated TOC, one chip per key, muted when
+empty, each linking `all.html#wp-<KEY>`. The registry is rebuilt in-process
+from the SAME disk state this cycle sweeps (never a possibly-stale
+`outputs/_registry/results.json` — measure at point of use); a run that is
+not the family's `current` head is collapsed under a `<details>`, never
+dropped. A swept file with no registry row (not yet declared in any family,
+or the registry generator is unavailable) renders in a final "Not yet in
+the registry" section, grouped by the folder it sits in as before — release
+class never hides anything from the PI (ruling §2) applies here too.
 """
 from __future__ import annotations
 
@@ -39,6 +54,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import yaml
 from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = None  # the citywide pair is 21298x6211 by design
@@ -567,6 +583,118 @@ def sweep_remaining(out_root: Path, already: set, entries: list) -> list:
     return sections
 
 
+# --------------------------------------------------------------------------
+# Charter phase D / figure_organization_spec.md §7 O7 ("WP chips"): group the
+# sweep by the results registry's WP -> family -> run, instead of by the
+# folder it happens to sit in. This is a read-only join, same shape as the
+# Phase 4 release-badge join above: the registry stays the only authority for
+# `wp`/`family`/`lifecycle`, this generator only looks each swept path up.
+# --------------------------------------------------------------------------
+
+def _wp_key_order() -> list[tuple[str, str]]:
+    """(key, title) pairs in config/work_packages.yaml's own declared order —
+    the chip row's order and the full set of chips, including a key with
+    nothing swept this cycle (shown muted, never omitted, so a chip never
+    links to a missing anchor). Appends the registry's own synthetic
+    UNASSIGNED bucket when the yaml declares any unassigned family, matching
+    build_results_registry.py's wp:UNASSIGNED node."""
+    path = ROOT / "config" / "work_packages.yaml"
+    if not path.exists():
+        return []
+    try:
+        cfg = yaml.safe_load(path.read_text()) or {}
+    except yaml.YAMLError:
+        return []
+    out = [(k, (v or {}).get("title") or k) for k, v in (cfg.get("work_packages") or {}).items()]
+    if cfg.get("unassigned"):
+        out.append(("UNASSIGNED", "Unassigned"))
+    return out
+
+
+def _load_fresh_registry() -> dict:
+    """A fresh results registry (organization_charter.md §2), rebuilt
+    in-process from the SAME disk state this cycle is about to sweep —
+    never a possibly-stale outputs/_registry/results.json (defended-number
+    drift: measure at point of use, never cache). Returns {} if the
+    registry generator is unavailable or errors, so a broken registry
+    degrades the WP tree to one "Not yet in the registry" bucket rather
+    than breaking the whole review-folder build."""
+    try:
+        import build_results_registry as brr
+    except ImportError:
+        return {}
+    try:
+        return brr.build()
+    except Exception:
+        return {}
+
+
+def _group_sweep_by_wp(entries: list[dict], registry: dict) -> dict:
+    """`{"wps": [...], "unmatched": [...]}`. `wps` covers every declared
+    work_packages.yaml key in order (§ _wp_key_order), each with its
+    families (declared order) and, per family, its runs — the `current`
+    run's items open, every other lifecycle (superseded/draft/archived)
+    collapsed under its own run node, rows kept, never deleted. A static
+    family (no run axis) is emitted as a single `run_id: None` bucket.
+    `unmatched` is every swept entry whose source path has no figure row in
+    the registry at all — shown, never hidden (ruling §2)."""
+    nodes = registry.get("nodes", {})
+    fig_by_path = {n["path"]: n for n in nodes.values()
+                   if n.get("kind") == "figure" and n.get("path")}
+
+    wp_order = _wp_key_order()
+    wp_titles = dict(wp_order)
+    fam_order: dict[str, list[str]] = defaultdict(list)
+    for node_id, n in nodes.items():
+        if n.get("kind") != "family":
+            continue
+        wp_key = (n.get("parent") or "").removeprefix("wp:")
+        fam_key = node_id.removeprefix("fam:")
+        if fam_key not in fam_order[wp_key]:
+            fam_order[wp_key].append(fam_key)
+
+    by_wp: dict[str, dict] = {}
+    unmatched: list[dict] = []
+    for e in entries:
+        if e.get("status") != "ok":
+            continue
+        fig = fig_by_path.get(e.get("source"))
+        if fig is None:
+            unmatched.append(e)
+            continue
+        wp_key, fam_key = fig.get("wp"), fig.get("family")
+        parent = nodes.get(fig.get("parent"), {})
+        if parent.get("kind") == "run":
+            run_id = fig["parent"].removeprefix("run:")
+            run_lifecycle = parent.get("lifecycle") or "current"
+            run_utc = parent.get("run_utc")
+        else:
+            run_id, run_lifecycle, run_utc = None, "current", None
+        fam_bucket = by_wp.setdefault(wp_key, {}).setdefault(fam_key, {})
+        run_bucket = fam_bucket.setdefault(
+            run_id, {"run_id": run_id, "lifecycle": run_lifecycle, "run_utc": run_utc, "items": []})
+        run_bucket["items"].append(e)
+
+    wps = []
+    for wp_key, title in wp_order:
+        families = []
+        n_wp = 0
+        for fam_key in fam_order.get(wp_key, []):
+            fam_runs = by_wp.get(wp_key, {}).get(fam_key)
+            if not fam_runs:
+                continue
+            runs = sorted(fam_runs.values(),
+                          key=lambda r: (r["lifecycle"] != "current", r["run_utc"] or "", r["run_id"] or ""))
+            n_fam = sum(len(r["items"]) for r in runs)
+            if n_fam == 0:
+                continue
+            families.append({"key": fam_key, "runs": runs, "n": n_fam})
+            n_wp += n_fam
+        wps.append({"key": wp_key, "title": title, "families": families, "n": n_wp})
+
+    return {"wps": wps, "unmatched": unmatched}
+
+
 def _previous_cycle_utc(out_root: Path) -> str | None:
     """The prior dated folder's own MANIFEST._utc — the diff base for 'new
     this cycle'. None on the very first recorded cycle: nothing to compare
@@ -714,6 +842,11 @@ def build(out_root: Path) -> dict:
     prev_utc = _previous_cycle_utc(out_root)
     new_since = _compute_new_since(entries, sections, prev_utc)
 
+    # O7 (WP chips): group the sweep by the registry's WP -> family -> run,
+    # for all.html's tree and index.html's chip row.
+    sweep_entries = [e for e in entries if e.get("section", "").startswith("sweep/")]
+    wp_tree = _group_sweep_by_wp(sweep_entries, _load_fresh_registry())
+
     manifest = {
         "_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "generator": "scripts/build_pi_review_folder.py",
@@ -722,6 +855,7 @@ def build(out_root: Path) -> dict:
         "files": entries,
         "new_since": new_since,
         "awaiting": awaiting,
+        "wp_tree": wp_tree,
     }
     (out_root / "MANIFEST.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
     (out_root / "index.html").write_text(_render_index(manifest))
@@ -787,6 +921,16 @@ border:1px solid var(--ink);background:var(--ink);color:var(--bg);cursor:pointer
 .mr-msg{margin-left:10px;color:var(--dim);font-size:13px}
 .mr-msg.mr-err{color:var(--warn)}
 .mr-msg.mr-ok{color:var(--ok)}
+.wp-chips{margin:6px 0 20px}
+.wp-chips strong{font-size:13px;color:var(--dim);display:block;margin-bottom:7px}
+.chip-row{display:flex;flex-wrap:wrap;gap:7px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:13px;padding:5px 11px;
+border-radius:99px;border:1px solid var(--line);background:#fff;text-decoration:none}
+.chip .n{color:var(--dim);font-variant-numeric:tabular-nums}
+.chip-muted{opacity:.42}
+details.run-details{margin:6px 0 14px;border:1px solid var(--line);border-radius:8px;padding:2px 12px;background:#fff}
+details.run-details summary{cursor:pointer;padding:8px 0;font-size:13px;color:var(--dim)}
+details.run-details .grid{padding-bottom:14px}
 </style>"""
 
 
@@ -910,6 +1054,23 @@ def _render_awaiting(awaiting: list[dict]) -> str:
     return "\n".join(parts)
 
 
+def _render_wp_chips(wp_tree: dict) -> str:
+    """O7: one chip per config/work_packages.yaml key, always all of them —
+    a WP with nothing swept this cycle still gets a chip (muted) and a
+    matching all.html anchor, so a chip never opens onto nothing."""
+    wps = wp_tree.get("wps") or []
+    if not wps:
+        return ""
+    parts = ['<nav class="wp-chips" aria-label="By work package"><strong>By work package</strong>'
+             '<div class="chip-row">']
+    for wp in wps:
+        cls = "chip chip-muted" if wp["n"] == 0 else "chip"
+        parts.append(f'<a class="{cls}" href="all.html#wp-{_html.escape(wp["key"])}">'
+                     f'{_html.escape(wp["title"])} <span class="n">{wp["n"]}</span></a>')
+    parts.append("</div></nav>")
+    return "\n".join(parts)
+
+
 def _render_index(m: dict) -> str:
     # Deliberately NOT re-sorted here: the render step must prove the order it
     # was handed is already correct, not silently repair it (G1).
@@ -941,6 +1102,7 @@ the paper or shared figures without your own tap.</p></header>"""]
 
     parts.append(_render_new_since(new_since))
     parts.append(_render_awaiting(m.get("awaiting", [])))
+    parts.append(_render_wp_chips(m.get("wp_tree", {})))
 
     parts.append('<nav class="toc" id="s-toc"><strong>This review</strong><ul>')
     for s in curated:
@@ -971,32 +1133,77 @@ the paper or shared figures without your own tap.</p></header>"""]
 
 
 def _render_all(m: dict) -> str:
-    by_section: dict[str, list] = {}
-    for e in m["files"]:
-        by_section.setdefault(e["section"], []).append(e)
-    other = [s for s in m["sections"] if s.get("group") == "other" and by_section.get(s["slug"])]
+    """Charter phase D / O7: the sweep, grouped by the registry's WP ->
+    family -> run. Every declared work_packages.yaml key gets an
+    `id="wp-<KEY>"` node — even an empty one — so index.html's chip row
+    never links to a missing anchor (checked by a dedicated test, not the
+    dangling-link guard, which only follows file targets, never `#...`
+    fragments). Runs that are not their family's `current` head render
+    collapsed under `<details>`: rows stay, they are just not open by
+    default (organization_charter.md §4 lifecycle table)."""
+    wp_tree = m.get("wp_tree") or {"wps": [], "unmatched": []}
+    folder_title = {s["slug"]: s["title"] for s in m["sections"] if s.get("group") == "other"}
 
     parts = [f"""<!doctype html><meta charset="utf-8"><title>Everything else — figure review</title>
 {_STYLE}
 <header><h1>Everything else on disk</h1>
-<p class="blurb">Every other figure under outputs/, deduplicated by content and grouped by the folder
-it came from. These are earlier and ongoing analyses, not a curated set, and some predate the current
-reframe. <a href="index.html">← back to the review</a></p></header>"""]
+<p class="blurb">Every other figure under outputs/, deduplicated by content, grouped by the results
+registry's work package → family → run (organization_charter.md §2). Superseded, draft and archived
+runs are collapsed under their family, never deleted — open the run to see them.
+<a href="index.html">← back to the review</a></p></header>"""]
 
-    parts.append('<nav class="toc"><ul class="cols">')
-    for s in other:
-        head, _, tail = s["title"].rpartition("/")
-        shown = f'<span class="dim">{head}/</span>{tail}' if head else tail
-        parts.append(f'<li><a href="#{_anchor(s["slug"])}">{shown}</a> '
-                     f'<span class="n">{len(by_section[s["slug"]])}</span></li>')
+    parts.append('<nav class="toc" id="tree"><ul class="cols">')
+    for wp in wp_tree["wps"]:
+        parts.append(f'<li><a href="#wp-{_html.escape(wp["key"])}">{_html.escape(wp["title"])} '
+                     f'<span class="dim">{_html.escape(wp["key"])}</span></a> '
+                     f'<span class="n">{wp["n"]}</span></li>')
+    if wp_tree["unmatched"]:
+        parts.append(f'<li><a href="#wp-UNCLASSIFIED">Not yet in the registry</a> '
+                     f'<span class="n">{len(wp_tree["unmatched"])}</span></li>')
     parts.append("</ul></nav>")
 
-    for s in other:
-        parts.append(f'<h2 id="{_anchor(s["slug"])}">{s["title"]}</h2>'
-                     f'<p class="prov">{s["provenance"]}</p><div class="grid">')
-        for e in by_section[s["slug"]]:
-            parts.append(_figure_card(e, s["slug"]))
-        parts.append("</div>")
+    for wp in wp_tree["wps"]:
+        parts.append(f'<h2 id="wp-{_html.escape(wp["key"])}">{_html.escape(wp["title"])} '
+                     f'<span class="dim">{_html.escape(wp["key"])}</span> '
+                     f'<span class="n">{wp["n"]}</span></h2>')
+        if not wp["families"]:
+            parts.append('<p class="blurb">Nothing swept for this work package this cycle — every '
+                         'current figure it has is either curated above or has yet to run.</p>')
+            continue
+        for fam in wp["families"]:
+            parts.append(f'<h3>{_html.escape(fam["key"])} <span class="n">{fam["n"]}</span></h3>')
+            for run in fam["runs"]:
+                label = run["run_id"] or "static family (no run axis)"
+                if run["run_id"] is None or run["lifecycle"] == "current":
+                    parts.append(f'<p class="prov">{_html.escape(label)} · {run["lifecycle"]}</p>'
+                                 '<div class="grid">')
+                    for e in run["items"]:
+                        parts.append(_figure_card(e, e["section"]))
+                    parts.append("</div>")
+                else:
+                    parts.append(f'<details class="run-details"><summary>{len(run["items"])} figure(s) '
+                                 f'— {_html.escape(label)} ({run["lifecycle"]})</summary><div class="grid">')
+                    for e in run["items"]:
+                        parts.append(_figure_card(e, e["section"]))
+                    parts.append("</div></details>")
+
+    if wp_tree["unmatched"]:
+        parts.append(f'<h2 id="wp-UNCLASSIFIED">Not yet in the registry '
+                     f'<span class="n">{len(wp_tree["unmatched"])}</span></h2>'
+                     '<p class="blurb">Swept figures with no work-package registry row yet — not '
+                     'declared in config/work_packages.yaml, or the registry could not be built this '
+                     'run. Shown, never hidden (organization_charter.md ruling §2), grouped by the '
+                     'folder they sit in.</p>')
+        by_folder: dict[str, list] = defaultdict(list)
+        for e in wp_tree["unmatched"]:
+            by_folder[e["section"]].append(e)
+        for slug in sorted(by_folder, key=lambda s: folder_title.get(s, s)):
+            items = by_folder[slug]
+            parts.append(f'<h3>{_html.escape(folder_title.get(slug, slug))} '
+                         f'<span class="n">{len(items)}</span></h3><div class="grid">')
+            for e in items:
+                parts.append(_figure_card(e, slug))
+            parts.append("</div>")
 
     return "\n".join(parts)
 

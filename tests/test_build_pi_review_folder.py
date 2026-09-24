@@ -8,6 +8,7 @@ fallbacks, and dated-folder retention.
 """
 
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -502,3 +503,154 @@ def test_figure_card_release_badge_is_shown_and_never_hides_the_figure():
 def test_every_figure_card_names_its_file_for_the_gates():
     card = bprf._figure_card({"status": "OK", "file": "f9_x.png", "bytes": 1000, "thumb": None}, "sec")
     assert 'data-file="f9_x.png"' in card
+
+
+# --------------------------------------------------------------------------
+# O7 — "WP chips" (charter phase D / figure_organization_spec.md §7): the
+# sweep grouped by the registry's WP -> family -> run, and index.html's chip
+# row linking all.html#wp-<KEY>.
+# --------------------------------------------------------------------------
+
+def _fake_registry():
+    """One run-backed family (WP07/wp07_figures) with a current + a
+    superseded run, and one static family (WP04F/site_print) with no run
+    axis — enough to exercise every branch of _group_sweep_by_wp."""
+    return {
+        "nodes": {
+            "wp:WP07": {"kind": "wp", "parent": None, "title": "P1 solar results"},
+            "wp:WP04F": {"kind": "wp", "parent": None, "title": "Facade solar"},
+            "fam:wp07_figures": {"kind": "family", "parent": "wp:WP07"},
+            "fam:site_print": {"kind": "family", "parent": "wp:WP04F"},
+            "run:wp07_figures_20260917T125201Z": {
+                "kind": "run", "parent": "fam:wp07_figures", "lifecycle": "current",
+                "run_utc": "2026-09-17T12:52:01Z"},
+            "run:wp07_figures_20260910T000000Z": {
+                "kind": "run", "parent": "fam:wp07_figures", "lifecycle": "superseded",
+                "run_utc": "2026-09-10T00:00:00Z"},
+            "art:wp07_figures::wp07_figures_20260917T125201Z::f1": {
+                "kind": "figure", "parent": "run:wp07_figures_20260917T125201Z",
+                "wp": "WP07", "family": "wp07_figures",
+                "path": "runs/wp07_figures_20260917T125201Z/f1.png"},
+            "art:wp07_figures::wp07_figures_20260910T000000Z::f1": {
+                "kind": "figure", "parent": "run:wp07_figures_20260910T000000Z",
+                "wp": "WP07", "family": "wp07_figures",
+                "path": "runs/wp07_figures_20260910T000000Z/f1.png"},
+            "art:site_print::plate": {
+                "kind": "figure", "parent": "fam:site_print",
+                "wp": "WP04F", "family": "site_print",
+                "path": "outputs/mare/print/plate.png"},
+        },
+    }
+
+
+def test_group_sweep_by_wp_buckets_current_and_superseded_runs(monkeypatch):
+    monkeypatch.setattr(bprf, "_wp_key_order", lambda: [
+        ("WP07", "P1 solar results"), ("WP04F", "Facade solar"), ("WP01", "Footprint repair")])
+    entries = [
+        {"status": "ok", "section": "sweep/a", "file": "f1_new.png",
+         "source": "runs/wp07_figures_20260917T125201Z/f1.png"},
+        {"status": "ok", "section": "sweep/a", "file": "f1_old.png",
+         "source": "runs/wp07_figures_20260910T000000Z/f1.png"},
+        {"status": "ok", "section": "sweep/b", "file": "plate.png",
+         "source": "outputs/mare/print/plate.png"},
+        {"status": "ok", "section": "sweep/c", "file": "mystery.png",
+         "source": "outputs/some/untracked/mystery.png"},
+    ]
+    tree = bprf._group_sweep_by_wp(entries, _fake_registry())
+
+    by_key = {wp["key"]: wp for wp in tree["wps"]}
+    assert set(by_key) == {"WP07", "WP04F", "WP01"}
+    assert by_key["WP01"]["n"] == 0 and by_key["WP01"]["families"] == []  # declared, nothing swept
+
+    wp07 = by_key["WP07"]
+    assert wp07["n"] == 2
+    fam = wp07["families"][0]
+    assert fam["key"] == "wp07_figures"
+    runs_by_lifecycle = {r["lifecycle"]: r for r in fam["runs"]}
+    assert runs_by_lifecycle["current"]["items"][0]["file"] == "f1_new.png"
+    assert runs_by_lifecycle["superseded"]["items"][0]["file"] == "f1_old.png"  # kept, not dropped
+
+    wp04f = by_key["WP04F"]
+    assert wp04f["n"] == 1
+    assert wp04f["families"][0]["runs"][0]["run_id"] is None  # static family, no run axis
+
+    assert [e["file"] for e in tree["unmatched"]] == ["mystery.png"]  # shown, never hidden
+
+
+def test_group_sweep_by_wp_degrades_to_all_unmatched_when_registry_unavailable(monkeypatch):
+    monkeypatch.setattr(bprf, "_wp_key_order", lambda: [("WP07", "P1 solar results")])
+    entries = [{"status": "ok", "section": "sweep/a", "file": "x.png", "source": "outputs/x.png"}]
+    tree = bprf._group_sweep_by_wp(entries, {})
+    assert tree["wps"] == [{"key": "WP07", "title": "P1 solar results", "families": [], "n": 0}]
+    assert [e["file"] for e in tree["unmatched"]] == ["x.png"]
+
+
+def _wp_tree_fixture():
+    return {
+        "wps": [
+            {"key": "WP07", "title": "P1 solar results", "n": 2, "families": [
+                {"key": "wp07_figures", "n": 2, "runs": [
+                    {"run_id": "wp07_figures_20260917T125201Z", "lifecycle": "current",
+                     "run_utc": "2026-09-17T12:52:01Z",
+                     "items": [{"section": "sweep/a", "file": "f1_new.png", "status": "ok", "bytes": 1}]},
+                    {"run_id": "wp07_figures_20260910T000000Z", "lifecycle": "superseded",
+                     "run_utc": "2026-09-10T00:00:00Z",
+                     "items": [{"section": "sweep/a", "file": "f1_old.png", "status": "ok", "bytes": 1}]},
+                ]},
+            ]},
+            {"key": "WP01", "title": "Footprint repair", "n": 0, "families": []},
+        ],
+        "unmatched": [{"section": "sweep/c", "file": "mystery.png", "status": "ok", "bytes": 1}],
+    }
+
+
+def _base_manifest(**extra):
+    m = {
+        "_utc": "2026-09-24T00:00:00Z", "cycle_date": "2026-09-24",
+        "sections": [{"slug": "sweep/c", "title": "some/untracked", "group": "other"}],
+        "files": [], "new_since": {"cutoff_utc": None, "total": 0, "shown": 0, "families": []},
+        "awaiting": [],
+    }
+    m.update(extra)
+    return m
+
+
+def test_every_wp_chip_on_index_opens_a_matching_anchor_in_all_html():
+    """The O7 test: every chip index.html renders must resolve to a real
+    id="wp-<KEY>" node in all.html — including WP01, which has nothing
+    swept this cycle (muted, never omitted)."""
+    m = _base_manifest(wp_tree=_wp_tree_fixture())
+    index_html = bprf._render_index(m)
+    all_html = bprf._render_all(m)
+
+    chips = re.findall(r'<a class="(chip[^"]*)" href="(all\.html#[^"]+)">', index_html)
+    assert len(chips) == 2  # WP07 + WP01, both declared
+    for cls, href in chips:
+        anchor_id = href.split("#", 1)[1]
+        assert f'id="{anchor_id}"' in all_html, f"chip {href!r} has no matching anchor in all.html"
+    muted = {href for cls, href in chips if "chip-muted" in cls}
+    assert muted == {"all.html#wp-WP01"}  # the empty WP is muted, not hidden
+
+
+def test_all_html_collapses_a_superseded_run_but_keeps_its_figure():
+    m = _base_manifest(wp_tree=_wp_tree_fixture())
+    html = bprf._render_all(m)
+    assert 'id="wp-WP07"' in html
+    assert "f1_new.png" in html
+    assert "<details" in html and "f1_old.png" in html  # collapsed, never deleted
+    # the current run's figure is NOT inside a <details> (open by default)
+    assert html.index("f1_new.png") < html.index("<details")
+
+
+def test_all_html_shows_unmatched_sweep_entries_grouped_by_folder_never_hidden():
+    m = _base_manifest(wp_tree=_wp_tree_fixture())
+    html = bprf._render_all(m)
+    assert 'id="wp-UNCLASSIFIED"' in html
+    assert "mystery.png" in html
+    assert "some/untracked" in html  # folder title, from the sweep section metadata
+
+
+def test_render_all_with_no_wp_tree_at_all_still_renders_a_valid_page():
+    m = _base_manifest()
+    html = bprf._render_all(m)
+    assert "<!doctype html>" in html.lower()
