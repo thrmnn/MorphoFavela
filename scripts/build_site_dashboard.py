@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import math
 import subprocess
 import sys
 import warnings
@@ -33,6 +34,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib import patheffects
 from matplotlib.patches import Rectangle
 from scipy import ndimage
 from scipy.stats import pearsonr
@@ -50,7 +52,8 @@ from src.svf_v2.paths import AREA_FILES
 from src.viz.folha.sites import SHEET_NUMBER
 from src.brisa_solar import mare_study_area as msa
 from src.brisa_solar.wp07_figures import BOUNDARY_STROKE_PX
-from src.sites.territory import has_subunit_study_area
+from src.sites.territory import has_subunit_study_area, load_territory, north_arrow_angle, rotate_for_display
+from scripts import render_mare_irradiation_distributions as mare_dist
 
 TYPOLOGY = {
     "vidigal": ("hillside canyon", "#2C5F8D"),
@@ -1082,6 +1085,275 @@ def draw_caveats_v2(ax, site: str, stats: dict) -> None:
             ha="right", va="bottom")
 
 
+# --- FOLHA4 Maré (brisaverse shared/facts/tasks.json id FOLHA4, PI 2026-09-24) ----
+#
+# Supersedes FOLHA3's Maré sheet (its open findings carry into this one, per
+# tasks.json's FOLHA3 note): the SVF x solar scatter was ~1.45x the grid
+# row's fixed height_ratio (a constant, not sized from content); the hero
+# map's axis-aligned crop left wide blank margins on Maré's diagonal
+# footprint (flagged rounds 1-3, docs/critic/folha_round3.md, never fixed);
+# the masthead sub-header printed the zoom-selection rule in code-level
+# jargon. This sheet drops the grid row/zoom inlets/hexbin entirely for
+# Maré (the PI's brief redefines the analysis core as the three citywide-
+# distribution views below) rather than further tuning those panels, so
+# all three carry over as resolved-by-removal, not patched in place — see
+# build_folha4_mare's docstring for the trade-off this represents.
+
+def _mare_rotation_origin(territory) -> tuple:
+    """Single shared rotation point for every FOLHA4 Maré layer — the study
+    area's own centroid, neutral between definitions A/E and every
+    community. Per-geometry 'center' origins (rotate_for_display's default)
+    rotate each layer around its own bbox center and scatter them relative
+    to each other; scripts/explain_mare_definitions.py's render_component_map
+    hit exactly this and fixed it the same way — one shared origin, passed
+    explicitly to every layer."""
+    c = territory.study_area.centroid
+    return (c.x, c.y)
+
+
+def draw_hero_map_v4(ax, d: dict, territory, stats: dict) -> None:
+    """FOLHA4's street-level SVF hero map: every layer rotated by the same
+    amount, about the same point, so the site's own long axis
+    (territory.display_rotation_deg — derived from the study-area geometry
+    by src.sites.territory.rotation_deg, never typed) renders horizontal,
+    with a north arrow rotated to match (north_arrow_angle) and thin
+    community outlines for orientation. Adapted from the pre-v3 hero map
+    (git dee25e8's draw_hero_map) for the marker styling (resolved / offset
+    / unresolved-SVF observers) and scale bar, but fixes that version's
+    standing "~19% panel width, wide blank margins" defect (round 1/2/3):
+    that defect came from fitting an axis-aligned box around a diagonal
+    footprint, where more padding cannot help because the gap IS the
+    mismatch between the footprint's long axis and the panel's. Rotating
+    the footprint itself removes the mismatch instead of padding around
+    it — the same principle draw_grid_panel's _fit_square_axes already
+    uses for the (now-rotated) bounds it is handed."""
+    fig = ax.figure
+    ax.set_facecolor(PAPER)
+
+    rot = territory.display_rotation_deg
+    origin = _mare_rotation_origin(territory)
+    boundary = rotate_for_display(d["boundary"], rot, origin=origin)
+    buildings = rotate_for_display(d["buildings"], rot, origin=origin) if d["buildings"] is not None else None
+    communities = d.get("communities")
+    communities_r = (rotate_for_display(communities, rot, origin=origin)
+                      if communities is not None and len(communities) else None)
+    svf = rotate_for_display(d["svf"], rot, origin=origin)
+
+    if buildings is not None:
+        try:
+            buildings.plot(ax=ax, color="#E4E4E0", edgecolor="none", linewidth=0, zorder=1)
+        except Exception:
+            pass
+
+    try:
+        busy = stats.get("edge_share", 0.0) > 0.10
+        tick_spacing = 9.0 if busy else 6.5
+        tick_length = 0.5 if busy else 0.7
+        halo_pe = [patheffects.withTickedStroke(angle=-45, length=tick_length, spacing=tick_spacing)]
+        boundary.boundary.plot(ax=ax, color=INK, linewidth=0.7, zorder=3, path_effects=halo_pe)
+        inner = boundary.buffer(-15.0)
+        gpd.GeoSeries(inner, crs=boundary.crs).boundary.plot(
+            ax=ax, color=INK, linewidth=0.5, linestyle="--", zorder=2.5, alpha=0.6)
+    except Exception:
+        pass
+
+    if communities_r is not None:
+        try:
+            community_lw = BOUNDARY_STROKE_PX / fig.dpi * 72.0
+            communities_r.boundary.plot(ax=ax, color=MARE_COMMUNITY_STROKE,
+                                        linewidth=community_lw, zorder=3.2)
+        except Exception:
+            pass
+
+    is_zero = svf["svf"] == 0.0
+    is_offset = (svf["offset_distance"] > 2.5) & ~is_zero
+    normal = ~is_zero & ~is_offset
+    cmap = mpl.colormaps.get_cmap("YlGnBu_r")
+    norm_v = mpl.colors.Normalize(vmin=0.0, vmax=1.0)
+    if normal.any():
+        ax.scatter(svf.loc[normal].geometry.x, svf.loc[normal].geometry.y,
+                  c=cmap(norm_v(svf.loc[normal, "svf"].values)),
+                  s=1.6, alpha=0.85, linewidths=0, zorder=4)
+    if is_offset.any():
+        ax.scatter(svf.loc[is_offset].geometry.x, svf.loc[is_offset].geometry.y,
+                  facecolors="none", edgecolors=cmap(norm_v(svf.loc[is_offset, "svf"].values)),
+                  s=4.0, linewidths=0.6, zorder=5)
+    if is_zero.any():
+        ax.scatter(svf.loc[is_zero].geometry.x, svf.loc[is_zero].geometry.y,
+                  marker="o", facecolors=MAGENTA, edgecolors="none", s=3.0, alpha=0.30, linewidths=0, zorder=6)
+        ax.scatter(svf.loc[is_zero].geometry.x, svf.loc[is_zero].geometry.y,
+                  marker="+", c=MAGENTA, s=11.0, linewidths=0.8, alpha=0.7, zorder=7)
+
+    minx, miny, maxx, maxy = boundary.total_bounds
+    pad_x = 0.04 * (maxx - minx)
+    pad_y = 0.04 * (maxy - miny)
+    ax.set_xlim(minx - pad_x, maxx + pad_x)
+    ax.set_ylim(miny - pad_y, maxy + pad_y)
+    _fit_square_axes(ax)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_title("street-level SVF · rotated to the site's own long axis",
+                fontsize=9.5, color=INK, pad=3, loc="left")
+
+    # Scale bar and north arrow are drawn in the ROTATED frame's own
+    # coordinates (the frame the map content now sits in) — not the source
+    # CRS's — since _fit_square_axes already fit the box to this frame's
+    # (now tight, no-longer-diagonal) bounds.
+    bar_y = miny - pad_y + (maxy - miny) * 0.02
+    bar_x0 = minx - pad_x + (maxx - minx) * 0.04
+    bar_x1 = bar_x0 + 200.0
+    ax.plot([bar_x0, bar_x1], [bar_y, bar_y], color=INK, lw=1.4, zorder=7)
+    ax.text((bar_x0 + bar_x1) / 2, bar_y + (maxy - miny) * 0.012,
+            "200 m", fontsize=7, family="DejaVu Sans Mono",
+            ha="center", va="bottom", color=INK, zorder=7)
+
+    # North arrow at north_arrow_angle(rot) degrees clockwise from up — the
+    # angle the map's own rotation (rotate_for_display's -rot convention)
+    # leaves north pointing at, derived from territory.display_rotation_deg,
+    # never typed.
+    angle = math.radians(north_arrow_angle(rot))
+    arr_x0, arr_y0 = bar_x0, bar_y + (maxy - miny) * 0.045
+    arr_len = (maxy - miny) * 0.05
+    dx, dy = arr_len * math.sin(angle), arr_len * math.cos(angle)
+    ax.annotate("", xy=(arr_x0 + dx, arr_y0 + dy), xytext=(arr_x0, arr_y0),
+                arrowprops=dict(arrowstyle="->", color=INK, lw=1.1), zorder=7)
+    ax.text(arr_x0 + dx * 1.32, arr_y0 + dy * 1.32, "N", fontsize=7,
+            family="DejaVu Sans Mono", color=INK, ha="center", va="center", zorder=7)
+
+    # Colorbar BELOW the now-fitted map box (draw_grid_panel's own pattern,
+    # _CBAR_GAP_IN/_CBAR_RESERVE_IN) rather than a top-left inset anchored to
+    # the panel's original (pre-shrink) cell — an inset there sits at the
+    # same height the reserved title strip occupies and collided with the
+    # title text above (caught on first render, this round; fixed by moving
+    # it instead of shrinking either element further).
+    panel_box = ax.get_position()
+    fig_w_in, fig_h_in = ax.figure.get_size_inches()
+    cbar_w = panel_box.width * 0.30
+    cbar_h = 0.05 / fig_h_in
+    cbar_x0 = panel_box.x0
+    cbar_y0 = panel_box.y0 - _CBAR_GAP_IN / fig_h_in - cbar_h
+    cbar_ax = fig.add_axes([cbar_x0, cbar_y0, cbar_w, cbar_h])
+    sm = mpl.cm.ScalarMappable(norm=norm_v, cmap=cmap)
+    sm.set_array([])
+    cb = plt.colorbar(sm, cax=cbar_ax, orientation="horizontal", format="%.1f", ticks=[0.0, 0.5, 1.0])
+    cb.outline.set_linewidth(0.3)
+    cb.ax.tick_params(labelsize=6, length=2, pad=1)
+    cb.set_label("SVF", fontsize=7, color=INK, labelpad=2)
+    fig.text(cbar_x0 + cbar_w + 0.012, cbar_y0 + cbar_h * 0.5,
+             "resolved · pale ring = offset > 2.5 m · magenta = unresolved (SVF = 0)",
+             fontsize=6.5, color=MUTED, ha="left", va="center")
+
+
+def build_folha4_mare(hero: bool) -> dict:
+    """FOLHA4's Maré sheet: horizontal display via the site's own
+    display_rotation_deg, the three citywide-distribution views (compute
+    once in scripts/render_mare_irradiation_distributions.py, drawn here
+    from the SAME data — never re-derived) as the sheet's analytical core,
+    and — per the PI's folha_hero_map ruling (2026-09-24: "the FOLHA4
+    rounds grade the sheet with and without it; the PI sees both") — one
+    call per variant rather than a flag the implementer decides for them.
+
+    Trade-off made this round, stated rather than hidden: the v3 grid row
+    (terrain/density/SVF/sunlight) and its two zoom inlets are absent from
+    this sheet entirely, not just de-emphasised. The PI's FOLHA4 brief
+    names the three distribution views as the sheet's analysis core; adding
+    them alongside a full v3 grid row would produce a sheet with two
+    unrelated analytical cores fighting for the same page, re-introducing
+    the "text/panel-heavy" residual the v3 restructure was written to cut.
+    If the PI wants the grid row back, it is a small addition (draw_grid_row
+    already takes the same `d`/lattice this function could build) — this
+    round did not add it because nothing in the brief asked for it back."""
+    site = "maré"
+    issues: list = []
+    panels: list = []
+    territory = load_territory(site, root=ROOT)
+
+    out_dir = ROOT / "outputs" / "_distribution" / "site_dashboards" / site
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    d = load_site(site, issues)
+    stats = compute_stats(d)
+    sha = git_sha()
+    build_date = datetime.date.today().isoformat()
+    folha_nn = SHEET_NUMBER.get(site, "00")
+    dist_data = mare_dist.compute_distributions(ROOT)
+
+    fig = plt.figure(figsize=(11.69, 16.54), dpi=200, facecolor=PAPER)
+    if hero:
+        height_ratios = [1.3, 0.75, 4.5, 8.0, 1.9]
+    else:
+        height_ratios = [1.3, 0.75, 12.15, 1.9]
+    gs = fig.add_gridspec(
+        nrows=len(height_ratios), ncols=1, height_ratios=height_ratios,
+        left=0.04, right=0.97, top=0.985, bottom=0.015, hspace=0.30,
+    )
+
+    # Plain-English sub-header — this sheet has no zoom-inlet selection rule
+    # to state (the FOLHA3 jargon residual was provenance_line() printing
+    # that rule in code-level terms; this sheet carries no zoom inlets at
+    # all, so there is nothing code-level left to print).
+    subheader = (f"ground irradiation lattice, WP-05 run {dist_data['run_of_record']} · "
+                f"definitions A (favela polygons, P1 f1) and E (IPP complex outline, this sheet)")
+
+    ax_mast = fig.add_subplot(gs[0, 0])
+    draw_masthead(ax_mast, site, stats, sha, build_date, folha_nn, subheader)
+    panels.append("masthead")
+
+    ax_id = fig.add_subplot(gs[1, 0])
+    draw_identity_card(ax_id, site, stats)
+    panels.append("identity_card")
+
+    row = 2
+    if hero:
+        ax_hero = fig.add_subplot(gs[row, 0])
+        try:
+            draw_hero_map_v4(ax_hero, d, territory, stats)
+            panels.append("hero_map_v4")
+        except Exception as e:
+            ax_hero.axis("off")
+            ax_hero.text(0.5, 0.5, f"hero map unavailable: {e}", ha="center", va="center",
+                        fontsize=8, color=MUTED, transform=ax_hero.transAxes)
+            issues.append(f"maré: hero map failed — {e}")
+        row += 1
+
+    with mpl.rc_context(mpl.rcParamsDefault):
+        plt.rcParams.update(mare_dist.DISTRIBUTIONS_RC)
+        mare_dist.draw_distributions(fig, gs[row, 0], dist_data)
+    panels.append("distributions_core")
+    row += 1
+
+    ax_cav = fig.add_subplot(gs[row, 0])
+    draw_caveats_v2(ax_cav, site, stats)
+    panels.append("caveat_strip")
+
+    fig.text(0.005, 0.004, mare_dist.provenance_note(dist_data), fontsize=6, color=MUTED)
+
+    suffix = "_hero" if hero else ""
+    a3_path = out_dir / f"folha_{site}{suffix}_A3.png"
+    fig.savefig(a3_path, dpi=220, facecolor=PAPER, bbox_inches=None)
+    pdf_path = out_dir / f"folha_{site}{suffix}.pdf"
+    fig.savefig(pdf_path, facecolor=PAPER)
+    web_path = out_dir / f"folha_{site}{suffix}_web1200.png"
+    fig.savefig(web_path, dpi=85, facecolor=PAPER)
+    plt.close(fig)
+
+    meta = {
+        "site": site, "variant": "hero" if hero else "no_hero",
+        "sheet_version": "FOLHA4", "build_date": build_date, "git_sha7": sha,
+        "display_rotation_deg": territory.display_rotation_deg,
+        "panels_built": panels,
+        "distributions_run_of_record": dist_data["run_of_record"],
+        "issues": issues,
+        "outputs": {"A3_png": str(a3_path), "pdf": str(pdf_path), "web1200": str(web_path)},
+    }
+    with open(out_dir / f"metadata_folha4{suffix}.json", "w") as f:
+        json.dump(meta, f, indent=2, default=str)
+
+    return dict(a3_path=a3_path, pdf=pdf_path, web=web_path, issues=issues, panels=panels)
+
+
 # --- atomic exports ---------------------------------------------------------
 
 
@@ -1315,9 +1587,33 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--site")
     p.add_argument("--all", action="store_true", help="build every site")
+    p.add_argument("--folha4-mare", action="store_true",
+                   help="build FOLHA4's Maré sheet, both hero/no-hero variants (docs/critic, tasks.json id FOLHA4)")
     args = p.parse_args()
-    if not args.site and not args.all:
-        p.error("must pass --site <name> or --all")
+    if not args.site and not args.all and not args.folha4_mare:
+        p.error("must pass --site <name>, --all, or --folha4-mare")
+
+    if args.folha4_mare:
+        failed = []
+        for hero in (False, True):
+            label = "maré (hero)" if hero else "maré"
+            try:
+                result = build_folha4_mare(hero)
+            except Exception as e:
+                print(f"[{label}] FAILED: {e}")
+                failed.append(label)
+                continue
+            n_issues = len(result["issues"])
+            print(f"[{label}] OK — {result['web']} ({n_issues} issue(s))")
+            print(f"  A3 PNG: {result['a3_path']}")
+            print(f"  PDF:    {result['pdf']}")
+            print(f"  web1200: {result['web']}")
+            print(f"  panels: {', '.join(result['panels'])}")
+            if result["issues"]:
+                print("  ISSUES:")
+                for i in result["issues"]:
+                    print(f"    - {i}")
+        return 1 if failed else 0
 
     sites = STRIP_ORDER if args.all else [args.site]
     failed = []

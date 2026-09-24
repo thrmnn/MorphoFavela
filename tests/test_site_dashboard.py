@@ -90,6 +90,47 @@ def test_builder_accepts_all_flag(script):
     assert "--all" in proc.stdout
 
 
+# ---------------------------------------------------------------------------
+# FOLHA4 (2026-09-24): Maré's horizontal sheet, hero/no-hero variants.
+# ---------------------------------------------------------------------------
+
+def test_build_site_dashboard_accepts_folha4_mare_flag():
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPTS / "build_site_dashboard.py"), "--help"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "--folha4-mare" in proc.stdout
+
+
+class _FakePoint:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+
+class _FakeGeom:
+    def __init__(self, x, y):
+        self._centroid = _FakePoint(x, y)
+
+    @property
+    def centroid(self):
+        return self._centroid
+
+
+class _FakeTerritory:
+    def __init__(self, x, y):
+        self.study_area = _FakeGeom(x, y)
+
+
+def test_mare_rotation_origin_is_the_study_area_centroid_not_per_layer():
+    # The bug this guards: rotate_for_display's default origin="center"
+    # rotates each layer around ITS OWN bbox center, scattering boundary/
+    # buildings/communities/observers relative to each other. Every FOLHA4
+    # Maré layer must share exactly this one point.
+    t = _FakeTerritory(123.5, -456.25)
+    assert bsd._mare_rotation_origin(t) == (123.5, -456.25)
+
+
 def test_uses_quadrant_fallback_true_without_tipo_logra_column():
     # No segments at all — Maré-shaped failure mode this helper exists for
     # (round-1 finding 3: an honest ridgeline title when tipo_logra is
