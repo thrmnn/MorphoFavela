@@ -100,18 +100,24 @@ def compute_distributions(root: Path = ROOT) -> dict:
     )
 
 
-def draw_distributions(fig, spec, data: dict) -> tuple:
-    """Draws the three panels into a 2x2 sub-gridspec carved out of `spec`
-    (a SubplotSpec — pass `fig.add_gridspec(1, 1)[0, 0]` for "the whole
-    figure", or a cell of a host sheet's own outer gridspec to embed).
-    Caller is responsible for the `matplotlib.rc_context(DISTRIBUTIONS_RC)`
-    wrapper (see module docstring) — this function only draws. Returns the
-    three axes (city-vs-Maré histogram, decile-share bars, community
-    boxplot) in case a caller wants to touch one further."""
+def draw_distributions_top(fig, spec, data: dict) -> tuple:
+    """Panels 1 & 2 (city-vs-Maré histogram, decile-share bars) side by
+    side. Split out from `draw_distributions` (FOLHA4 round 3) because a
+    single hspace fraction inside one shared sub-gridspec scales with
+    whatever outer-cell height the caller gives it — fine for
+    `draw_distributions`'s own equal-height callers, but FOLHA4's hero and
+    no-hero variants give the distributions block very different outer
+    heights (~7.6 vs ~11.3 page-ratio units), so a fixed *fraction* gap
+    ballooned into ~250px of dead space in no-hero while staying tight in
+    hero (round-2 council finding). Returning top/bottom as separate specs
+    lets the host sheet place a fixed-*ratio* spacer row between them on
+    its own outer gridspec — the same absolute-gap-regardless-of-variant
+    trick already used for the gap before the caveat strip
+    (SPACER_BEFORE_CAVEATS in build_site_dashboard.py)."""
     city, a, e, a_p, deciles = data["city"], data["a"], data["e"], data["a_p"], data["deciles"]
-    label_a, label_e, order = data["label_a"], data["label_e"], data["order"]
+    label_a, label_e = data["label_a"], data["label_e"]
 
-    gs = spec.subgridspec(2, 2, height_ratios=[1, 1.25], hspace=0.42, wspace=0.22)
+    gs = spec.subgridspec(1, 2, wspace=0.22)
 
     ax = fig.add_subplot(gs[0, 0])
     bins = np.linspace(0, deciles[-1], 90)
@@ -144,7 +150,16 @@ def draw_distributions(fig, spec, data: dict) -> tuple:
     ax.legend(frameon=False, fontsize=7, loc="upper right")
     ax2 = ax
 
-    ax = fig.add_subplot(gs[1, :])
+    return ax1, ax2
+
+
+def draw_distributions_bottom(fig, spec, data: dict) -> tuple:
+    """Panel 3 alone (each community's spread of citywide percentiles,
+    listed north to south). Split out from `draw_distributions` — see
+    `draw_distributions_top`'s docstring for why."""
+    e, order = data["e"], data["order"]
+
+    ax = fig.add_subplot(spec)
     data_by_order = [e.loc[e["sub"] == o, "p"].to_numpy() for o in order]
     bp = ax.boxplot(data_by_order, widths=0.55, showfliers=False, patch_artist=True,
                     medianprops=dict(color=INK, lw=1.6), whiskerprops=dict(color=MUTED), capprops=dict(color=MUTED))
@@ -162,15 +177,43 @@ def draw_distributions(fig, spec, data: dict) -> tuple:
                 loc="left", fontsize=10, color=INK)
     ax3 = ax
 
+    return (ax3,)
+
+
+def draw_distributions(fig, spec, data: dict) -> tuple:
+    """Combined convenience wrapper: all three panels into one 2-row
+    sub-gridspec carved out of `spec` (a SubplotSpec — pass
+    `fig.add_gridspec(1, 1)[0, 0]` for "the whole figure", or a cell of a
+    host sheet's own outer gridspec to embed). Caller is responsible for
+    the `matplotlib.rc_context(DISTRIBUTIONS_RC)` wrapper (see module
+    docstring) — this function only draws. Safe here because this
+    wrapper's two callers (this module's own `main()` and, historically,
+    FOLHA4 round 1/2) always give it one fixed-height figure — the
+    variant-height mismatch that broke a shared hspace fraction only
+    shows up when a host sheet's hero/no-hero variants hand the block
+    very different outer heights, which is why FOLHA4 now calls
+    `draw_distributions_top`/`draw_distributions_bottom` directly instead
+    of this wrapper (see build_site_dashboard.py)."""
+    gs = spec.subgridspec(2, 1, height_ratios=[1, 1.25], hspace=0.42)
+    ax1, ax2 = draw_distributions_top(fig, gs[0, 0], data)
+    ax3, = draw_distributions_bottom(fig, gs[1, 0], data)
     return ax1, ax2, ax3
 
 
 def provenance_note(data: dict) -> str:
-    """One plain-English line: what produced these numbers and their
-    release status — no code-level identifiers beyond the run id itself,
-    which is a citable artefact name, not an internal algorithm parameter."""
-    return (f"WP-05 run of record {data['run_of_record']} · ground lattice · box = interquartile range, "
-            "whiskers 1.5×IQR · staged for PI review, ethics-gate before release")
+    """One plain-English line: what produced these numbers, a working
+    glossary for the stats terms panels 1-3 use with no other gloss on
+    the page (decile, IQR, length-weighted — round-2/3 council finding:
+    a reader without a stats background has nothing to go on for these,
+    print has no hover the way the interactive twin's <dfn> tooltips do),
+    and their release status — no code-level identifiers beyond the run
+    id itself, which is a citable artefact name, not an internal
+    algorithm parameter."""
+    return (f"WP-05 run of record {data['run_of_record']} · ground lattice · "
+            "decile = one tenth of the citywide distribution, darkest to brightest · "
+            "box = interquartile range (the middle 50% of values), whiskers = 1.5× that range · "
+            "length-weighted = each road segment counted by its length, not as one point · "
+            "staged for PI review, ethics-gate before release")
 
 
 def main() -> int:
