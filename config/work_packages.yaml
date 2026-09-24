@@ -1,0 +1,68 @@
+# Results-registry input (charter: docs/charter/organization_charter.md §2,
+# figure_organization_spec.md §5). Hand-edited, PI-visible, same precedent as
+# sites.yaml. This is the ONLY declared source of WP -> family membership;
+# scripts/build_results_registry.py reads it and never hand-registers a family.
+#
+# Reviewed census draft (figure_organization_spec.md §5, ruled 2026-09-24):
+# mare_territory was removed (double-counted site_territory); site_svf_v2 owns
+# the SVF diagnostics. `script` is the generator that OWNS the family (for
+# provenance in the registry's `generator` field); it is not necessarily how
+# the family's files are located on disk — that is `static_root` / `glob`, or
+# (when neither is given) the run-directory prefix under runs/, or the
+# outputs/*/<suffix> convention build_results_registry.py falls back to.
+# `script_confidence: low` flags a script path build_results_registry.py could
+# not confirm still exists / still owns this output (report-only, never a gate
+# failure at this phase).
+rendered_copy_roots: [outputs/_hub, outputs/_review]
+work_packages:
+  WP01: {title: Footprint repair, papers: [p1], families: {}}
+  WP02: {title: Sky-view and horizon, papers: [p1], families:
+    {site_svf_v2: {script: src/svf_v2/}, wp02_horizon: {script: src/brisa_solar/wp02_horizon.py}}}
+  WP03: {title: TLS ground truth, papers: [p1], families: {wp03_tls: {script: src/brisa_solar/wp03_tls.py}}}
+  WP04: {title: Site models and sampling, papers: [p1], families:
+    {site_territory: {script: scripts/build_site_territory.py}, site_sampling_streets: {script: scripts/build_street_observers.py},
+     mare_definitions: {script: scripts/mare_definition_sensitivity.py}, wp04_sites: {script: src/brisa_solar/wp04_sites.py}}}
+  WP04F: {title: Facade solar, papers: [p1, x1], families:
+    {site_print: {script: scripts/build_print_plate.py}, wp04f_facade: {script: scripts/run_wp04f_facade_comparison.py},
+     wp04f2_facade: {script: scripts/run_wp04f2_facade_crossref.py}}}
+  WP05: {title: Pilot to full campaign, papers: [p1], families: {}}
+  WP06: {title: Core morphometrics, papers: [p1], families:
+    {site_morphometrics: {script: scripts/compute_urban_morphology.py, glob: "outputs/<site>/morphometrics{,_5m,_15m,_20m,_30m}/**"},
+     wp06_geometry: {script: src/brisa_solar/wp06_geometry.py}, brisa_ventilation_fix: {script: scripts/brisa_ventilation/, script_confidence: low}}}
+  WP07: {title: P1 solar results, papers: [p1], families:
+    {wp07_figures: {script: src/brisa_solar/wp07_figures.py}, wp07_zoom: {script: src/brisa_solar/wp07_figures.py},
+     wp07_map: {script: src/brisa_solar/wp07_figures.py}, wp07_method: {script: src/brisa_solar/wp07_method_figures.py},
+     wp07_ledger: {script: src/brisa_solar/wp07_ledger.py},
+     p1_exports: {static_root: outputs/paper_figures/exports, script_confidence: low},
+     site_paper_figures: {glob: "outputs/<site>/paper_figures/**"},
+     presentation_figures: {script: scripts/brisa_deck/, glob: "outputs/{cross_site,paper_figures,<site>}/presentation_figures/**"},
+     manuscript_figures: {static_root: docs/manuscript/figures},
+     technical_report_figures: {static_root: docs/technical_report/figures, script_confidence: low},
+     shared_figures_p1: {static_root: brisaverse/shared/figures},
+     p1_figures_incoming: {static_root: brisaverse/papers/p1-nature-cities/figures}}}
+  G3: {title: Domain gate, papers: [p1], families: {g3_domain: {script: src/brisa_solar/g3_domain.py}}}
+  CFD: {title: CFD and terrain cross-checks, papers: [p3], families:
+    {site_cfd: {script: scripts/analyze_cfd_results.py}, site_sampling_cfd: {script: scripts/run_pilot_sampling.py, script_confidence: low},
+     site_solar: {script: src/solar/visualize.py}, terrain_split_full: {script: src/brisa_solar/terrain_split.py},
+     comparative_health: {script: scripts/health/terrain_morphology_split.py},
+     comparative_vidigal_vs_mingze: {script: scripts/compare_mingze_vidigal.py},
+     comparative_mingze_facade: {script: scripts/compare_mingze_facade.py},
+     comparative_pilot_summary: {script: scripts/select_pilot_candidates.py, script_confidence: low},
+     comparative_maup: {script: scripts/run_maup_sensitivity.py}, cityhours: {script: src/brisa_solar/cityhours.py}}}
+  MORPHO: {title: Morphotypes and signature, papers: [p1, p4, e2], families:
+    {cross_site_signature: {script: scripts/build_signature_figures.py}, robustness: {script: scripts/build_robustness_dossier.py},
+     cross_site_typology: {script: scripts/classify_typology.py},
+     p4_figures: {static_root: brisaverse/papers/p4-emss-tool/figures}, e2_figures: {static_root: brisaverse/papers/e2-lcz-gap/figures}}}
+  BRIEFS: {title: Briefs, papers: [e1], families:
+    {mare_brief_figures: {static_root: docs/briefs/mare/figures, script_confidence: low},
+     e1_figures: {static_root: brisaverse/papers/e1-anti-weaponization/latex/figures}}}
+  OCTOPUS: {title: Octopus X1 package, papers: [x1], families:
+    {mare_om2_package: {script: scripts/build_om_package.py, static_root: outputs/_packages/mare_om2}}}
+unassigned:
+  distribution_site_dashboards: {reason: "site product; site page Dashboard slot"}
+  distribution_audit: {reason: "dashboard QA captures"}
+  distribution_offset_diagnostic: {reason: "no generator found"}
+  comparative_final_allocation: {reason: "no generator found"}
+  comparative_satellite: {reason: "manual basemap drop"}
+  site_dataviz: {reason: "one-off file, no generator"}
+  site_cfd_analysis: {reason: "outputs/<site>/cfd_analysis/figures — a second CFD figure location distinct from site_cfd's outputs/<site>/cfd/; census 2026-09-24 found 5 files here with no declared family (organization_charter.md O2 census cross-check)"}

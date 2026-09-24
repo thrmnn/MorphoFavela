@@ -1,0 +1,5 @@
+{
+ "recorded_utc": "2026-09-24T21:46:43.482979Z",
+ "unclassified_count": 876,
+ "note": "charter \u00a73 R7 ratchet floor \u2014 recorded on the first build_results_registry.py run (charter phase B / O2). check_registry.py R7 fails if unclassified.count rises above this."
+}
