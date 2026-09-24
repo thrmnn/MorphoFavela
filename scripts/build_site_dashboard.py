@@ -1237,7 +1237,7 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict) -> None:
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
-    ax.set_title("street-level SVF · rotated to the site's own long axis",
+    ax.set_title("street-level sky view factor (SVF) · rotated to the site's own long axis",
                 fontsize=9.5, color=INK, pad=3, loc="left")
 
     # Scale bar and north arrow are drawn in the ROTATED frame's own
@@ -1289,7 +1289,7 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict) -> None:
     cb = plt.colorbar(sm, cax=cbar_ax, orientation="horizontal", format="%.1f", ticks=[0.0, 0.5, 1.0])
     cb.outline.set_linewidth(0.3)
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
-    cb.set_label("SVF", fontsize=7, color=INK, labelpad=2)
+    cb.set_label("SVF — share of open sky seen from the street", fontsize=6.5, color=INK, labelpad=2)
     fig.text(cbar_x0 + cbar_w + 0.012, cbar_y0 + cbar_h * 0.5,
              "resolved · pale ring = offset > 2.5 m · magenta = unresolved (SVF = 0)",
              fontsize=6.5, color=MUTED, ha="left", va="center")
@@ -1350,10 +1350,38 @@ def build_folha4_mare(hero: bool) -> dict:
     # the longest label ("Salsa e Merengue / Novo Pinheiro (n=1,725)") touch
     # the caveat strip's top rule; 1.3 clears it with margin.
     SPACER_BEFORE_CAVEATS = 1.3
+    # distributions_core is split into its own top (panels 1&2) / bottom
+    # (panel 3) rows with a fixed-ratio spacer between them, instead of
+    # drawing both through draw_distributions()'s internal hspace-fraction
+    # split (round-2 finding: hspace is a fraction of ITS OWN outer
+    # cell's height, and that cell is ~49% of the page in hero vs ~75%
+    # in no-hero, so the same fraction produced a tight gap in hero and
+    # ~250px of dead space in no-hero). Splitting the ratio 1:1.25
+    # (matching draw_distributions()'s own top:bottom proportion) keeps
+    # panel sizing the same as before; the gap itself uses its own
+    # constant (plain SPACER=0.15 is sized for whitespace between single
+    # -line chrome like the masthead/identity-card rows and measured far
+    # too small here on a first render — panels 1&2's own xlabel/tick
+    # text draws past their nominal cell edge with no layout engine to
+    # contain it, same "needs real clearance below the axes" shape as
+    # SPACER_BEFORE_CAVEATS, so it reuses that value): with the outer
+    # gridspec's hspace=0, a spacer's absolute gap is
+    # spacer_ratio/sum(all_ratios) * page_body_height, which at 1.3
+    # ratio units comes out to ~1.15in in no-hero and ~1.09in in hero —
+    # close to the ~1.19in the OLD internal hspace=0.42 gave hero (never
+    # flagged as too tight), applied evenly to both variants now instead
+    # of scaling with distributions_core's own height.
+    SPACER_BEFORE_PANEL3 = 1.3
     if hero:
-        height_ratios = [1.3, SPACER, 0.75, SPACER, 4.5, SPACER, 7.6, SPACER_BEFORE_CAVEATS, 1.9]
+        dist_core = 7.6
+        dist_top, dist_bottom = dist_core / 2.25, dist_core / 2.25 * 1.25
+        height_ratios = [1.3, SPACER, 0.75, SPACER, 4.5, SPACER,
+                          dist_top, SPACER_BEFORE_PANEL3, dist_bottom, SPACER_BEFORE_CAVEATS, 1.9]
     else:
-        height_ratios = [1.3, SPACER, 0.75, SPACER, 11.3, SPACER_BEFORE_CAVEATS, 1.9]
+        dist_core = 11.3
+        dist_top, dist_bottom = dist_core / 2.25, dist_core / 2.25 * 1.25
+        height_ratios = [1.3, SPACER, 0.75, SPACER,
+                          dist_top, SPACER_BEFORE_PANEL3, dist_bottom, SPACER_BEFORE_CAVEATS, 1.9]
     gs = fig.add_gridspec(
         nrows=len(height_ratios), ncols=1, height_ratios=height_ratios,
         left=0.04, right=0.97, top=0.985, bottom=0.015, hspace=0.0,
@@ -1390,7 +1418,10 @@ def build_folha4_mare(hero: bool) -> dict:
 
     with mpl.rc_context(mpl.rcParamsDefault):
         plt.rcParams.update(mare_dist.DISTRIBUTIONS_RC)
-        mare_dist.draw_distributions(fig, gs[row, 0], dist_data)
+        mare_dist.draw_distributions_top(fig, gs[row, 0], dist_data)
+        row += 2  # skip the fixed SPACER before panel 3 (round-3 fix for
+        # the no-hero dead-space gap — see the height_ratios comment above)
+        mare_dist.draw_distributions_bottom(fig, gs[row, 0], dist_data)
     panels.append("distributions_core")
     row += 2  # skip SPACER_BEFORE_CAVEATS, the wider gap panel 3's rotated
     # tick labels need to clear the caveat strip's top rule
