@@ -26,6 +26,7 @@ import argparse
 import json
 import math
 import subprocess
+import sys
 from datetime import date
 from pathlib import Path
 from typing import Optional
@@ -33,6 +34,11 @@ from typing import Optional
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+
+# sys.path uses the RUNNING checkout's own root (may be a worktree ahead of
+# REPO below, e.g. carrying a module not yet merged to the main checkout).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.brisa_solar import mare_study_area as msa  # noqa: E402
 
 # Hard-coded, not Path(__file__).resolve().parents[1]: this script runs
 # from a git worktree whose own outputs/ and data/ dirs are untracked and
@@ -83,7 +89,7 @@ SITE_META = {
     ),
     "maré": dict(
         display="Maré",
-        subtitle="a north-zone low-rise grid of 16 favelas, ~4 km²",
+        subtitle="a north-zone low-rise grid, 15 of 16 recognised communities analysed, ~2 km²",
         typology="Dense low-rise grid",
         boundary_shp="data/maré/raw/mare_boundary.shp",
         atoms_subdir="maré",
@@ -244,10 +250,21 @@ def stratified_decimate(df: pd.DataFrame, target: int, bins: int = 10) -> pd.Dat
 
 
 def compute_site_stats(site: str, obs: gpd.GeoDataFrame, seg: gpd.GeoDataFrame,
-                       boundary: Optional[gpd.GeoDataFrame]) -> dict:
+                       boundary: Optional[gpd.GeoDataFrame],
+                       area_km2_override: Optional[float] = None) -> dict:
     n = len(obs)
     road_km = float(seg["length_m"].sum() / 1000) if "length_m" in seg.columns else float("nan")
-    area_km2 = float(boundary.area.sum() / 1e6) if boundary is not None else float("nan")
+    # area_km2_override (Maré only): the study area's own km², not the data
+    # extent's — obs/seg are already study-area-filtered by the caller, so
+    # a density (n / area_km2) mixing a filtered numerator with the whole
+    # bairro's denominator would be a hybrid, internally inconsistent
+    # statistic (MAREBOUND rule: study area governs every count here).
+    # `boundary` itself is untouched — edge_share below still measures
+    # against it, never the study area.
+    if area_km2_override is not None:
+        area_km2 = float(area_km2_override)
+    else:
+        area_km2 = float(boundary.area.sum() / 1e6) if boundary is not None else float("nan")
 
     # length-weighted mean SVF: per-observer weights = segment length / n_points
     # use the segments table for the authoritative length-weighted site mean
@@ -401,6 +418,19 @@ def write_footprint(boundary: Optional[gpd.GeoDataFrame], out_path: Path) -> boo
     return True
 
 
+def write_communities_geojson(communities: Optional[gpd.GeoDataFrame], out_path: Path) -> bool:
+    """Maré only: the study-area outline (16 communities, minus Marcílio
+    Dias — src/brisa_solar/mare_study_area.py), one `name` property per
+    feature straight from the gpkg (never typed), for the map's thin
+    outline layer + hover tooltip (JS_MAP's `communityLayer`)."""
+    if communities is None or len(communities) == 0:
+        return False
+    c = communities.to_crs(epsg=4326)
+    out = c[["community", "geometry"]].rename(columns={"community": "name"})
+    out.to_file(out_path, driver="GeoJSON")
+    return True
+
+
 # ---------- HTML / asset generation ----------
 
 GLOSSARY = {
@@ -478,15 +508,40 @@ def build_site(site: str) -> dict:
     print(f"[{site}] loading observers + segments")
     obs = gpd.read_file(REPO / f"outputs/{site}/morphometrics/svf/svf_streets_solar.gpkg")
     seg = gpd.read_file(REPO / f"outputs/{site}/morphometrics/svf/svf_streets_segments.gpkg")
-    boundary = boundary_for(site)
+    boundary = boundary_for(site)  # DATA EXTENT — stays unfiltered; passed to compute_site_stats
+    #                                 unchanged below so edge_share keeps measuring against it,
+    #                                 never the study area (MAREBOUND rule 2).
+
+    communities = None
+    if site in ("maré", "mare"):
+        # Study area (MAREBOUND): which observers/segments count in every
+        # stat below is the 16-community union ∩ data extent, not the
+        # whole bairro. `boundary` itself is passed to compute_site_stats
+        # untouched — see the comment above.
+        sa = msa.load_study_area()
+        communities = sa["included"]
+        obs_in_area = msa.within_mask(obs.geometry.x.to_numpy(), obs.geometry.y.to_numpy(), sa["study_area"])
+        obs = obs.loc[obs_in_area].reset_index(drop=True)
+        seg_c = seg.geometry.centroid
+        seg_in_area = msa.within_mask(seg_c.x.to_numpy(), seg_c.y.to_numpy(), sa["study_area"])
+        seg = seg.loc[seg_in_area].reset_index(drop=True)
 
     print(f"[{site}] computing stats")
-    stats = compute_site_stats(site, obs, seg, boundary)
+    area_override = float(sa["study_area"].area / 1e6) if communities is not None else None
+    stats = compute_site_stats(site, obs, seg, boundary, area_km2_override=area_override)
     stats["findings_present"] = SITE_FINDINGS.get(site, [])
+    if communities is not None:
+        stats["study_area"] = {
+            "n_communities_total": 16,
+            "n_communities_included": int(len(communities)),
+            "excluded": sorted(set(sa["excluded"]["community"])),
+            "km2": float(sa["study_area"].area / 1e6),
+        }
 
     print(f"[{site}] writing decimated geojson")
     n_written = write_observers_geojson(obs, site_dir / "data" / "observers.geojson")
     fp_ok = write_footprint(boundary, site_dir / "data" / "footprint.geojson")
+    write_communities_geojson(communities, site_dir / "data" / "communities.geojson")
 
     stats["observer_count_in_geojson"] = n_written
     stats["footprint_written"] = fp_ok
@@ -1429,6 +1484,29 @@ JS_MAP = r"""
       map.fitBounds(fpLayer.getBounds());
     }
 
+    // Maré only: the study-area community outline (16 communities minus
+    // Marcílio Dias, which lies outside the analysed extent — see
+    // src/brisa_solar/mare_study_area.py). Thin stroke (weight 1, half the
+    // footprint's) so it reads as context, not a second boundary competing
+    // with the data-extent outline above; name on hover, never printed on
+    // the map itself (this is the interactive twin's answer to "one panel
+    // gets the names" on the static sheet).
+    try {
+      const commResp = await fetch('data/communities.geojson');
+      if(commResp.ok){
+        const communities = await commResp.json();
+        L.geoJSON(communities, {
+          pane:'footprint',
+          style: { color:'#7C3AED', weight:1.0, opacity:0.75, fillOpacity:0, dashArray:'3,2' },
+          onEachFeature: (f, lyr) => {
+            if(f.properties && f.properties.name){
+              lyr.bindTooltip(f.properties.name, { sticky:true, className:'community-tooltip' });
+            }
+          }
+        }).addTo(map);
+      }
+    } catch(e){}
+
     function styleFn(feature){
       const p = feature.properties;
       const colorBy = window.mfState.colorBy;
@@ -2254,7 +2332,19 @@ def main():
             obs = gpd.read_file(REPO / f"outputs/{s}/morphometrics/svf/svf_streets_solar.gpkg")
             seg = gpd.read_file(REPO / f"outputs/{s}/morphometrics/svf/svf_streets_segments.gpkg")
             bnd = boundary_for(s)
-            site_stats_by_site[s] = compute_site_stats(s, obs, seg, bnd)
+            area_override = None
+            if s in ("maré", "mare"):
+                # Keep the landing-page tile consistent with the per-site
+                # page below — both must report the study area, not the
+                # whole bairro (MAREBOUND). bnd stays unfiltered.
+                sa = msa.load_study_area()
+                obs_in_area = msa.within_mask(obs.geometry.x.to_numpy(), obs.geometry.y.to_numpy(), sa["study_area"])
+                obs = obs.loc[obs_in_area].reset_index(drop=True)
+                seg_c = seg.geometry.centroid
+                seg_in_area = msa.within_mask(seg_c.x.to_numpy(), seg_c.y.to_numpy(), sa["study_area"])
+                seg = seg.loc[seg_in_area].reset_index(drop=True)
+                area_override = float(sa["study_area"].area / 1e6)
+            site_stats_by_site[s] = compute_site_stats(s, obs, seg, bnd, area_km2_override=area_override)
         except Exception as e:
             print(f"[{s}] cross-site stats skipped: {e}")
 

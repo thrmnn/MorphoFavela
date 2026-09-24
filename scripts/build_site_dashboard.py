@@ -41,10 +41,15 @@ warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
-sys.path.insert(0, str(ROOT))
+# sys.path uses the RUNNING checkout's own root (may be a worktree ahead of
+# ROOT, e.g. carrying a module not yet merged to the main checkout) —
+# ROOT itself stays hardcoded for data/outputs paths regardless.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.svf_v2.paths import AREA_FILES
 from src.viz.folha.sites import SHEET_NUMBER
+from src.brisa_solar import mare_study_area as msa
+from src.brisa_solar.wp07_figures import BOUNDARY_STROKE_PX
 
 TYPOLOGY = {
     "vidigal": ("hillside canyon", "#2C5F8D"),
@@ -112,6 +117,12 @@ MAGENTA = "#C026D3"
 MUTED = "#6B7280"
 GREEN = "#5B7C5B"
 RED = "#B91C1C"
+# Maré study-area community outlines: thin (BOUNDARY_STROKE_PX-derived, like
+# src/brisa_solar/wp07_figures.py), a distinct colour from INK (the site
+# boundary / data extent outline) so the two boundaries in play never read
+# as one line, but muted — this is an administrative-unit outline for
+# geographic orientation, not a value encoding.
+MARE_COMMUNITY_STROKE = "#7C3AED"
 
 mpl.rcParams.update({
     "font.family": "DejaVu Sans",
@@ -187,9 +198,30 @@ def load_site(site: str, issues: list) -> dict:
     with open(p["manifest"]) as f:
         manifest = json.load(f)
     grid = load_grid_table(site)
+
+    # Maré only: the study area (union of the 16 Redes da Maré communities ∩
+    # the site data extent) governs which grid cells/observers count in
+    # Maré's statistics and gets outlined on the sheet (src/brisa_solar/
+    # mare_study_area.py). `boundary` above stays the DATA EXTENT (the
+    # bairro) unconditionally — near_boundary/edge-halo logic in
+    # compute_stats() must keep measuring against it, never the study area.
+    communities = None
+    excluded_communities = None
+    study_area_geom = None
+    study_area_mask = None
+    if site in ("maré", "mare"):
+        sa = msa.load_study_area()
+        communities = sa["included"]
+        excluded_communities = sa["excluded"]
+        study_area_geom = sa["study_area"]
+        study_area_mask = msa.within_mask(
+            grid["center_x"].to_numpy(), grid["center_y"].to_numpy(), study_area_geom)
+
     return dict(
         svf=svf, solar=solar, seg=seg, boundary=boundary,
         buildings=buildings, manifest=manifest, grid=grid,
+        communities=communities, excluded_communities=excluded_communities,
+        study_area_geom=study_area_geom, study_area_mask=study_area_mask,
     )
 
 
@@ -197,37 +229,69 @@ def compute_stats(d: dict) -> dict:
     svf = d["svf"]
     solar = d["solar"]
     seg = d["seg"]
-    boundary = d["boundary"]
+    boundary = d["boundary"]  # DATA EXTENT — near_boundary/edge-halo below must keep using this, never the study area
     manifest = d["manifest"]
     grid = d["grid"]
+    study_area_geom = d.get("study_area_geom")
+    study_area_mask = d.get("study_area_mask")
 
-    n_obs = len(svf)
-    n_grid_cells = len(grid)
-    road_km = float(seg.geometry.length.sum() / 1000.0) if seg is not None else float("nan")
-    area_km2 = float(boundary.geometry.area.sum() / 1e6)
+    # Maré only: "which cells/observers/buildings count in statistics" is
+    # the study area, not the whole data extent (MAREBOUND). svf_stats/
+    # seg_stats are the study-area-restricted observer/segment tables used
+    # for every statistic BELOW this point (edge share, mean SVF, the
+    # SVF x solar hexbin/Pearson r); `boundary`/`inner_union` themselves
+    # stay the unfiltered DATA EXTENT throughout — see the near_boundary
+    # comment below. Every other site keeps its existing whole-boundary
+    # tables and counts (study_area_geom is None for them).
+    if study_area_geom is not None:
+        n_grid_cells = int(study_area_mask.sum()) if study_area_mask is not None else len(grid)
+        area_km2 = float(study_area_geom.area / 1e6)
+        obs_in_area = msa.within_mask(svf.geometry.x.to_numpy(), svf.geometry.y.to_numpy(), study_area_geom)
+        svf_stats = svf.loc[obs_in_area].reset_index(drop=True)
+        n_obs = int(len(svf_stats))
+        if seg is not None:
+            seg_c = seg.geometry.centroid
+            seg_in_area = msa.within_mask(seg_c.x.to_numpy(), seg_c.y.to_numpy(), study_area_geom)
+            seg_stats = seg.loc[seg_in_area].reset_index(drop=True)
+        else:
+            seg_stats = None
+    else:
+        n_grid_cells = len(grid)
+        area_km2 = float(boundary.geometry.area.sum() / 1e6)
+        svf_stats = svf
+        n_obs = len(svf)
+        seg_stats = seg
+    road_km = float(seg_stats.geometry.length.sum() / 1000.0) if seg_stats is not None else float("nan")
     obs_per_km2 = n_obs / area_km2 if area_km2 > 0 else float("nan")
 
-    # near_boundary: 15 m inward buffer (kept geometry outside the buffer)
+    # near_boundary: 15 m inward buffer of the DATA EXTENT boundary — kept
+    # unconditionally on `boundary` (the bairro), never the study area.
+    # Buildings actually stop at the bairro edge, not at an interior
+    # community-to-community line; using the study-area edge here would
+    # flag interior community borders as "edge halo", which is the bug
+    # MAREBOUND's split (data extent vs. study area) exists to prevent.
+    # Only the POPULATION being tested (svf_stats) narrows to the study
+    # area; the boundary/buffer geometry it is tested against does not.
     inner = boundary.buffer(-15.0)
     inner_union = inner.union_all() if hasattr(inner, "union_all") else inner.unary_union
-    near = ~svf.geometry.within(inner_union)
+    near = ~svf_stats.geometry.within(inner_union)
     edge_share = float(near.mean())
 
     # length-weighted mean SVF, segment-level
-    if seg is not None and "svf_mean" in seg.columns:
-        w = seg.geometry.length
-        valid = seg["svf_mean"].notna() & (w > 0)
+    if seg_stats is not None and "svf_mean" in seg_stats.columns:
+        w = seg_stats.geometry.length
+        valid = seg_stats["svf_mean"].notna() & (w > 0)
         if valid.any():
-            mean_svf = float(np.average(seg.loc[valid, "svf_mean"], weights=w[valid]))
+            mean_svf = float(np.average(seg_stats.loc[valid, "svf_mean"], weights=w[valid]))
         else:
             mean_svf = float("nan")
     else:
-        mean_svf = float(svf["svf"].mean())
+        mean_svf = float(svf_stats["svf"].mean())
 
     # Pearson — observers not near boundary, with valid solar
     if solar is not None and "solar_hours_annual" in solar.columns:
         m = solar.set_index(["street_id", "distance_along"])
-        s = svf.set_index(["street_id", "distance_along"])
+        s = svf_stats.set_index(["street_id", "distance_along"])
         merged = s[["svf", "geometry", "offset_distance"]].join(
             m[["solar_hours_annual", "sunshine_ratio_mean"]], how="inner",
         ).reset_index()
@@ -244,11 +308,17 @@ def compute_stats(d: dict) -> dict:
 
     offset_frac = manifest.get("qa", {}).get("offset_fraction", float("nan"))
 
+    excluded = d.get("excluded_communities")
+    excluded_names = ", ".join(sorted(excluded["community"])) if excluded is not None and len(excluded) else None
+    communities = d.get("communities")
+    n_communities = int(len(communities)) if communities is not None else None
+
     return dict(
         n_obs=n_obs, n_grid_cells=n_grid_cells, road_km=road_km, area_km2=area_km2,
         obs_per_km2=obs_per_km2, edge_share=edge_share,
         mean_svf=mean_svf, pearson=r, offset_frac=offset_frac,
         merged=merged, inner_union=inner_union, near=near,
+        study_area_excluded_names=excluded_names, study_area_n_communities=n_communities,
     )
 
 
@@ -516,13 +586,22 @@ def _fit_square_axes(ax) -> None:
 def draw_grid_panel(ax, X: np.ndarray, Y: np.ndarray, Z: np.ndarray, boundary,
                      buildings, cmap: str, vmin: float, vmax: float, title: str,
                      unit: str, scalebar: bool = False, zoom_bounds: dict | None = None,
-                     window: tuple | None = None, coverage_pct: float | None = None) -> None:
+                     window: tuple | None = None, coverage_pct: float | None = None,
+                     communities=None, label_communities: bool = False) -> None:
     """One grid-row map, or the same map re-rendered at a zoom `window`
     inside an inlet: buildings for context, one shared boundary outline, the
     metric as a masked pcolormesh (NaN cells stay transparent — a stated
     gap, never fabricated), a compact horizontal colorbar whose label is the
     whole caption. Title budget: 2-3 words + a unit, nothing else
-    (docs/folha_v3_spec.md's text budget)."""
+    (docs/folha_v3_spec.md's text budget).
+
+    `communities` (Maré only): the 16-community study-area outline, drawn
+    THIN — BOUNDARY_STROKE_PX-derived, same technique as
+    src/brisa_solar/wp07_figures.py (PI standing complaint: a stroke given
+    in points reads as a hairline at one dpi and a masking slab at
+    another). `label_communities=True` additionally prints each community's
+    name (from the gpkg, never typed) at print-legible size — the caller
+    sets this True on exactly one panel, never on every panel."""
     ax.set_facecolor(PAPER)
     if buildings is not None:
         try:
@@ -533,6 +612,21 @@ def draw_grid_panel(ax, X: np.ndarray, Y: np.ndarray, Z: np.ndarray, boundary,
         boundary.boundary.plot(ax=ax, color=INK, linewidth=0.5, zorder=2)
     except Exception:
         pass
+    if communities is not None and len(communities):
+        try:
+            community_lw = BOUNDARY_STROKE_PX / ax.figure.dpi * 72.0
+            communities.boundary.plot(ax=ax, color=MARE_COMMUNITY_STROKE,
+                                       linewidth=community_lw, zorder=2.5)
+            if label_communities:
+                import matplotlib.patheffects as pe
+                for row in communities.itertuples():
+                    c = row.geometry.centroid
+                    ax.text(c.x, c.y, row.community, fontsize=3.6,
+                            color=MARE_COMMUNITY_STROKE, ha="center", va="center",
+                            zorder=6, fontweight="bold",
+                            path_effects=[pe.withStroke(linewidth=1.2, foreground="white")])
+        except Exception:
+            pass
 
     Zm = np.ma.masked_invalid(Z)
     pc = ax.pcolormesh(X, Y, Zm, cmap=cmap, vmin=vmin, vmax=vmax,
@@ -610,15 +704,28 @@ def draw_grid_row(fig, gs_cell, d: dict, lat: dict, X: np.ndarray, Y: np.ndarray
     lattice, same extent, aligned axes, one shared boundary outline, in the
     PI's own causal order (docs/folha_v3_spec.md)."""
     sub = gs_cell.subgridspec(1, len(GRID_LAYERS), wspace=0.12)
-    n_built = len(d["grid"])
+    # Coverage badge denominator (Maré only): the study area's own built-cell
+    # count, not the whole data extent's (MAREBOUND — "re-derive the badge
+    # against the new study area"). study_area_mask is over d["grid"]'s own
+    # row order, so boolean-AND with notna() stays aligned.
+    study_mask = d.get("study_area_mask")
+    if study_mask is not None:
+        n_built = int(study_mask.sum())
+    else:
+        n_built = len(d["grid"])
+    communities = d.get("communities")
     axes = []
     for i, layer in enumerate(GRID_LAYERS):
         ax = fig.add_subplot(sub[0, i])
-        cov = 100.0 * d["grid"][layer["col"]].notna().sum() / n_built if n_built else None
+        notna = d["grid"][layer["col"]].notna().to_numpy()
+        if study_mask is not None:
+            notna = notna & study_mask
+        cov = 100.0 * notna.sum() / n_built if n_built else None
         draw_grid_panel(
             ax, X, Y, layer_arrays[layer["key"]], d["boundary"], d["buildings"],
             layer["cmap"], *panel_norms[layer["key"]], layer["title"], layer["unit"],
             scalebar=(i == 0), zoom_bounds=windows, coverage_pct=cov,
+            communities=communities, label_communities=(i == 0),
         )
         axes.append(ax)
     return axes
@@ -661,7 +768,7 @@ def draw_zoom_row(fig, gs_cell, d: dict, X: np.ndarray, Y: np.ndarray,
             draw_grid_panel(
                 ax, X, Y, layer_arrays[lkey], d["boundary"], d["buildings"],
                 layer["cmap"], *panel_norms[lkey], layer["title"], layer["unit"],
-                window=z["bounds"],
+                window=z["bounds"], communities=d.get("communities"),
             )
 
 
@@ -919,14 +1026,25 @@ def draw_caveats_v2(ax, site: str, stats: dict) -> None:
          "observers were repositioned > 2.5 m from their original "
          "sample location (low-confidence)."),
     ]
+    if site in ("maré", "mare"):
+        excluded = stats.get("study_area_excluded_names") or "none"
+        n_included = stats.get("study_area_n_communities")
+        caveats.append((
+            "[H3] STUDY AREA",
+            f"Cells/observers here: {n_included} Redes da Maré "
+            f"communities, clipped to the data extent — not the whole "
+            f"bairro. {excluded} lies outside the extent, excluded. "
+            "Edge-halo still uses the bairro, not this outline."
+        ))
     n = len(caveats)
     col_w = 1.0 / n
+    wrap_width = 42 if n <= 4 else int(42 * 4 / n)
     for i, (head, body) in enumerate(caveats):
         cx = i * col_w + 0.01
         ax.text(cx, 0.92, head, fontsize=7.5, fontweight="bold",
                 family="DejaVu Sans Mono", color=MUTED,
                 ha="left", va="top")
-        body_wrapped = _wrap_text(body, 42)
+        body_wrapped = _wrap_text(body, wrap_width)
         ax.text(cx, 0.78, body_wrapped, fontsize=7, color=INK,
                 ha="left", va="top", family="DejaVu Sans",
                 linespacing=1.35)

@@ -5,7 +5,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "m",
-    "value": 8.6125
+    "value": 8.956291666666667
   },
   "mare_H_mean_iqr_lo": {
     "expression": "H_mean.quantile(0.25)",
@@ -13,7 +13,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "m",
-    "value": 5.275
+    "value": 5.925
   },
   "mare_H_mean_median": {
     "expression": "median(H_mean)",
@@ -21,7 +21,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "m",
-    "value": 6.92625
+    "value": 7.484
   },
   "mare_annual_mean_sun_h": {
     "expression": "table column 'Annual mean sun'",
@@ -53,7 +53,7 @@
     "kind": "int",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "cells",
-    "value": 29229
+    "value": 18548
   },
   "mare_built_cells_share_pct": {
     "expression": "count(building_count > 0) / n_cells_total",
@@ -61,15 +61,15 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "%",
-    "value": 67.31845505423892
+    "value": 90.86366531132121
   },
   "mare_cells_10m": {
-    "expression": "table column '10 m cells'",
+    "expression": "count(cells within the study area)",
     "id": "mare_cells_10m",
     "kind": "int",
-    "source": "docs/technical_report/technical_report.md §1 site table, Maré row",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "cells",
-    "value": 43419
+    "value": 20413
   },
   "mare_constraint_directional_share_pct": {
     "expression": "100 * mean(constraint_directional)",
@@ -77,7 +77,7 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/geometry_indicators/per_patch_geometry.csv",
     "unit": "%",
-    "value": 75.26771357213727
+    "value": 75.48522751779167
   },
   "mare_constraint_lateral_share_pct": {
     "expression": "100 * mean(constraint_lateral)",
@@ -85,7 +85,7 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/geometry_indicators/per_patch_geometry.csv",
     "unit": "%",
-    "value": 47.90789968866537
+    "value": 65.1822298900151
   },
   "mare_constraint_vertical_share_pct": {
     "expression": "100 * mean(constraint_vertical)",
@@ -93,13 +93,13 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/geometry_indicators/per_patch_geometry.csv",
     "unit": "%",
-    "value": 64.82602894385712
+    "value": 75.72784127668751
   },
   "mare_diag_enclosure_threshold": {
     "expression": "thresholds.lambda_f_max",
     "id": "mare_diag_enclosure_threshold",
     "kind": "float",
-    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats.json",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats_study_area.json",
     "unit": "",
     "value": 0.35
   },
@@ -107,63 +107,63 @@
     "expression": "n_cells_classified",
     "id": "mare_diag_n_classified",
     "kind": "int",
-    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats.json",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats_study_area.json",
     "unit": "cells",
-    "value": 24348
+    "value": 17587
   },
   "mare_diag_n_total": {
     "expression": "n_cells_total",
     "id": "mare_diag_n_total",
     "kind": "int",
-    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats.json",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats_study_area.json",
     "unit": "cells",
-    "value": 43419
+    "value": 20413
   },
   "mare_diag_share_both_pct": {
     "expression": "100 * shares.compound_constraint",
     "id": "mare_diag_share_both_pct",
     "kind": "percent",
-    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats.json",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats_study_area.json",
     "unit": "%",
-    "value": 34.162970264498114
+    "value": 43.79371126400182
   },
   "mare_diag_share_enclosure_only_pct": {
     "expression": "100 * shares.ventilation_constraint",
     "id": "mare_diag_share_enclosure_only_pct",
     "kind": "percent",
-    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats.json",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats_study_area.json",
     "unit": "%",
-    "value": 54.846393954328896
+    "value": 48.09234093364417
   },
   "mare_diag_share_nodata_pct": {
     "expression": "100 * counts.nodata / n_cells_total",
     "id": "mare_diag_share_nodata_pct",
     "kind": "percent",
-    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats.json",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats_study_area.json",
     "unit": "%",
-    "value": 43.92316727699855
+    "value": 13.844118943810317
   },
   "mare_diag_share_sun_only_pct": {
     "expression": "100 * shares.sunlight_constraint",
     "id": "mare_diag_share_sun_only_pct",
     "kind": "percent",
-    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats.json",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats_study_area.json",
     "unit": "%",
-    "value": 0.3614259898143585
+    "value": 0.39802126570762497
   },
   "mare_diag_share_unconstrained_pct": {
     "expression": "100 * shares.adequate",
     "id": "mare_diag_share_unconstrained_pct",
     "kind": "percent",
-    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats.json",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats_study_area.json",
     "unit": "%",
-    "value": 10.629209791358633
+    "value": 7.7159265366463865
   },
   "mare_diag_sun_floor_h": {
     "expression": "thresholds.sun_hours_winter_min",
     "id": "mare_diag_sun_floor_h",
     "kind": "float",
-    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats.json",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/paper_figures/diagnostic_stats_study_area.json",
     "unit": "h",
     "value": 2.0
   },
@@ -184,12 +184,12 @@
     "value": 1.0099474660889365
   },
   "mare_geom_n_cells": {
-    "expression": "len(df)",
+    "expression": "len(df), study area",
     "id": "mare_geom_n_cells",
     "kind": "int",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/geometry_indicators/per_patch_geometry.csv",
     "unit": "cells",
-    "value": 29229
+    "value": 18548
   },
   "mare_grid_resolution_m": {
     "expression": "pipeline constant, all sites",
@@ -205,7 +205,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "",
-    "value": 0.9918550088187773
+    "value": 1.0
   },
   "mare_lambda_p_iqr_lo": {
     "expression": "lambda_p.quantile(0.25)",
@@ -213,7 +213,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "",
-    "value": 0.0
+    "value": 0.3804656922043191
   },
   "mare_lambda_p_median": {
     "expression": "median(lambda_p)",
@@ -221,7 +221,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "",
-    "value": 0.4260033191034826
+    "value": 0.8121052001869525
   },
   "mare_mean_H_m": {
     "expression": "table column 'Mean H'",
@@ -285,7 +285,7 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/geometry_indicators/per_patch_geometry.csv",
     "unit": "%",
-    "value": 9.832700400287386
+    "value": 5.709510459348717
   },
   "mare_n_constraints_1_share_pct": {
     "expression": "100 * mean(n_constraints == 1)",
@@ -293,7 +293,7 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/geometry_indicators/per_patch_geometry.csv",
     "unit": "%",
-    "value": 24.325156522631634
+    "value": 16.33060168212206
   },
   "mare_n_constraints_2_share_pct": {
     "expression": "100 * mean(n_constraints == 2)",
@@ -301,7 +301,7 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/geometry_indicators/per_patch_geometry.csv",
     "unit": "%",
-    "value": 33.84994354921482
+    "value": 33.81496657321544
   },
   "mare_n_constraints_3_share_pct": {
     "expression": "100 * mean(n_constraints == 3)",
@@ -309,7 +309,7 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/geometry_indicators/per_patch_geometry.csv",
     "unit": "%",
-    "value": 31.992199527866163
+    "value": 44.144921285313785
   },
   "mare_porosity_iqr_hi": {
     "expression": "porosity.quantile(0.75)",
@@ -317,7 +317,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "",
-    "value": 0.6004624361445549
+    "value": 0.5025136050022452
   },
   "mare_porosity_iqr_lo": {
     "expression": "porosity.quantile(0.25)",
@@ -333,7 +333,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "",
-    "value": 0.1905773171619782
+    "value": 0.14731476760051776
   },
   "mare_roughness_floored_share_pct": {
     "expression": "100 * mean(flag_z0_floored)",
@@ -341,15 +341,15 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/cross_site/roughness/patch_roughness.csv",
     "unit": "%",
-    "value": 20.0
+    "value": 22.22222222222222
   },
   "mare_roughness_n_patches": {
-    "expression": "count(site == 'maré')",
+    "expression": "count(site == 'maré'), study area (via campaign_patches.gpkg patch_id)",
     "id": "mare_roughness_n_patches",
     "kind": "int",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/cross_site/roughness/patch_roughness.csv",
     "unit": "patches",
-    "value": 25
+    "value": 18
   },
   "mare_roughness_out_of_envelope_share_pct": {
     "expression": "100 * mean(flag_pai_over_envelope)",
@@ -357,7 +357,7 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/cross_site/roughness/patch_roughness.csv",
     "unit": "%",
-    "value": 56.00000000000001
+    "value": 72.22222222222221
   },
   "mare_share_below_2h_annual_pct": {
     "expression": "100 * mean(solar_hours_annual < 2.0)",
@@ -365,7 +365,7 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/svf/svf_streets_solar.gpkg",
     "unit": "%",
-    "value": 9.88151686928827
+    "value": 16.832691641711993
   },
   "mare_share_below_2h_summer_pct": {
     "expression": "100 * mean(solar_hours_summer < 2.0)",
@@ -373,7 +373,7 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/svf/svf_streets_solar.gpkg",
     "unit": "%",
-    "value": 5.295494788881363
+    "value": 9.026462140194342
   },
   "mare_share_below_2h_winter_pct": {
     "expression": "100 * mean(solar_hours_winter < 2.0)",
@@ -381,7 +381,7 @@
     "kind": "percent",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/svf/svf_streets_solar.gpkg",
     "unit": "%",
-    "value": 27.816796796083043
+    "value": 45.1486076310375
   },
   "mare_sigma_h_iqr_hi": {
     "expression": "sigma_h.quantile(0.75)",
@@ -389,7 +389,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "m",
-    "value": 2.522965627105442
+    "value": 2.575
   },
   "mare_sigma_h_iqr_lo": {
     "expression": "sigma_h.quantile(0.25)",
@@ -397,7 +397,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "m",
-    "value": 1.3009611831257688
+    "value": 1.4288642557025808
   },
   "mare_sigma_h_median": {
     "expression": "median(sigma_h)",
@@ -405,15 +405,63 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "m",
-    "value": 1.9020113622747423
+    "value": 2.0055982872439637
   },
   "mare_street_points_n": {
-    "expression": "len(gdf)",
+    "expression": "len(gdf), study area",
     "id": "mare_street_points_n",
     "kind": "int",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/svf/svf_streets_solar.gpkg",
     "unit": "points",
-    "value": 84147
+    "value": 49089
+  },
+  "mare_study_area_excluded_name": {
+    "expression": "communities[~in_extent].community",
+    "id": "mare_study_area_excluded_name",
+    "kind": "text",
+    "source": "data/maré/neighbourhoods.gpkg",
+    "unit": "",
+    "value": "Marcílio Dias"
+  },
+  "mare_study_area_km2": {
+    "expression": "union(included communities).intersection(data_extent).area",
+    "id": "mare_study_area_km2",
+    "kind": "float",
+    "source": "data/maré/neighbourhoods.gpkg",
+    "unit": "km²",
+    "value": 2.039664494579374
+  },
+  "mare_study_area_n_communities_excluded": {
+    "expression": "len(communities[~in_extent])",
+    "id": "mare_study_area_n_communities_excluded",
+    "kind": "int",
+    "source": "data/maré/neighbourhoods.gpkg",
+    "unit": "communities",
+    "value": 1
+  },
+  "mare_study_area_n_communities_included": {
+    "expression": "len(communities[in_extent])",
+    "id": "mare_study_area_n_communities_included",
+    "kind": "int",
+    "source": "data/maré/neighbourhoods.gpkg",
+    "unit": "communities",
+    "value": 15
+  },
+  "mare_study_area_n_communities_total": {
+    "expression": "len(communities)",
+    "id": "mare_study_area_n_communities_total",
+    "kind": "int",
+    "source": "data/maré/neighbourhoods.gpkg",
+    "unit": "communities",
+    "value": 16
+  },
+  "mare_study_area_n_inferred_matches": {
+    "expression": "qa.n_inferred",
+    "id": "mare_study_area_n_inferred_matches",
+    "kind": "int",
+    "source": "data/maré/neighbourhoods_provenance.json",
+    "unit": "communities",
+    "value": 5
   },
   "mare_sun_annual_mean_h": {
     "expression": "mean(solar_hours_annual)",
@@ -421,7 +469,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/svf/svf_streets_solar.gpkg",
     "unit": "h",
-    "value": 7.070379811520316
+    "value": 5.010142292570637
   },
   "mare_sun_seasonal_range_h": {
     "expression": "mean(solar_hours_summer) - mean(solar_hours_winter)",
@@ -429,7 +477,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/svf/svf_streets_solar.gpkg",
     "unit": "h",
-    "value": 3.4996315970860508
+    "value": 3.8017274745869747
   },
   "mare_sun_summer_mean_h": {
     "expression": "mean(solar_hours_summer)",
@@ -437,7 +485,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/svf/svf_streets_solar.gpkg",
     "unit": "h",
-    "value": 8.703827825115571
+    "value": 6.785899081260568
   },
   "mare_sun_winter_mean_h": {
     "expression": "mean(solar_hours_winter)",
@@ -445,7 +493,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/svf/svf_streets_solar.gpkg",
     "unit": "h",
-    "value": 5.20419622802952
+    "value": 2.984171606673593
   },
   "mare_svf_grid_iqr_hi": {
     "expression": "svf.quantile(0.75)",
@@ -453,7 +501,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "",
-    "value": 0.8033637417323
+    "value": 0.49980843378842815
   },
   "mare_svf_grid_iqr_lo": {
     "expression": "svf.quantile(0.25)",
@@ -461,7 +509,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "",
-    "value": 0.2691835708766484
+    "value": 0.18636601410590492
   },
   "mare_svf_grid_median": {
     "expression": "median(svf)",
@@ -469,7 +517,7 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/morphometrics/grid/grid_metrics.csv",
     "unit": "",
-    "value": 0.5338901860499483
+    "value": 0.31772422662397637
   },
   "mare_svf_street_median": {
     "expression": "median(svf_median)",
@@ -477,15 +525,15 @@
     "kind": "float",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/svf_v2/svf_streets_segments.gpkg",
     "unit": "",
-    "value": 0.39194934937669657
+    "value": 0.4391307589450524
   },
   "mare_svf_street_n_segments": {
-    "expression": "len(gdf)",
+    "expression": "len(gdf), study area (segment centroid)",
     "id": "mare_svf_street_n_segments",
     "kind": "int",
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/svf_v2/svf_streets_segments.gpkg",
     "unit": "segments",
-    "value": 2147
+    "value": 1555
   },
   "mare_typology": {
     "expression": "table column 'Type'",

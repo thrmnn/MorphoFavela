@@ -15,6 +15,7 @@ import argparse
 import json
 import re
 import os
+import sys
 from pathlib import Path
 
 import geopandas as gpd
@@ -24,6 +25,9 @@ HERE = Path(__file__).resolve().parent
 REPO_ROOT = Path(os.environ.get("MORPHOFAVELA_ROOT", HERE.parent.parent.parent))
 TR_MD = REPO_ROOT / "docs" / "technical_report" / "technical_report.md"
 OUT_JSON = HERE / "mare_numbers.json"
+
+sys.path.insert(0, str(REPO_ROOT))
+from src.brisa_solar import mare_study_area as msa  # noqa: E402
 
 SITE = "maré"
 
@@ -41,6 +45,35 @@ def _entry(id_, value, unit, kind, source, expr):
         "source": source,
         "expression": expr,
     }
+
+
+def _study_area(numbers: list[dict]) -> dict:
+    """Load the Maré study area (union of the 16 Redes da Maré communities ∩
+    the site data extent; src/brisa_solar/mare_study_area.py) and append its
+    provenance numbers. Every downstream _* function filters its own source
+    table to this same geometry before computing anything — never a second,
+    independently-typed definition of "Maré".
+
+    Returns the study dict (msa.load_study_area()'s return value) so callers
+    can filter their own tables against sa["study_area"]."""
+    sa = msa.load_study_area()  # msa.ROOT is the hardcoded main checkout, not REPO_ROOT — see its module docstring
+    prov = json.loads(msa.PROVENANCE_JSON.read_text())
+    rel = str(msa.NEIGHBOURHOODS_GPKG.relative_to(msa.ROOT))
+
+    numbers.append(_entry("mare_study_area_km2", sa["study_area"].area / 1e6, "km²", "float",
+                           rel, "union(included communities).intersection(data_extent).area"))
+    numbers.append(_entry("mare_study_area_n_communities_total", len(sa["communities"]), "communities", "int",
+                           rel, "len(communities)"))
+    numbers.append(_entry("mare_study_area_n_communities_included", len(sa["included"]), "communities", "int",
+                           rel, "len(communities[in_extent])"))
+    numbers.append(_entry("mare_study_area_n_communities_excluded", len(sa["excluded"]), "communities", "int",
+                           rel, "len(communities[~in_extent])"))
+    excluded_name = ", ".join(sorted(sa["excluded"]["community"])) if len(sa["excluded"]) else "none"
+    numbers.append(_entry("mare_study_area_excluded_name", excluded_name, "", "text",
+                           rel, "communities[~in_extent].community"))
+    numbers.append(_entry("mare_study_area_n_inferred_matches", int(prov["qa"]["n_inferred"]), "communities", "int",
+                           str(msa.PROVENANCE_JSON.relative_to(msa.ROOT)), "qa.n_inferred"))
+    return sa
 
 
 def _parse_tr_site_row(numbers: list[dict]) -> None:
@@ -80,16 +113,27 @@ def _parse_tr_site_row(numbers: list[dict]) -> None:
     ))
 
 
-def _grid_metrics(numbers: list[dict], outputs_root: Path) -> None:
+def _grid_metrics(numbers: list[dict], outputs_root: Path, sa: dict) -> None:
     path = outputs_root / SITE / "morphometrics" / "grid" / "grid_metrics.csv"
     if not path.exists():
         raise MissingSource(f"missing {path}")
     df = pd.read_csv(path)
     rel = str(path)
+    # Study-area filter: every cell/statistic below counts only within the
+    # 16-community study area, never the whole bairro (MAREBOUND). Marcílio
+    # Dias contributes nothing here — it lies entirely outside the site data
+    # extent (grid_metrics.csv has no cells there to begin with).
+    in_area = msa.within_mask(df["centroid_x"].to_numpy(), df["centroid_y"].to_numpy(), sa["study_area"])
+    df = df.loc[in_area].reset_index(drop=True)
     built = df[df["building_count"] > 0]
 
+    # Overrides technical_report.md's whole-bairro cell count (§1 site
+    # table) with the study-area count — collect() runs _grid_metrics()
+    # after _parse_tr_site_row(), and by_id collapses on id, so this is the
+    # value that actually reaches the template.
+    numbers.append(_entry("mare_cells_10m", int(len(df)), "cells", "int", rel, "count(cells within the study area)"))
     numbers.append(_entry("mare_built_cells_n", int(len(built)), "cells", "int", rel, "count(building_count > 0)"))
-    numbers.append(_entry("mare_built_cells_share_pct", 100 * len(built) / len(df), "%", "percent", rel, "count(building_count > 0) / n_cells_total"))
+    numbers.append(_entry("mare_built_cells_share_pct", 100 * len(built) / len(df) if len(df) else 0.0, "%", "percent", rel, "count(building_count > 0) / n_cells_total"))
 
     def add_median_iqr(prefix, col, unit, subset):
         numbers.append(_entry(f"mare_{prefix}_median", float(subset[col].median()), unit, "float", rel, f"median({col})"))
@@ -107,19 +151,22 @@ def _grid_metrics(numbers: list[dict], outputs_root: Path) -> None:
     add_median_iqr("sigma_h", "sigma_h", "m", built)
 
 
-def _svf_streets(numbers: list[dict], outputs_root: Path) -> None:
+def _svf_streets(numbers: list[dict], outputs_root: Path, sa: dict) -> None:
     seg_path = outputs_root / SITE / "svf_v2" / "svf_streets_segments.gpkg"
     if not seg_path.exists():
         raise MissingSource(f"missing {seg_path}")
     seg = gpd.read_file(seg_path)
-    numbers.append(_entry("mare_svf_street_n_segments", int(len(seg)), "segments", "int", str(seg_path), "len(gdf)"))
+    seg_c = seg.geometry.centroid
+    seg = seg.loc[msa.within_mask(seg_c.x.to_numpy(), seg_c.y.to_numpy(), sa["study_area"])].reset_index(drop=True)
+    numbers.append(_entry("mare_svf_street_n_segments", int(len(seg)), "segments", "int", str(seg_path), "len(gdf), study area (segment centroid)"))
     numbers.append(_entry("mare_svf_street_median", float(seg["svf_median"].median()), "", "float", str(seg_path), "median(svf_median)"))
 
     solar_path = outputs_root / SITE / "morphometrics" / "svf" / "svf_streets_solar.gpkg"
     if not solar_path.exists():
         raise MissingSource(f"missing {solar_path}")
     pts = gpd.read_file(solar_path)
-    numbers.append(_entry("mare_street_points_n", int(len(pts)), "points", "int", str(solar_path), "len(gdf)"))
+    pts = pts.loc[msa.within_mask(pts.geometry.x.to_numpy(), pts.geometry.y.to_numpy(), sa["study_area"])].reset_index(drop=True)
+    numbers.append(_entry("mare_street_points_n", int(len(pts)), "points", "int", str(solar_path), "len(gdf), study area"))
 
     winter_mean = float(pts["solar_hours_winter"].mean())
     annual_mean = float(pts["solar_hours_annual"].mean())
@@ -135,9 +182,13 @@ def _svf_streets(numbers: list[dict], outputs_root: Path) -> None:
 
 
 def _diagnostic_stats(numbers: list[dict], outputs_root: Path) -> None:
-    path = outputs_root / SITE / "paper_figures" / "diagnostic_stats.json"
+    # study-area variant, written by `python scripts/build_diagnostic_map.py
+    # --site maré --study-area` (never the default diagnostic_stats.json,
+    # which technical_report.md/the manuscript figures/the project hub read
+    # unfiltered — MAREBOUND must not change what they see).
+    path = outputs_root / SITE / "paper_figures" / "diagnostic_stats_study_area.json"
     if not path.exists():
-        raise MissingSource(f"missing {path}")
+        raise MissingSource(f"missing {path} — run: python scripts/build_diagnostic_map.py --site maré --study-area")
     d = json.loads(path.read_text())
     rel = str(path)
     numbers.append(_entry("mare_diag_n_total", int(d["n_cells_total"]), "cells", "int", rel, "n_cells_total"))
@@ -156,13 +207,15 @@ def _diagnostic_stats(numbers: list[dict], outputs_root: Path) -> None:
     numbers.append(_entry("mare_diag_share_nodata_pct", nodata_share, "%", "percent", rel, "100 * counts.nodata / n_cells_total"))
 
 
-def _geometry_indicators(numbers: list[dict], outputs_root: Path) -> None:
+def _geometry_indicators(numbers: list[dict], outputs_root: Path, sa: dict) -> None:
     path = outputs_root / SITE / "geometry_indicators" / "per_patch_geometry.csv"
     if not path.exists():
         raise MissingSource(f"missing {path}")
     df = pd.read_csv(path)
     rel = str(path)
-    numbers.append(_entry("mare_geom_n_cells", int(len(df)), "cells", "int", rel, "len(df)"))
+    in_area = msa.within_mask(df["center_x"].to_numpy(), df["center_y"].to_numpy(), sa["study_area"])
+    df = df.loc[in_area].reset_index(drop=True)
+    numbers.append(_entry("mare_geom_n_cells", int(len(df)), "cells", "int", rel, "len(df), study area"))
     for name, col in (("vertical", "constraint_vertical"), ("lateral", "constraint_lateral"), ("directional", "constraint_directional")):
         numbers.append(_entry(f"mare_constraint_{name}_share_pct", 100 * float(df[col].mean()), "%", "percent", rel, f"100 * mean({col})"))
     vc = df["n_constraints"].value_counts(normalize=True).sort_index()
@@ -172,14 +225,25 @@ def _geometry_indicators(numbers: list[dict], outputs_root: Path) -> None:
     numbers.append(_entry("mare_exposure_ratio_median", float(df["exposure_ratio"].median()), "", "float", rel, "median(exposure_ratio)"))
 
 
-def _roughness_envelope(numbers: list[dict], outputs_root: Path) -> None:
+def _roughness_envelope(numbers: list[dict], outputs_root: Path, sa: dict) -> None:
     path = outputs_root / "cross_site" / "roughness" / "patch_roughness.csv"
     if not path.exists():
         raise MissingSource(f"missing {path}")
     df = pd.read_csv(path)
     d = df[df["site"] == SITE]
     rel = str(path)
-    numbers.append(_entry("mare_roughness_n_patches", int(len(d)), "patches", "int", rel, "count(site == 'maré')"))
+
+    # patch_roughness.csv carries patch_id but no coordinates; its own
+    # geometry lives in the CFD campaign-sampling patch layer, keyed by the
+    # same patch_id.
+    patches_path = outputs_root / SITE / "sampling_cfd" / "campaign_sampling" / "campaign_patches.gpkg"
+    if not patches_path.exists():
+        raise MissingSource(f"missing {patches_path}")
+    patches = gpd.read_file(patches_path)
+    in_area = msa.within_mask(patches["center_x"].to_numpy(), patches["center_y"].to_numpy(), sa["study_area"])
+    ids_in_area = set(patches.loc[in_area, "patch_id"])
+    d = d[d["patch_id"].isin(ids_in_area)]
+    numbers.append(_entry("mare_roughness_n_patches", int(len(d)), "patches", "int", rel, "count(site == 'maré'), study area (via campaign_patches.gpkg patch_id)"))
     numbers.append(_entry("mare_roughness_out_of_envelope_share_pct", 100 * float(d["flag_pai_over_envelope"].mean()), "%", "percent", rel, "100 * mean(flag_pai_over_envelope)"))
     numbers.append(_entry("mare_roughness_floored_share_pct", 100 * float(d["flag_z0_floored"].mean()), "%", "percent", rel, "100 * mean(flag_z0_floored)"))
 
@@ -203,6 +267,17 @@ def _wind_rose(numbers: list[dict], outputs_root: Path) -> None:
 
 
 def _composition(numbers: list[dict], outputs_root: Path) -> None:
+    # NOT filtered to the study area (MAREBOUND scope note): the fabric-
+    # cluster labels behind this table are only retained as a per-site
+    # aggregate (outputs/cross_site/signature/composition_by_site.csv) — the
+    # per-cell cluster assignment the clustering pipeline used to produce it
+    # is not written to outputs/ anywhere, so there is no cell-level source
+    # of record to re-filter here. This still describes the whole bairro's
+    # fabric, not the 16-community study area. Recomputing a study-area
+    # version would mean re-running the cross-site clustering fit restricted
+    # to Maré's study area, which changes methodology (the fit is shared
+    # across all 5 campaign sites) — out of MAREBOUND's scope; flagged in
+    # the PI report rather than done silently.
     path = outputs_root / "cross_site" / "signature" / "composition_by_site.csv"
     if not path.exists():
         raise MissingSource(f"missing {path}")
@@ -220,12 +295,13 @@ def _composition(numbers: list[dict], outputs_root: Path) -> None:
 
 def collect(outputs_root: Path) -> list[dict]:
     numbers: list[dict] = []
+    sa = _study_area(numbers)
     _parse_tr_site_row(numbers)
-    _grid_metrics(numbers, outputs_root)
-    _svf_streets(numbers, outputs_root)
+    _grid_metrics(numbers, outputs_root, sa)
+    _svf_streets(numbers, outputs_root, sa)
     _diagnostic_stats(numbers, outputs_root)
-    _geometry_indicators(numbers, outputs_root)
-    _roughness_envelope(numbers, outputs_root)
+    _geometry_indicators(numbers, outputs_root, sa)
+    _roughness_envelope(numbers, outputs_root, sa)
     _wind_rose(numbers, outputs_root)
     _composition(numbers, outputs_root)
     return numbers

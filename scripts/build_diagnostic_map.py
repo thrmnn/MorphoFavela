@@ -40,7 +40,16 @@ from matplotlib import patches as mpatches
 from matplotlib.colors import BoundaryNorm, ListedColormap
 from scipy.spatial import cKDTree
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Hardcoded, not Path(__file__).resolve().parents[1]: this script also runs
+# from a git worktree that has no data/outputs/ of its own (same rationale
+# as scripts/build_site_dashboard.py, scripts/build_html_dashboard.py) — it
+# always reads/writes the one main checkout's data/outputs regardless of
+# which checkout's copy of this file is running. sys.path, unlike
+# PROJECT_ROOT, uses the RUNNING checkout's own root (whichever it is) so
+# `import src...` resolves that checkout's own src/ tree (e.g. a module
+# added on a worktree branch, not yet merged to the main checkout).
+PROJECT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "maré", "riodaspedras"]
 SITE_DISPLAY = {
@@ -78,7 +87,13 @@ STATE_KEYS = {
 }
 
 
-def site_paths(site: str) -> dict:
+def site_paths(site: str, study_area: bool = False) -> dict:
+    """`study_area=True` (Maré only) writes to `*_study_area` suffixed
+    outputs instead of the default whole-data-extent ones, so the
+    Maré-brief/site-sheet study-area recompute never overwrites the
+    whole-bairro diagnostic map/stats other consumers read (technical
+    report, manuscript figures, project hub)."""
+    suffix = "_study_area" if study_area else ""
     return {
         "grid": PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg",
         "solar": PROJECT_ROOT
@@ -93,8 +108,8 @@ def site_paths(site: str) -> dict:
         / "outputs"
         / site
         / "paper_figures"
-        / f"fig_{site}_diagnostic_map.png",
-        "out_stats": PROJECT_ROOT / "outputs" / site / "paper_figures" / "diagnostic_stats.json",
+        / f"fig_{site}_diagnostic_map{suffix}.png",
+        "out_stats": PROJECT_ROOT / "outputs" / site / "paper_figures" / f"diagnostic_stats{suffix}.json",
     }
 
 
@@ -150,7 +165,8 @@ def classify(grid: gpd.GeoDataFrame) -> np.ndarray:
     return state
 
 
-def render(site: str, grid: gpd.GeoDataFrame, state: np.ndarray, paths: dict) -> dict:
+def render(site: str, grid: gpd.GeoDataFrame, state: np.ndarray, paths: dict,
+           title_suffix: str = "") -> dict:
     fig, ax = plt.subplots(figsize=(12, 6.0), facecolor="white")
     ax.set_facecolor("white")
 
@@ -220,7 +236,7 @@ def render(site: str, grid: gpd.GeoDataFrame, state: np.ndarray, paths: dict) ->
     ax.text(
         0.01,
         1.02,
-        f"{SITE_DISPLAY[site]}  ·  diagnostic map (pre-CFD; geometric λf proxy for ventilation)",
+        f"{SITE_DISPLAY[site]}{title_suffix}  ·  diagnostic map (pre-CFD; geometric λf proxy for ventilation)",
         transform=ax.transAxes,
         fontsize=9.5,
         color="#666666",
@@ -293,29 +309,49 @@ def render(site: str, grid: gpd.GeoDataFrame, state: np.ndarray, paths: dict) ->
     return stats
 
 
-def run_site(site: str) -> dict:
-    paths = site_paths(site)
+def run_site(site: str, study_area: bool = False) -> dict:
+    """`study_area=True` (Maré only): filter the grid to the 16-community
+    study area (union ∩ data extent; src/brisa_solar/mare_study_area.py)
+    before classifying, and write to the `*_study_area` suffixed outputs —
+    the default whole-data-extent outputs (used by the technical report,
+    manuscript figures, and the project hub) are left untouched."""
+    paths = site_paths(site, study_area=study_area)
     for k in ("grid", "solar"):
         if not paths[k].exists():
             raise FileNotFoundError(f"[{site}] missing input: {paths[k]}")
     grid = gpd.read_file(paths["grid"])
+    title_suffix = ""
+    if study_area:
+        from src.brisa_solar import mare_study_area as msa
+
+        sa = msa.load_study_area()
+        mask = msa.within_mask(grid["centroid_x"].to_numpy(), grid["centroid_y"].to_numpy(), sa["study_area"])
+        grid = grid.loc[mask].reset_index(drop=True)
+        title_suffix = " — study area (16 communities ∩ data extent)"
     grid = aggregate_solar_to_cells(grid, paths["solar"])
     state = classify(grid)
-    return render(site, grid, state, paths)
+    return render(site, grid, state, paths, title_suffix=title_suffix)
 
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--site", choices=SITES, help="single site to process")
     p.add_argument("--all", action="store_true", help="process every site")
+    p.add_argument("--study-area", action="store_true",
+                    help="Maré only: filter to the 16-community study area "
+                    "(union of Redes da Maré's communities ∩ the site data "
+                    "extent) instead of the whole bairro; writes to "
+                    "*_study_area suffixed outputs, never the default ones")
     args = p.parse_args()
 
     if not args.site and not args.all:
         p.error("must pass --site <name> or --all")
+    if args.study_area and (args.all or args.site != "maré"):
+        p.error("--study-area is only defined for --site maré")
 
     sites = SITES if args.all else [args.site]
     for site in sites:
-        run_site(site)
+        run_site(site, study_area=args.study_area)
     return 0
 
 
