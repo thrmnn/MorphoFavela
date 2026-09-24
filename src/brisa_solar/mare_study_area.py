@@ -1,16 +1,17 @@
-"""Maré study-area geometry: the union of the 16 Redes da Maré communities
-(data/maré/neighbourhoods.gpkg, layer "communities"; provenance in
-data/maré/neighbourhoods_provenance.json, built by
-scripts/data_utils/build_mare_neighbourhoods.py), intersected with the site
-DATA EXTENT — the bairro polygon (data/maré/raw/mare_boundary.shp) that
-building footprints and the DTM are actually clipped to.
+"""Maré study-area geometry — THIN WRAPPER over src.sites.territory (SITETERR,
+2026-09-24). Kept only because scripts/build_site_dashboard.py,
+scripts/build_html_dashboard.py and scripts/render_mare_territory_map.py
+already import `mare_study_area as msa` and call `msa.load_study_area()` /
+`msa.within_mask()`; new code should call `src.sites.territory.load_territory`
+directly instead.
 
 Two boundaries exist for Maré and must never be conflated (PI-approved
 2026-09-23):
 
 - STUDY AREA  = union(16 communities) ∩ DATA EXTENT — governs which
   cells/observers/buildings count in Maré's statistics, and is what gets
-  outlined on the site sheet and the interactive dashboard.
+  outlined on the site sheet and the interactive dashboard. Registry:
+  config/sites.yaml maré.study_area (kind: subunits_union_in_extent).
 - DATA EXTENT = the bairro polygon itself — the near_boundary / edge-halo
   15 m logic (scripts/build_site_dashboard.py, scripts/build_html_dashboard.py)
   must keep measuring distance to THIS boundary: buildings actually stop at
@@ -20,62 +21,48 @@ Two boundaries exist for Maré and must never be conflated (PI-approved
 
 Marcílio Dias, one of the 16 communities, lies ~2 km north of bairro Maré
 and is excluded from the study area. The exclusion is computed by GEOMETRY
-(the community's own share of area inside the data extent), never by name:
-data/maré/neighbourhoods.gpkg's own QA (share_in_official_bairro) measures
-Marcílio Dias at 0.0% inside the bairro against >= 99.1% for every other
-community, so INSIDE_EXTENT_MIN_SHARE = 0.5 cleanly separates the two
-groups without hardcoding "Marcílio Dias" as a name to drop.
+(the community's own share of area inside the data extent, config/sites.yaml
+maré.study_area.share_threshold = 0.5), never by name — see
+src.sites.territory.build_study_area.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
 import geopandas as gpd
-import numpy as np
-import shapely
+
+from src.sites.territory import ROOT_DEFAULT, load_sites_config, load_territory, within_mask  # noqa: F401
 
 # Hardcoded, not Path(__file__).resolve().parents[2]: this module is also
-# imported from a git worktree that has no data/ of its own (see other
-# ROOT-hardcoding scripts, e.g. scripts/build_site_dashboard.py,
-# scripts/build_html_dashboard.py) — every caller reads data/outputs from
-# the one main checkout regardless of which checkout's copy of this file runs.
+# imported from a git worktree that has no data/ of its own — every caller
+# reads data/outputs from the one main checkout regardless of which
+# checkout's copy of this file runs. src.sites.territory.load_territory
+# takes the same `root` explicitly, so this default only matters for callers
+# (still) invoking this module's own functions with no argument.
 ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
-NEIGHBOURHOODS_GPKG = ROOT / "data" / "maré" / "neighbourhoods.gpkg"
-BAIRRO_SHP = ROOT / "data" / "maré" / "raw" / "mare_boundary.shp"
-PROVENANCE_JSON = ROOT / "data" / "maré" / "neighbourhoods_provenance.json"
 
-# A community with less than this share of its own area inside the data
-# extent is excluded from the study area. Geometry-based cutoff, not a
-# per-name list: every included community actually measures >= 0.99, the
-# one excluded community measures 0.0 (see module docstring).
-INSIDE_EXTENT_MIN_SHARE = 0.5
-
-
-def _union(geoseries) -> "shapely.Geometry":
-    return geoseries.union_all() if hasattr(geoseries, "union_all") else geoseries.unary_union
+# Backward-compatible constants some existing tests/callers read directly
+# (tests/test_mare_study_area.py). Sourced from config/sites.yaml — not
+# retyped — so they can never drift from what load_territory("maré") itself
+# uses.
+_MARE_CFG = load_sites_config()["maré"]
+BAIRRO_SHP = ROOT / "data" / _MARE_CFG["data_extent"]
+NEIGHBOURHOODS_GPKG = ROOT / "data" / _MARE_CFG["subunits"]["file"]
+PROVENANCE_JSON = ROOT / "data" / _MARE_CFG["subunits"]["provenance"]
+INSIDE_EXTENT_MIN_SHARE = _MARE_CFG["study_area"]["share_threshold"]
 
 
-def load_data_extent(root: Path = ROOT) -> "shapely.Geometry":
+def load_data_extent(root: Path = ROOT) -> "shapely.Geometry":  # noqa: F821
     """The bairro polygon (data extent): buildings/DTM are clipped to this,
-    never to the study area. Used unmodified by near_boundary/edge-halo
-    logic everywhere in the codebase."""
-    bairro_shp = root / "data" / "maré" / "raw" / "mare_boundary.shp"
-    bairro = gpd.read_file(bairro_shp)
-    if bairro.crs is None:
-        bairro = bairro.set_crs(31983)
-    else:
-        bairro = bairro.to_crs(31983)
-    return _union(bairro.geometry)
+    never to the study area."""
+    return load_territory("maré", root=root).data_extent
 
 
 def load_communities(root: Path = ROOT) -> gpd.GeoDataFrame:
-    """All 16 Redes da Maré communities, unfiltered."""
-    gpkg = root / "data" / "maré" / "neighbourhoods.gpkg"
-    comm = gpd.read_file(gpkg, layer="communities")
-    if comm.crs is None:
-        comm = comm.set_crs(31983)
-    else:
-        comm = comm.to_crs(31983)
+    """All 16 Redes da Maré communities, unfiltered (no `in_extent` column)."""
+    from src.sites.territory import load_sites_config, load_subunits
+    cfg = load_sites_config()["maré"]
+    comm, _ = load_subunits(cfg, root)
     return comm
 
 
@@ -89,33 +76,13 @@ def load_study_area(root: Path = ROOT) -> dict:
       data_extent  — the bairro polygon geometry (shapely), unclipped
       study_area   — union(included) ∩ data_extent (shapely)
     """
-    extent_geom = load_data_extent(root)
-    comm = load_communities(root)
-    share = comm.geometry.intersection(extent_geom).area / comm.geometry.area
-    comm = comm.assign(in_extent=(share.to_numpy() >= INSIDE_EXTENT_MIN_SHARE))
-    included = comm[comm["in_extent"]].reset_index(drop=True)
-    excluded = comm[~comm["in_extent"]].reset_index(drop=True)
-    if len(included) == 0:
+    t = load_territory("maré", root=root)
+    if t.subunits is None or len(t.subunits_included) == 0:
         raise ValueError("no community intersects the Maré data extent — check the crosswalk / geometry")
-    study_area_geom = _union(included.geometry).intersection(extent_geom)
     return {
-        "communities": comm,
-        "included": included,
-        "excluded": excluded,
-        "data_extent": extent_geom,
-        "study_area": study_area_geom,
+        "communities": t.subunits,
+        "included": t.subunits_included,
+        "excluded": t.subunits_excluded,
+        "data_extent": t.data_extent,
+        "study_area": t.study_area,
     }
-
-
-def within_mask(x: np.ndarray, y: np.ndarray, geom) -> np.ndarray:
-    """Vectorised point-in-polygon test against `geom`, bbox-prefiltered
-    first (same pattern as scripts/mare_definition_sensitivity.py's
-    `_within`, applied here to arrays instead of a DataFrame)."""
-    x = np.asarray(x, dtype=float)
-    y = np.asarray(y, dtype=float)
-    x0, y0, x1, y1 = geom.bounds
-    in_box = (x >= x0) & (x <= x1) & (y >= y0) & (y <= y1)
-    out = np.zeros(len(x), dtype=bool)
-    if in_box.any():
-        out[in_box] = shapely.contains_xy(geom, x[in_box], y[in_box])
-    return out

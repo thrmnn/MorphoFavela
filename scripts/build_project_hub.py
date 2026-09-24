@@ -23,6 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT))
 
 import audit_hub_graph  # the same reachability walk backs outputs/_hub/map.html
 from hubkit import (
@@ -599,6 +600,205 @@ def _doc_card(url, name, desc, prov):
                     base=_doc_base(src), root=ROOT, mirror_dir=DOCS)
     return card(name, desc, f"/outputs/_hub/docs/{src.stem}.html", meta=url, kind="doc",
                 new_tab=False)
+
+
+ORG_DIAGRAM_SVG = """
+<svg viewBox="0 0 980 200" role="img" aria-label="SITETERR data flow"
+     style="width:100%;height:auto;font:12px system-ui,sans-serif">
+  <defs>
+    <marker id="siteterr-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/>
+    </marker>
+  </defs>
+  <style>
+    .box{fill:#fff;stroke:#6b6b6b;stroke-width:1}
+    .lbl{fill:#1b1b1b;font-weight:600}
+    .file{fill:#6b6b6b;font-family:monospace;font-size:10px}
+    .edge{stroke:#6b6b6b;stroke-width:1;fill:none;marker-end:url(#siteterr-arrow)}
+  </style>
+  <rect class="box" x="10" y="70" width="150" height="60" rx="4"/>
+  <text class="lbl" x="85" y="92" text-anchor="middle">Registry</text>
+  <text class="file" x="85" y="108" text-anchor="middle">config/sites.yaml</text>
+  <text class="file" x="85" y="120" text-anchor="middle">src/sites/territory.py</text>
+
+  <path class="edge" d="M160,100 H230"/>
+  <rect class="box" x="230" y="70" width="180" height="60" rx="4"/>
+  <text class="lbl" x="320" y="92" text-anchor="middle">Per-site territory</text>
+  <text class="file" x="320" y="108" text-anchor="middle">build_site_territory.py</text>
+  <text class="file" x="320" y="120" text-anchor="middle">data/&lt;site&gt;/territory.gpkg + _provenance.json</text>
+
+  <path class="edge" d="M410,90 C450,90 450,30 490,30"/>
+  <path class="edge" d="M410,110 C450,110 450,170 490,170"/>
+
+  <rect class="box" x="490" y="0" width="190" height="60" rx="4"/>
+  <text class="lbl" x="585" y="22" text-anchor="middle">Site runs</text>
+  <text class="file" x="585" y="38" text-anchor="middle">build_site_dashboard.py</text>
+  <text class="file" x="585" y="50" text-anchor="middle">build_html_dashboard.py</text>
+
+  <rect class="box" x="490" y="140" width="190" height="60" rx="4"/>
+  <text class="lbl" x="585" y="162" text-anchor="middle">Citywide run</text>
+  <text class="file" x="585" y="178" text-anchor="middle">wp05_full.match_favela_group</text>
+  <text class="file" x="585" y="190" text-anchor="middle">(target from citywide_rule)</text>
+
+  <path class="edge" d="M680,170 C720,170 720,110 750,110"/>
+  <rect class="box" x="750" y="80" width="130" height="60" rx="4"/>
+  <text class="lbl" x="815" y="102" text-anchor="middle">Ledger</text>
+  <text class="file" x="815" y="118" text-anchor="middle">wp07_ledger.py</text>
+
+  <path class="edge" d="M680,30 C900,30 900,60 900,80"/>
+  <path class="edge" d="M880,110 H900"/>
+  <rect class="box" x="850" y="0" width="130" height="200" rx="4" style="fill:none;stroke:none"/>
+  <text class="lbl" x="915" y="14" text-anchor="middle" font-size="11">figures</text>
+  <text class="lbl" x="915" y="28" text-anchor="middle" font-size="11">briefs</text>
+  <text class="lbl" x="915" y="42" text-anchor="middle" font-size="11">dashboards</text>
+  <text class="lbl" x="915" y="56" text-anchor="middle" font-size="11">cockpit</text>
+</svg>
+"""
+
+
+def _territory_data(site: str):
+    from src.sites.territory import load_territory
+    prov_path = ROOT / "data" / site / "territory_provenance.json"
+    if not prov_path.exists():
+        return None
+    return json.loads(prov_path.read_text(encoding="utf-8"))
+
+
+def _territory_map_img(site: str) -> str | None:
+    name = "mare_territory_map" if site == "maré" else f"{site}_territory_map"
+    p = ROOT / "outputs" / site / "territory" / f"{name}.png"
+    if not p.exists():
+        return None
+    return "/" + str(p.relative_to(ROOT))
+
+
+def _territory_site_html(site: str, display: str, tp: dict) -> str:
+    de = tp["data_extent"]["area_m2"] / 1e6
+    sa = tp["study_area"]["area_m2"] / 1e6
+    cw = tp["citywide"]["area_m2"] / 1e6
+    bshare = tp.get("building_share_inside") or {}
+
+    def pct(v):
+        return "n/a" if v is None else f"{100 * v:.1f}%"
+
+    rows = f"""
+    <table>
+      <thead><tr><th>Boundary</th><th>Area (km²)</th><th>Buildings inside</th></tr></thead>
+      <tbody>
+        <tr><td>Data extent</td><td>{de:.3f}</td><td>{pct(bshare.get('data_extent'))}</td></tr>
+        <tr><td>Study area ({tp['study_area']['kind']})</td><td>{sa:.3f}</td><td>{pct(bshare.get('study_area'))}</td></tr>
+        <tr><td>Citywide ({tp['citywide']['match_method']}, {tp['citywide']['n_polygons']} polygon(s))</td>
+            <td>{cw:.3f}</td><td>{pct(bshare.get('citywide'))}</td></tr>
+      </tbody>
+    </table>"""
+
+    overlap = tp.get("overlap_study_area_vs_citywide")
+    overlap_html = ""
+    if overlap:
+        overlap_html = (f"<p><strong>Study area vs. citywide:</strong> IoU "
+                        f"{overlap['iou']:.3f}"
+                        f"{' — identical boundary' if overlap['identical_boundary'] else ' — boundaries differ'}"
+                        f"</p>")
+
+    inferred = tp.get("inferred_matches") or []
+    inferred_html = ""
+    if inferred:
+        items = "".join(f"<li>{html.escape(m['community'])} — {html.escape(m.get('note') or 'inferred match')}</li>"
+                        for m in inferred)
+        inferred_html = f"<p><strong>Inferred name matches ({len(inferred)}):</strong></p><ul>{items}</ul>"
+
+    note = tp.get("definition_note")
+    note_html = f'<p class="pill terra" style="display:block;white-space:normal">{html.escape(note)}</p>' if note else ""
+
+    candidates = tp.get("study_area_candidates") or {}
+    cand_html = ""
+    if candidates:
+        items = "".join(
+            f"<li><strong>{html.escape(c['label'])}</strong> — {c['area_m2']/1e6:.3f} km² · "
+            f"{html.escape(str(c.get('status', 'candidate')))}</li>"
+            for c in candidates.values())
+        cand_html = f"<p><strong>Study-area candidates (not active):</strong></p><ul>{items}</ul>"
+
+    img = _territory_map_img(site)
+    img_html = ""
+    if img:
+        attrs = _img_attrs(img)
+        dim = f' width="{attrs["width"]}" height="{attrs["height"]}"' if attrs.get("width") else ""
+        img_html = (f'<img src="{attrs.get("thumb", img)}"{dim} loading="lazy" '
+                    f'style="max-width:420px;width:100%;height:auto;border:1px solid #ddd" '
+                    f'alt="{html.escape(display)} territory map" '
+                    f'onclick="event.preventDefault();zoom(\'{img}\',\'{_pz_js_attr(display)}\')">')
+
+    return f"""
+    <section>
+      <h2 id="site-{_slug_ascii(site)}">{html.escape(display)}</h2>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
+        <div style="flex:0 0 auto">{img_html}</div>
+        <div style="flex:1 1 320px;min-width:280px">
+          {rows}
+          {overlap_html}
+          {cand_html}
+          {inferred_html}
+          {note_html}
+        </div>
+      </div>
+    </section>"""
+
+
+def write_territory_page(prov):
+    """SITETERR territory review page: the Organisation flow (registry ->
+    per-site territory.gpkg -> site/citywide runs -> ledger -> figures,
+    briefs, dashboards, cockpit) then one section per site with its map,
+    areas, building shares and inferred-match list from
+    data/<site>/territory_provenance.json. Degrades to (None, None) when no
+    site has been built yet (scripts/build_site_territory.py --all)."""
+    try:
+        from src.sites.territory import load_sites_config
+        registry = load_sites_config()
+    except Exception:
+        return None, None
+
+    sections_html = []
+    thumb = None
+    for site, cfg in registry.items():
+        tp = _territory_data(site)
+        if not tp:
+            continue
+        sections_html.append(_territory_site_html(site, cfg["display_name"], tp))
+        thumb = thumb or _territory_map_img(site)
+    if not sections_html:
+        return None, None
+
+    crumb = breadcrumb([("← Project hub", "index.html"), ("Site territories", None)])
+    body = (
+        '<p class="lead">What "the site" means, declared once per site '
+        '(<code>config/sites.yaml</code>, loader <code>src/sites/territory.py</code>) '
+        'instead of six independent hardcodings. Every number below is read from '
+        '<code>data/&lt;site&gt;/territory_provenance.json</code>, written by '
+        '<code>scripts/build_site_territory.py</code>.</p>'
+        '<h2 id="organisation">Organisation</h2>' + ORG_DIAGRAM_SVG
+        + "".join(sections_html)
+    )
+    out = OUT / "territory.html"
+    out.write_text(_relativize(page(
+        "Site territories", badge("ok", f"{len(sections_html)} of {len(registry)} sites built"),
+        body, crumb=crumb, provenance=prov)))
+    return "/outputs/_hub/territory.html", thumb
+
+
+def territory_section(prov):
+    url, thumb = write_territory_page(prov)
+    if not url:
+        return ""
+    cards = [card(
+        "Site territories",
+        "One declared boundary per site — data extent, study area, citywide "
+        "definition and subunits, with a map and provenance per site. "
+        "Replaces six places a site's boundary used to be typed.",
+        url, img=thumb, kind="ok", badge_label="Start here", new_tab=False,
+        **(_img_attrs(thumb) if thumb else {}))]
+    return section("Territory", cards, anchor="territory")
 
 
 def sites_section(prov):
@@ -1645,6 +1845,7 @@ def main(root: Path | None = None):
     # precedes the partner façade cross-check.
     sections = [
         ("figure-review", "Figure review", figure_review_section(prov)),
+        ("territory", "Site territories", territory_section(prov)),
         ("latest", "Latest & work queue", build_callout(prov)),
         ("headline", "Headline result", headline_section(prov)),
         ("work-packages", "Work packages (runs of record)", work_packages_section(prov)),
