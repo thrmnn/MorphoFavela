@@ -163,25 +163,14 @@ def test_token_lint_fails_on_planted_token_passes_clean(tmp_path, monkeypatch):
 
 # --- WP04MARE: --out-name/--depth-median default to the pre-WP04MARE behaviour
 
-def test_cli_defaults_preserve_pre_wp04mare_behaviour():
-    import argparse
-
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--data-root", default="/home/theo/SCL/SCR/MorphoFavela")
-    ap.add_argument("--wp04-run-id", default="wp04_sites_20260914T230606Z")
-    ap.add_argument("--run-dir", default=None)
-    ap.add_argument("--sites", default=",".join(w.SITES))
-    ap.add_argument("--depth-median", type=float, default=None)
-    ap.add_argument("--out-name", default="per_patch_geometry.csv")
-    args = ap.parse_args([])
-    assert args.out_name == "per_patch_geometry.csv"
-    assert args.depth_median is None
-
-    # And the real parser (main()'s own) agrees -- read straight off the
-    # module's own argparse setup rather than re-typing the expectation.
+def test_depth_median_is_read_from_a_recorded_run_not_typed(tmp_path):
+    run = tmp_path / "runs" / "wp06_geometry_X"
+    run.mkdir(parents=True)
+    (run / "summary.json").write_text('{"depth_median_m": 12.5}')
+    assert w.resolve_depth_median(tmp_path, ["vidigal"], "wp06_geometry_X") == 12.5
     src = (ROOT / "src" / "brisa_solar" / "wp06_geometry.py").read_text()
     assert '"--out-name", default="per_patch_geometry.csv"' in src
-    assert '"--depth-median", type=float, default=None' in src
+    assert "--depth-median\"" not in src
 
 
 # --- (e) the module imports no CFD code --------------------------------------

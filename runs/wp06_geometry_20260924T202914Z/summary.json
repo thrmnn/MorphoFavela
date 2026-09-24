@@ -1,10 +1,10 @@
 {
-  "_utc": "2026-09-24T20:16:36Z",
+  "_utc": "2026-09-24T20:29:18Z",
   "status": "PROVISIONAL — depends on WP-05/G3 cards",
   "wp04_run_id": "wp04_mare_studyarea_20260924T201015Z",
   "out_name": "per_patch_geometry_study_area.csv",
   "depth_median_m": 31.622776601683796,
-  "depth_median_source": "--depth-median override",
+  "depth_median_source": "runs/wp06_geometry_20260915T052604Z/summary.json",
   "per_site": {
     "maré": {
       "n": 29229,

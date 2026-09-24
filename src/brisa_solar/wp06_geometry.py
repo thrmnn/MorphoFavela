@@ -193,6 +193,13 @@ def build_site_table(data_root: Path, wp04_run_id: str, site: str, depth_median:
     return compute_site_table(grid, ground, freq, depth_median)
 
 
+def resolve_depth_median(data_root: Path, sites: list[str], from_run: str | None) -> float:
+    """The pooled value over `sites`, or the one a previous run recorded — never a typed number."""
+    if from_run:
+        return float(json.loads((data_root / "runs" / from_run / "summary.json").read_text())["depth_median_m"])
+    return pooled_depth_median(data_root, sites)
+
+
 def pooled_depth_median(data_root: Path, sites: list[str]) -> float:
     dists = []
     for site in sites:
@@ -212,11 +219,10 @@ def main() -> int:
     ap.add_argument("--run-dir", default=None, help="defaults to a fresh runs/wp06_geometry_<UTC>/ in --data-root")
     ap.add_argument("--sites", default=",".join(SITES))
     ap.add_argument(
-        "--depth-median", type=float, default=None,
-        help="override pooled_depth_median (e.g. to reuse the canonical "
-             "5-site pooled value when --sites is a strict subset, so "
-             "constraint_lateral/exposure_ratio stay comparable to the "
-             "canonical run rather than being re-pooled over the subset)",
+        "--depth-median-from-run", default=None,
+        help="read depth_median_m from runs/<id>/summary.json instead of re-pooling — "
+             "use the canonical run's id when --sites is a strict subset, so "
+             "constraint_lateral/exposure_ratio stay comparable to it",
     )
     ap.add_argument(
         "--out-name", default="per_patch_geometry.csv",
@@ -234,7 +240,7 @@ def main() -> int:
     )
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    depth_median = args.depth_median if args.depth_median is not None else pooled_depth_median(data_root, sites)
+    depth_median = resolve_depth_median(data_root, sites, args.depth_median_from_run)
 
     per_site_summary = {}
     for site in sites:
@@ -265,7 +271,7 @@ def main() -> int:
         "out_name": args.out_name,
         "depth_median_m": depth_median,
         "depth_median_source": (
-            "--depth-median override" if args.depth_median is not None
+            f"runs/{args.depth_median_from_run}/summary.json" if args.depth_median_from_run
             else f"pooled_depth_median over --sites={args.sites}"
         ),
         "per_site": per_site_summary,
