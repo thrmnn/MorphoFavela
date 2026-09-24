@@ -148,10 +148,35 @@ def git_sha() -> str:
         return "0000000"
 
 
+#: WP04MARE (2026-09-24): Maré's grid row (svf_c_p50/kwh_m2_p50, the "cov"
+#: badge) is fed by src/brisa_solar/wp06_geometry.py binning WP-04's
+#: ground.parquet onto the 10 m grid. WP-04's ground observers used to be
+#: clipped to Maré's 6-polygon Favelas_Limit_2019 match (0.84 km²) —
+#: src.brisa_solar.wp04_sites.TERRITORY_CITYWIDE, the default P1's run of
+#: record and the WP-07 ledger still use — while the sheet's own boundary
+#: outline is the promoted IPP Territórios Sociais study area (3.357 km²),
+#: leaving most of the study area's built cells with no observer (cov 29.7%,
+#: measured against runs/wp04_sites_20260914T230606Z). Extending WP-04 to
+#: territory="study_area" (runs/wp04_mare_studyarea_20260924T201015Z) and
+#: re-binning it (outputs/maré/geometry_indicators/per_patch_geometry_
+#: study_area.csv, beside — never over — the canonical citywide-territory
+#: file every other site keeps reading) lifts that to cov 87.5%. This does
+#: not touch P1's run of record or the WP-07 ledger: only the SHEET's own
+#: source file changes, and only for Maré.
+_MARE_STUDY_AREA_GRID_OVERRIDE = {
+    "maré": "per_patch_geometry_study_area.csv",
+    "mare": "per_patch_geometry_study_area.csv",
+}
+
+
 def site_paths(site: str) -> dict:
     files = AREA_FILES[site]
     raw = ROOT / "data" / site / "raw"
     out = ROOT / "outputs" / site
+    grid_name = "per_patch_geometry.csv"
+    override = _MARE_STUDY_AREA_GRID_OVERRIDE.get(site)
+    if override and (out / "geometry_indicators" / override).exists():
+        grid_name = override
     return {
         "boundary": raw / files["boundary"],
         "buildings": raw / files["footprints"],
@@ -160,7 +185,7 @@ def site_paths(site: str) -> dict:
         "segments": out / "morphometrics" / "svf" / "svf_streets_segments.gpkg",
         "observers": out / "sampling_streets" / "observers.gpkg",
         "manifest": out / "sampling_streets" / "manifest.json",
-        "grid": out / "geometry_indicators" / "per_patch_geometry.csv",
+        "grid": out / "geometry_indicators" / grid_name,
     }
 
 

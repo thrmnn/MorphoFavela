@@ -1,0 +1,38 @@
+{
+  "_utc": "2026-09-24T20:16:36Z",
+  "status": "PROVISIONAL — depends on WP-05/G3 cards",
+  "wp04_run_id": "wp04_mare_studyarea_20260924T201015Z",
+  "out_name": "per_patch_geometry_study_area.csv",
+  "depth_median_m": 31.622776601683796,
+  "depth_median_source": "--depth-median override",
+  "per_site": {
+    "maré": {
+      "n": 29229,
+      "shares": {
+        "0": 0.09832700400287386,
+        "1": 0.24325156522631633,
+        "2": 0.3384994354921482,
+        "3": 0.3199219952786616
+      },
+      "svf_c_p50_median": 0.39814394209056214,
+      "share_ge_2h_winter_median": 0.38095238095238093,
+      "output_csv": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/geometry_indicators/per_patch_geometry_study_area.csv"
+    }
+  },
+  "comparison_vs_ventilation_index": {
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/paper_figures/ventilation_index.json",
+    "per_site": {
+      "maré": {
+        "n_wp06": 29229,
+        "n_ventilation_index": 29229,
+        "share_diff": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 0.0,
+          "3": 0.0
+        },
+        "cause": "constraint shares reuse the same count_constraints/open_edge_distance/wind_exposure pure functions and the same pooled depth median as ventilation_index.json, so diffs here are expected to be ~0; svf_c_p50 is NOT comparable to ventilation_index.json (which carries no SVF column) — it is new: WP-04's C′ engine (raster-horizon visibility, epw_weighted sky) 1 m ground-point median per cell, distinct from the grid's own clear-sky street SVF column."
+      }
+    }
+  }
+}

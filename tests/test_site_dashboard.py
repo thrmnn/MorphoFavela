@@ -46,6 +46,37 @@ def test_site_display_covers_five_sites():
     assert bsd.SITE_DISPLAY["riodaspedras"] == "Rio das Pedras"
 
 
+# ---------------------------------------------------------------------------
+# WP04MARE: site_paths() picks up Maré's study_area-territory grid file when
+# it exists, beside (never instead of) the canonical file every other site
+# keeps reading, and falls back cleanly when it doesn't exist yet.
+# ---------------------------------------------------------------------------
+
+def test_site_paths_grid_prefers_mare_study_area_file_when_present(tmp_path, monkeypatch):
+    monkeypatch.setattr(bsd, "ROOT", tmp_path)
+    geom_dir = tmp_path / "outputs" / "maré" / "geometry_indicators"
+    geom_dir.mkdir(parents=True)
+    (geom_dir / "per_patch_geometry_study_area.csv").write_text("patch_id\n1\n")
+
+    grid_path = bsd.site_paths("maré")["grid"]
+    assert grid_path.name == "per_patch_geometry_study_area.csv"
+
+
+def test_site_paths_grid_falls_back_to_canonical_file_when_study_area_file_absent(tmp_path, monkeypatch):
+    monkeypatch.setattr(bsd, "ROOT", tmp_path)
+    # No outputs/maré/geometry_indicators/ at all -- site_paths must not error,
+    # and must return the same default path pre-WP04MARE code did.
+    grid_path = bsd.site_paths("maré")["grid"]
+    assert grid_path.name == "per_patch_geometry.csv"
+
+
+def test_site_paths_grid_unaffected_for_other_sites(tmp_path, monkeypatch):
+    monkeypatch.setattr(bsd, "ROOT", tmp_path)
+    for site in FIVE_SITES - {"maré"}:
+        grid_path = bsd.site_paths(site)["grid"]
+        assert grid_path.name == "per_patch_geometry.csv"
+
+
 @pytest.mark.parametrize(
     "script",
     ["build_site_dashboard.py", "build_html_dashboard.py"],

@@ -1,0 +1,70 @@
+{
+ "_utc": "2026-09-24T20:12:52Z",
+ "territory": "study_area",
+ "surfaces": [
+  "ground",
+  "street"
+ ],
+ "pilot_window_m": null,
+ "sky": {
+  "patches": 145
+ },
+ "cell_m": 1.0,
+ "sky_model": "epw_weighted",
+ "obs_height_m": 1.5,
+ "max_dist_m": 500.0,
+ "march_sampling": "nearest",
+ "facade_own_building_exclusion_default": true,
+ "facade_own_building_exclusion_decision": "docs/wp04f_facade_spec.md deliverable 4, taken 2026-09-15 against runs/wp04f_facade_20260915T060126Z/comparison.json: own-building exclusion measurably drops the exact-zero share at fixed inset on both comparison sites and, by construction, can only remove blocking attributed to the observer's OWN building \u2014 see FACADE_OWN_BUILDING_EXCLUSION_DEFAULT's docstring in src/brisa_solar/wp04_sites.py.",
+ "carried_from": null,
+ "reference_days": {
+  "winter_solstice": "2026-06-21",
+  "equinox": "2026-03-20",
+  "duration_thresholds_h": [
+   1,
+   2,
+   3,
+   4
+  ],
+  "status": "default",
+  "floor_provenance": "The 2h daylight floor is the ATHENS CHARTER (1943) Point 26 \u2014 NOT a WHO benchmark. Older docstrings in src/solar/ still say 'WHO \u22652h'; that attribution is wrong and must not propagate."
+ },
+ "sun_azimuth_quantisation": "nearest of the 145-patch scheme's own azimuth sampling (~12-deg bands at the lowest altitude ring); not a second sky",
+ "floor_provenance": "The 2h daylight floor is the ATHENS CHARTER (1943) Point 26 \u2014 NOT a WHO benchmark. Older docstrings in src/solar/ still say 'WHO \u22652h'; that attribution is wrong and must not propagate.",
+ "device": "cuda",
+ "torch_version": "2.4.1+cu121",
+ "git_sha": "c2dd440",
+ "params_sky_section_sha256": "a82a40e3e9bb1d85",
+ "sites": [
+  {
+   "site_key": "mar\u00e9",
+   "display_name": "Mar\u00e9"
+  }
+ ],
+ "site_reports": [
+  {
+   "site_key": "mar\u00e9",
+   "display_name": "Mar\u00e9",
+   "territory": "study_area",
+   "surfaces": [
+    "ground",
+    "street"
+   ],
+   "pilot_window_m": null,
+   "match_method": "territory_study_area",
+   "matched_polygons": [
+    {
+     "territory_study_area_kind": "polygon_file",
+     "territory_study_area_path": "mar\u00e9/raw/ipp_territorios_sociais_territorio03.gpkg",
+     "territory_study_area_area_m2": 3357216.1080836365
+    }
+   ],
+   "surface_shape": [
+    6310,
+    3785
+   ],
+   "n_ground": 1763663,
+   "n_street": 71280
+  }
+ ]
+}

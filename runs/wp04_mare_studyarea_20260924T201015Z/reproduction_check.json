@@ -1,0 +1,113 @@
+{
+ "_utc": "2026-09-24T20:15:20Z",
+ "description": "Reproduction check: for cells/points shared between the citywide run-of-record's Favelas_Limit_2019-clipped WP-04 run and the new study_area-territory run, values must be IDENTICAL (same 1 m surface raster, same engine, same sky) -- proves the territory change only widens which cells get an observer; it does not alter the physics or any already-published P1 cell. Ground uses the raster's own (row, col) as the cell identity (clip-invariant). Street points are NOT clip-invariant the same way: sample_street_points resamples each CLIPPED road LineString from its own start at fixed spacing, so a different clip boundary shifts where 'distance 0' falls along a road even where the clipped geometry is otherwise identical -- so street's matched-point coverage is expected to be lower than ground's, and is reported separately rather than gating the same way.",
+ "run_of_record": "/home/theo/SCL/SCR/MorphoFavela/runs/wp04_sites_20260914T230606Z",
+ "new_run": "/home/theo/SCL/SCR/MorphoFavela/runs/wp04_mare_studyarea_20260924T201015Z",
+ "site": "mar\u00e9",
+ "favela_vs_study_area_geometry": {
+  "favela_match_area_m2": 840375.4610628461,
+  "study_area_area_m2": 3357216.1080836365,
+  "favela_match_area_outside_study_area_m2": 31917.307203762844,
+  "favela_match_area_outside_study_area_pct": 3.7979818167698687,
+  "favela_match_is_subset_of_study_area": false,
+  "note": "The two boundaries are independently-digitized sources (see src/brisa_solar/mare_study_area.py module docstring) and not nested. This ~3.8% is the expected ceiling on ground-cell reproduction coverage below -- it is a real geometric difference between two declared boundaries, not a WP-04 defect."
+ },
+ "surfaces": {
+  "ground": {
+   "surface": "ground",
+   "n_run_of_record": 258178,
+   "n_new_run": 1763663,
+   "n_matched_on_key": 248810,
+   "match_key": [
+    "row",
+    "col"
+   ],
+   "coverage_of_run_of_record_pct": 96.3714956347946,
+   "column_diffs": {
+    "svf": {
+     "max_abs_diff": 3.3306690738754696e-16,
+     "mean_abs_diff": 8.70115709987161e-21,
+     "n_compared": 248810
+    },
+    "kwh_m2": {
+     "max_abs_diff": 4.547473508864641e-13,
+     "mean_abs_diff": 1.2565363278583823e-17,
+     "n_compared": 248810
+    },
+    "hours_winter_solstice": {
+     "max_abs_diff": 0.0,
+     "mean_abs_diff": 0.0,
+     "n_compared": 248810
+    },
+    "hours_equinox": {
+     "max_abs_diff": 0.0,
+     "mean_abs_diff": 0.0,
+     "n_compared": 248810
+    },
+    "hours_count_winter_solstice": {
+     "max_abs_diff": 0.0,
+     "mean_abs_diff": 0.0,
+     "n_compared": 248810
+    },
+    "hours_count_equinox": {
+     "max_abs_diff": 0.0,
+     "mean_abs_diff": 0.0,
+     "n_compared": 248810
+    }
+   },
+   "max_abs_diff_any_column": 4.547473508864641e-13,
+   "within_tolerance": true,
+   "tolerance": 1e-09
+  },
+  "street": {
+   "surface": "street",
+   "n_run_of_record": 84147,
+   "n_new_run": 71280,
+   "n_matched_on_key": 73733,
+   "match_key": [
+    "_kx",
+    "_ky"
+   ],
+   "coverage_of_run_of_record_pct": 87.62403888433337,
+   "column_diffs": {
+    "svf": {
+     "max_abs_diff": 1.2212453270876722e-15,
+     "mean_abs_diff": 1.0238992808445424e-19,
+     "n_compared": 73733
+    },
+    "kwh_m2": {
+     "max_abs_diff": 4.547473508864641e-13,
+     "mean_abs_diff": 1.2643349237346255e-16,
+     "n_compared": 73733
+    },
+    "hours_winter_solstice": {
+     "max_abs_diff": 0.0,
+     "mean_abs_diff": 0.0,
+     "n_compared": 73733
+    },
+    "hours_equinox": {
+     "max_abs_diff": 0.0,
+     "mean_abs_diff": 0.0,
+     "n_compared": 73733
+    },
+    "hours_count_winter_solstice": {
+     "max_abs_diff": 0.0,
+     "mean_abs_diff": 0.0,
+     "n_compared": 73733
+    },
+    "hours_count_equinox": {
+     "max_abs_diff": 0.0,
+     "mean_abs_diff": 0.0,
+     "n_compared": 73733
+    }
+   },
+   "max_abs_diff_any_column": 4.547473508864641e-13,
+   "within_tolerance": true,
+   "tolerance": 1e-09
+  }
+ },
+ "ground_status": "PASS",
+ "street_values_status": "PASS",
+ "expected_ground_coverage_ceiling_pct": 96.20201818323014,
+ "status": "PASS"
+}

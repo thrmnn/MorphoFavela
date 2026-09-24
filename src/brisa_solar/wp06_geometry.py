@@ -211,6 +211,20 @@ def main() -> int:
     ap.add_argument("--wp04-run-id", default="wp04_sites_20260914T230606Z", help="runs/<id>/<site>/ground.parquet")
     ap.add_argument("--run-dir", default=None, help="defaults to a fresh runs/wp06_geometry_<UTC>/ in --data-root")
     ap.add_argument("--sites", default=",".join(SITES))
+    ap.add_argument(
+        "--depth-median", type=float, default=None,
+        help="override pooled_depth_median (e.g. to reuse the canonical "
+             "5-site pooled value when --sites is a strict subset, so "
+             "constraint_lateral/exposure_ratio stay comparable to the "
+             "canonical run rather than being re-pooled over the subset)",
+    )
+    ap.add_argument(
+        "--out-name", default="per_patch_geometry.csv",
+        help="output CSV filename under outputs/<site>/geometry_indicators/ "
+             "(default unchanged — same file every prior invocation wrote). "
+             "A non-default name writes BESIDE the canonical file rather "
+             "than overwriting it.",
+    )
     args = ap.parse_args()
 
     data_root = Path(args.data_root)
@@ -220,14 +234,14 @@ def main() -> int:
     )
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    depth_median = pooled_depth_median(data_root, sites)
+    depth_median = args.depth_median if args.depth_median is not None else pooled_depth_median(data_root, sites)
 
     per_site_summary = {}
     for site in sites:
         table = build_site_table(data_root, args.wp04_run_id, site, depth_median)
         out_dir = data_root / "outputs" / site / "geometry_indicators"
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / "per_patch_geometry.csv"
+        out_path = out_dir / args.out_name
         table.to_csv(out_path, index=False)
 
         n = len(table)
@@ -247,7 +261,13 @@ def main() -> int:
     summary = {
         "_utc": _utc_now(),
         "status": "PROVISIONAL — depends on WP-05/G3 cards",
+        "wp04_run_id": args.wp04_run_id,
+        "out_name": args.out_name,
         "depth_median_m": depth_median,
+        "depth_median_source": (
+            "--depth-median override" if args.depth_median is not None
+            else f"pooled_depth_median over --sites={args.sites}"
+        ),
         "per_site": per_site_summary,
         "comparison_vs_ventilation_index": comparison,
     }
