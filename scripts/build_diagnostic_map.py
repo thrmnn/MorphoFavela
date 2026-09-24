@@ -42,6 +42,11 @@ from scipy.spatial import cKDTree
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
+#: Default for `site_paths`/`run_site`'s `root` argument — this checkout's
+#: own root. A worktree has no data/outputs of its own (SITETERR,
+#: 2026-09-24): pass the main checkout's absolute path via --root when
+#: running from one, same convention as scripts/build_site_territory.py.
+ROOT_DEFAULT = PROJECT_ROOT
 
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "maré", "riodaspedras"]
 SITE_DISPLAY = {
@@ -79,7 +84,7 @@ STATE_KEYS = {
 }
 
 
-def site_paths(site: str, study_area: bool = False) -> dict:
+def site_paths(site: str, study_area: bool = False, root: Path = ROOT_DEFAULT) -> dict:
     """`study_area=True` (Maré only) writes to `*_study_area` suffixed
     outputs instead of the default whole-data-extent ones, so the
     Maré-brief/site-sheet study-area recompute never overwrites the
@@ -87,21 +92,21 @@ def site_paths(site: str, study_area: bool = False) -> dict:
     report, manuscript figures, project hub)."""
     suffix = "_study_area" if study_area else ""
     return {
-        "grid": PROJECT_ROOT / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg",
-        "solar": PROJECT_ROOT
+        "grid": root / "outputs" / site / "morphometrics" / "grid" / "grid_metrics.gpkg",
+        "solar": root
         / "outputs"
         / site
         / "morphometrics"
         / "svf"
         / "svf_streets_solar.gpkg",
-        "bldg": PROJECT_ROOT / "data" / site / "buildings_extended_300m.gpkg",
-        "out_dir": PROJECT_ROOT / "outputs" / site / "paper_figures",
-        "out_png": PROJECT_ROOT
+        "bldg": root / "data" / site / "buildings_extended_300m.gpkg",
+        "out_dir": root / "outputs" / site / "paper_figures",
+        "out_png": root
         / "outputs"
         / site
         / "paper_figures"
         / f"fig_{site}_diagnostic_map{suffix}.png",
-        "out_stats": PROJECT_ROOT / "outputs" / site / "paper_figures" / f"diagnostic_stats{suffix}.json",
+        "out_stats": root / "outputs" / site / "paper_figures" / f"diagnostic_stats{suffix}.json",
     }
 
 
@@ -301,13 +306,13 @@ def render(site: str, grid: gpd.GeoDataFrame, state: np.ndarray, paths: dict,
     return stats
 
 
-def run_site(site: str, study_area: bool = False) -> dict:
-    """`study_area=True` (Maré only): filter the grid to the 16-community
-    study area (union ∩ data extent; src/brisa_solar/mare_study_area.py)
+def run_site(site: str, study_area: bool = False, root: Path = ROOT_DEFAULT) -> dict:
+    """`study_area=True` (Maré only): filter the grid to the active study
+    area (the IPP Territórios Sociais outline; src/brisa_solar/mare_study_area.py)
     before classifying, and write to the `*_study_area` suffixed outputs —
     the default whole-data-extent outputs (used by the technical report,
     manuscript figures, and the project hub) are left untouched."""
-    paths = site_paths(site, study_area=study_area)
+    paths = site_paths(site, study_area=study_area, root=root)
     for k in ("grid", "solar"):
         if not paths[k].exists():
             raise FileNotFoundError(f"[{site}] missing input: {paths[k]}")
@@ -319,7 +324,7 @@ def run_site(site: str, study_area: bool = False) -> dict:
         sa = msa.load_study_area()
         mask = msa.within_mask(grid["centroid_x"].to_numpy(), grid["centroid_y"].to_numpy(), sa["study_area"])
         grid = grid.loc[mask].reset_index(drop=True)
-        title_suffix = " — study area (16 communities ∩ data extent)"
+        title_suffix = " — study area (IPP Territórios Sociais outline)"
     grid = aggregate_solar_to_cells(grid, paths["solar"])
     state = classify(grid)
     return render(site, grid, state, paths, title_suffix=title_suffix)
@@ -330,10 +335,15 @@ def main() -> int:
     p.add_argument("--site", choices=SITES, help="single site to process")
     p.add_argument("--all", action="store_true", help="process every site")
     p.add_argument("--study-area", action="store_true",
-                    help="Maré only: filter to the 16-community study area "
-                    "(union of Redes da Maré's communities ∩ the site data "
-                    "extent) instead of the whole bairro; writes to "
-                    "*_study_area suffixed outputs, never the default ones")
+                    help="Maré only: filter to the active study area "
+                    "(the IPP Territórios Sociais outline) instead of the "
+                    "whole bairro; writes to *_study_area suffixed outputs, "
+                    "never the default ones")
+    p.add_argument("--root", type=Path, default=ROOT_DEFAULT,
+                    help="repo root to read data/outputs from and write "
+                         "outputs/<site>/paper_figures/ to (default: this "
+                         "checkout's own root — pass the main checkout's "
+                         "absolute path when running from a worktree)")
     args = p.parse_args()
 
     if not args.site and not args.all:
@@ -341,9 +351,10 @@ def main() -> int:
     if args.study_area and (args.all or args.site != "maré"):
         p.error("--study-area is only defined for --site maré")
 
+    root = args.root.resolve()
     sites = SITES if args.all else [args.site]
     for site in sites:
-        run_site(site, study_area=args.study_area)
+        run_site(site, study_area=args.study_area, root=root)
     return 0
 
 

@@ -94,18 +94,20 @@ sites:
       method: complexo_exact
       target: "Maré"
     study_area:
-      kind: subunits_union_in_extent
-      share_threshold: 0.5
+      kind: polygon_file
+      path: "maré/raw/ipp_territorios_sociais_territorio03.gpkg"
     study_area_candidates:
-      - id: ipp_territorios_sociais
-        kind: polygon_file
-        path: "maré/raw/ipp_territorios_sociais_territorio03.gpkg"
-        provenance_file: "maré/raw/ipp_territorios_sociais_territorio03.provenance.json"
-        label: "IPP Territórios Sociais — Complexo da Maré outline"
-        status: "candidate — not active. Contiguous IPP outline of the whole
-          complex (the 16-community union has interior gaps between
-          communities that this outline covers). Promotion to `study_area`
-          is a PI decision, not yet made; see definition_note below."
+      - id: communities_union_in_extent
+        kind: subunits_union_in_extent
+        share_threshold: 0.5
+        label: "Union of the 16 Redes da Maré communities ∩ data extent (the
+          study area until 2026-09-24)"
+        status: "history — superseded 2026-09-24 by the IPP Territórios
+          Sociais outline (PI ruling, resolved_decisions id
+          mare_site_study_area). Kept as a declared candidate so the old
+          definition stays reproducible, not because it is under
+          consideration again. Has interior gaps between communities that
+          the promoted outline covers ('between communities')."
     subunits:
       source: neighbourhoods_gpkg
       file: "maré/neighbourhoods.gpkg"
@@ -113,10 +115,18 @@ sites:
       provenance: "maré/neighbourhoods_provenance.json"
       name_field: community
     definition_note: >
-      Maré's study area (union of the 16 Redes da Maré communities inside the
-      data extent) differs from its citywide definition (the IPP
-      Favelas_Limit_2019 polygons under complexo "Maré") — open /ops card
-      mare_citywide_definition. A second candidate study area (the IPP
-      Territórios Sociais outline, see study_area_candidates) has also been
-      logged but not promoted.
+      Maré's study area = the IPP Territórios Sociais complex outline
+      (territory 03; PI ruling 2026-09-24, resolved_decisions id
+      mare_site_study_area) — a single contiguous polygon, not a union of
+      parts. Subunits = the 16 Redes da Maré communities; every study-area
+      point/cell gets exactly one subunit label, a community name or
+      "between communities" for study-area ground inside none of them
+      (open passageways/canals/open land within the outline). Citywide =
+      the 6 IPP Favelas_Limit_2019 polygons under complexo "Maré", pending
+      open /ops card mare_citywide_definition. Marcílio Dias (one of the 16
+      communities) lies outside the outline and outside the data extent —
+      excluded from the study area by geometry (its own area's share
+      inside the study area is 0.0), never by name. The previous study-area
+      definition (union of the 16 communities ∩ data extent) is kept as a
+      declared candidate/history entry, see study_area_candidates.
     display_rotation_deg: auto

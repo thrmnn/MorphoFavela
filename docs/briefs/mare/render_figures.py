@@ -215,10 +215,12 @@ def _render_all(outputs_root: Path, figures_dir: Path) -> list[dict]:
     data_root = outputs_root.parent / "data"
     wind_rose = json.loads((data_root / SITE / "wind_rose.json").read_text())
 
-    # Study-area clip (MAREBOUND): every map below covers the 16-community
-    # study area, matching mare_numbers.json's own counts, never the whole
-    # bairro. Community outlines drawn thin (BOUNDARY_STROKE_PX) for
-    # geographic orientation only — not a per-community comparison.
+    # Study-area clip (MAREBOUND): every map below covers the active study
+    # area (the IPP Territórios Sociais outline — communities plus the
+    # ground between them), matching mare_numbers.json's own counts, never
+    # the whole bairro. Community outlines drawn thin (BOUNDARY_STROKE_PX)
+    # for geographic orientation only — not a per-community comparison; the
+    # unfilled/unoutlined ground inside the clip is "between communities".
     sa = msa.load_study_area()
     grid = grid.loc[msa.within_mask(grid["centroid_x"].to_numpy(), grid["centroid_y"].to_numpy(), sa["study_area"])].reset_index(drop=True)
     seg_c = segments.geometry.centroid
@@ -233,7 +235,7 @@ def _render_all(outputs_root: Path, figures_dir: Path) -> list[dict]:
         "file": p.name, "class": "band-classed map, freshly rendered",
         "layers": ["lambda_p", "H_mean", "porosity", "svf"],
         "n_classes": 5, "basemap": False, "coordinate_ticks": False,
-        "source": "morphometrics/grid/grid_metrics.gpkg, study area (16 communities ∩ data extent)", **extra,
+        "source": "morphometrics/grid/grid_metrics.gpkg, study area (IPP Territórios Sociais outline)", **extra,
     })
 
     p = figures_dir / "fig_street_svf_map.png"
@@ -241,7 +243,7 @@ def _render_all(outputs_root: Path, figures_dir: Path) -> list[dict]:
     manifest.append({
         "file": p.name, "class": "band-classed map, freshly rendered",
         "layers": ["street_svf"], "n_classes": 5, "basemap": False,
-        "coordinate_ticks": False, "source": "svf_v2/svf_streets_segments.gpkg, study area (16 communities ∩ data extent)", **extra,
+        "coordinate_ticks": False, "source": "svf_v2/svf_streets_segments.gpkg, study area (IPP Territórios Sociais outline)", **extra,
     })
 
     p = figures_dir / "fig_distributions.png"

@@ -90,7 +90,7 @@ SITE_META = {
     ),
     "maré": dict(
         display="Maré",
-        subtitle="a north-zone low-rise grid, 15 of 16 recognised communities analysed, ~2 km²",
+        subtitle="a north-zone low-rise grid, 15 of 16 recognised communities analysed, ~3.4 km²",
         typology="Dense low-rise grid",
         boundary_shp="data/maré/raw/mare_boundary.shp",
         atoms_subdir="maré",
@@ -420,10 +420,15 @@ def write_footprint(boundary: Optional[gpd.GeoDataFrame], out_path: Path) -> boo
 
 
 def write_communities_geojson(communities: Optional[gpd.GeoDataFrame], out_path: Path) -> bool:
-    """Maré only: the study-area outline (16 communities, minus Marcílio
-    Dias — src/brisa_solar/mare_study_area.py), one `name` property per
-    feature straight from the gpkg (never typed), for the map's thin
-    outline layer + hover tooltip (JS_MAP's `communityLayer`)."""
+    """Maré only: the 16 named communities recognised by Redes da Maré,
+    minus Marcílio Dias (outside the active study area — see
+    src/brisa_solar/mare_study_area.py), one `name` property per feature
+    straight from the gpkg (never typed), for the map's thin outline layer
+    + hover tooltip (JS_MAP's `communityLayer`). This is context, not the
+    study area's own boundary any more (config/sites.yaml maré.study_area
+    is the IPP Territórios Sociais outline, which also covers ground
+    between these communities — "between communities" — that this layer
+    leaves unoutlined/unfilled by design)."""
     if communities is None or len(communities) == 0:
         return False
     c = communities.to_crs(epsg=4326)
@@ -516,11 +521,12 @@ def build_site(site: str) -> dict:
     communities = None
     if has_subunit_study_area(site):
         # Registry-driven (config/sites.yaml, src/sites/territory.py): a
-        # site whose study_area.kind is subunits_union_in_extent (today,
-        # only Maré) counts only observers/segments inside that subunit
-        # union ∩ data extent in every stat below, not the whole boundary.
-        # `boundary` itself is passed to compute_site_stats untouched — see
-        # the comment above.
+        # site with a genuinely separate study area boundary + declared
+        # subunits (today, only Maré — the promoted IPP Territórios Sociais
+        # outline) counts only observers/segments inside the active study
+        # area in every stat below, not the whole boundary. `boundary`
+        # itself is passed to compute_site_stats untouched — see the
+        # comment above.
         sa = msa.load_study_area()
         communities = sa["included"]
         obs_in_area = msa.within_mask(obs.geometry.x.to_numpy(), obs.geometry.y.to_numpy(), sa["study_area"])
@@ -1487,13 +1493,17 @@ JS_MAP = r"""
       map.fitBounds(fpLayer.getBounds());
     }
 
-    // Maré only: the study-area community outline (16 communities minus
-    // Marcílio Dias, which lies outside the analysed extent — see
+    // Maré only: the named-community outlines (16 communities minus
+    // Marcílio Dias, which lies outside the active study area — see
     // src/brisa_solar/mare_study_area.py). Thin stroke (weight 1, half the
     // footprint's) so it reads as context, not a second boundary competing
     // with the data-extent outline above; name on hover, never printed on
     // the map itself (this is the interactive twin's answer to "one panel
-    // gets the names" on the static sheet).
+    // gets the names" on the static sheet). The study area itself (the IPP
+    // Territórios Sociais outline) is wider than the union of these
+    // community outlines — ground between them ("between communities")
+    // still counts in every stat, but is left unoutlined/unfilled here by
+    // design, same as the static territory map.
     try {
       const commResp = await fetch('data/communities.geojson');
       if(commResp.ok){
@@ -2338,9 +2348,9 @@ def main():
             area_override = None
             if has_subunit_study_area(s):
                 # Keep the landing-page tile consistent with the per-site
-                # page below — both must report the study area, not the
-                # whole boundary, for a site whose study_area.kind is
-                # subunits_union_in_extent (config/sites.yaml). bnd stays
+                # page below — both must report the active study area, not
+                # the whole boundary, for a site with a genuinely separate
+                # study area boundary (config/sites.yaml). bnd stays
                 # unfiltered.
                 sa = msa.load_study_area()
                 obs_in_area = msa.within_mask(obs.geometry.x.to_numpy(), obs.geometry.y.to_numpy(), sa["study_area"])

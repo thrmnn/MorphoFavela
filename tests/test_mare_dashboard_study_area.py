@@ -185,7 +185,12 @@ def test_js_map_has_community_outline_layer_with_hover_tooltip():
 
 def test_mare_site_meta_subtitle_has_no_stale_four_km2():
     # Pre-MAREBOUND subtitle said "~4 km²" (the whole bairro); the
-    # analysed extent is now ~2 km² (16-community study area).
+    # analysed extent is now ~3.4 km² (the IPP Territórios Sociais
+    # outline, promoted 2026-09-24 — bigger than the retired
+    # union-of-communities definition's ~2 km², since the outline covers
+    # ground between communities too). Checks the exact stale phrase, not
+    # a bare "4 km" substring — the new correct value "~3.4 km²" itself
+    # contains "4 km" as a substring.
     subtitle = bhd.SITE_META["maré"]["subtitle"]
-    assert "4 km" not in subtitle
+    assert "~4 km" not in subtitle
     assert "15 of 16" in subtitle

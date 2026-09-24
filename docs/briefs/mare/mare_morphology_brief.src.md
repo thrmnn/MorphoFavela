@@ -14,14 +14,18 @@ at what resolution, and what the PI can share. It is not a results paper —
 it is an inventory, written for researchers deciding whether and how to
 build on this morphological base.
 
-*Study area: the union of the ${mare_study_area_n_communities_total}
-communities recognised by Redes da Maré (boundary polygons: Prefeitura do
-Rio de Janeiro SABREN favela limits (2022) and conjuntos habitacionais,
+*Study area: the IPP Territórios Sociais outline of Complexo da Maré
+(Prefeitura do Rio de Janeiro / IPP) — a single contiguous
+polygon covering the ${mare_study_area_n_communities_total} communities
+recognised by Redes da Maré (boundary polygons: Prefeitura do Rio de
+Janeiro SABREN favela limits (2022) and conjuntos habitacionais,
 ${mare_study_area_n_inferred_matches} of ${mare_study_area_n_communities_total}
-name matches inferred rather than exact). ${mare_study_area_excluded_name}
-lies outside the analysed extent and is excluded from every figure and
-count below; the remaining ${mare_study_area_n_communities_included}
-communities make up the ${mare_study_area_km2} km² reported throughout.*
+name matches inferred rather than exact) plus the ground between them —
+streets, canals, open land inside the complex, not attributed to any one
+community. ${mare_study_area_excluded_name} lies outside the outline and
+is excluded from every figure and count below; the remaining
+${mare_study_area_n_communities_included} communities, plus the ground
+between them, make up the ${mare_study_area_km2} km² reported throughout.*
 
 ## Maré at a glance
 
@@ -82,13 +86,14 @@ Median porosity on built cells is ${mare_porosity_median} (IQR
 ${mare_porosity_iqr_lo}–${mare_porosity_iqr_hi}).
 
 The high all-cell λp median reflects the study area itself, not the whole
-bairro: restricted to Redes da Maré's ${mare_study_area_n_communities_included}
-community footprints, most grid cells fall on or immediately next to a
-building, whereas the bairro's open land, canals, and low-density fringes
-(outside every one of the ${mare_study_area_n_communities_total} communities) are excluded from the figure
-entirely rather than folded in and pulling it down. The low built-cell
-porosity is consistent with this: large, near-saturated housing-project
-block interiors dominate the study area's built fabric.
+bairro: restricted to the IPP Territórios Sociais outline (Redes da Maré's
+${mare_study_area_n_communities_included} communities plus the ground
+between them), most grid cells fall on or immediately next to a building,
+whereas the bairro's open land and low-density fringes outside the
+outline are excluded from the figure entirely rather than folded in and
+pulling it down. The low built-cell porosity is consistent with this:
+large, near-saturated housing-project block interiors dominate the study
+area's built fabric.
 
 ![Distributions of λp, mean height, SVF (grid), and street-level SVF (segments) across Maré, as histograms.](figures/fig_distributions.png)
 
@@ -159,8 +164,8 @@ campaign, distinguished among them by its scale and by the near-uniform
 block interiors of its planned-housing sections. This section positions
 Maré within that typology; it is not a ranking of the five sites. Unlike
 the rest of this brief, the composition below covers Maré's whole analysed
-data extent (the bairro), not the ${mare_study_area_n_communities_included}-community
-study area — the underlying fabric-cluster fit is shared across all five
+data extent (the bairro), not the study area (the IPP Territórios Sociais
+outline) — the underlying fabric-cluster fit is shared across all five
 campaign sites and is not re-run per community.
 
 ${morphotype_composition}
