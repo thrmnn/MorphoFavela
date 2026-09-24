@@ -202,6 +202,13 @@ def render_wind_rose(wind_rose: dict, out_path: Path) -> dict:
 
 
 def render_all(outputs_root: Path, figures_dir: Path) -> list[dict]:
+    # The brief's page count depends on figure size and fonts, so it must not
+    # inherit whatever style another module left in this process.
+    with matplotlib.rc_context(matplotlib.rcParamsDefault):
+        return _render_all(outputs_root, figures_dir)
+
+
+def _render_all(outputs_root: Path, figures_dir: Path) -> list[dict]:
     figures_dir.mkdir(parents=True, exist_ok=True)
     grid = gpd.read_file(outputs_root / SITE / "morphometrics" / "grid" / "grid_metrics.gpkg")
     segments = gpd.read_file(outputs_root / SITE / "svf_v2" / "svf_streets_segments.gpkg")
