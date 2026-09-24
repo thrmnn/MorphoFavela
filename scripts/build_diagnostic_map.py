@@ -40,16 +40,8 @@ from matplotlib import patches as mpatches
 from matplotlib.colors import BoundaryNorm, ListedColormap
 from scipy.spatial import cKDTree
 
-# Hardcoded, not Path(__file__).resolve().parents[1]: this script also runs
-# from a git worktree that has no data/outputs/ of its own (same rationale
-# as scripts/build_site_dashboard.py, scripts/build_html_dashboard.py) — it
-# always reads/writes the one main checkout's data/outputs regardless of
-# which checkout's copy of this file is running. sys.path, unlike
-# PROJECT_ROOT, uses the RUNNING checkout's own root (whichever it is) so
-# `import src...` resolves that checkout's own src/ tree (e.g. a module
-# added on a worktree branch, not yet merged to the main checkout).
-PROJECT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 SITES = ["vidigal", "rocinha", "complexo_do_alemao", "maré", "riodaspedras"]
 SITE_DISPLAY = {
