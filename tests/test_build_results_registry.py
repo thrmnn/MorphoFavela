@@ -133,17 +133,34 @@ def test_skipped_figure_is_draft_and_gets_no_current_alias(env):
     assert "art:wp07_figures::current::f2_skipped" not in reg["nodes"]
 
 
-def test_unclassified_excludes_hub_and_review_mirrors(env):
+def test_unclassified_excludes_only_hash_matched_hub_review_mirrors(env):
+    """figure_organization_spec.md §1 exempts a HASH MATCH under
+    outputs/_hub/**/outputs/_review/** as a copy of a registered original —
+    it does not exempt the whole directory. A file there with unique
+    content (no registered artifact shares its hash) is real,
+    unregistered content and must surface as unclassified, never be
+    silently dropped (organization_charter.md: 'a figure with no register
+    row is shown as unclassified, never hidden'). Regression test for the
+    O2 verifier finding: the round-1 fix blanket-excluded EXCLUDED_TOP_DIRS
+    regardless of hash, hiding 9 real files on the live repo."""
     config = env["config"]
     outputs = env["outputs"]
-    _write(config / "work_packages.yaml", yaml.dump(_wp_yaml({})))
-    _write(outputs / "_hub" / "docs" / "explainer.png")
-    _write(outputs / "_review" / "2026-09-17" / "x.png")
-    _write(outputs / "orphan_dir" / "mystery.png")
+    _write(config / "work_packages.yaml",
+           yaml.dump(_wp_yaml({"p1_exports": {"static_root": "outputs/paper_figures/exports"}})))
+    _write(outputs / "paper_figures" / "exports" / "fig01_composite.png", "registered content")
+
+    # genuine copy of the registered artifact -> excluded (hash matches)
+    _write(outputs / "_hub" / "mirror" / "fig01_composite.png", "registered content")
+    # real, unique content under an otherwise-mirror dir -> NOT excluded
+    _write(outputs / "_hub" / "docs" / "explainer.png", "unique explainer content")
+    _write(outputs / "_review" / "2026-09-17" / "x.png", "unique review content")
+    _write(outputs / "orphan_dir" / "mystery.png", "unique orphan content")
 
     reg = brr.build()
-    assert reg["unclassified"]["count"] == 1
-    assert reg["unclassified"]["by_folder"] == {"orphan_dir": 1}
+    assert reg["unclassified"]["count"] == 3
+    assert reg["unclassified"]["by_folder"] == {
+        "_hub/docs": 1, "_review/2026-09-17": 1, "orphan_dir": 1,
+    }
 
 
 def test_orphan_run_family_reported(env):

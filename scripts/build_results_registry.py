@@ -95,13 +95,19 @@ TASKS_JSON = BRISA / "shared" / "facts" / "tasks.json"
 
 IMG_EXTS = (".png", ".svg")
 RUN_SUFFIX_RE = re.compile(r"_(\d{8}T\d{6}Z)$")
-# Dirs that are generated mirrors/aggregators of figures placed elsewhere
-# under outputs/ (figure_organization_spec.md §1: "Hash matches under
-# outputs/_hub/** and outputs/_review/** are copies") or internal/superseded
-# package snapshots — walking them as unclassified originals would
-# double-count. Real copy-merging (`copies[]`) is charter §6 / O8 (cleanup),
-# out of scope for O2; for now these paths are excluded from both placed and
-# unclassified counts, same treatment as the round-1/2/3 prototype.
+# Dirs that MAY contain generated mirrors/aggregators of figures placed
+# elsewhere under outputs/ (figure_organization_spec.md §1: "Hash matches
+# under outputs/_hub/** and outputs/_review/** are copies") or
+# internal/superseded package snapshots. The spec's exemption is scoped to
+# actual hash matches, not the whole directory — "Anything else goes to
+# unclassified." A file under one of these dirs is therefore only skipped
+# from the unclassified walk when its content hash matches a real,
+# already-registered artifact (see `_content_matches_a_placed_artifact`
+# below); a file here with unique content (no registered original) is real,
+# unaccounted-for content and must surface as unclassified like anything
+# else — never silently dropped (organization_charter.md: "a figure with no
+# register row is shown as unclassified, never hidden"). Real copy-merging
+# (`copies[]`) is charter §6 / O8 (cleanup), out of scope for O2.
 EXCLUDED_TOP_DIRS = {"_hub", "_review"}
 EXCLUDED_SUBSTRINGS = ("/_packages/_internal/",)
 
@@ -403,6 +409,14 @@ def build(*, verbose: bool = False) -> dict:
     orphan_run_families = sorted(set(runs_by_family) - declared_families)
 
     # ---- unclassified ---------------------------------------------------
+    # A hash match under an EXCLUDED_TOP_DIRS/EXCLUDED_SUBSTRINGS path is a
+    # genuine copy of an already-registered artifact and is legitimately
+    # skipped; anything else there is real, unregistered content and must
+    # be counted (see the EXCLUDED_TOP_DIRS docstring above).
+    placed_hashes: set[str] = {
+        n["content_hash"] for n in nodes.values()
+        if n.get("kind") == "figure" and n.get("content_hash")
+    }
     unclassified_by_folder: dict[str, int] = defaultdict(int)
     unclassified_total = 0
     if OUTPUTS.is_dir():
@@ -410,9 +424,9 @@ def build(*, verbose: bool = False) -> dict:
             if not f.is_file() or f.suffix.lower() not in IMG_EXTS:
                 continue
             rel = _posix(f)
-            if _is_excluded(rel):
-                continue
             if rel in placed_paths:
+                continue
+            if _is_excluded(rel) and _sha256(f) in placed_hashes:
                 continue
             parts = Path(rel).parts  # outputs/<top>/<sub>/.../<file>
             # Two levels when the file sits at least that deep (parts[1:3]
