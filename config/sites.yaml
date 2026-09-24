@@ -1,0 +1,122 @@
+# SITETERR registry — the one declared, reviewable territory per campaign site.
+# PI-approved 2026-09-24. A site's boundary used to be defined in six places
+# (src/svf_v2/paths.py, scripts/build_html_dashboard.py, this file's
+# predecessor config/zoom_windows.yaml, src/brisa_solar/wp05_full.py's
+# match_favela_group, src/brisa_solar/mare_study_area.py, data/maré/*) and
+# Maré's silently differed from its citywide definition for months. Loader:
+# src/sites/territory.py. Build: scripts/build_site_territory.py.
+#
+# Field meanings:
+#   data_extent    — the file buildings/DTM are actually clipped to (path
+#                     relative to data/). This is what near_boundary /
+#                     edge-halo logic must keep measuring against.
+#   citywide_rule  — how the site is found in data/RJ/Favelas_Limit_2019.shp:
+#                     method is complexo_exact or nome_exact (the same
+#                     two-tier order src.brisa_solar.wp05_full.match_favela_group
+#                     already tries), target is the value matched. The loader
+#                     calls match_favela_group itself (not a reimplementation)
+#                     so the matched polygons are identical by construction;
+#                     `method` here is the declared/expected tier, asserted
+#                     against what match_favela_group actually reports.
+#   study_area     — how the reviewable/statistics boundary is built:
+#                       citywide_polygons        -> union(citywide_rule's match)
+#                       subunits_union_in_extent -> union(subunits whose own
+#                                                    area share inside
+#                                                    data_extent >=
+#                                                    share_threshold) ∩ data_extent
+#                       polygon_file              -> union(features in `path`)
+#                     share_threshold only applies to subunits_union_in_extent.
+#   study_area_candidates — declared alternative study-area definitions not
+#                     yet promoted to `study_area` (PI must confirm before a
+#                     switch). Never used by any consumer; recorded for the
+#                     territory review page and territory_provenance.json only.
+#   subunits       — source + provenance for named parts of the site (null
+#                     for Vidigal/Rocinha: each is one polygon, "Isolada").
+#   definition_note — required when study_area and citywide_rule describe
+#                     different boundaries; names the open /ops card.
+#   display_rotation_deg: auto -> computed by src.sites.territory.rotation_deg
+#                     from the study area's minimum rotated rectangle; never
+#                     typed here.
+
+sites:
+  vidigal:
+    display_name: Vidigal
+    data_extent: vidigal/raw/Vidigal_Limit.shp
+    citywide_rule:
+      method: nome_exact
+      target: Vidigal
+    study_area:
+      kind: citywide_polygons
+    subunits: null
+    display_rotation_deg: auto
+
+  rocinha:
+    display_name: Rocinha
+    data_extent: rocinha/raw/rocinha_boundary.shp
+    citywide_rule:
+      method: nome_exact
+      target: Rocinha
+    study_area:
+      kind: citywide_polygons
+    subunits: null
+    display_rotation_deg: auto
+
+  complexo_do_alemao:
+    display_name: "Complexo do Alemão"
+    data_extent: complexo_do_alemao/raw/complexo_do_alemao_boundary.shp
+    citywide_rule:
+      method: complexo_exact
+      target: "Complexo do Alemão"
+    study_area:
+      kind: citywide_polygons
+    subunits:
+      source: favelas_limit_2019_by_complexo
+      name_field: nome
+    display_rotation_deg: auto
+
+  riodaspedras:
+    display_name: "Rio das Pedras"
+    data_extent: riodaspedras/raw/riodaspedras_boundary.shp
+    citywide_rule:
+      method: complexo_exact
+      target: "Rio das Pedras"
+    study_area:
+      kind: citywide_polygons
+    subunits:
+      source: favelas_limit_2019_by_complexo
+      name_field: nome
+    display_rotation_deg: auto
+
+  maré:
+    display_name: "Maré"
+    data_extent: "maré/raw/mare_boundary.shp"
+    citywide_rule:
+      method: complexo_exact
+      target: "Maré"
+    study_area:
+      kind: subunits_union_in_extent
+      share_threshold: 0.5
+    study_area_candidates:
+      - id: ipp_territorios_sociais
+        kind: polygon_file
+        path: "maré/raw/ipp_territorios_sociais_territorio03.gpkg"
+        provenance_file: "maré/raw/ipp_territorios_sociais_territorio03.provenance.json"
+        label: "IPP Territórios Sociais — Complexo da Maré outline"
+        status: "candidate — not active. Contiguous IPP outline of the whole
+          complex (the 16-community union has interior gaps between
+          communities that this outline covers). Promotion to `study_area`
+          is a PI decision, not yet made; see definition_note below."
+    subunits:
+      source: neighbourhoods_gpkg
+      file: "maré/neighbourhoods.gpkg"
+      layer: communities
+      provenance: "maré/neighbourhoods_provenance.json"
+      name_field: community
+    definition_note: >
+      Maré's study area (union of the 16 Redes da Maré communities inside the
+      data extent) differs from its citywide definition (the IPP
+      Favelas_Limit_2019 polygons under complexo "Maré") — open /ops card
+      mare_citywide_definition. A second candidate study area (the IPP
+      Territórios Sociais outline, see study_area_candidates) has also been
+      logged but not promoted.
+    display_rotation_deg: auto
