@@ -730,9 +730,15 @@ def _territory_site_html(site: str, display: str, tp: dict) -> str:
                     f'alt="{html.escape(display)} territory map" '
                     f'onclick="event.preventDefault();zoom(\'{img}\',\'{_pz_js_attr(display)}\')">')
 
+    site_page = ROOT / "outputs" / "_hub" / "sites" / f"{site}.html"
+    site_page_html = (f'<p><a href="{os.path.relpath(site_page, OUT)}">Site page — '
+                      f'deliverables, decisions, current artifacts →</a></p>'
+                      if site_page.exists() else "")
+
     return f"""
     <section>
       <h2 id="site-{_slug_ascii(site)}">{html.escape(display)}</h2>
+      {site_page_html}
       <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
         <div style="flex:0 0 auto">{img_html}</div>
         <div style="flex:1 1 320px;min-width:280px">
@@ -802,16 +808,33 @@ def territory_section(prov):
 
 
 def sites_section(prov):
+    # O6 (figure_organization_spec.md §3): "The hub's #sites cards link to
+    # these pages" — scripts/build_site_pages.py's outputs/_hub/sites/<site>.html
+    # is the campaign card's destination (deliverables + decisions + current-
+    # artifact rows for that site); the interactive dashboard itself becomes
+    # that page's "Dashboard" product slot, one hop further, rather than the
+    # card's own href. Calibration sites (no sites.yaml entry, no site page)
+    # keep linking straight to their dashboard as before.
     cards = []
     for s in CAMPAIGN + [s for s in SITE_NAMES if s not in CAMPAIGN]:
         idx = DASH / s / "index.html"
-        if idx.exists():
-            camp = s in CAMPAIGN
+        camp = s in CAMPAIGN
+        site_page = OUT / "sites" / f"{s}.html"
+        if camp and site_page.exists():
+            cards.append(card(SITE_NAMES[s], "Deliverables, open decisions and current artifacts for this site.",
+                              os.path.relpath(site_page, OUT),
+                              kind="ok", badge_label="Campaign"))
+        elif idx.exists():
             tag = "campaign site" if camp else "calibration site"
             cards.append(card(SITE_NAMES[s], f"Interactive per-favela dashboard — {tag}.",
                               os.path.relpath(idx, OUT),
                               kind="ok" if camp else "info",
                               badge_label="Campaign" if camp else "Calibration"))
+    sites_index = OUT / "sites" / "index.html"
+    if sites_index.exists():
+        cards.append(card("All site pages",
+                          "Every campaign site's own page in one list.",
+                          os.path.relpath(sites_index, OUT), kind="info"))
     if (DASH / "index.html").exists():
         cards.append(card("All sites — interactive index",
                           "Combined dashboard index for every favela.",
