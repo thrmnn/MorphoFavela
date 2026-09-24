@@ -156,6 +156,50 @@ These geometric tendencies are a pre-simulation prioritisation surface, not
 a ventilation verdict. A wind-simulation study of two Maré patches is a
 parked companion track with no results to report at this time.
 
+## Maré's communities
+
+Redes da Maré recognises ${mare_subunit_n_communities} communities within
+the study area; MorphoFavela's grid and the study-area sun/sky run
+(${mare_subunit_wp04_run}) can both be labelled by which community each
+cell or sample point falls in
+(src.sites.territory.label_subunits), including the streets, canals, and
+open ground between communities that the study area counts but no single
+community claims ("between communities"). The panel and table below break
+the site-wide figures above down to that resolution — density, height,
+footprint, sky view, winter sun, and annual irradiation, one row per
+community, ordered north to south by each community's mean grid-cell
+position. This is a geographic ordering, not a ranking: no row is
+privileged over another, and the two housing-project communities and the
+older, denser communities are described side by side rather than
+contrasted as better or worse.
+
+![Per-community morphology, one bar-chart column per indicator, rows ordered north to south.](figures/fig_subunit_small_multiples.png)
+
+${mare_subunit_table}
+
+### A Maré-internal fabric grouping
+
+"Maré among the five campaign sites", below, describes the campaign's
+fabric-vector clustering, fit once across all five sites and applied here —
+one cluster accounts for ${mare_campaign_dominant_share_pct}% of Maré's
+built cells, because that fit has to separate Maré's fabric from four other
+settlements' fabric at the same time, not because Maré's own fabric is
+undifferentiated. Refitting the same clustering method restricted to
+Maré's own ${mare_fabric_within_n_cells} built cells only — never pooled
+with the other four sites, and with k chosen freshly rather than
+inherited — gives a different picture:
+
+${mare_fabric_within_composition}
+
+The largest Maré-internal group holds ${mare_fabric_within_dominant_share_pct}%
+of built cells, well below the campaign fit's ${mare_campaign_dominant_share_pct}%,
+which is expected: a fit run only on Maré is free to resolve distinctions
+within Maré's fabric that a five-site fit spends its clusters separating
+sites instead. Both fits are legitimate for what they each answer — the
+campaign fit for "where does Maré's fabric sit among the five sites",
+this one for "how much internal variation does Maré's own fabric have" —
+and neither supersedes the other.
+
 ## Maré among the five campaign sites
 
 MorphoFavela's five-site campaign spans hillside and flatland informal

@@ -20,6 +20,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
+import pandas as pd
 import weasyprint
 
 import collect_numbers
@@ -155,6 +156,16 @@ img {{
 figure {{
   margin: 0.5em 0;
   counter-increment: brief-figure;
+  /* Keeps a figure's image and caption from splitting across a page break
+     (they are two separate boxes without this). The actual fix for the
+     2026-09 page-break audit's blank tails (pp. 3-4: ~2/3 of the page
+     empty below a short intro paragraph) is render_figures.py's figure
+     heights — an oversized image is a replaced element weasyprint cannot
+     split, so one that doesn't fit the remaining page gets pushed whole to
+     the next page, leaving the gap behind; shrinking the two tallest
+     figures (built-form maps, distributions) was what let the intro
+     paragraph and its figure fit on the same page instead. */
+  page-break-inside: avoid;
 }}
 figcaption {{ font-size: 7.5pt; color: #555; text-align: center; padding: 0 4mm; }}
 figcaption::before {{
@@ -191,6 +202,18 @@ h2:nth-of-type(2) + table td:last-child {{
 }}
 h2:nth-of-type(2) + table td:first-child {{ width: 60%; }}
 h2:nth-of-type(2) + table td:last-child {{ width: 40%; }}
+
+/* per-community table: 10 narrow numeric columns, smaller font than the
+   other body tables so the community-name column stays legible */
+table.subunit-table {{
+  font-size: 7pt;
+}}
+table.subunit-table th, table.subunit-table td {{
+  padding: 2px 4px;
+}}
+table.subunit-table th:first-child, table.subunit-table td:first-child {{
+  width: 19%;
+}}
 
 /* data-inventory table: fixed column widths so no header wraps ragged */
 h2:nth-of-type(3) + table {{ table-layout: fixed; }}
@@ -274,6 +297,61 @@ def _morphotype_composition_md(numbers_by_id: dict, named_morphotypes: bool) -> 
     return f"{intro_and_table}\n\n{narrative}"
 
 
+SUBUNIT_TABLE_COLUMNS = [
+    ("name", "Community", "text"),
+    ("n_cells", "Cells", "int"),
+    ("lambda_p_median", "λp", "float"),
+    ("far_median", "FAR", "float"),
+    ("H_mean_median", "H̄ (m)", "float"),
+    ("sigma_h_median", "σH (m)", "float"),
+    ("porosity_median", "Porosity", "float"),
+    ("svf_median", "SVF", "float"),
+    ("sun_winter_median_h", "Winter sun (h)", "float"),
+    ("kwh_m2_median", "Annual irrad. (kWh/m²)", "float"),
+]
+
+
+def _subunit_table_md(subunits_csv: Path) -> str:
+    """Render mare_subunits.csv (collect_numbers._subunits) as one HTML
+    table, row order preserved as written (north to south, never resorted
+    by value)."""
+    df = pd.read_csv(subunits_csv)
+    header = "".join(f"<th>{label}</th>" for _, label, _ in SUBUNIT_TABLE_COLUMNS)
+    body_rows = []
+    for _, r in df.iterrows():
+        cells = []
+        for col, _, kind in SUBUNIT_TABLE_COLUMNS:
+            cells.append(f"<td>{format_entry({'kind': kind, 'value': r[col]})}</td>")
+        body_rows.append(f"<tr>{''.join(cells)}</tr>")
+    return (
+        '<div class="keep-together">\n<table class="subunit-table">\n'
+        f"<thead><tr>{header}</tr></thead>\n"
+        "<tbody>\n" + "\n".join(body_rows) + "\n</tbody>\n</table>\n</div>"
+    )
+
+
+def _fabric_within_composition_md(numbers_by_id: dict) -> str:
+    clusters = json.loads((HERE / "mare_fabric_within.json").read_text())
+    rows = []
+    for group_id, pct in sorted(clusters["shares_pct"].items(), key=lambda kv: int(kv[0])):
+        rows.append(f"<tr><td>Fabric group {int(group_id) + 1}</td><td>{format_entry({'kind': 'percent', 'value': pct})}%</td></tr>")
+    table = (
+        '<div class="keep-together">\n<table>\n'
+        '<colgroup><col style="width:55%"><col style="width:45%"></colgroup>\n'
+        "<thead><tr><th>Group</th><th>Share of built cells</th></tr></thead>\n"
+        "<tbody>\n" + "\n".join(rows) + "\n</tbody>\n</table>\n</div>"
+    )
+    bic_note = (
+        "BIC does not settle to an interior minimum over the tested range "
+        "(k = 2–8, matching the campaign fit's own range) — it decreases "
+        "monotonically, so a plain minimum would just report the range's upper "
+        "bound. k is instead chosen by the geometric elbow of the BIC curve."
+        if clusters["bic_monotonic"] else
+        f"BIC is minimised at k = {clusters['bic_argmin_k']} over the tested range (k = 2–8)."
+    )
+    return f"{table}\n\n{bic_note}"
+
+
 def fill_template(numbers_by_id: dict, named_morphotypes: bool = False) -> str:
     template = string.Template(SRC_MD.read_text())
     mapping = {
@@ -282,6 +360,8 @@ def fill_template(numbers_by_id: dict, named_morphotypes: bool = False) -> str:
         if id_ != UNFILLED_ID
     }
     mapping["morphotype_composition"] = _morphotype_composition_md(numbers_by_id, named_morphotypes)
+    mapping["mare_subunit_table"] = _subunit_table_md(HERE / "mare_subunits.csv")
+    mapping["mare_fabric_within_composition"] = _fabric_within_composition_md(numbers_by_id)
 
     class _KeepUnfilled(dict):
         def __missing__(self, key):
@@ -376,7 +456,8 @@ def build(outputs_root: Path, named_morphotypes: bool = False) -> int:
     NUMBERS_JSON.write_text(json.dumps(by_id, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
     print(f"build_brief: collected {len(by_id)} numbers -> {NUMBERS_JSON}")
 
-    manifest = render_figures.render_all(outputs_root, FIGURES_DIR)
+    subunit_table = pd.read_csv(HERE / "mare_subunits.csv")
+    manifest = render_figures.render_all(outputs_root, FIGURES_DIR, subunit_table=subunit_table)
     MANIFEST_JSON.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
     print(f"build_brief: rendered {len(manifest)} figures -> {FIGURES_DIR}")
 

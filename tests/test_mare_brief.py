@@ -75,6 +75,7 @@ ALLOWED_FIGURE_CLASSES_PREFIXES = (
     "distribution (histogram), freshly rendered",
     "wind rose, freshly rendered",
     "publishable (already band-classed",
+    "small multiples (per-community panel), freshly rendered",
 )
 
 
@@ -101,7 +102,7 @@ PLACEHOLDER_RE = re.compile(r"\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 # Placeholders filled by build_brief.fill_template() from computed markdown
 # (e.g. the morphotype table + narrative, which differs by --named-morphotypes)
 # rather than directly from a mare_numbers.json entry.
-SYNTHESISED_PLACEHOLDERS = {"morphotype_composition"}
+SYNTHESISED_PLACEHOLDERS = {"morphotype_composition", "mare_subunit_table", "mare_fabric_within_composition"}
 
 
 def test_a_all_placeholders_resolve(built):
