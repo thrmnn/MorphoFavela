@@ -31,5 +31,24 @@ def test_provenance_note_states_run_of_record_and_release_status():
     assert "PI review" in note
 
 
+def test_provenance_note_glosses_the_stats_terms_the_panels_use():
+    # round-2/3 council finding: decile/IQR/length-weighted appear on the
+    # panels with no other gloss anywhere on a print page (no hover the
+    # way the interactive twin's <dfn> tooltips have) — this note is where
+    # FOLHA4 puts the plain-language definitions.
+    note = mid.provenance_note({"run_of_record": "wp05_full_20260101T000000Z"})
+    assert "decile" in note
+    assert "interquartile range" in note
+    assert "length-weighted" in note
+
+
+def test_draw_distributions_top_and_bottom_are_split_out():
+    # FOLHA4's hero/no-hero variants call these directly (not the combined
+    # draw_distributions wrapper) so the host sheet can place its own
+    # fixed-ratio spacer between them — see build_site_dashboard.py.
+    assert callable(mid.draw_distributions_top)
+    assert callable(mid.draw_distributions_bottom)
+
+
 def test_between_label_is_the_module_constant_not_a_retyped_string():
     assert mid.BETWEEN == "between communities"
