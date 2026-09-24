@@ -617,6 +617,28 @@ def render_site_html(site: str, stats: dict) -> str:
     site_display = stats["site_display"]
     typology = stats["typology"]
 
+    # FOLHA4 (round 1, 2026-09-23) added a per-favela decile-share and
+    # per-community percentile-spread analysis to the print sheet
+    # (scripts/build_site_dashboard.py::build_folha4_mare) that this
+    # interactive twin has never gained a code path for — the Distribution
+    # section below still only shows the generic cross-site SVF histogram.
+    # Round-2/3 council review (both seats) flagged this as a
+    # PI-review-blocking gap: shipping both surfaces to the PI without
+    # saying so lets them look like two disagreeing "Maré" artifacts. This
+    # banner is the interim fix (explicit caveat rather than full parity,
+    # which is out of this round's scope); remove it once this page grows
+    # the definitions-A/E and per-community panels.
+    folha4_parity_note = ""
+    if site == "maré":
+        folha4_parity_note = (
+            '<div class="callout-caveat" role="note">'
+            '<strong>Not yet updated:</strong> the print sheet (Folha de Rua, linked at the bottom of '
+            'this page) adds a per-favela decile-share and per-community percentile-spread analysis '
+            'that this interactive view does not show yet — the histogram below is the older, '
+            'site-only SVF view. Treat the print sheet as the current word on those two panels.'
+            '</div>'
+        )
+
     def kpi(label, value, anchor, lineage_key, fmt=None, extra_html=""):
         l = stats["lineage"].get(lineage_key, {})
         formula = l.get("formula", "")
@@ -771,7 +793,7 @@ def render_site_html(site: str, stats: dict) -> str:
         f'(<dfn data-term="SVF">SVF</dfn>) and how much sun reaches it. '
         f'<strong>Why this matters:</strong> street-level sky and sun exposure shape heat stress, '
         f'daylight access, mental health, and vitamin D — the everyday habitability of a '
-        f'neighbourhood and how it will hold up as Rio warms. In informal settlements, where '
+        f'neighbourhood and how it will hold up as Rio warms. In favelas, where '
         f'public space is the street, these numbers are the climate adaptation surface. '
         f'The headline mean is <dfn data-term="length-weighted">length-weighted</dfn>, '
         f'correcting a count-weighted bias in earlier reports.'
@@ -900,6 +922,7 @@ def render_site_html(site: str, stats: dict) -> str:
         git_sha=stats["git_sha"],
         crs=stats["crs"],
         dek=dek,
+        folha4_parity_note=folha4_parity_note,
         kpi_strip=kpi_strip,
         toggles_html=toggles_html,
         number_changers=render_findings(number_changers),
@@ -1143,6 +1166,12 @@ select{font-family:var(--sans); padding:0.3rem 0.5rem; border:1px solid var(--ru
 .chart-caption{font-size:0.82rem; color:var(--ink-muted); margin-top:0.5rem;}
 
 /* caveats */
+.callout-caveat{
+  border-left:3px solid var(--accent-warm); background:rgba(180,83,9,0.06);
+  padding:0.7rem 1rem; margin:0 0 1rem; font-size:0.88rem; color:var(--ink);
+  max-width:var(--measure);
+}
+.callout-caveat strong{color:var(--accent-warm);}
 .caveat-group{padding:1.2rem 0; border-bottom:1px solid var(--rule);}
 .caveat-group:last-child{border-bottom:none;}
 .caveat-group h3{font-family:var(--sans); font-size:0.78rem; text-transform:uppercase;
@@ -2151,6 +2180,7 @@ __INLINE_CSS__
 
 <section id="distribution">
   <h2>Distribution of sky</h2>
+  {folha4_parity_note}
   <p class="lede measure">
     The shape of the SVF distribution tells you the typology of the place. Dense canyons pile up near zero; open grids push to the right. The dashed line is the length-weighted site mean.
   </p>
@@ -2306,7 +2336,7 @@ LANDING_HTML = r"""<!DOCTYPE html>
 <header class="landing-hero">
   <div class="mast-mark">MORPHOFAVELA</div>
   <h1>Five favelas, mapped at street level</h1>
-  <p class="lede">Interactive sky view factor and solar access dashboards for five informal settlements in Rio de Janeiro. Length-weighted, audit-disclosed, file:// portable.</p>
+  <p class="lede">Interactive sky view factor and solar access dashboards for five favelas in Rio de Janeiro. Length-weighted, audit-disclosed, file:// portable.</p>
 </header>
 <section>
   <h2>Sites</h2>
