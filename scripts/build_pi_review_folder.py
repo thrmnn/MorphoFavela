@@ -117,6 +117,7 @@ EXTRA = {
         "the open card <a href=\"/ops\">mare_citywide_definition</a>; the interactive twin is "
         "<a href=\"/morphofavela-dash/outputs/_distribution/html_dashboards/maré/index.html\">here</a>.",
         [ROOT / "outputs/maré/territory/mare_territory_map.png",
+         ROOT / "outputs/maré/territory/mare_irradiation_distributions.png",
          ROOT / "outputs/_distribution/site_dashboards/maré/folha_maré_A3.png",
          ROOT / "outputs/_distribution/site_dashboards/maré/folha_maré.pdf",
          ROOT / "docs/briefs/mare/mare_morphology_brief.pdf"],
