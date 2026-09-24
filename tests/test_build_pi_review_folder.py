@@ -164,6 +164,57 @@ def test_render_index_stamp_shows_as_of_cycle_and_new_count():
     assert "2026-09-17T15:32:22Z" in html
 
 
+# --------------------------------------------------------------------------
+# "Mark this cycle reviewed" (navigation council ruling §5 phase 5)
+# --------------------------------------------------------------------------
+
+def test_render_index_includes_mark_reviewed_button_posting_review_mark():
+    m = {
+        "_utc": "2026-09-24T00:00:00Z", "cycle_date": "2026-09-24",
+        "sections": [{"slug": "a", "title": "A", "blurb": "", "provenance": "", "order": 1}],
+        "files": [{"section": "a", "file": "a.png", "status": "ok", "bytes": 1,
+                   "src_mtime_utc": "2026-09-24T00:00:00Z"}],
+        "new_since": {"cutoff_utc": None, "total": 0, "shown": 0, "families": []},
+    }
+    html = bprf._render_index(m)
+    assert 'id="mark-reviewed"' in html
+    assert "Mark this cycle reviewed" in html
+    # Relative URL — this page's own origin becomes whatever mirrors it
+    # (brisaverse's hub at /morphofavela-dash/…), never a hardcoded host.
+    assert "fetch('/api/review-mark'" in html
+    assert "http://" not in html and "https://" not in html
+
+
+def test_mark_reviewed_button_appears_before_the_toc_and_after_the_stamp():
+    m = {
+        "_utc": "2026-09-24T00:00:00Z", "cycle_date": "2026-09-24",
+        "sections": [{"slug": "a", "title": "A", "blurb": "", "provenance": "", "order": 1}],
+        "files": [{"section": "a", "file": "a.png", "status": "ok", "bytes": 1,
+                   "src_mtime_utc": "2026-09-24T00:00:00Z"}],
+        "new_since": {"cutoff_utc": None, "total": 0, "shown": 0, "families": []},
+    }
+    html = bprf._render_index(m)
+    assert html.index("AS OF") < html.index('id="mark-reviewed"') < html.index('id="s-toc"')
+
+
+def test_render_index_never_leaves_a_dangling_relative_link_from_the_mark_script():
+    """The mark-reviewed script's only network call is the relative fetch()
+    target /api/review-mark, which is not an href/src the dangling-link
+    checker would even see — this pins that it stays that way (no accidental
+    <script src=...> or stylesheet link introduced alongside it)."""
+    m = {
+        "_utc": "2026-09-24T00:00:00Z", "cycle_date": "2026-09-24",
+        "sections": [{"slug": "a", "title": "A", "blurb": "", "provenance": "", "order": 1}],
+        "files": [{"section": "a", "file": "a.png", "status": "ok", "bytes": 1,
+                   "src_mtime_utc": "2026-09-24T00:00:00Z"}],
+        "new_since": {"cutoff_utc": None, "total": 0, "shown": 0, "families": []},
+    }
+    html = bprf._render_index(m)
+    import re
+    targets = re.findall(r'(?:href|src)="([^"#?:]+)"', html)
+    assert not any("api/review-mark" in t for t in targets)
+
+
 def test_render_index_shows_release_badge_without_hiding_the_section():
     """Release class never hides anything from the PI — it is a badge only."""
     m = {

@@ -780,7 +780,46 @@ grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:2px 18px}
 .toc .n{color:var(--dim);font-variant-numeric:tabular-nums}
 #s-new{margin-bottom:16px}
 .all-link{margin:48px 0 12px;font-size:14px}
+.mark-row{margin:6px 0 14px}
+#mark-reviewed{font:inherit;font-weight:600;padding:8px 14px;border-radius:6px;
+border:1px solid var(--ink);background:var(--ink);color:var(--bg);cursor:pointer}
+#mark-reviewed:disabled{opacity:.6;cursor:default}
+.mr-msg{margin-left:10px;color:var(--dim);font-size:13px}
+.mr-msg.mr-err{color:var(--warn)}
+.mr-msg.mr-ok{color:var(--ok)}
 </style>"""
+
+
+# "Mark this cycle reviewed" (navigation council ruling §2 "Seen and
+# decided", §5 phase 5): POSTs the brisaverse hub's /api/review-mark as a
+# RELATIVE url — this page is only ever meaningfully live when served
+# through the hub's /morphofavela-dash/ mirror (same origin as the API), so
+# no base URL is hardcoded here. Opened as a bare file:// (the PI's own
+# file-manager / weekly-RM copy, see mirror_to_weekly_rm above) the fetch
+# simply fails and the button says so — never a silent no-op.
+_MARK_REVIEWED_SCRIPT = """<script>
+(function(){
+  var btn=document.getElementById('mark-reviewed'), msg=document.getElementById('mark-reviewed-msg');
+  if(!btn) return;
+  btn.addEventListener('click', function(){
+    var label=btn.textContent;
+    btn.disabled=true; btn.textContent='Marking…';
+    msg.className='mr-msg'; msg.textContent='';
+    fetch('/api/review-mark', {method:'POST'})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(d){
+        btn.textContent='Reviewed \\u2713';
+        msg.className='mr-msg mr-ok';
+        msg.textContent='as of '+(d.last_reviewed_utc||'now')+' \\u2014 /now\\u2019s \\u201cNew this cycle\\u201d count will read 0.';
+      })
+      .catch(function(){
+        btn.disabled=false; btn.textContent=label;
+        msg.className='mr-msg mr-err';
+        msg.textContent='\\u26a0 could not reach the hub \\u2014 this only works served through the hub (not a bare file:// open).';
+      });
+  });
+})();
+</script>"""
 
 
 def _anchor(sl: str) -> str:
@@ -894,6 +933,8 @@ def _render_index(m: dict) -> str:
 {_STYLE}
 <header><h1>Figure review</h1>
 <p class="stamp">{" · ".join(stamp_bits)}</p>
+<p class="mark-row"><button id="mark-reviewed" type="button">Mark this cycle reviewed</button>
+<span id="mark-reviewed-msg" class="mr-msg"></span></p>
 <p class="blurb">Every figure this cycle produced, in one place. Cards marked
 <span class="tag withheld">withheld · L1</span> are yours to read; they do not travel into
 the paper or shared figures without your own tap.</p></header>"""]
@@ -925,6 +966,7 @@ the paper or shared figures without your own tap.</p></header>"""]
                      f'{len(other_sections)} folders — earlier and ongoing analyses, not curated. '
                      f'<a href="all.html">Open all.html →</a></p>')
 
+    parts.append(_MARK_REVIEWED_SCRIPT)
     return "\n".join(parts)
 
 
