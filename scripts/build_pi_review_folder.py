@@ -755,7 +755,6 @@ border:1px solid var(--line);margin-right:5px}
 .reg-unclassified{color:var(--dim);border-color:var(--line)}
 a{color:inherit}.nolink{padding:9px 11px;font-size:13px}
 #s-awaiting{margin-bottom:16px}
-#s-awaiting .grid a.opcall{display:block;margin-top:6px;font-size:12px}
 .toc{border:1px solid var(--line);border-radius:8px;padding:16px 18px;background:#fff;margin-bottom:8px}
 .toc ul{list-style:none;margin:8px 0 16px;padding:0;display:grid;
 grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:2px 18px}
