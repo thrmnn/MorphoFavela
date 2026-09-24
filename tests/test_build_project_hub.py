@@ -269,3 +269,44 @@ def test_synthetic_fixture_hub_has_no_root_absolute_links(tmp_path):
         assert (out / "docs/roughness_explainer/log_profile.png").exists()
     finally:
         bph.ROOT, bph.OUT, bph.DOCS, bph.DASH = saved
+
+
+# ── wp07_staged redirect stub (navigation council ruling, Phase 4) ─────────
+# _hub/wp07_staged/ is replaced by a static meta-refresh stub pointing at
+# /figures#s-awaiting; the PNGs it mirrors (referenced by brisaverse's
+# p1_artifacts.json image_url) must still land on disk.
+
+def test_write_staged_figures_page_mirrors_pngs_and_writes_redirect_stub(tmp_path, monkeypatch):
+    monkeypatch.setattr(bph, "ROOT", tmp_path)
+    monkeypatch.setattr(bph, "OUT", tmp_path / "outputs" / "_hub")
+
+    run_dir = tmp_path / "runs" / "wp07_figures_20260924T000000Z"
+    run_dir.mkdir(parents=True)
+    (run_dir / "f1_citywide_position.png").write_bytes(b"not a real png")
+    (run_dir / "figure_manifest.json").write_text(json.dumps({
+        "figures": {"f1_citywide_position": {
+            "status": "produced", "png_path": "f1_citywide_position.png",
+            "ledger_ids_used": [],
+        }}
+    }))
+
+    url, thumb = bph.write_staged_figures_page(prov="test")
+
+    assert url == "/outputs/_hub/wp07_staged/index.html"
+    assert thumb == "/outputs/_hub/wp07_staged/f1_citywide_position.png"
+    mirrored = bph.OUT / "wp07_staged" / "f1_citywide_position.png"
+    assert mirrored.is_file()  # the register's image_url must still resolve
+
+    stub_html = (bph.OUT / "wp07_staged" / "index.html").read_text()
+    assert 'http-equiv="refresh"' in stub_html
+    assert bph._WP07_STAGED_REDIRECT_TARGET in stub_html
+    assert "s-awaiting" in stub_html
+    assert not stub_html.count('class="card"')  # no card-listing UI left behind
+
+
+def test_write_staged_figures_page_returns_none_when_nothing_to_mirror(tmp_path, monkeypatch):
+    monkeypatch.setattr(bph, "ROOT", tmp_path)
+    monkeypatch.setattr(bph, "OUT", tmp_path / "outputs" / "_hub")
+    (tmp_path / "runs").mkdir()
+    url, thumb = bph.write_staged_figures_page(prov="test")
+    assert (url, thumb) == (None, None)

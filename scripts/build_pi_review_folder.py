@@ -12,6 +12,16 @@ intended (G1). The page opens on a freshness stamp and "New this cycle"
 (id="s-new"), then the curated records in order, then a link to `all.html`,
 which now holds the multi-hundred-file sweep so the main page stays a few
 tablet screens long.
+
+Phase 4: this generator stays the only authority for "what exists on disk
+this cycle" (MANIFEST.json) but JOINS `release_class` from brisaverse's
+`shared/facts/p1_artifacts.json` by (run_of_record, filename) — it never
+re-derives release_class itself (that stays gen_p1_artifacts.py's job,
+ethics-critical). A figure with no register row renders with the
+`unclassified` badge; it is still shown (release class never hides anything
+from the PI — ruling §2). The staged rows are pulled into a dedicated
+"Awaiting your call" block (id="s-awaiting", G3), each badge linking the
+`/ops` promotion card.
 """
 from __future__ import annotations
 
@@ -22,6 +32,7 @@ import html as _html
 import json
 import re
 import os
+import re
 import shutil
 import subprocess
 from collections import defaultdict
@@ -33,9 +44,11 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = None  # the citywide pair is 21298x6211 by design
 
 ROOT = Path(__file__).resolve().parents[1]
+BRISAVERSE_ROOT = Path.home() / "SCL" / "SCR" / "brisaverse"
 THUMB_W = 1100
 KEEP_DATED_FOLDERS = 3  # PI decision, ruling §7.1: 3 dated review folders
 NEW_SINCE_CAP = 30  # "New this cycle" thumbnail cap before "see sections below"
+OPS_PROMOTION_ANCHOR = "/ops#dec-wp07_figure_promotion"  # hub/gallery/paper.html's own link
 
 
 def _image_dir(run_dir: Path) -> Path:
@@ -98,6 +111,120 @@ def _manifest_classes(run_dir: Path) -> dict[str, dict]:
         }
         for f in figs.values() if f.get("status") == "produced" and f.get("png_path")
     }
+
+
+# --------------------------------------------------------------------------
+# Phase 4 join: read-only lookup into brisaverse's release-class register.
+# gen_p1_artifacts.py stays the only authority for release_class (it parses
+# red_lines.md §5 and cross-checks run manifests, ethics-critical); this
+# generator only joins by (run_of_record, filename), never re-derives.
+# --------------------------------------------------------------------------
+
+def _load_p1_register() -> list[dict]:
+    path = BRISAVERSE_ROOT / "shared" / "facts" / "p1_artifacts.json"
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text()).get("artifacts", [])
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _register_index(register: list[dict]) -> dict[tuple[str, str], dict]:
+    """(run_of_record, filename) -> register row. Filename alone collides
+    across runs (every WP-07 figure family reuses f1_/f2_/f3_/f4_): the run
+    each figure actually came from is what disambiguates it."""
+    idx: dict[tuple[str, str], dict] = {}
+    for row in register:
+        run = row.get("run_of_record")
+        name = Path(row.get("image_url") or "").name
+        if run and name:
+            idx[(run, name)] = row
+    return idx
+
+
+def _register_hash_index(register: list[dict]) -> dict[tuple[str, str], dict]:
+    """(filename, md5) -> register row, resolved against the register's own
+    run_of_record on THIS disk. A fallback for the case the primary
+    (run, filename) key misses because the review folder picked a
+    differently-timestamped run of the same family — content hash still
+    proves it is the figure the register describes, not a same-named one."""
+    idx: dict[tuple[str, str], dict] = {}
+    for row in register:
+        run = row.get("run_of_record")
+        name = Path(row.get("image_url") or "").name
+        if not (run and name):
+            continue
+        run_dir = ROOT / "runs" / run
+        if not run_dir.is_dir():
+            continue
+        src = _image_dir(run_dir) / name
+        if not src.exists():
+            continue
+        try:
+            h = hashlib.md5(src.read_bytes()).hexdigest()
+        except OSError:
+            continue
+        idx[(name, h)] = row
+    return idx
+
+
+def _release_badge(row: dict | None) -> str:
+    """withheld / staged / publishable / unclassified — the only four badges
+    the ruling allows (§2). `state` decides first (staged is a state, not a
+    class); release_class text decides the rest."""
+    if row is None:
+        return "unclassified"
+    if row.get("state") == "staged":
+        return "staged"
+    rc = (row.get("release_class") or "").lower()
+    if row.get("state") == "withheld" or "withheld" in rc:
+        return "withheld"
+    if "publishable" in rc:
+        return "publishable"
+    return "unclassified"
+
+
+def _join_release(name: str, src: Path, run_name: str | None,
+                   by_run_file: dict, by_hash: dict, hash_names: set) -> dict:
+    """The joined fields folded into a figure's row: release_badge always
+    present; register_id/register_state only when a row matched. Hashing is
+    skipped unless the filename is one the register could plausibly know
+    (hash_names) — the 628-file sweep must never pay for 628 reads."""
+    row = by_run_file.get((run_name, name)) if run_name else None
+    if row is None and name in hash_names and src.exists():
+        try:
+            h = hashlib.md5(src.read_bytes()).hexdigest()
+        except OSError:
+            h = None
+        if h is not None:
+            row = by_hash.get((name, h))
+    out = {"release_badge": _release_badge(row)}
+    if row is not None:
+        out["register_id"] = row.get("id")
+        out["register_state"] = row.get("state")
+    return out
+
+
+_RUN_SOURCE_RE = re.compile(r"^runs/([^/]+)/")
+
+
+def _apply_release_badges(entries: list[dict], register: list[dict]) -> None:
+    """Phase 4 join (G2/G3's counterpart on the MorphoFavela side): stamp
+    every 'ok' entry with a release_badge from brisaverse's register, keyed
+    off the same (run, filename) each entry was already copied under — no
+    entry is re-classified by anything other than the register."""
+    by_run_file = _register_index(register)
+    by_hash = _register_hash_index(register)
+    hash_names = {name for (name, _h) in by_hash}
+    for e in entries:
+        if e.get("status") != "ok":
+            continue
+        name = e["file"]
+        m = _RUN_SOURCE_RE.match(e.get("source", ""))
+        run_name = m.group(1) if m else None
+        src_abs = ROOT / e["source"]
+        e.update(_join_release(name, src_abs, run_name, by_run_file, by_hash, hash_names))
 
 
 # --------------------------------------------------------------------------
@@ -275,7 +402,9 @@ RECORDS: list[dict] = [
             "the open card <a href=\"/ops\">mare_citywide_definition</a>; the interactive twin is "
             "<a href=\"/morphofavela-dash/outputs/_distribution/html_dashboards/maré/index.html\">here</a>; "
             "the full territory index is "
-            "<a href=\"/morphofavela-dash/outputs/_hub/territory.html\">/_hub/territory.html</a>."
+            "<a href=\"/morphofavela-dash/outputs/_hub/territory.html\">/_hub/territory.html</a>; "
+            "the brief, deck and Folha de Rua refresher for your review are at "
+            "<a href=\"/morphofavela-dash/outputs/_hub/mare_review/index.html\">_hub/mare_review</a>."
         ),
         paths=_mare_territory_paths,
     ),
@@ -485,6 +614,17 @@ def _compute_new_since(entries: list[dict], curated_sections: list[dict], prev_u
     return {"cutoff_utc": prev_utc, "families": families, "total": total, "shown": shown}
 
 
+def _compute_awaiting(entries: list[dict]) -> list[dict]:
+    """G3: the staged rows — every entry the register join marked
+    register_state == 'staged', in section then filename order. This is the
+    page-side count that must equal the register's own staged count and the
+    /paper/p1 staged strip (checked cross-repo by check_review_surface.py)."""
+    return sorted(
+        (e for e in entries if e.get("status") == "ok" and e.get("register_state") == "staged"),
+        key=lambda e: (e["section"], e["file"]),
+    )
+
+
 def _prune_dated_folders(base: Path, keep: int) -> list[Path]:
     """Delete all but the newest `keep` dated folders — but only a folder
     whose own MANIFEST.json names this script as its generator. A directory
@@ -565,6 +705,12 @@ def build(out_root: Path) -> dict:
     already = {e["file"] for e in entries if e["status"] == "ok"}
     other_sections = sweep_remaining(out_root, already, entries)
 
+    # Phase 4 join: stamp every entry (curated and swept) with a release_badge
+    # from brisaverse's register, then pull the staged rows into their own
+    # "Awaiting your call" list — G3's page-side half.
+    _apply_release_badges(entries, _load_p1_register())
+    awaiting = _compute_awaiting(entries)
+
     prev_utc = _previous_cycle_utc(out_root)
     new_since = _compute_new_since(entries, sections, prev_utc)
 
@@ -575,6 +721,7 @@ def build(out_root: Path) -> dict:
         "sections": sections + other_sections,
         "files": entries,
         "new_since": new_since,
+        "awaiting": awaiting,
     }
     (out_root / "MANIFEST.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
     (out_root / "index.html").write_text(_render_index(manifest))
@@ -598,7 +745,7 @@ def dangling_relative_links(out_root: Path) -> list[str]:
 
 
 _STYLE = """<style>
-:root{--bg:#faf8f5;--ink:#1c1a17;--dim:#6b6560;--line:#ddd6cd;--warn:#b6482b;--draft:#c99a2e}
+:root{--bg:#faf8f5;--ink:#1c1a17;--dim:#6b6560;--line:#ddd6cd;--warn:#b6482b;--draft:#c99a2e;--ok:#2f7d4f}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
 font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:0 20px 80px}
 header{padding:32px 0 8px;border-bottom:1px solid var(--line);margin-bottom:24px}
@@ -617,7 +764,13 @@ border:1px solid var(--line);margin-right:5px}
 .withheld{color:var(--warn);border-color:var(--warn)}
 .wp{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
 .draft{color:var(--draft);border-color:var(--draft);font-weight:600}
+.reg{font-weight:600}
+.reg-staged{color:var(--draft);border-color:var(--draft)}
+.reg-withheld{color:var(--warn);border-color:var(--warn)}
+.reg-publishable{color:var(--ok);border-color:var(--ok)}
+.reg-unclassified{color:var(--dim);border-color:var(--line)}
 a{color:inherit}.nolink{padding:9px 11px;font-size:13px}
+#s-awaiting{margin-bottom:16px}
 .toc{border:1px solid var(--line);border-radius:8px;padding:16px 18px;background:#fff;margin-bottom:8px}
 .toc ul{list-style:none;margin:8px 0 16px;padding:0;display:grid;
 grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:2px 18px}
@@ -634,10 +787,24 @@ def _anchor(sl: str) -> str:
     return "s-" + sl.replace("/", "-").replace("__", "-")
 
 
+def _release_badge_tag(e: dict) -> str:
+    """The Phase-4 register badge — withheld / staged / publishable /
+    unclassified, joined from brisaverse's p1_artifacts.json. Distinct from
+    the .withheld tag above, which is the RUN's own self-declared proposal;
+    this one is the PI-facing, ethics-reviewed classification."""
+    badge = e.get("release_badge")
+    if not badge:
+        return ""
+    label = f"register: {badge}" if badge != "unclassified" else "unclassified"
+    if badge == "staged":
+        return f'<a class="tag reg reg-staged" href="{OPS_PROMOTION_ANCHOR}">{label} → rule on this</a>'
+    return f'<span class="tag reg reg-{badge}">{label}</span>'
+
+
 def _figure_card(e: dict, slug: str) -> str:
     if e["status"] == "MISSING":
         return f'<figure><div class="nolink">missing: <span class="name">{e["file"]}</span></div></figure>'
-    tags = ""
+    tags = _release_badge_tag(e)
     if e.get("work_package"):
         tags += f'<span class="tag wp">{e["work_package"]}</span>'
     if e.get("release_class") == "withheld":
@@ -686,6 +853,24 @@ def _render_new_since(new_since: dict) -> str:
     return "\n".join(parts)
 
 
+def _render_awaiting(awaiting: list[dict]) -> str:
+    """Ruling §2 page structure item 3, G3: every staged row, generated from
+    release_class, badge linking the /ops promotion card. Always rendered
+    (even at zero) so the section's presence itself is not a signal."""
+    if not awaiting:
+        return ('<section id="s-awaiting"><h2>Awaiting your call <span class="n">(0)</span></h2>'
+                '<p class="blurb">Nothing staged this cycle.</p></section>')
+    parts = [f'<section id="s-awaiting"><h2>Awaiting your call <span class="n">({len(awaiting)})</span></h2>'
+             f'<p class="blurb">Every figure the register (brisaverse '
+             f'<code>shared/facts/p1_artifacts.json</code>) marks <code>staged</code> — '
+             f'promoting or holding each one is your tap on '
+             f'<a href="{OPS_PROMOTION_ANCHOR}">/ops</a>, not an agent\'s.</p><div class="grid">']
+    for e in awaiting:
+        parts.append(_figure_card(e, e["section"]))
+    parts.append("</div></section>")
+    return "\n".join(parts)
+
+
 def _render_index(m: dict) -> str:
     # Deliberately NOT re-sorted here: the render step must prove the order it
     # was handed is already correct, not silently repair it (G1).
@@ -714,6 +899,7 @@ def _render_index(m: dict) -> str:
 the paper or shared figures without your own tap.</p></header>"""]
 
     parts.append(_render_new_since(new_since))
+    parts.append(_render_awaiting(m.get("awaiting", [])))
 
     parts.append('<nav class="toc" id="s-toc"><strong>This review</strong><ul>')
     for s in curated:

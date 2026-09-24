@@ -334,3 +334,115 @@ def test_dangling_relative_links_catches_a_missing_target(tmp_path):
     (tmp_path / "index.html").write_text('<a href="sec/doc.html">ok</a><a href="doc.html">broken</a><a href="/ops">abs</a>')
     (tmp_path / "all.html").write_text("")
     assert bprf.dangling_relative_links(tmp_path) == ["index.html: doc.html"]
+# --------------------------------------------------------------------------
+# Phase 4 — join release_class from brisaverse's p1_artifacts.json register
+# (never re-derived), the "Awaiting your call" block (G3), release badges.
+# --------------------------------------------------------------------------
+
+def test_release_badge_staged_wins_over_publishable_text():
+    # A staged row's own release_class text says "publishable (staged; PI
+    # promotes)" — state must decide first, or every staged row would render
+    # as publishable and G3 would silently undercount.
+    row = {"state": "staged", "release_class": "`publishable` (staged; PI promotes)"}
+    assert bprf._release_badge(row) == "staged"
+
+
+def test_release_badge_withheld_from_state_or_text():
+    assert bprf._release_badge({"state": "withheld", "release_class": "withheld"}) == "withheld"
+    assert bprf._release_badge({"state": "final", "release_class": "withheld"}) == "withheld"
+
+
+def test_release_badge_publishable_from_text():
+    row = {"state": "promoted", "release_class": "PNG + SVG `publishable`"}
+    assert bprf._release_badge(row) == "publishable"
+
+
+def test_release_badge_unclassified_when_no_row():
+    assert bprf._release_badge(None) == "unclassified"
+
+
+def test_release_badge_unclassified_when_row_has_no_recognizable_class():
+    assert bprf._release_badge({"state": "final", "release_class": None}) == "unclassified"
+
+
+def test_register_index_keys_by_run_and_filename():
+    register = [
+        {"id": "f1", "state": "staged", "run_of_record": "wp07_figures_X",
+         "image_url": "/morphofavela-dash/outputs/_hub/wp07_staged/f1_citywide_position.png"},
+    ]
+    idx = bprf._register_index(register)
+    assert idx[("wp07_figures_X", "f1_citywide_position.png")]["id"] == "f1"
+    assert len(idx) == 1
+
+
+def test_apply_release_badges_joins_by_run_and_filename(tmp_path, monkeypatch):
+    monkeypatch.setattr(bprf, "ROOT", tmp_path)
+    register = [
+        {"id": "f1", "state": "staged", "run_of_record": "wp07_figures_X",
+         "image_url": "/x/f1_citywide_position.png"},
+        {"id": "f5", "state": "withheld", "release_class": "withheld",
+         "run_of_record": "wp07_map_Y", "image_url": "/x/f5_citywide_svf_map.png"},
+    ]
+    entries = [
+        {"section": "p1_solar_figures", "file": "f1_citywide_position.png", "status": "ok",
+         "source": "runs/wp07_figures_X/f1_citywide_position.png"},
+        {"section": "citywide_maps", "file": "f5_citywide_svf_map.png", "status": "ok",
+         "source": "runs/wp07_map_Y/f5_citywide_svf_map.png"},
+        {"section": "mare_territory", "file": "mare_territory_map.png", "status": "ok",
+         "source": "outputs/maré/territory/mare_territory_map.png"},
+        {"section": "sweep/foo", "file": "unrelated.png", "status": "MISSING"},
+    ]
+    bprf._apply_release_badges(entries, register)
+    assert entries[0]["release_badge"] == "staged"
+    assert entries[0]["register_id"] == "f1"
+    assert entries[1]["release_badge"] == "withheld"
+    assert entries[2]["release_badge"] == "unclassified"
+    assert "register_id" not in entries[2]
+    assert "release_badge" not in entries[3]  # MISSING entries are never joined
+
+
+def test_compute_awaiting_selects_only_staged_ok_entries_sorted():
+    entries = [
+        {"section": "b", "file": "z.png", "status": "ok", "register_state": "staged"},
+        {"section": "a", "file": "y.png", "status": "ok", "register_state": "staged"},
+        {"section": "a", "file": "x.png", "status": "ok", "register_state": "withheld"},
+        {"section": "a", "file": "w.png", "status": "MISSING", "register_state": "staged"},
+    ]
+    out = bprf._compute_awaiting(entries)
+    assert [(e["section"], e["file"]) for e in out] == [("a", "y.png"), ("b", "z.png")]
+
+
+def test_render_awaiting_links_badge_to_ops_promotion_card():
+    awaiting = [{"section": "p1_solar_figures", "file": "f1.png", "status": "ok", "bytes": 1,
+                 "release_badge": "staged", "register_id": "f1_citywide_position"}]
+    html = bprf._render_awaiting(awaiting)
+    assert 'id="s-awaiting"' in html
+    assert bprf.OPS_PROMOTION_ANCHOR in html
+    assert "Awaiting your call <span class=\"n\">(1)</span>" in html
+
+
+def test_render_awaiting_renders_zero_state_without_omitting_section():
+    html = bprf._render_awaiting([])
+    assert 'id="s-awaiting"' in html
+    assert "(0)" in html
+
+
+def test_render_index_includes_awaiting_section_between_new_and_toc():
+    m = {
+        "_utc": "2026-09-24T00:00:00Z", "cycle_date": "2026-09-24",
+        "sections": [{"slug": "a", "title": "A", "blurb": "", "provenance": "", "order": 1}],
+        "files": [{"section": "a", "file": "a.png", "status": "ok", "bytes": 1,
+                   "src_mtime_utc": "2026-09-24T00:00:00Z"}],
+        "new_since": {"cutoff_utc": None, "total": 0, "shown": 0, "families": []},
+        "awaiting": [{"section": "a", "file": "a.png", "status": "ok", "bytes": 1,
+                      "release_badge": "staged"}],
+    }
+    html = bprf._render_index(m)
+    assert html.index('id="s-new"') < html.index('id="s-awaiting"') < html.index('id="s-toc"')
+
+
+def test_figure_card_release_badge_is_shown_and_never_hides_the_figure():
+    e = {"status": "ok", "file": "f.png", "bytes": 1, "release_badge": "unclassified"}
+    html = bprf._figure_card(e, "sec")
+    assert "unclassified" in html
+    assert "f.png" in html
