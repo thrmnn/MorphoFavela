@@ -1490,49 +1490,41 @@ def write_zoom_viewer_page(prov):
     return "/outputs/_hub/wp07_staged/zoom/index.html", thumb
 
 
+_WP07_STAGED_REDIRECT_TARGET = "https://brisa.theoalessandro.com/figures#s-awaiting"
+
+
 def write_staged_figures_page(prov):
-    """The WP07B staged C′ figures, discovered from the latest
-    runs/wp07_figures_<UTC>/figure_manifest.json and existence-gated per PNG
-    (docs/hub_wp_structure_spec.md Ph.2 item 2) — degrades to (None, None)
-    wherever the figure images (gitignored) haven't been generated in this
-    checkout. Nothing here is promoted: this is the PI's staging view: each
-    card shows the run's own *proposed* release class, never an asserted one,
-    and links through to the promotion review pack. Returns (url, thumb)."""
-    run_dir = _latest_wp07_figures_dir()
-    if run_dir is None:
-        return None, None
-    manifest_path = run_dir / "figure_manifest.json"
-    if not manifest_path.exists():
-        return None, None
-    figures = json.loads(manifest_path.read_text()).get("figures", {})
-    cards, thumb = [], None
-    for fig_id in sorted(figures):
-        fig = figures[fig_id]
-        png = fig.get("png_path")
-        # Serve the copy WP-07B already staged into the mirror, never the run
-        # directory: the hub's L1 guard forbids any "runs" path segment under
-        # _hub/, and it fired on main the moment the PNGs existed (the worktree
-        # that wrote this had none, so the guard never ran there).
-        staged_copy = OUT / "wp07_staged" / Path(png).name if png else None
-        if not png or not (staged_copy.exists() or (run_dir / png).exists()):
-            continue
-        img_url = f"/outputs/_hub/wp07_staged/{Path(png).name}" if staged_copy.exists() else "/" + str((run_dir / png).relative_to(ROOT))
-        thumb = thumb or img_url
-        n_used = len(fig.get("ledger_ids_used", []))
-        cards.append(card(
-            fig_id.replace("_", " "),
-            f"Staged C′ figure · status {fig.get('status', '?')} · proposed "
-            f"release class {fig.get('release_class_proposed', '?')} (not "
-            f"promoted — awaiting the ethics gate + the PI's "
-            f"wp07_figure_promotion decision) · {n_used} ledger numbers "
-            f"behind it.",
-            img_url, img=img_url, kind="amber", badge_label="Staged",
-            meta=f"{run_dir.name} · {fig_id}", **_img_attrs(img_url)))
-    # The WP-07M citywide maps are a second family: producer-declared withheld
-    # under red line L1 and not yet read by the ethics guardian. The PI may SEE
-    # them here; nothing may promote them. Their images are copied into the
-    # mirror (same repo, PI-only) because the L1 guard forbids a runs/ segment.
+    """Mirrors the staged WP-07 figure PNGs into outputs/_hub/wp07_staged/ (so
+    every image_url the brisaverse register cites — /morphofavela-dash/outputs/
+    _hub/wp07_staged/<name>.png — still resolves) but no longer builds a card
+    listing there. Navigation council ruling, 2026-09-24, Phase 4 ("Die":
+    _hub/wp07_staged/ is replaced by a stub): this used to be a third,
+    unlinked staged-count view (diagnosis #2 — 4 on /figures, 6 here, 9 in the
+    register). The PI's one staged count now lives at /figures#s-awaiting,
+    joined from the same register this mirror only serves bytes for.
+    Returns (url, thumb) — url is the stub page, thumb the first PNG copied,
+    for the deliverables card."""
     import shutil
+    thumb = None
+    run_dir = _latest_wp07_figures_dir()
+    if run_dir is not None:
+        manifest_path = run_dir / "figure_manifest.json"
+        figures = json.loads(manifest_path.read_text()).get("figures", {}) if manifest_path.exists() else {}
+        for fig_id in sorted(figures):
+            fig = figures[fig_id]
+            png = fig.get("png_path")
+            # Serve the copy staged into the mirror, never the run directory:
+            # the hub's L1 guard forbids any "runs" path segment under _hub/.
+            staged_copy = OUT / "wp07_staged" / Path(png).name if png else None
+            if not png or not (staged_copy.exists() or (run_dir / png).exists()):
+                continue
+            if not staged_copy.exists():
+                staged_copy.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(run_dir / png, staged_copy)
+            img_url = f"/outputs/_hub/wp07_staged/{Path(png).name}"
+            thumb = thumb or img_url
+    # The WP-07M citywide maps are a second family, mirrored for the same
+    # register-image_url reason (producer-declared withheld, red line L1).
     map_dirs = sorted(d for d in (ROOT / "runs").glob("wp07_map_*") if d.is_dir() and list(d.glob("*.png")))
     if map_dirs:
         map_dir = map_dirs[-1]
@@ -1548,26 +1540,20 @@ def write_staged_figures_page(prov):
                 shutil.copy2(map_dir / png, dst)
             img_url = f"/outputs/_hub/wp07_staged/{dst.name}"
             thumb = thumb or img_url
-            cards.append(card(
-                fig_id.replace("_", " "),
-                f"Citywide map · release class {fig.get('release_class', 'withheld')} under "
-                f"{fig.get('red_line', 'L1')} — producer-declared, not yet read by the ethics "
-                f"guardian. Visible to the PI here; never promoted by an agent.",
-                img_url, img=img_url, kind="terra", badge_label="Withheld · L1",
-                meta=f"{map_dir.name} · {fig_id}", **_img_attrs(img_url)))
-    if not cards:
+    if thumb is None:
         return None, None
-    crumb = breadcrumb([("← Project hub", "../index.html"), ("WP-07 staged figures", None)])
-    body = ('<p class="lead">Staged candidates from the latest WP-07 figure run — '
-            'not promoted. See the '
-            '<a href="review/index.html">promotion review pack</a> for the numbers, '
-            'methodology and validation behind them.</p>'
-            + section("Staged figures", cards, anchor="staged-figures"))
+
     out = OUT / "wp07_staged" / "index.html"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(_relativize(page(
-        "WP-07 staged figures", badge("amber", f"{len(cards)} staged · not promoted"),
-        body, crumb=crumb, provenance=prov), out.parent))
+    out.write_text(
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        f'<meta http-equiv="refresh" content="0; url={_WP07_STAGED_REDIRECT_TARGET}">'
+        '<title>Moved — WP-07 staged figures</title></head><body>'
+        '<p>This page moved. The one staged count now lives in the review '
+        f'folder’s "Awaiting your call" section: '
+        f'<a href="{_WP07_STAGED_REDIRECT_TARGET}">{_WP07_STAGED_REDIRECT_TARGET}</a></p>'
+        '</body></html>'
+    )
     return "/outputs/_hub/wp07_staged/index.html", thumb
 
 
@@ -1676,10 +1662,11 @@ def deliverables_section(prov):
     if sf_url:
         cards.append(card(
             "WP-07 staged figures",
-            "The C′ figure candidates behind the ledger's headline numbers — "
-            "staged for review, not promoted.",
-            sf_url, img=sf_thumb, kind="amber", badge_label="Staged",
-            meta="generated from the latest runs/wp07_figures_<UTC>/figure_manifest.json",
+            "The staged listing moved: the one staged count now lives in the "
+            "review folder's \"Awaiting your call\" section — this card just "
+            "takes you there.",
+            sf_url, img=sf_thumb, kind="amber", badge_label="→ /figures",
+            meta="mirrors the PNGs runs/wp07_figures_<UTC>/ and runs/wp07_map_<UTC>/ cite",
             new_tab=False, **(_img_attrs(sf_thumb) if sf_thumb else {})))
     zv_url, zv_thumb = write_zoom_viewer_page(prov)
     if zv_url:
