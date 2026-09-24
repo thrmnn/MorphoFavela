@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 from pathlib import Path
 
 import geopandas as gpd
@@ -23,11 +25,28 @@ from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.patches import Patch
 
 HERE = Path(__file__).resolve().parent
+REPO_ROOT = Path(os.environ.get("MORPHOFAVELA_ROOT", HERE.parent.parent.parent))
+sys.path.insert(0, str(REPO_ROOT))
+from src.brisa_solar import mare_study_area as msa  # noqa: E402
+from src.brisa_solar.wp07_figures import BOUNDARY_STROKE_PX  # noqa: E402
+
 SITE = "maré"
 
 ACCENT = "#2A5FA5"
+COMMUNITY_STROKE = "#4B5563"
 BAND_CMAP_5 = ListedColormap(["#eff3ff", "#bdd7e7", "#6baed6", "#3182bd", "#08519c"])
 BAND_CMAP_4 = ListedColormap(["#eff3ff", "#9ecae1", "#4292c6", "#08519c"])
+
+
+def _plot_community_outlines(ax, communities: gpd.GeoDataFrame) -> None:
+    """Thin (~1 output pixel) study-area community outlines — same
+    pixel-derived-linewidth technique as src/brisa_solar/wp07_figures.py's
+    BOUNDARY_STROKE_PX (PI standing complaint: a stroke in points reads as a
+    hairline at one dpi and a masking slab at another)."""
+    if communities is None or len(communities) == 0:
+        return
+    lw = BOUNDARY_STROKE_PX / ax.figure.dpi * 72.0
+    communities.boundary.plot(ax=ax, color=COMMUNITY_STROKE, linewidth=lw, zorder=4)
 
 
 def _no_coord_axes(ax):
@@ -76,7 +95,8 @@ def _plot_grid_layer(ax, gdf, col, edges, cmap, title):
     return norm, labels, cmap
 
 
-def render_built_form_maps(grid: gpd.GeoDataFrame, out_path: Path) -> dict:
+def render_built_form_maps(grid: gpd.GeoDataFrame, out_path: Path,
+                            communities: gpd.GeoDataFrame | None = None) -> dict:
     fig, axes = plt.subplots(2, 2, figsize=(6.3, 6.4))
     common_edges = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
     layers = [
@@ -91,6 +111,7 @@ def render_built_form_maps(grid: gpd.GeoDataFrame, out_path: Path) -> dict:
         e = edges if edges is not None else h_edges
         _plot_grid_layer(ax, grid, col, e, cmap, title)
         ax.set_title(title, fontsize=10)
+        _plot_community_outlines(ax, communities)
     _scale_bar_and_north(axes.flat[0], grid)
 
     axes.flat[1].legend(
@@ -119,7 +140,8 @@ def render_built_form_maps(grid: gpd.GeoDataFrame, out_path: Path) -> dict:
     }
 
 
-def render_street_svf_map(segments: gpd.GeoDataFrame, out_path: Path) -> dict:
+def render_street_svf_map(segments: gpd.GeoDataFrame, out_path: Path,
+                           communities: gpd.GeoDataFrame | None = None) -> dict:
     edges = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
     fig, ax = plt.subplots(figsize=(6.3, 3.9))
     norm, labels = _band_classes(segments["svf_median"], edges)
@@ -127,6 +149,7 @@ def render_street_svf_map(segments: gpd.GeoDataFrame, out_path: Path) -> dict:
     ax.set_title("Maré — street-segment Sky View Factor", fontsize=10)
     ax.set_aspect("equal")
     _no_coord_axes(ax)
+    _plot_community_outlines(ax, communities)
     _scale_bar_and_north(ax, segments, length_m=500)
     ax.legend(
         handles=_legend_patches(BAND_CMAP_5, edges),
@@ -185,23 +208,33 @@ def render_all(outputs_root: Path, figures_dir: Path) -> list[dict]:
     data_root = outputs_root.parent / "data"
     wind_rose = json.loads((data_root / SITE / "wind_rose.json").read_text())
 
+    # Study-area clip (MAREBOUND): every map below covers the 16-community
+    # study area, matching mare_numbers.json's own counts, never the whole
+    # bairro. Community outlines drawn thin (BOUNDARY_STROKE_PX) for
+    # geographic orientation only — not a per-community comparison.
+    sa = msa.load_study_area()
+    grid = grid.loc[msa.within_mask(grid["centroid_x"].to_numpy(), grid["centroid_y"].to_numpy(), sa["study_area"])].reset_index(drop=True)
+    seg_c = segments.geometry.centroid
+    segments = segments.loc[msa.within_mask(seg_c.x.to_numpy(), seg_c.y.to_numpy(), sa["study_area"])].reset_index(drop=True)
+    communities = sa["included"]
+
     manifest = []
 
     p = figures_dir / "fig_built_form_maps.png"
-    extra = render_built_form_maps(grid, p)
+    extra = render_built_form_maps(grid, p, communities=communities)
     manifest.append({
         "file": p.name, "class": "band-classed map, freshly rendered",
         "layers": ["lambda_p", "H_mean", "porosity", "svf"],
         "n_classes": 5, "basemap": False, "coordinate_ticks": False,
-        "source": "morphometrics/grid/grid_metrics.gpkg", **extra,
+        "source": "morphometrics/grid/grid_metrics.gpkg, study area (16 communities ∩ data extent)", **extra,
     })
 
     p = figures_dir / "fig_street_svf_map.png"
-    extra = render_street_svf_map(segments, p)
+    extra = render_street_svf_map(segments, p, communities=communities)
     manifest.append({
         "file": p.name, "class": "band-classed map, freshly rendered",
         "layers": ["street_svf"], "n_classes": 5, "basemap": False,
-        "coordinate_ticks": False, "source": "svf_v2/svf_streets_segments.gpkg", **extra,
+        "coordinate_ticks": False, "source": "svf_v2/svf_streets_segments.gpkg, study area (16 communities ∩ data extent)", **extra,
     })
 
     p = figures_dir / "fig_distributions.png"

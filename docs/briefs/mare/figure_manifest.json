@@ -11,7 +11,7 @@
     "n_classes": 5,
     "basemap": false,
     "coordinate_ticks": false,
-    "source": "morphometrics/grid/grid_metrics.gpkg",
+    "source": "morphometrics/grid/grid_metrics.gpkg, study area (16 communities ∩ data extent)",
     "classes": {
       "lambda_p": [
         0,
@@ -23,11 +23,11 @@
       ],
       "H_mean_m": [
         0.01,
-        4.8,
-        6.28,
-        7.57,
-        9.02,
-        19.88
+        5.49,
+        6.91,
+        8.05,
+        9.37,
+        18.96
       ],
       "porosity": [
         0,
@@ -56,7 +56,7 @@
     "n_classes": 5,
     "basemap": false,
     "coordinate_ticks": false,
-    "source": "svf_v2/svf_streets_segments.gpkg",
+    "source": "svf_v2/svf_streets_segments.gpkg, study area (16 communities ∩ data extent)",
     "classes": {
       "svf_median": [
         0,
