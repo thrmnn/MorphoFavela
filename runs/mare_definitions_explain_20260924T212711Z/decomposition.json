@@ -1,0 +1,173 @@
+{
+  "_utc": "2026-09-24T21:27:11+00:00",
+  "derived_from": "mare_definitions_20260924T173822Z",
+  "wp05_run": "wp05_full_20260914T215419Z",
+  "display_rotation_deg": -78,
+  "definition_A_full": {
+    "n": 9924,
+    "median_kwh_m2": 610.5811898325103,
+    "citywide_percentile": 7.737499012146551
+  },
+  "definition_E": {
+    "n": 39345,
+    "median_kwh_m2": 959.059107975034,
+    "citywide_percentile": 20.741679179477025
+  },
+  "buckets": {
+    "A": {
+      "label": "A · 6 IPP favela polygons",
+      "status": "PROVISIONAL — wp05_run_design untapped",
+      "n": 9546,
+      "median": 618.0114462149793,
+      "iqr": [
+        391.8133256190287,
+        886.2875203424421
+      ],
+      "citywide_percentile_position": 7.938509336286262,
+      "decile_share": [
+        56.45296459249948,
+        22.4910957469097,
+        8.935679865912425,
+        4.986381730567778,
+        3.25790907186256,
+        2.042740414833438,
+        0.9218520846427822,
+        0.5237795935470354,
+        0.2723653886444584,
+        0.11523151058034778
+      ]
+    },
+    "favelas_2022": {
+      "label": "(ii) other favela-layer communities",
+      "status": "PROVISIONAL — wp05_run_design untapped",
+      "n": 1132,
+      "median": 342.3512546960695,
+      "iqr": [
+        193.74956584453375,
+        563.0947915240695
+      ],
+      "citywide_percentile_position": 2.5089335276984586,
+      "decile_share": [
+        86.04240282685512,
+        13.604240282685511,
+        0.35335689045936397,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "conjuntos": {
+      "label": "(i) conjuntos habitacionais",
+      "status": "PROVISIONAL — wp05_run_design untapped",
+      "n": 14554,
+      "median": 989.7728811164599,
+      "iqr": [
+        683.1422025662143,
+        1357.134121326399
+      ],
+      "citywide_percentile_position": 22.272036749100458,
+      "decile_share": [
+        25.37446750034355,
+        20.99766387247492,
+        13.549539645458294,
+        9.887316201731483,
+        8.5749622097018,
+        7.509962896798131,
+        5.9090284457881,
+        4.081352205579222,
+        2.425450048096743,
+        1.6902569740277589
+      ]
+    },
+    "between": {
+      "label": "(iii) between communities",
+      "status": "PROVISIONAL — wp05_run_design untapped",
+      "n": 14113,
+      "median": 1294.539304090895,
+      "iqr": [
+        915.3968259807688,
+        1538.837777369982
+      ],
+      "citywide_percentile_position": 41.30646713137832,
+      "decile_share": [
+        10.86232551548218,
+        16.30411677177071,
+        11.322893785871182,
+        10.05455962587685,
+        10.748954864309502,
+        10.812725855594133,
+        9.090909090909092,
+        8.60908382342521,
+        6.858924395947,
+        5.335506270814143
+      ]
+    },
+    "A_outside_E": {
+      "label": "A_outside_E",
+      "status": "PROVISIONAL — wp05_run_design untapped",
+      "n": 378,
+      "median": 484.16880535693593,
+      "iqr": [
+        269.7702054263615,
+        673.8160276723311
+      ],
+      "citywide_percentile_position": 4.798980154381261,
+      "decile_share": [
+        77.24867724867724,
+        13.492063492063492,
+        6.349206349206349,
+        1.0582010582010581,
+        0.5291005291005291,
+        1.0582010582010581,
+        0.0,
+        0.0,
+        0.0,
+        0.26455026455026454
+      ]
+    }
+  },
+  "waterfall": [
+    {
+      "step": "A",
+      "label": "A · 6 IPP favela polygons",
+      "n_added": 9546,
+      "cumulative_n": 9546,
+      "cumulative_median_kwh_m2": 618.0114462149793,
+      "cumulative_percentile": 7.938509336286262,
+      "delta_percentile": null
+    },
+    {
+      "step": "favelas_2022",
+      "label": "(ii) other favela-layer communities",
+      "n_added": 1132,
+      "cumulative_n": 10678,
+      "cumulative_median_kwh_m2": 585.6385942175923,
+      "cumulative_percentile": 7.0805645665775145,
+      "delta_percentile": -0.8579447697087472
+    },
+    {
+      "step": "conjuntos",
+      "label": "(i) conjuntos habitacionais",
+      "n_added": 14554,
+      "cumulative_n": 25232,
+      "cumulative_median_kwh_m2": 803.0331528383919,
+      "cumulative_percentile": 14.008571235421426,
+      "delta_percentile": 6.928006668843912
+    },
+    {
+      "step": "between",
+      "label": "(iii) between communities",
+      "n_added": 14113,
+      "cumulative_n": 39345,
+      "cumulative_median_kwh_m2": 959.059107975034,
+      "cumulative_percentile": 20.741679179477025,
+      "delta_percentile": 6.7331079440555985
+    }
+  ],
+  "deciles_note": "decile_share: % of the bucket's own cells in each citywide decile D1..D10",
+  "a_outside_e_share": 0.0380894800483676
+}

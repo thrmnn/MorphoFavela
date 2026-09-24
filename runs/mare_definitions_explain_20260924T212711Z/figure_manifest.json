@@ -1,0 +1,39 @@
+{
+  "_utc": "2026-09-24T21:27:11+00:00",
+  "git_sha": "b14dd75",
+  "derived_from": [
+    "mare_definitions_20260924T173822Z"
+  ],
+  "release_class": "staged",
+  "p1_status": "not for P1 — descriptive investigation only",
+  "figures": {
+    "fig_a_waterfall": {
+      "id": "fig_a_waterfall",
+      "status": "produced",
+      "png_path": "fig_a_waterfall.png",
+      "derived_from": [
+        "mare_definitions_20260924T173822Z"
+      ],
+      "caption": "Cumulative citywide percentile of Maré's median irradiation, A → E."
+    },
+    "fig_b_decile_shares": {
+      "id": "fig_b_decile_shares",
+      "status": "produced",
+      "png_path": "fig_b_decile_shares.png",
+      "derived_from": [
+        "mare_definitions_20260924T173822Z"
+      ],
+      "caption": "Each component's own share of the city's irradiation deciles."
+    },
+    "fig_c_component_map": {
+      "id": "fig_c_component_map",
+      "status": "produced",
+      "png_path": "fig_c_component_map.png",
+      "derived_from": [
+        "mare_definitions_20260924T173822Z"
+      ],
+      "caption": "The three components mapped on Maré's outline (horizontal display rotation)."
+    }
+  },
+  "work_packages_yaml": "config/work_packages.yaml does not exist in this checkout (O2 'Registry input' from docs/charter/figure_organization_spec.md §7 has not merged) — family NOT registered; register it once O2 lands."
+}
