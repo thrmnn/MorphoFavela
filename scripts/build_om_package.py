@@ -29,6 +29,9 @@ Builds, per requested route:
   neighbourhoods crossed (printed + saved)
   manifest.json: package_version, crs, use_terms, relative paths, sha256
        per file (computed last, over every file this run wrote)
+  outputs/_packages/mare_om2/index.html: the package page (stable URL
+       across versions), rebuilt from this run's outputs by
+       scripts/build_om_package_page.py — see that module for its content.
 
 Run:
     python scripts/build_om_package.py --route OM2 --root /home/theo/SCL/SCR/MorphoFavela
@@ -43,6 +46,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # for build_om_package_page,
+# a sibling module — needed when this file is loaded via importlib (tests)
+# rather than run as `python scripts/build_om_package.py`.
 
 import geopandas as gpd
 import pandas as pd
@@ -58,6 +64,8 @@ from src.om_package.quality import write_quality_report
 from src.om_package.routes import compute_route_geometry_flag, densify_route, route_length_m
 from src.om_package.shade import build_empty_shade_table
 from src.om_package.ventilation import compute_ventilation_proxies
+
+from build_om_package_page import build_page as build_om_package_page
 
 ALL_ROUTES = ["OM_1", "OM_2", "OM_3", "OM_4"]
 CRS = "EPSG:31983"
@@ -206,6 +214,9 @@ def main() -> int:
         f"[build_om_package] route_geometry_flag: {n_route_geometry_flagged}/{n_om2_points} OM2 points flagged; "
         f"lambda_p=1.0 explained by flag: {n_lambda_p_ones_flagged}/{n_lambda_p_ones} ({lambda_p_share_explained_pct}%)"
     )
+
+    page_path = build_om_package_page(paths.root)
+    print(f"[build_om_package] rebuilt package page: {page_path}")
 
     return 0
 
