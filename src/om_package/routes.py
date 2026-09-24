@@ -41,6 +41,14 @@ PEDESTRIAN_HEIGHT_M = 1.5
 #: OM2 is sampled every 1 m along the chained route (P-02).
 POINT_SPACING_M = 1.0
 
+#: PI ruling 2026-09-24 — a point's route geometry is flagged if it falls
+#: inside a building footprint (the OSM-inferred route cut through a
+#: building) or lands farther than this from the nearest real street
+#: centreline (the inferred route drifted off the street network). Both
+#: are signs of route-inference defect, not a real point-level property —
+#: see route_geometry_flag in the data dictionary.
+ROUTE_FLAG_MAX_STREET_DIST_M = 10.0
+
 _TO_UTM = Transformer.from_crs(WGS84, UTM23S, always_xy=True)
 
 
@@ -189,3 +197,30 @@ def densify_route(path: Path, spacing_m: float = POINT_SPACING_M) -> gpd.GeoData
 def route_length_m(path: Path) -> float:
     _, line = route_line_utm(path)
     return line.length
+
+
+def compute_route_geometry_flag(points_gdf: gpd.GeoDataFrame, paths) -> pd.Series:
+    """route_geometry_flag: True where a point is within a ``buildings_mare``
+    footprint, OR farther than ``ROUTE_FLAG_MAX_STREET_DIST_M`` from the
+    nearest ``street_mare`` centreline (PI ruling, 2026-09-24). Both flag a
+    point where the OSM-inferred route (this package's only route source in
+    v0.1) has drifted off the street the team actually walked.
+
+    ``point_id`` stays stable and provisional either way — it is minted from
+    the OSM-inferred route, not this flag. v0.2 rebuilds on the team's
+    om_routes.gpkg and publishes an old->new point_id crosswalk.
+    """
+    pts = points_gdf[["point_id", "geometry"]]
+
+    buildings = gpd.read_file(paths.buildings_mare)[["geometry"]]
+    within = gpd.sjoin(pts, buildings, how="left", predicate="within")
+    in_building = within.groupby("point_id")["index_right"].apply(lambda s: s.notna().any())
+
+    streets = gpd.read_file(paths.street_mare)[["geometry"]]
+    nearest = gpd.sjoin_nearest(pts, streets, how="left", distance_col="_street_dist_m")
+    nearest_dist = nearest.groupby("point_id")["_street_dist_m"].min()
+
+    flag = pts["point_id"].map(in_building).fillna(False).to_numpy().astype(bool) | (
+        pts["point_id"].map(nearest_dist).to_numpy() > ROUTE_FLAG_MAX_STREET_DIST_M
+    )
+    return pd.Series(flag, index=points_gdf.index, name="route_geometry_flag", dtype=bool)

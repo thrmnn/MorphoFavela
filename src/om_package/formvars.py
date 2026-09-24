@@ -15,6 +15,8 @@ Sources (all EPSG:31983):
   - plan_density_lambda_p: outputs/maré/features/features_grid.parquet
     (10 m grid cell containing/nearest the point), lambda_p = building
     footprint area fraction per cell.
+  - grid_cell_id: that same nearest features_grid cell's zone_id, so
+    downstream models can cluster/group by the 10 m grid a point falls in.
   - sky_view_factor: outputs/maré/svf_v2/svf_streets.gpkg 'svf', ray-cast
     at 1.5 m pedestrian height against the buildings+DTM mesh (src/svf_v2).
   - street_orientation_deg: computed directly from OM2's own chained
@@ -74,11 +76,16 @@ def compute_form_variables(points_gdf: gpd.GeoDataFrame, paths: Paths) -> pd.Dat
     out["sky_view_factor"] = svf_join["svf"]
     out["sky_view_factor_join_dist_m"] = svf_join["_join_dist_m"]
 
-    grid = pd.read_parquet(paths.features_grid, columns=["centroid_x", "centroid_y", "lambda_p"])
+    grid = pd.read_parquet(paths.features_grid, columns=["centroid_x", "centroid_y", "lambda_p", "zone_id"])
     grid_xy = grid[["centroid_x", "centroid_y"]].to_numpy()
-    grid_join = nearest_join(xy, grid_xy, grid[["lambda_p"]].reset_index(drop=True), MAX_JOIN_DIST_GRID_M)
+    grid_join = nearest_join(xy, grid_xy, grid[["lambda_p", "zone_id"]].reset_index(drop=True), MAX_JOIN_DIST_GRID_M)
     out["plan_density_lambda_p"] = grid_join["lambda_p"]
     out["plan_density_join_dist_m"] = grid_join["_join_dist_m"]
+    # grid_cell_id: features_grid.zone_id from the SAME join used for
+    # plan_density_lambda_p, so models can cluster the 10 m-grid variables
+    # (must-fix 4, panel 2026-09-24). Int cast: nearest_join leaves an
+    # unjoined row as NaN (float); Int64 keeps that nullable.
+    out["grid_cell_id"] = grid_join["zone_id"].astype("Int64")
 
     out["street_orientation_deg"] = compute_street_orientation_deg(points_gdf)
 

@@ -5,6 +5,7 @@ retired), it doesn't vanish. v0.1 has no retired variables yet.
 from __future__ import annotations
 
 from .buffers import BUFFER_RADII_M
+from .routes import ROUTE_FLAG_MAX_STREET_DIST_M
 
 # id -> {definition, unit, source, method, limits, status}
 # status: "computed" (present as a real column in v0.1's tables) or
@@ -12,11 +13,19 @@ from .buffers import BUFFER_RADII_M
 # place that enumerates every variable this package will ever carry).
 _BASE: dict[str, dict] = {
     "point_id": {
-        "definition": "Stable OM2 point identifier, e.g. OM2-000042.",
+        "definition": "PROVISIONAL point identifier, e.g. OM2-000042 — minted on the OSM-inferred route, not the team's own walked route.",
         "unit": "-",
         "source": "Octopus route file (Google Drive, PI-owned) + this package's code",
-        "method": "route_id + zero-padded integer metres from route start (deterministic; stable across rebuilds of the same route file)",
-        "limits": "Not comparable across different route files for the same OM route if the source route JSON changes.",
+        "method": "route_id + zero-padded integer metres from route start (deterministic; stable across rebuilds of the same OSM-inferred route file)",
+        "limits": "PROVISIONAL: the ID string is stable, but the place it names may move once v0.2 rebuilds on the team's om_routes.gpkg — a published old->new point_id crosswalk will accompany that release. Not comparable across different route files for the same OM route if the source route JSON changes.",
+        "status": "computed",
+    },
+    "route_geometry_flag": {
+        "definition": "True where the OSM-inferred route is defective at this point: it falls inside a building footprint, or lands off the real street network.",
+        "unit": "bool",
+        "source": "data/maré/raw/buildings_mare.shp, data/maré/raw/street_mare.shp",
+        "method": f"within(buildings_mare) OR distance-to-nearest(street_mare centreline) > {ROUTE_FLAG_MAX_STREET_DIST_M:.0f} m (src/om_package/routes.py compute_route_geometry_flag)",
+        "limits": "Only catches route-inference defects visible against these two layers; a route that is on-street but still not the team's actual walked path is not caught. See the README's route_geometry_flag caveat for the measured share of plan_density_lambda_p == 1.0 points this explains.",
         "status": "computed",
     },
     "route_id": {
@@ -87,7 +96,7 @@ _BASE: dict[str, dict] = {
         "definition": "Fraction of the sky hemisphere visible at this point (airborne).",
         "unit": "fraction [0,1]", "source": "outputs/maré/svf_v2/svf_streets.gpkg column svf",
         "method": "nearest-neighbour join (<=15 m); ray-cast at 1.5 m pedestrian height against a buildings+DTM mesh (src/svf_v2, 145-patch Tregenza sky)",
-        "limits": "Airborne (2019 buildings) only; NaN beyond 15 m of any SVF sample.",
+        "limits": "UPPER BOUND under canopy: the ray-cast mesh is buildings + bare-earth terrain only, no vegetation, so a tree-covered point's real sky view is <= this value, never more. Airborne (2019 buildings) only; NaN beyond 15 m of any SVF sample.",
         "status": "computed",
     },
     "sky_view_factor_join_dist_m": {
@@ -99,12 +108,18 @@ _BASE: dict[str, dict] = {
         "definition": "Building footprint area fraction of the 10 m grid cell nearest this point.",
         "unit": "fraction [0,1]", "source": "outputs/maré/features/features_grid.parquet column lambda_p",
         "method": "nearest-neighbour join (<=12 m) to grid cell centroid; lambda_p from src/urban_morphology.py",
-        "limits": "10 m-cell resolution, not a point-native measurement; NaN beyond 12 m of any grid cell centroid.",
+        "limits": "10 m-cell resolution, not a point-native measurement; NaN beyond 12 m of any grid cell centroid. Some lambda_p == 1.0 points are a route_geometry_flag defect (route cuts through a building) rather than a real fully-built cell — see the README's route_geometry_flag caveat for the measured split.",
         "status": "computed",
     },
     "plan_density_join_dist_m": {
         "definition": "Distance from the OM2 point to the features_grid cell centroid used for plan_density_lambda_p.",
         "unit": "m", "source": "this package", "method": "nearest-neighbour KDTree distance", "limits": "-",
+        "status": "computed",
+    },
+    "grid_cell_id": {
+        "definition": "features_grid.zone_id of the same 10 m grid cell used for plan_density_lambda_p, so downstream models can cluster/group by grid cell (adjacent OM2 points are not independent).",
+        "unit": "-", "source": "outputs/maré/features/features_grid.parquet column zone_id",
+        "method": "same nearest-neighbour join (<=12 m) as plan_density_lambda_p — same source row, so the two columns are always consistent", "limits": "NaN (nullable Int64) beyond 12 m of any grid cell centroid, same gap as plan_density_lambda_p.",
         "status": "computed",
     },
     "street_orientation_deg": {
@@ -122,10 +137,10 @@ _BASE: dict[str, dict] = {
         "status": "computed",
     },
     "ventilation_frontal_area_proxy": {
-        "definition": "PROXY for windward obstruction — Oke (1988) frontal-area density of the nearest 10 m grid cell.",
+        "definition": "PROXY for OMNIDIRECTIONAL obstruction density — Oke (1988) frontal-area density of the nearest 10 m grid cell, averaged over 8 compass directions. Not windward-specific by itself; see the lambda_f_<dir> columns for that.",
         "unit": "proxy, lambda_f (dimensionless)", "source": "outputs/maré/features/features_grid.parquet column lambda_f_mean",
         "method": "nearest-neighbour join (<=12 m); lambda_f_mean = mean over 8 compass directions, src/urban_morphology.py",
-        "limits": "PROXY, not a simulated flow field. 10 m-cell resolution.",
+        "limits": "PROXY, not a simulated flow field; isotropic buffer, so it says nothing about upwind fetch on its own. 10 m-cell resolution.",
         "status": "computed",
     },
     "ventilation_openness_proxy": {
@@ -142,6 +157,40 @@ _BASE: dict[str, dict] = {
         "limits": "PROXY. Threshold (0.05) is a modelling choice, not a measured open-space boundary; grid-cell resolution 10 m.",
         "status": "computed",
     },
+}
+
+_DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+for _d in _DIRECTIONS:
+    _BASE[f"lambda_f_{_d}"] = {
+        "definition": f"Frontal-area density (Oke 1988) of the nearest 10 m grid cell, facing {_d}.",
+        "unit": "dimensionless", "source": f"outputs/maré/features/features_grid.parquet column lambda_f_{_d}",
+        "method": "nearest-neighbour join (<=12 m), same join as ventilation_frontal_area_proxy; src/urban_morphology.py",
+        "limits": "Geometry-derived, not a simulated flow field. 10 m-cell resolution; NaN beyond 12 m of any grid cell centroid.",
+        "status": "computed",
+    }
+del _d
+
+# P-03 segment columns (scripts/aggregate_om_points.py output — must-fix 4).
+_BASE["segment_id"] = {
+    "definition": "0-based segment index along the route, at the chosen segment length.",
+    "unit": "-", "source": "src/om_package/segments.py aggregate_to_segments",
+    "method": "distance_along_m // segment_length_m", "limits": "Segment length is a caller choice (scripts/aggregate_om_points.py), not fixed at build time — not comparable across two outputs built with different segment lengths.",
+    "status": "computed",
+}
+_BASE["segment_start_m"] = {
+    "definition": "distance_along_m of the first point in this segment.",
+    "unit": "m", "source": "src/om_package/segments.py aggregate_to_segments", "method": "min(distance_along_m) per segment", "limits": "-",
+    "status": "computed",
+}
+_BASE["segment_end_m"] = {
+    "definition": "distance_along_m of the last point in this segment.",
+    "unit": "m", "source": "src/om_package/segments.py aggregate_to_segments", "method": "max(distance_along_m) per segment", "limits": "-",
+    "status": "computed",
+}
+_BASE["n_points"] = {
+    "definition": "Count of 1 m points aggregated into this segment.",
+    "unit": "count", "source": "src/om_package/segments.py aggregate_to_segments", "method": "group size", "limits": "The last segment of a route is typically shorter than segment_length_m, so it has fewer points.",
+    "status": "computed",
 }
 
 _BUFFER_TEMPLATES = {
@@ -175,9 +224,9 @@ _PENDING: dict[str, dict] = {
         "limits": "-", "status": "PENDING",
     },
     "tree_shade": {
-        "definition": "Whether tree canopy shades each OM2 point.",
+        "definition": "Whether tree canopy shades each OM2 point. RESERVED column in the shade table schema (SHADE_TABLE_COLUMNS) — present but always null, so the table's shape will not change again once this is computed.",
         "unit": "bool", "source": "PENDING — no DSM/canopy layer for Maré on disk",
-        "method": "PENDING", "limits": "-", "status": "PENDING",
+        "method": "PENDING", "limits": "Building-only shade (the 'shaded' column) releases once campaign dates are known; tree_shade stays null until a canopy/DSM layer exists.", "status": "PENDING",
     },
     "airborne_vs_terrestrial_comparison": {
         "definition": "Comparison of airborne vs. terrestrial form-variable estimates along OM2.",
@@ -185,14 +234,14 @@ _PENDING: dict[str, dict] = {
         "method": "PENDING", "limits": "-", "status": "PENDING",
     },
     "height_change_2024_2026": {
-        "definition": "Change in building/canopy height between the 2019 airborne source and the 2026 OM2 field campaign.",
-        "unit": "m", "source": "PENDING — no 2024/2026 height re-survey on disk",
-        "method": "PENDING", "limits": "-", "status": "PENDING",
+        "definition": "Change in building/canopy height between the 2024 airborne LiDAR and the 2026 OM2 terrestrial field campaign.",
+        "unit": "m", "source": "PENDING — data location being confirmed by T. Hermann",
+        "method": "PENDING", "limits": "Name kept as height_change_2024_2026 for now; will be revisited (e.g. renamed to height_change_2019_2026) once the 2024 airborne dataset's existence and location are confirmed.", "status": "PENDING",
     },
 }
 
 _SHADE_TABLE_ONLY = {
-    "timestamp": {"definition": "Local clock timestamp of a shade evaluation (5-min step).", "unit": "datetime (America/Sao_Paulo)", "source": "src/om_package/shade.py", "method": "pd.date_range over the requested time window", "limits": "-", "status": "PENDING"},
+    "timestamp": {"definition": "Clock timestamp of a shade evaluation (5-min step).", "unit": "datetime (timezone UNRESOLVED — see src/om_package/shade.py module docstring; tz is a required, no-default parameter of every shade/join function)", "source": "src/om_package/shade.py", "method": "pd.date_range over the requested time window", "limits": "-", "status": "PENDING"},
     "date": {"definition": "Calendar date of a shade evaluation.", "unit": "date", "source": "src/om_package/shade.py", "method": "-", "limits": "-", "status": "PENDING"},
     "sun_altitude_deg": {"definition": "Apparent solar elevation at the evaluation timestamp.", "unit": "degrees", "source": "pvlib.solarposition.get_solarposition", "method": "-", "limits": "-", "status": "PENDING"},
     "sun_azimuth_deg": {"definition": "Solar azimuth (clockwise from north) at the evaluation timestamp.", "unit": "degrees", "source": "pvlib.solarposition.get_solarposition", "method": "-", "limits": "-", "status": "PENDING"},

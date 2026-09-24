@@ -39,11 +39,16 @@ def coverage_report(df: pd.DataFrame, variable_cols: list[str]) -> dict:
             "coverage_fraction": float(valid.sum()) / n if n else 0.0,
             "missing_point_ids": df.loc[~valid, "point_id"].tolist() if "point_id" in df.columns else [],
         }
-    return {
+    report = {
         "n_points": n,
         "columns": per_column,
         "pending_items": PENDING_ITEMS,
     }
+    if "route_geometry_flag" in df.columns:
+        # PI ruling 2026-09-24 (must-fix 1): count points where the
+        # OSM-inferred route falls inside a building or off the street.
+        report["route_geometry_flagged_points"] = int(df["route_geometry_flag"].sum())
+    return report
 
 
 def write_quality_report(df: pd.DataFrame, variable_cols: list[str], out_dir: Path, stem: str = "p07_quality_report"):

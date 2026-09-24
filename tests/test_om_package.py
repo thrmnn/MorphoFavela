@@ -7,21 +7,51 @@ integration tests, e.g. tests/test_wp01_footprints.py).
 """
 from __future__ import annotations
 
+import hashlib
+import importlib.util
+from pathlib import Path
+
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pytest
+from shapely.geometry import Point
 
 from src.om_package.buffers import BUFFER_RADII_M, compute_buffer_variables
 from src.om_package.dictionary import dictionary_dataframe, full_dictionary
 from src.om_package.formvars import compute_form_variables
-from src.om_package.io_utils import Paths
-from src.om_package.quality import PENDING_ITEMS
-from src.om_package.routes import POINT_SPACING_M, densify_route, stable_point_id
+from src.om_package.io_utils import Paths, hash_tree, write_table
+from src.om_package.package_docs import USE_TERMS, render_readme
+from src.om_package.quality import PENDING_ITEMS, coverage_report
+from src.om_package.routes import (
+    POINT_SPACING_M,
+    ROUTE_FLAG_MAX_STREET_DIST_M,
+    compute_route_geometry_flag,
+    densify_route,
+    stable_point_id,
+)
 from src.om_package.segments import aggregate_to_segments
-from src.om_package.shade import SHADE_TABLE_COLUMNS, build_empty_shade_table
-from src.om_package.ventilation import compute_ventilation_proxies
+from src.om_package.shade import (
+    SHADE_TABLE_COLUMNS,
+    build_empty_shade_table,
+    drop_nofix_rows,
+    infer_campaign_windows,
+    sun_positions,
+)
+from src.om_package.ventilation import LAMBDA_F_DIRECTION_COLS, compute_ventilation_proxies
 
 PATHS = Paths()
+
+
+def _load_build_module():
+    """scripts/build_om_package.py isn't a package — load it by path so its
+    small pure helpers (route_output_dir) are unit-testable without paying
+    for a full 4-route build."""
+    repo_root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location("build_om_package", repo_root / "scripts" / "build_om_package.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 pytestmark = pytest.mark.skipif(
     not PATHS.route_json("OM_2").exists(), reason="Maré/Octopus data not present at the default root"
 )
@@ -161,7 +191,8 @@ def test_dictionary_covers_every_output_column(om2_points_small):
     form = compute_form_variables(om2_points_small, PATHS)
     vent = compute_ventilation_proxies(om2_points_small, form["street_orientation_deg"].to_numpy(), PATHS)
     buf = compute_buffer_variables(om2_points_small, PATHS)
-    points_cols = set(om2_points_small.drop(columns="geometry").columns) | {"x", "y"}
+    flag_col = compute_route_geometry_flag(om2_points_small, PATHS)
+    points_cols = set(om2_points_small.drop(columns="geometry").columns) | {"x", "y", flag_col.name}
     all_cols = points_cols | set(form.columns) | set(vent.columns) | set(buf.columns)
     all_cols -= {"point_id"}  # join key, already covered once
 
@@ -178,3 +209,179 @@ def test_no_dictionary_row_is_orphaned_from_a_real_table():
 
     known_sources = set(_BASE) | {t.format(r=r) for t in _BUFFER_TEMPLATES for r in BUFFER_RADII_M} | set(_PENDING) | set(_SHADE_TABLE_ONLY)
     assert set(full_dictionary()) == known_sources
+
+
+def test_segment_columns_have_dictionary_rows():
+    dict_ids = set(dictionary_dataframe()["id"])
+    for col in ("segment_id", "segment_start_m", "segment_end_m", "n_points"):
+        assert col in dict_ids
+
+
+# --- must-fix 2: OM2-only in the shared package path -----------------------
+
+def test_om2_only_route_output_dir(tmp_path):
+    mod = _load_build_module()
+    shared = tmp_path / "mare_om2" / "v0.1.1"
+    internal = tmp_path / "_internal" / "mare_routes" / "v0.1.1"
+    assert mod.route_output_dir("OM_2", shared, internal) == shared
+    for om in ("OM_1", "OM_3", "OM_4"):
+        assert mod.route_output_dir(om, shared, internal) == internal
+
+
+# --- must-fix 1: route_geometry_flag ---------------------------------------
+
+def test_route_geometry_flag_is_boolean_and_aligned(om2_points_small):
+    flag = compute_route_geometry_flag(om2_points_small, PATHS)
+    assert len(flag) == len(om2_points_small)
+    assert flag.dtype == bool
+    assert list(flag.index) == list(om2_points_small.index)
+
+
+def test_route_geometry_flag_counted_in_quality_report(om2_points_small):
+    df = om2_points_small.copy()
+    df["route_geometry_flag"] = compute_route_geometry_flag(om2_points_small, PATHS).to_numpy()
+    df["dummy"] = 1.0
+    report = coverage_report(df, ["dummy", "route_geometry_flag"])
+    assert report["route_geometry_flagged_points"] == int(df["route_geometry_flag"].sum())
+
+
+def test_route_flag_threshold_is_10m():
+    assert ROUTE_FLAG_MAX_STREET_DIST_M == 10.0
+
+
+# --- must-fix 4: schema freeze ----------------------------------------------
+
+def test_lambda_f_direction_columns_joined(om2_points_small):
+    form = compute_form_variables(om2_points_small, PATHS)
+    vent = compute_ventilation_proxies(om2_points_small, form["street_orientation_deg"].to_numpy(), PATHS)
+    assert len(LAMBDA_F_DIRECTION_COLS) == 8
+    for col in LAMBDA_F_DIRECTION_COLS:
+        assert col in vent.columns
+
+
+def test_grid_cell_id_present(om2_points_small):
+    form = compute_form_variables(om2_points_small, PATHS)
+    assert "grid_cell_id" in form.columns
+
+
+def test_shade_table_reserves_tree_shade_column():
+    assert "tree_shade" in SHADE_TABLE_COLUMNS
+    t = build_empty_shade_table()
+    assert "tree_shade" in t.columns
+
+
+# --- must-fix 5: timezone is a required parameter, no default --------------
+
+def test_sun_positions_requires_tz():
+    with pytest.raises(TypeError):
+        sun_positions(["2026-01-01"], ("08:00", "18:00"), 5, -22.86, -43.24)
+
+
+def test_drop_nofix_rows_removes_zero_zero_sentinel():
+    df = pd.DataFrame(
+        {
+            "Latitude": [-22.86, 0.0, -22.87],
+            "Longitude": [-43.24, 0.0, -43.25],
+            "Temperature": [28.0, 29.0, 27.5],
+        }
+    )
+    out = drop_nofix_rows(df)
+    assert len(out) == 2
+    assert not ((out["Latitude"] == 0.0) & (out["Longitude"] == 0.0)).any()
+
+
+def test_infer_campaign_windows(tmp_path):
+    csv_path = tmp_path / "log0.csv"
+    csv_path.write_text(
+        "Timestamp,Latitude,Longitude,Temperature\n"
+        "2026-03-01 08:00:00,-22.860,-43.240,27.5\n"
+        "2026-03-01 08:00:05,0.0,0.0,27.6\n"
+        "2026-03-01 08:00:10,-22.861,-43.241,27.6\n"
+    )
+    windows = infer_campaign_windows([csv_path])
+    assert len(windows) == 1
+    row = windows.iloc[0]
+    assert str(row["date"]) == "2026-03-01"
+    assert row["n_rows"] == 3
+    assert row["n_fix"] == 2
+    assert row["n_no_fix"] == 1
+    assert row["first_timestamp"] == pd.Timestamp("2026-03-01 08:00:00")
+    assert row["last_timestamp"] == pd.Timestamp("2026-03-01 08:00:10")
+
+
+# --- must-fix 7: manifest and GeoParquet -------------------------------------
+
+def test_hash_tree_matches_file_contents(tmp_path):
+    (tmp_path / "a.txt").write_text("hello")
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    (sub / "b.txt").write_text("world")
+
+    hashes = hash_tree(tmp_path)
+    assert hashes["a.txt"] == hashlib.sha256(b"hello").hexdigest()
+    assert hashes["sub/b.txt"] == hashlib.sha256(b"world").hexdigest()
+    assert set(hashes) == {"a.txt", "sub/b.txt"}
+
+
+def test_write_table_geo_keeps_geoparquet_metadata_and_xy(tmp_path):
+    gdf = gpd.GeoDataFrame(
+        {"point_id": ["p0", "p1"]}, geometry=[Point(0, 0), Point(1, 1)], crs="EPSG:31983"
+    )
+    written = write_table(gdf, tmp_path, "test_points", geo=True)
+    pq_path = tmp_path / "test_points.parquet"
+    assert pq_path in written
+
+    roundtrip = gpd.read_parquet(pq_path)
+    assert "geometry" in roundtrip.columns
+    assert roundtrip.crs is not None
+    assert list(roundtrip["x"]) == [0.0, 1.0]
+    assert list(roundtrip["y"]) == [0.0, 1.0]
+
+    csv_df = pd.read_csv(tmp_path / "test_points.csv")
+    assert "geometry" not in csv_df.columns
+    assert "x" in csv_df.columns and "y" in csv_df.columns
+
+
+# --- must-fix 3: use-terms banner, no PLACEHOLDER --------------------------
+
+_README_STATS = dict(
+    n_om2_points=1559,
+    n_route_geometry_flagged=38,
+    n_lambda_p_ones=124,
+    n_lambda_p_ones_flagged=38,
+    lambda_p_share_explained_pct=30.6,
+)
+
+
+def test_readme_has_no_placeholder():
+    readme = render_readme(**_README_STATS)
+    assert "PLACEHOLDER" not in readme
+
+
+def test_readme_has_use_terms_banner():
+    readme = render_readme(**_README_STATS)
+    assert USE_TERMS in readme
+    assert readme.strip().startswith(">")
+
+
+def test_readme_states_om2_only_release_scope():
+    readme = render_readme(**_README_STATS)
+    assert "OM2 only" in readme
+    assert "_internal" in readme
+
+
+def test_readme_has_how_to_cite_acknowledgment():
+    readme = render_readme(**_README_STATS)
+    assert "Théo Hermann" in readme
+    assert "How to cite" in readme
+
+
+def test_readme_no_pending_surface_cover_row():
+    readme = render_readme(**_README_STATS)
+    coverage_section = readme.split("## Coverage vs Table 1")[1].split("## CRS")[0]
+    assert "surface structure only" in coverage_section
+    assert "façade materials" in coverage_section
+    # the panel's suggested PENDING surface-cover row was overruled (PI, 2026-09-24)
+    from src.om_package.dictionary import _PENDING
+
+    assert not any("surface_cover" in k or "surface cover" in v.get("definition", "").lower() for k, v in _PENDING.items())
