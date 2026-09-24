@@ -277,3 +277,79 @@ def test_riodaspedras_street_crossreference(sky, directions_weights, tmp_path):
     assert r >= 0.98 and median_abs_delta <= 0.03, (
         f"accepted floor failed for best variant '{best_name}': r={r:.4f} (need >=0.98), "
         f"median|delta|={median_abs_delta:.4f} (need <=0.03)")
+
+
+# ---------------------------------------------------------------------------
+# 6. WP04MARE: territory="citywide" (the default) is byte-identical to
+#    pre-WP04MARE behaviour — the site polygon equals match_favela_polygon's
+#    own union, for every site, and equals site_polygon()'s own output too.
+# ---------------------------------------------------------------------------
+
+def test_default_territory_matches_citywide_site_polygon():
+    favelas_path = MAIN_CHECKOUT / "data/RJ/Favelas_Limit_2019.shp"
+    if not favelas_path.exists():
+        pytest.skip(f"Favelas_Limit_2019.shp not on disk: {favelas_path}")
+
+    import geopandas as gpd
+    from shapely.ops import unary_union
+
+    target_crs = "EPSG:31983"
+    gdf = gpd.read_file(favelas_path)
+
+    for site_key, display_name in wp04_sites.SITES:
+        # 1. resolve_site_polygon's default territory ("citywide") reproduces
+        #    site_polygon() exactly — same function call, but prove it rather
+        #    than assume it, since it is a public seam other callers rely on.
+        poly_default, method_default, matched_default = wp04_sites.resolve_site_polygon(
+            site_key, display_name, favelas_path, target_crs, wp04_sites.TERRITORY_CITYWIDE, MAIN_CHECKOUT,
+        )
+        poly_direct, method_direct, matched_direct = wp04_sites.site_polygon(
+            favelas_path, display_name, target_crs
+        )
+        assert method_default == method_direct
+        assert matched_default == matched_direct
+        assert poly_default.equals(poly_direct), f"{site_key}: resolve_site_polygon(citywide) != site_polygon()"
+
+        # 2. ...and both equal match_favela_polygon's own union directly —
+        #    the ground truth this whole seam must never drift from.
+        matched, _method = wp04_sites.match_favela_polygon(gdf, display_name)
+        matched_31983 = matched.to_crs(target_crs) if str(matched.crs) != target_crs else matched
+        poly_ground_truth = unary_union(matched_31983.geometry.values)
+        assert poly_default.equals(poly_ground_truth), (
+            f"{site_key}: default (citywide) territory polygon != match_favela_polygon's own union"
+        )
+
+
+def test_study_area_territory_is_maré_registered_study_area():
+    """territory="study_area" pulls Maré's polygon from
+    src.sites.territory.load_territory — never a typed path — and it is a
+    genuinely different (larger) polygon than the citywide favela match."""
+    from src.sites.territory import load_territory
+
+    favelas_path = MAIN_CHECKOUT / "data/RJ/Favelas_Limit_2019.shp"
+    if not favelas_path.exists() or not (MAIN_CHECKOUT / "data/maré").exists():
+        pytest.skip("Favelas_Limit_2019.shp or data/maré not on disk")
+
+    target_crs = "EPSG:31983"
+    poly_sa, method_sa, matched_sa = wp04_sites.resolve_site_polygon(
+        "maré", "Maré", favelas_path, target_crs, wp04_sites.TERRITORY_STUDY_AREA, MAIN_CHECKOUT,
+    )
+    t = load_territory("maré", root=MAIN_CHECKOUT)
+    assert method_sa == "territory_study_area"
+    assert poly_sa.equals(t.study_area)
+    assert matched_sa[0]["territory_study_area_kind"] == "polygon_file"
+
+    poly_citywide, _method, _matched = wp04_sites.site_polygon(favelas_path, "Maré", target_crs)
+    assert poly_sa.area > poly_citywide.area * 2, (
+        "Maré's study_area territory should be substantially larger than the "
+        f"6-polygon citywide match ({poly_sa.area / 1e6:.3f} km² vs "
+        f"{poly_citywide.area / 1e6:.3f} km²)"
+    )
+
+
+def test_invalid_territory_rejected():
+    favelas_path = MAIN_CHECKOUT / "data/RJ/Favelas_Limit_2019.shp"
+    with pytest.raises(ValueError):
+        wp04_sites.resolve_site_polygon(
+            "vidigal", "Vidigal", favelas_path, "EPSG:31983", "bogus_territory", MAIN_CHECKOUT,
+        )

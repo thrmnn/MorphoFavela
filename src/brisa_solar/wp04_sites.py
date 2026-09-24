@@ -156,6 +156,51 @@ def site_polygon(favelas_path: Path, display_name: str, target_crs):
     return poly, method, matched_polygons
 
 
+#: territories `resolve_site_polygon` accepts. "citywide" (the default) is
+#: today's behaviour, byte-identical: it is a pure passthrough to
+#: site_polygon() — see test_default_territory_matches_citywide_site_polygon
+#: (tests/test_wp04_sites.py), which proves it for all five sites. "study_area"
+#: is the WP04MARE addition: a site's own registered study area
+#: (src.sites.territory.load_territory, config/sites.yaml), e.g. for Maré the
+#: IPP Territórios Sociais outline (3.357 km²) PI-promoted 2026-09-24 in place
+#: of the 6-polygon Favelas_Limit_2019 match (0.84 km²) that P1's run of
+#: record (and the WP-07 ledger) still uses and must keep using unchanged.
+TERRITORY_CITYWIDE = "citywide"
+TERRITORY_STUDY_AREA = "study_area"
+TERRITORIES = (TERRITORY_CITYWIDE, TERRITORY_STUDY_AREA)
+
+
+def resolve_site_polygon(
+    site_key: str, display_name: str, favelas_path: Path, target_crs, territory: str, data_root: Path,
+):
+    """Ground/street observer boundary for one site, selected by `territory`.
+
+    citywide (default) -> site_polygon()'s Favelas_Limit_2019 match, exactly
+    as before this function existed. study_area -> the site's registered
+    study area (never a typed path — src.sites.territory.load_territory's
+    own geometry), reprojected to `target_crs` only if the two CRSs differ
+    (territory geometry is always EPSG:31983 per src.sites.territory._to_31983).
+    """
+    if territory == TERRITORY_CITYWIDE:
+        return site_polygon(favelas_path, display_name, target_crs)
+    if territory != TERRITORY_STUDY_AREA:
+        raise ValueError(f"unknown territory {territory!r} — expected one of {TERRITORIES}")
+
+    from src.sites.territory import load_territory
+
+    t = load_territory(site_key, root=data_root)
+    poly = t.study_area
+    if str(target_crs) != "EPSG:31983":
+        poly = gpd.GeoSeries([poly], crs=31983).to_crs(target_crs).iloc[0]
+    sa_prov = t.provenance["study_area"]
+    matched_polygons = [{
+        "territory_study_area_kind": sa_prov.get("kind"),
+        "territory_study_area_path": sa_prov.get("path"),
+        "territory_study_area_area_m2": sa_prov.get("area_m2"),
+    }]
+    return poly, "territory_study_area", matched_polygons
+
+
 # ---------------------------------------------------------------------------
 # Surface + ground grid
 # ---------------------------------------------------------------------------
@@ -536,6 +581,9 @@ def quantiles(values: np.ndarray) -> dict:
 def run_site(
     site_key: str, display_name: str, run_dir: Path, *, data_root: Path,
     directions, weights, sky, meta, params, device: str,
+    territory: str = TERRITORY_CITYWIDE,
+    surfaces: tuple[str, ...] = ("ground", "street", "facade"),
+    pilot_window_m: float | None = None,
 ) -> dict:
     site_dir = run_dir / site_key
     site_dir.mkdir(parents=True, exist_ok=True)
@@ -553,10 +601,35 @@ def run_site(
     surface, transform, crs, is_building, building_id_raster, ground_surface, dtm_path, fp_path = (
         build_site_surface(site_key, data_root, CELL_M, tmp_dir)
     )
-    polygon, match_method, matched_polygons = site_polygon(favelas_path, display_name, crs)
+    polygon, match_method, matched_polygons = resolve_site_polygon(
+        site_key, display_name, favelas_path, crs, territory, data_root
+    )
+    if pilot_window_m is not None:
+        assert territory == TERRITORY_STUDY_AREA, (
+            "pilot_window_m is only wired through street's boundary_gdf for "
+            "territory=study_area (citywide's street boundary stays the "
+            "unmodified native boundary file for byte-identical default "
+            "behaviour) — a citywide pilot would time ground on a cropped "
+            "window but street on the full boundary, an inconsistent pilot."
+        )
+        # PILOT TIMING ONLY — never the run of record. Shrinks the resolved
+        # territory polygon to a square window of side `pilot_window_m`
+        # centred on its own centroid, so a pilot exercises the exact same
+        # surface build / engine / chunked-write path as the full run, at a
+        # measured, reproducible fraction of its point count.
+        cx, cy = polygon.centroid.x, polygon.centroid.y
+        half = pilot_window_m / 2.0
+        from shapely.geometry import box as _box
+        window = _box(cx - half, cy - half, cx + half, cy + half)
+        polygon = polygon.intersection(window)
+        matched_polygons = matched_polygons + [{
+            "pilot_window_m": pilot_window_m, "pilot_window_area_m2": float(polygon.area),
+        }]
 
     report = {
         "site_key": site_key, "display_name": display_name,
+        "territory": territory, "surfaces": list(surfaces),
+        "pilot_window_m": pilot_window_m,
         "match_method": match_method, "matched_polygons": matched_polygons,
         "surface_shape": list(surface.shape),
     }
@@ -570,7 +643,9 @@ def run_site(
 
     # --- ground ---
     ground_path = site_dir / "ground.parquet"
-    if ground_path.exists():
+    if "ground" not in surfaces:
+        pass
+    elif ground_path.exists():
         report["n_ground"] = int(pq_row_count(ground_path))
     else:
         obs = ground_grid_points(surface, transform, is_building, polygon)
@@ -582,17 +657,26 @@ def run_site(
 
     # --- street ---
     street_path = site_dir / "street.parquet"
-    if street_path.exists():
+    if "street" not in surfaces:
+        pass
+    elif street_path.exists():
         report["n_street"] = int(pq_row_count(street_path))
     else:
         native_dtm, native_fp, native_roads = resolve_native_paths(site_key, data_root)
         footprints_gdf = gpd.read_file(native_fp)
-        boundary_path = resolve_native_boundary(site_key, data_root)
-        # Clips road geometries to the community boundary before sampling — matches
-        # what produced the accepted CPU cross-reference (Rio das Pedras: 16,905
-        # points, test 5); without it, road segments outside the favela but inside
-        # the shapefile add ~34% extra points that were never part of that set.
-        boundary_gdf = gpd.read_file(boundary_path) if boundary_path is not None else None
+        if territory == TERRITORY_STUDY_AREA:
+            # Same registered study-area polygon that clips ground above
+            # (includes the pilot-window crop, when set) — not the native
+            # boundary file, which is a DIFFERENT declared boundary (the
+            # bairro data extent, config/sites.yaml `data_extent`).
+            boundary_gdf = gpd.GeoDataFrame(geometry=[polygon], crs=crs)
+        else:
+            boundary_path = resolve_native_boundary(site_key, data_root)
+            # Clips road geometries to the community boundary before sampling — matches
+            # what produced the accepted CPU cross-reference (Rio das Pedras: 16,905
+            # points, test 5); without it, road segments outside the favela but inside
+            # the shapefile add ~34% extra points that were never part of that set.
+            boundary_gdf = gpd.read_file(boundary_path) if boundary_path is not None else None
         street_pts = svf_sampling.sample_street_points(
             native_roads, native_dtm, footprints_gdf=footprints_gdf, boundary_gdf=boundary_gdf,
         )
@@ -610,7 +694,9 @@ def run_site(
 
     # --- façade ---
     facade_path = site_dir / "facade.parquet"
-    if facade_path.exists():
+    if "facade" not in surfaces:
+        pass
+    elif facade_path.exists():
         report["n_facade"] = int(pq_row_count(facade_path))
     else:
         native_dtm, native_fp, _native_roads = resolve_native_paths(site_key, data_root)
@@ -647,7 +733,8 @@ def run_site(
 
 
 def write_site_summary(
-    site_key: str, display_name: str, run_dir: Path, citywide_distribution: dict | None
+    site_key: str, display_name: str, run_dir: Path, citywide_distribution: dict | None,
+    surfaces: tuple[str, ...] = ("ground", "street", "facade"),
 ) -> dict:
     site_dir = run_dir / site_key
     # Only the numeric columns needed for quantiles — never the visibility_packed
@@ -657,9 +744,10 @@ def write_site_summary(
         ["svf", "kwh_m2"] + [f"hours_{l}" for l in ("winter_solstice", "equinox")]
         + [f"ge_{k}h_{l}" for k in (1, 2, 3, 4) for l in ("winter_solstice", "equinox")]
     )
-    ground_df = pd.read_parquet(site_dir / "ground.parquet", columns=summary_cols)
-    street_df = pd.read_parquet(site_dir / "street.parquet", columns=summary_cols)
-    facade_df = pd.read_parquet(site_dir / "facade.parquet", columns=summary_cols)
+    dfs = {}
+    for surf in ("ground", "street", "facade"):
+        if surf in surfaces:
+            dfs[surf] = pd.read_parquet(site_dir / f"{surf}.parquet", columns=summary_cols)
 
     status = "PROVISIONAL — wp05_run_design untapped" if citywide_distribution else "PROVISIONAL — no citywide distribution on disk"
 
@@ -679,26 +767,28 @@ def write_site_summary(
         "_utc": datetime.now(dt_timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "status": status,
         "site_key": site_key, "display_name": display_name,
-        "ground": surface_summary(ground_df),
-        "street": surface_summary(street_df),
-        "facade": surface_summary(facade_df),
+        "surfaces": list(surfaces),
     }
+    for surf, df in dfs.items():
+        summary[surf] = surface_summary(df)
 
-    ground_thresholds = {}
-    for k in (1, 2, 3, 4):
-        for label in ("winter_solstice", "equinox"):
-            col = f"ge_{k}h_{label}"
-            if col in ground_df.columns:
-                ground_thresholds[f"share_ge_{k}h_{label}"] = float(ground_df[col].mean())
-    summary["ground"]["threshold_shares"] = ground_thresholds
+    if "ground" in dfs:
+        ground_df = dfs["ground"]
+        ground_thresholds = {}
+        for k in (1, 2, 3, 4):
+            for label in ("winter_solstice", "equinox"):
+                col = f"ge_{k}h_{label}"
+                if col in ground_df.columns:
+                    ground_thresholds[f"share_ge_{k}h_{label}"] = float(ground_df[col].mean())
+        summary["ground"]["threshold_shares"] = ground_thresholds
 
-    if citywide_distribution is not None:
-        cw = citywide_distribution["citywide"]
-        summary["citywide_percentile"] = {
-            "status": citywide_distribution.get("status"),
-            "ground_svf_median_percentile": citywide_percentile(summary["ground"]["svf"]["median"], cw["svf"]),
-            "ground_kwh_m2_median_percentile": citywide_percentile(summary["ground"]["kwh_m2"]["median"], cw["kwh_m2"]),
-        }
+        if citywide_distribution is not None:
+            cw = citywide_distribution["citywide"]
+            summary["citywide_percentile"] = {
+                "status": citywide_distribution.get("status"),
+                "ground_svf_median_percentile": citywide_percentile(summary["ground"]["svf"]["median"], cw["svf"]),
+                "ground_kwh_m2_median_percentile": citywide_percentile(summary["ground"]["kwh_m2"]["median"], cw["kwh_m2"]),
+            }
 
     (site_dir / "summary.json").write_text(json.dumps(summary, indent=1))
     return summary
@@ -725,7 +815,26 @@ def main() -> int:
              "this run_dir before this invocation (WP-04F deliverable 4) — recorded in "
              "the manifest, not itself performed by this script",
     )
+    ap.add_argument(
+        "--territory", default=TERRITORY_CITYWIDE, choices=TERRITORIES,
+        help="citywide (default, byte-identical to pre-WP04MARE behaviour) or "
+             "study_area (src.sites.territory.load_territory(site).study_area — "
+             "e.g. Maré's promoted IPP Territórios Sociais outline)",
+    )
+    ap.add_argument(
+        "--surfaces", default="ground,street,facade",
+        help="comma-separated subset of ground,street,facade to compute "
+             "(default: all three, unchanged behaviour)",
+    )
+    ap.add_argument(
+        "--pilot-window-m", type=float, default=None,
+        help="PILOT TIMING ONLY: crop the resolved territory polygon to a "
+             "square window of this side length (m), centred on its own "
+             "centroid, before computing ground/street — never used for a "
+             "run of record. Requires --territory study_area.",
+    )
     args = ap.parse_args()
+    surfaces = tuple(s.strip() for s in args.surfaces.split(",") if s.strip())
 
     data_root = Path(args.data_root)
     params = load_params()
@@ -758,8 +867,9 @@ def main() -> int:
         report = run_site(
             site_key, display_name, run_dir, data_root=data_root,
             directions=directions, weights=weights, sky=sky, meta=meta, params=params, device=device,
+            territory=args.territory, surfaces=surfaces, pilot_window_m=args.pilot_window_m,
         )
-        summary = write_site_summary(site_key, display_name, run_dir, citywide_distribution)
+        summary = write_site_summary(site_key, display_name, run_dir, citywide_distribution, surfaces=surfaces)
         site_reports.append(report)
         site_summaries[site_key] = summary
         print(json.dumps(report, default=str), flush=True)
@@ -767,6 +877,9 @@ def main() -> int:
     sky_section = json.dumps(params["sky"], sort_keys=True)
     manifest = {
         "_utc": datetime.now(dt_timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "territory": args.territory,
+        "surfaces": list(surfaces),
+        "pilot_window_m": args.pilot_window_m,
         "sky": {"patches": int(P1_SKY_PATCHES)},
         "cell_m": CELL_M,
         "sky_model": "epw_weighted",
