@@ -63,6 +63,14 @@
     "unit": "%",
     "value": 74.11610129001433
   },
+  "mare_campaign_dominant_share_pct": {
+    "expression": "100 * max(row[str(t)] for t in 0..5), row = composition_by_site.csv.loc['maré']",
+    "id": "mare_campaign_dominant_share_pct",
+    "kind": "percent",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/cross_site/signature/composition_by_site.csv",
+    "unit": "%",
+    "value": 75.55060798081863
+  },
   "mare_cells_10m": {
     "expression": "count(cells within the study area)",
     "id": "mare_cells_10m",
@@ -182,6 +190,30 @@
     "source": "/home/theo/SCL/SCR/MorphoFavela/outputs/maré/geometry_indicators/per_patch_geometry.csv",
     "unit": "",
     "value": 1.0099474660889365
+  },
+  "mare_fabric_within_dominant_share_pct": {
+    "expression": "dominant_share_pct",
+    "id": "mare_fabric_within_dominant_share_pct",
+    "kind": "percent",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/.claude/worktrees/cyc4-maremorph/docs/briefs/mare/mare_fabric_within.json",
+    "unit": "%",
+    "value": 37.280356225381055
+  },
+  "mare_fabric_within_k": {
+    "expression": "k_selected",
+    "id": "mare_fabric_within_k",
+    "kind": "int",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/.claude/worktrees/cyc4-maremorph/docs/briefs/mare/mare_fabric_within.json",
+    "unit": "",
+    "value": 5
+  },
+  "mare_fabric_within_n_cells": {
+    "expression": "n_cells (built, morphotype_smooth not null)",
+    "id": "mare_fabric_within_n_cells",
+    "kind": "int",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/.claude/worktrees/cyc4-maremorph/docs/briefs/mare/mare_fabric_within.json",
+    "unit": "cells",
+    "value": 29195
   },
   "mare_geom_n_cells": {
     "expression": "len(df), study area",
@@ -462,6 +494,22 @@
     "source": "data/maré/neighbourhoods_provenance.json",
     "unit": "communities",
     "value": 5
+  },
+  "mare_subunit_n_communities": {
+    "expression": "len(communities[in_study_area]) — same set as mare_study_area_n_communities_included",
+    "id": "mare_subunit_n_communities",
+    "kind": "int",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/.claude/worktrees/cyc4-maremorph/docs/briefs/mare/mare_subunits.csv",
+    "unit": "communities",
+    "value": 15
+  },
+  "mare_subunit_wp04_run": {
+    "expression": "latest_wp04_studyarea_run(runs/).name",
+    "id": "mare_subunit_wp04_run",
+    "kind": "text",
+    "source": "/home/theo/SCL/SCR/MorphoFavela/.claude/worktrees/cyc4-maremorph/docs/briefs/mare/mare_subunits.csv",
+    "unit": "",
+    "value": "wp04_mare_studyarea_20260924T201015Z"
   },
   "mare_sun_annual_mean_h": {
     "expression": "mean(solar_hours_annual)",

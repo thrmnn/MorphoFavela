@@ -97,7 +97,12 @@ def _plot_grid_layer(ax, gdf, col, edges, cmap, title):
 
 def render_built_form_maps(grid: gpd.GeoDataFrame, out_path: Path,
                             communities: gpd.GeoDataFrame | None = None) -> dict:
-    fig, axes = plt.subplots(2, 2, figsize=(6.3, 6.4))
+    # Height trimmed from 6.4in (2026-09 page-break audit: this figure alone
+    # was tall enough that its section rarely fit its own intro paragraph on
+    # the same page, pushing the whole block over and leaving a blank tail
+    # on the page it was pushed from — see docs/briefs/mare/build_brief.py
+    # CSS notes).
+    fig, axes = plt.subplots(2, 2, figsize=(6.3, 5.5))
     common_edges = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
     layers = [
         ("lambda_p", common_edges, BAND_CMAP_5, "Plan density (λp)"),
@@ -142,8 +147,10 @@ def render_built_form_maps(grid: gpd.GeoDataFrame, out_path: Path,
 
 def render_street_svf_map(segments: gpd.GeoDataFrame, out_path: Path,
                            communities: gpd.GeoDataFrame | None = None) -> dict:
+    # Height trimmed from 3.9in — same page-break rationale as
+    # render_built_form_maps above.
     edges = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
-    fig, ax = plt.subplots(figsize=(6.3, 3.9))
+    fig, ax = plt.subplots(figsize=(6.3, 3.0))
     norm, labels = _band_classes(segments["svf_median"], edges)
     segments.plot(column="svf_median", ax=ax, cmap=BAND_CMAP_5, norm=norm, linewidth=1.2)
     ax.set_title("Maré — street-segment Sky View Factor", fontsize=10)
@@ -163,7 +170,9 @@ def render_street_svf_map(segments: gpd.GeoDataFrame, out_path: Path,
 
 
 def render_distributions(grid: gpd.GeoDataFrame, segments: gpd.GeoDataFrame, out_path: Path) -> dict:
-    fig, axes = plt.subplots(2, 2, figsize=(6.3, 5.8))
+    # Height trimmed from 5.8in — same page-break rationale as
+    # render_built_form_maps above.
+    fig, axes = plt.subplots(2, 2, figsize=(6.3, 4.6))
     panels = [
         (grid["lambda_p"], "λp (grid)", "cells"),
         (grid.loc[grid["H_mean"].notna(), "H_mean"], "Mean height, m (grid)", "cells"),
@@ -201,14 +210,51 @@ def render_wind_rose(wind_rose: dict, out_path: Path) -> dict:
     return {}
 
 
-def render_all(outputs_root: Path, figures_dir: Path) -> list[dict]:
+SUBUNIT_PANELS = [
+    ("lambda_p_median", "λp"),
+    ("H_mean_median", "H̄ (m)"),
+    ("porosity_median", "Porosity"),
+    ("svf_median", "SVF"),
+    ("sun_winter_median_h", "Winter\nsun (h)"),
+    ("kwh_m2_median", "Annual\nirrad.\n(kWh/m²)"),
+]
+
+
+def render_subunit_small_multiples(table, out_path: Path) -> dict:
+    """One row per subunit, fixed north-to-south order (table's own row
+    order — never sorted by value: sorting a small-multiples panel by
+    magnitude would read as a ranking of communities, which this brief does
+    not do). One narrow bar-chart column per metric, sharing the same
+    category axis, bar colour identical across rows and panels."""
+    names = table["name"].tolist()
+    n = len(names)
+    fig, axes = plt.subplots(1, len(SUBUNIT_PANELS), figsize=(6.3, 3.6), sharey=True)
+    y = np.arange(n)
+    for ax, (col, label) in zip(axes, SUBUNIT_PANELS):
+        vals = table[col].to_numpy(dtype=float)
+        ax.barh(y, np.nan_to_num(vals, nan=0.0), color=ACCENT, height=0.68)
+        ax.set_title(label, fontsize=7)
+        ax.tick_params(axis="x", labelsize=5.5)
+        ax.set_yticks(y)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+    axes[0].set_yticklabels(names, fontsize=6)
+    axes[0].invert_yaxis()  # first row (north) at the top
+    fig.suptitle("Maré — per-community morphology (north → south, not ranked)", fontsize=9.5)
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    fig.savefig(out_path, dpi=200)
+    plt.close(fig)
+    return {}
+
+
+def render_all(outputs_root: Path, figures_dir: Path, subunit_table=None) -> list[dict]:
     # The brief's page count depends on figure size and fonts, so it must not
     # inherit whatever style another module left in this process.
     with matplotlib.rc_context(matplotlib.rcParamsDefault):
-        return _render_all(outputs_root, figures_dir)
+        return _render_all(outputs_root, figures_dir, subunit_table=subunit_table)
 
 
-def _render_all(outputs_root: Path, figures_dir: Path) -> list[dict]:
+def _render_all(outputs_root: Path, figures_dir: Path, subunit_table=None) -> list[dict]:
     figures_dir.mkdir(parents=True, exist_ok=True)
     grid = gpd.read_file(outputs_root / SITE / "morphometrics" / "grid" / "grid_metrics.gpkg")
     segments = gpd.read_file(outputs_root / SITE / "svf_v2" / "svf_streets_segments.gpkg")
@@ -262,6 +308,17 @@ def _render_all(outputs_root: Path, figures_dir: Path) -> list[dict]:
         "layers": ["wind_frequency"], "basemap": False, "coordinate_ticks": False,
         "source": "data/maré/wind_rose.json",
     })
+
+    if subunit_table is not None:
+        p = figures_dir / "fig_subunit_small_multiples.png"
+        render_subunit_small_multiples(subunit_table, p)
+        manifest.append({
+            "file": p.name, "class": "small multiples (per-community panel), freshly rendered",
+            "layers": [col for col, _ in SUBUNIT_PANELS], "basemap": False,
+            "coordinate_ticks": False,
+            "source": "docs/briefs/mare/mare_subunits.py (grid_metrics.gpkg + WP-04 study-area ground.parquet), "
+                       "by community, north → south row order",
+        })
 
     return manifest
 

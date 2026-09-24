@@ -90,5 +90,20 @@
     "basemap": false,
     "coordinate_ticks": false,
     "source": "data/maré/wind_rose.json"
+  },
+  {
+    "file": "fig_subunit_small_multiples.png",
+    "class": "small multiples (per-community panel), freshly rendered",
+    "layers": [
+      "lambda_p_median",
+      "H_mean_median",
+      "porosity_median",
+      "svf_median",
+      "sun_winter_median_h",
+      "kwh_m2_median"
+    ],
+    "basemap": false,
+    "coordinate_ticks": false,
+    "source": "docs/briefs/mare/mare_subunits.py (grid_metrics.gpkg + WP-04 study-area ground.parquet), by community, north → south row order"
   }
 ]

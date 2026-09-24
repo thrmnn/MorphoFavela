@@ -29,8 +29,11 @@ OUT_JSON = HERE / "mare_numbers.json"
 sys.path.insert(0, str(REPO_ROOT))
 from src.brisa_solar import mare_study_area as msa  # noqa: E402
 from src.sites.territory import load_territory, within_mask  # noqa: E402,F401
+import mare_subunits  # noqa: E402
 
 SITE = "maré"
+SUBUNIT_TABLE_CSV = HERE / "mare_subunits.csv"
+FABRIC_WITHIN_JSON = HERE / "mare_fabric_within.json"
 
 
 class MissingSource(Exception):
@@ -313,6 +316,45 @@ def _composition(numbers: list[dict], outputs_root: Path) -> None:
         numbers.append(_entry(f"mare_morphotype_T{t}_pct", 100 * float(row[col]), "%", "percent", rel, f"100 * row['{t}']"))
 
 
+def _subunits(numbers: list[dict], outputs_root: Path, sa: dict) -> None:
+    """Per-community table (mare_subunits.csv) + the Maré-internal fabric-
+    clustering fit (mare_fabric_within.json) — written as side files
+    (mirroring figure_manifest.json's pattern) since neither is a scalar;
+    build_brief.py reads them back to build the synthesised
+    ${mare_subunit_table} / ${mare_fabric_within_composition} placeholders
+    and to pass the table into render_figures.render_subunit_small_multiples.
+    A handful of scalars used directly in prose are appended here."""
+    runs_root = msa.ROOT / "runs"  # msa.ROOT is the hardcoded main checkout, not REPO_ROOT (see _study_area above)
+    try:
+        table = mare_subunits.build_subunit_table(outputs_root, runs_root)
+        clusters = mare_subunits.fit_within_mare_clusters(outputs_root)
+    except mare_subunits.MissingSource as e:
+        raise MissingSource(str(e)) from e
+    table.to_csv(SUBUNIT_TABLE_CSV, index=False)
+    FABRIC_WITHIN_JSON.write_text(json.dumps(clusters, indent=2) + "\n")
+
+    n_included = int(len(sa["included"]))
+    rel_table = str(SUBUNIT_TABLE_CSV)
+    numbers.append(_entry("mare_subunit_n_communities", n_included, "communities", "int",
+                           rel_table, "len(communities[in_study_area]) — same set as mare_study_area_n_communities_included"))
+    numbers.append(_entry("mare_subunit_wp04_run", table.attrs["wp04_run"], "", "text",
+                           rel_table, "latest_wp04_studyarea_run(runs/).name"))
+
+    rel_clusters = str(FABRIC_WITHIN_JSON)
+    numbers.append(_entry("mare_fabric_within_n_cells", clusters["n_cells"], "cells", "int",
+                           rel_clusters, "n_cells (built, morphotype_smooth not null)"))
+    numbers.append(_entry("mare_fabric_within_k", clusters["k_selected"], "", "int",
+                           rel_clusters, "k_selected"))
+    numbers.append(_entry("mare_fabric_within_dominant_share_pct", clusters["dominant_share_pct"], "%", "percent",
+                           rel_clusters, "dominant_share_pct"))
+
+    comp_path = outputs_root / "cross_site" / "signature" / "composition_by_site.csv"
+    comp_row = pd.read_csv(comp_path, index_col=0).loc[SITE]
+    campaign_dominant_pct = 100 * max(float(comp_row[str(t)]) for t in range(6) if str(t) in comp_row.index)
+    numbers.append(_entry("mare_campaign_dominant_share_pct", campaign_dominant_pct, "%", "percent",
+                           str(comp_path), "100 * max(row[str(t)] for t in 0..5), row = composition_by_site.csv.loc['maré']"))
+
+
 def collect(outputs_root: Path) -> list[dict]:
     numbers: list[dict] = []
     sa = _study_area(numbers)
@@ -324,6 +366,7 @@ def collect(outputs_root: Path) -> list[dict]:
     _roughness_envelope(numbers, outputs_root, sa)
     _wind_rose(numbers, outputs_root)
     _composition(numbers, outputs_root)
+    _subunits(numbers, outputs_root, sa)
     return numbers
 
 
