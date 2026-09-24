@@ -49,6 +49,25 @@ FAVELAS_LIMIT_REL = "RJ/Favelas_Limit_2019.shp"
 #: on the one config/sites.yaml entry.
 _SITE_ALIASES = {"mare": "maré"}
 
+#: Share of a subunit's own area that must fall inside the ACTIVE study
+#: area for that subunit to count as "in" it (drives Territory.subunits_
+#: included/excluded and label_subunits' per-community assignment). One
+#: constant here — not per study_area `kind` — because "which subunits does
+#: the study area cover" is a property of the study area geometry itself,
+#: not of how that geometry was built. 0.5 is the threshold the original
+#: Maré community-union formula used (config/sites.yaml's historical
+#: communities_union_in_extent candidate still carries it explicitly); kept
+#: as the default for every kind because it produces the same clean
+#: (>=0.87 in / ==0.0 out, PI ruling 2026-09-24) separation for the
+#: promoted IPP Territórios Sociais outline too — see
+#: tests/test_site_territory.py.
+SUBUNIT_MEMBERSHIP_THRESHOLD = 0.5
+
+#: The literal label label_subunits() assigns to a study-area point/cell
+#: that falls inside no subunit polygon (open ground, canals, roads between
+#: named communities) — never typed elsewhere; import this constant instead.
+BETWEEN_SUBUNITS_LABEL = "between communities"
+
 
 def normalize_site_key(site: str) -> str:
     return _SITE_ALIASES.get(site, site)
@@ -237,19 +256,28 @@ class Territory:
 
     @property
     def subunits_included(self) -> Optional[gpd.GeoDataFrame]:
-        if self.subunits is None or "in_extent" not in self.subunits.columns:
+        if self.subunits is None:
             return None
-        return self.subunits[self.subunits["in_extent"]].reset_index(drop=True)
+        if "in_study_area" in self.subunits.columns:
+            return self.subunits[self.subunits["in_study_area"]].reset_index(drop=True)
+        if "in_extent" in self.subunits.columns:
+            return self.subunits[self.subunits["in_extent"]].reset_index(drop=True)
+        return None
 
     @property
     def subunits_excluded(self) -> Optional[gpd.GeoDataFrame]:
-        if self.subunits is None or "in_extent" not in self.subunits.columns:
+        if self.subunits is None:
             return None
-        return self.subunits[~self.subunits["in_extent"]].reset_index(drop=True)
+        if "in_study_area" in self.subunits.columns:
+            return self.subunits[~self.subunits["in_study_area"]].reset_index(drop=True)
+        if "in_extent" in self.subunits.columns:
+            return self.subunits[~self.subunits["in_extent"]].reset_index(drop=True)
+        return None
 
     @property
     def has_subunit_study_area(self) -> bool:
-        return self.provenance.get("study_area", {}).get("kind") == "subunits_union_in_extent"
+        return (self.subunits is not None
+                and self.provenance.get("study_area", {}).get("kind") != "citywide_polygons")
 
 
 def load_territory(site: str, root: Path = ROOT_DEFAULT) -> Territory:
@@ -279,6 +307,21 @@ def load_territory(site: str, root: Path = ROOT_DEFAULT) -> Territory:
     subunits, subunits_prov = load_subunits(cfg, root)
     study_area_geom, study_area_prov, subunits = build_study_area(
         cfg["study_area"], data_extent_geom, citywide_gdf, subunits, root)
+
+    # Generic "which subunits does the ACTIVE study area cover" — computed
+    # against study_area_geom itself (not data_extent, and not re-derived
+    # from whatever kind-specific formula built it) so it stays correct for
+    # any study_area kind, including polygon_file (an independently
+    # digitized outline with no structural relationship to the subunit
+    # polygons at all). Only meaningful when the study area is not simply
+    # "the citywide polygons" (there every subunit is trivially 100% in).
+    if subunits is not None and cfg["study_area"]["kind"] != "citywide_polygons":
+        share_sa = (subunits.geometry.intersection(study_area_geom).area
+                    / subunits.geometry.area)
+        subunits = subunits.assign(
+            in_study_area=share_sa.to_numpy() >= SUBUNIT_MEMBERSHIP_THRESHOLD,
+            share_in_study_area=share_sa.to_numpy(),
+        )
 
     candidates = {}
     for cand_cfg in cfg.get("study_area_candidates") or []:
@@ -330,11 +373,52 @@ def load_territory(site: str, root: Path = ROOT_DEFAULT) -> Territory:
 
 def has_subunit_study_area(site: str) -> bool:
     """Registry-driven replacement for `if site == "maré"`: true exactly
-    for sites whose study area is a subunit union restricted to the data
-    extent (today, only Maré) — the condition every `if site in ("maré",
-    "mare")` branch in the dashboard builders actually meant."""
+    for sites whose study area is a genuinely separate boundary from their
+    citywide polygons AND that declare subunits to break it down by (today,
+    only Maré — under either the old subunits_union_in_extent kind or the
+    2026-09-24-promoted polygon_file kind) — the condition every
+    `if site in ("maré", "mare")` branch in the dashboard builders actually
+    meant. Deliberately keyed on `kind != "citywide_polygons"`, not on one
+    named kind, so a future non-citywide site's boundary doesn't silently
+    fall through this check the way a `kind == "subunits_union_in_extent"`
+    string match would have."""
     site = normalize_site_key(site)
     cfg = load_sites_config()
     if site not in cfg:
         return False
-    return cfg[site]["study_area"]["kind"] == "subunits_union_in_extent"
+    return cfg[site]["study_area"]["kind"] != "citywide_polygons" and cfg[site].get("subunits") is not None
+
+
+def label_subunits(x: np.ndarray, y: np.ndarray, territory: Territory,
+                   between_label: str = BETWEEN_SUBUNITS_LABEL) -> np.ndarray:
+    """Assign every point (x, y) exactly one subunit label: the `name` of
+    the subunit polygon (territory.subunits) it falls in, or `between_label`
+    when it falls inside `territory.study_area` but inside no subunit
+    polygon — open ground, canals, roads between named communities, which
+    the study area counts (PI ruling 2026-09-24) even though no community
+    claims it. A point outside the study area entirely gets None: this
+    function labels study-area membership, not the whole data extent.
+
+    Subunits are checked against `territory.subunits` (ALL of them, not
+    just `subunits_included`) so a point is labelled by whichever community
+    polygon actually contains it, regardless of that community's own
+    in/out-of-study-area status — a community excluded from the study area
+    (Marcílio Dias) contributes ~0 area to it by construction (see
+    SUBUNIT_MEMBERSHIP_THRESHOLD), so in practice this never fires for an
+    excluded community, but the function does not assume that.
+
+    Raises ValueError if `territory.subunits` is None (Vidigal/Rocinha have
+    no subunits to label against — check `territory.subunits is not None`
+    before calling)."""
+    if territory.subunits is None:
+        raise ValueError(f"{territory.site}: no subunits declared — nothing to label")
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    labels = np.full(x.shape, None, dtype=object)
+    in_area = within_mask(x, y, territory.study_area)
+    labels[in_area] = between_label
+    name_col = "name" if "name" in territory.subunits.columns else territory.subunits.columns[0]
+    for _, row in territory.subunits.iterrows():
+        hit = in_area & within_mask(x, y, row.geometry)
+        labels[hit] = row[name_col]
+    return labels

@@ -35,35 +35,43 @@ def test_sixteen_communities_split_fifteen_in_one_out(sa):
 
 def test_marcilio_dias_is_excluded_by_geometry_not_name(sa):
     """The exclusion rule is a geometry threshold (share of the community's
-    own area inside the data extent); it happens to land on Marcílio Dias
-    because that community measures ~0% inside the bairro, not because the
-    code singles it out by name. Proven here by re-deriving the split from
-    raw share values and checking it matches, independent of any name."""
+    own area inside the ACTIVE study area — the IPP Territórios Sociais
+    outline since 2026-09-24, PI ruling); it happens to land on Marcílio
+    Dias because that community measures ~0% inside the outline, not
+    because the code singles it out by name. Proven here by re-deriving the
+    split from raw share values (against the study area, not the data
+    extent — the two coincide for Marcílio Dias, but for the right reason:
+    verified independently) and checking it matches, independent of any
+    name."""
     comm = sa["communities"]
-    share = comm.geometry.intersection(sa["data_extent"]).area / comm.geometry.area
+    share = comm.geometry.intersection(sa["study_area"]).area / comm.geometry.area
     expected_excluded = set(comm.loc[share.to_numpy() < msa.INSIDE_EXTENT_MIN_SHARE, "community"])
     assert expected_excluded == set(sa["excluded"]["community"])
     assert "Marcílio Dias" in expected_excluded
     # and it is a clean separation, not a threshold that happens to bite once
     included_shares = share[comm["community"].isin(sa["included"]["community"])]
-    assert (included_shares >= 0.99).all()
+    assert (included_shares >= 0.85).all()
     excluded_shares = share[comm["community"].isin(sa["excluded"]["community"])]
     assert (excluded_shares < 0.01).all()
 
 
-def test_study_area_is_subset_of_data_extent(sa):
-    # study_area = included communities ∩ data_extent, so it can never
-    # extend beyond the data extent (unlike the raw union of all 16, which
-    # bleeds ~51,000 m² north around Marcílio Dias — see neighbourhoods_provenance.json).
-    assert sa["study_area"].difference(sa["data_extent"]).area < 1.0  # numerical slop only
+def test_study_area_extends_slightly_beyond_data_extent(sa):
+    # Since the 2026-09-24 promotion, study_area is the IPP Territórios
+    # Sociais outline — an independently digitized source from the bairro
+    # polygon used as the data extent, no longer built by intersecting with
+    # it (contrast the retired union-of-communities definition, which by
+    # construction WAS a subset). A small sliver falls outside; it must
+    # stay small (source-mismatch slop), never balloon into real drift.
+    outside = sa["study_area"].difference(sa["data_extent"]).area
+    assert 0 < outside < 20_000  # m² — observed ~13,400 m² at promotion time
+    assert outside / sa["study_area"].area < 0.01
 
 
 def test_study_area_smaller_than_whole_bairro(sa):
-    # The pre-MAREBOUND definition of "Maré" was the whole bairro polygon;
-    # the 16-community union covers under half of it (open ground, canals,
-    # roads, and non-community land inside the bairro are not part of any
-    # of the 16 communities).
-    assert sa["study_area"].area < 0.6 * sa["data_extent"].area
+    # The outline covers most of the bairro (unlike the retired
+    # union-of-communities definition, which covered under half of it) but
+    # still excludes the bairro's fringes outside the outline.
+    assert 0.5 * sa["data_extent"].area < sa["study_area"].area < 0.95 * sa["data_extent"].area
 
 
 def test_excluded_community_contributes_nothing_to_study_area(sa):

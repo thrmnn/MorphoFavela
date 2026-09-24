@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
+import numpy as np
 import pytest
 from shapely.affinity import rotate as _shapely_rotate
 from shapely.geometry import box
@@ -21,9 +22,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from src.sites.territory import (  # noqa: E402
+    BETWEEN_SUBUNITS_LABEL,
+    label_subunits,
     load_sites_config,
     load_territory,
     rotation_deg,
+    within_mask,
 )
 
 MAIN_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
@@ -52,7 +56,33 @@ def test_registry_has_exactly_the_five_campaign_sites(registry):
 def test_registry_loads_for_every_site(territory):
     assert territory.data_extent.area > 0
     assert territory.study_area.area > 0
-    assert territory.study_area.difference(territory.data_extent).area < 1.0
+
+
+@pytest.mark.parametrize("site", ["vidigal", "rocinha", "complexo_do_alemao", "riodaspedras"])
+def test_citywide_kind_sites_study_area_is_a_subset_of_data_extent(site):
+    """The four non-Maré sites' study_area.kind is citywide_polygons, built
+    directly from the same declared boundary shapefile the data extent
+    comes from — the two must (near-)coincide. Kept separate from Maré's
+    own subset check below: Maré's promoted study area (2026-09-24, PI
+    ruling) is an independently digitized IPP source and is NOT a subset of
+    the data extent any more (see test_mare_study_area_extends_slightly_
+    beyond_the_data_extent)."""
+    t = load_territory(site, root=MAIN_ROOT)
+    assert t.study_area.difference(t.data_extent).area < 1.0
+
+
+def test_mare_study_area_extends_slightly_beyond_the_data_extent():
+    """Maré's promoted study area (the IPP Territórios Sociais outline) is
+    an independently digitized source from the bairro polygon used as the
+    data extent (data/maré/raw/mare_boundary.shp) — the two boundaries were
+    never meant to be pixel-identical, so a small sliver of the outline
+    falls outside the data extent. Documented here with a real number (not
+    "basically zero"): must stay a small fraction of the outline's own
+    area, never balloon into a real definitional drift."""
+    t = load_territory("maré", root=MAIN_ROOT)
+    outside = t.study_area.difference(t.data_extent).area
+    assert 0 < outside < 20_000  # m² — observed ~13,400 m² at promotion time
+    assert outside / t.study_area.area < 0.01
 
 
 def test_mare_alias_resolves_to_same_registry_entry():
@@ -95,30 +125,112 @@ def test_wp07_ledger_favela_names_all_resolve_through_the_registry():
         assert cfg[site_key]["citywide_rule"]["target"] == display
 
 
-# --- Maré: study area must match the pre-SITETERR algorithm exactly ---
+# --- Maré: active study area is the IPP Territórios Sociais outline (PI
+# ruling 2026-09-24, resolved_decisions id mare_site_study_area) ---
 
-def test_mare_study_area_matches_independent_reference_computation():
-    """Re-derive Maré's study area directly from the raw files with the
-    original formula (share = intersection(extent).area / own area >= 0.5;
-    study_area = union(included) ∩ extent), independent of
-    src.sites.territory, and check load_territory("maré") returns the exact
-    same geometry — not merely "close", byte-identical (area diff < 1 m²,
-    symmetric difference < 1 m²)."""
+def test_mare_active_study_area_matches_the_ts03_outline():
+    """Re-derive Maré's ACTIVE study area directly from the raw IPP outline
+    file (config/sites.yaml maré.study_area.path), independent of
+    src.sites.territory's own polygon_file branch, and check
+    load_territory("maré") returns the exact same geometry — not merely
+    "close", byte-identical (area diff < 1 m², symmetric difference < 1
+    m²)."""
     cfg = load_sites_config()["maré"]
+    assert cfg["study_area"]["kind"] == "polygon_file"
+    outline = gpd.read_file(MAIN_ROOT / "data" / cfg["study_area"]["path"])
+    outline = outline.set_crs(31983) if outline.crs is None else outline.to_crs(31983)
+    expected = outline.geometry.union_all()
+
+    t = load_territory("maré", root=MAIN_ROOT)
+    assert abs(t.study_area.area - expected.area) < 1.0
+    assert t.study_area.symmetric_difference(expected).area < 1.0
+
+
+def test_mare_communities_union_kept_as_reproducible_historical_candidate():
+    """The pre-2026-09-24 study area (union of the 16 communities ∩ data
+    extent) is retired from `study_area` but must stay reproducible as a
+    declared candidate/history entry (PI ruling task: 'keep the
+    community-union definition as a declared candidate/history entry, so
+    the old definition stays reproducible'). Re-derive it independently
+    with the original formula and check the registry's candidate geometry
+    matches byte-for-byte, and that it is smaller than the promoted outline
+    (the outline covers the gaps between communities the union does not)."""
+    cfg = load_sites_config()["maré"]
+    cand_cfg = next(c for c in cfg["study_area_candidates"] if c["id"] == "communities_union_in_extent")
+    assert cand_cfg["kind"] == "subunits_union_in_extent"
+
     bairro = gpd.read_file(MAIN_ROOT / "data" / cfg["data_extent"])
     bairro = bairro.set_crs(31983) if bairro.crs is None else bairro.to_crs(31983)
     extent = bairro.geometry.union_all()
-
     comm = gpd.read_file(MAIN_ROOT / "data" / cfg["subunits"]["file"], layer=cfg["subunits"]["layer"])
     comm = comm.set_crs(31983) if comm.crs is None else comm.to_crs(31983)
     share = comm.geometry.intersection(extent).area / comm.geometry.area
-    included = comm[share.to_numpy() >= cfg["study_area"]["share_threshold"]]
-    expected_study_area = included.geometry.union_all().intersection(extent)
+    included = comm[share.to_numpy() >= cand_cfg["share_threshold"]]
+    expected_union = included.geometry.union_all().intersection(extent)
 
     t = load_territory("maré", root=MAIN_ROOT)
-    assert abs(t.study_area.area - expected_study_area.area) < 1.0
-    assert t.study_area.symmetric_difference(expected_study_area).area < 1.0
+    cand = t.study_area_candidates["communities_union_in_extent"]
+    assert abs(cand["geometry"].area - expected_union.area) < 1.0
+    assert cand["geometry"].symmetric_difference(expected_union).area < 1.0
+    assert cand["geometry"].area < t.study_area.area
     assert len(t.subunits_excluded) == len(comm) - len(included)
+
+
+def test_mare_label_subunits_assigns_exactly_one_label_per_study_area_point():
+    """Every study-area point/cell gets exactly one subunit label: a
+    community name, or the literal "between communities" for study-area
+    ground inside none of the 16 — and "between communities" must be
+    non-empty (the whole reason the outline differs from the old
+    community-union definition)."""
+    t = load_territory("maré", root=MAIN_ROOT)
+    rng = np.random.default_rng(0)
+    x0, y0, x1, y1 = t.study_area.bounds
+    xs = rng.uniform(x0, x1, 6000)
+    ys = rng.uniform(y0, y1, 6000)
+    in_area = within_mask(xs, ys, t.study_area)
+    assert in_area.sum() > 0
+
+    labels = label_subunits(xs, ys, t)
+    assert (labels[in_area] != None).all()  # noqa: E711 — every study-area point labelled
+    assert (labels[~in_area] == None).all()  # noqa: E711 — nothing outside the study area labelled
+
+    valid_names = set(t.subunits["name"]) | {BETWEEN_SUBUNITS_LABEL}
+    assert set(labels[in_area].tolist()) <= valid_names
+    assert (labels[in_area] == BETWEEN_SUBUNITS_LABEL).any()  # non-empty, per the PI ruling
+
+    # "exactly one": no study-area point may fall inside two community
+    # polygons at once (a geometry sanity check, not just a labeller check).
+    hits = np.zeros(len(xs), dtype=int)
+    for _, row in t.subunits.iterrows():
+        hits += within_mask(xs, ys, row.geometry).astype(int)
+    assert (hits[in_area] <= 1).all()
+
+
+def test_mare_marcilio_dias_excluded_from_active_study_area_by_geometry():
+    """Marcílio Dias — one of the 16 communities — lies outside the
+    promoted outline (and outside the data extent). The exclusion must be
+    computed from geometry against the ACTIVE study area, not merely
+    inherited from the old data-extent-based split (the two happen to
+    agree here, but for the right reason: verified independently)."""
+    t = load_territory("maré", root=MAIN_ROOT)
+    excluded = t.subunits_excluded
+    assert list(excluded["community"]) == ["Marcílio Dias"]
+    marcilio = t.subunits.loc[t.subunits["community"] == "Marcílio Dias"].iloc[0]
+    assert marcilio.geometry.intersection(t.study_area).area < 1.0
+    assert float(marcilio["share_in_study_area"]) < 0.01
+    # a clean separation, not a threshold that happens to bite once
+    included_shares = t.subunits_included["share_in_study_area"].to_numpy()
+    assert (included_shares >= 0.85).all()
+
+
+def test_mare_rotation_recomputed_for_the_promoted_study_area():
+    """display_rotation_deg is always `auto` (derived, never typed) — the
+    promotion must have actually re-derived it from the new geometry, not
+    carried over the old union's angle."""
+    t = load_territory("maré", root=MAIN_ROOT)
+    assert t.display_rotation_deg == rotation_deg(t.study_area)
+    old_rotation = rotation_deg(t.study_area_candidates["communities_union_in_extent"]["geometry"])
+    assert old_rotation != t.display_rotation_deg  # promotion changed the driving geometry
 
 
 def test_mare_study_area_from_registry_matches_mare_study_area_module():
@@ -193,15 +305,22 @@ def test_vidigal_and_rocinha_have_no_subunits():
     assert load_territory("rocinha", root=MAIN_ROOT).subunits is None
 
 
-# --- Maré's IPP Territórios Sociais candidate (added 2026-09-24) ---
+# --- Maré's IPP Territórios Sociais outline is ACTIVE (promoted 2026-09-24) ---
 
-def test_mare_has_ipp_territorios_sociais_candidate_not_active():
+def test_mare_ipp_territorios_sociais_is_the_active_study_area_not_a_candidate():
+    """Promotion (PI ruling 2026-09-24): the outline is now `study_area`
+    itself, not a `study_area_candidates` entry — flip side of
+    test_mare_communities_union_kept_as_reproducible_historical_candidate
+    above, which checks the union went the other way."""
+    reg = load_sites_config()["maré"]
+    assert reg["study_area"]["kind"] == "polygon_file"
+    assert "ipp_territorios_sociais.gpkg" not in str(reg["study_area"]["path"])  # sanity: not a stray old id
+    assert reg["study_area"]["path"].endswith("ipp_territorios_sociais_territorio03.gpkg")
+    assert all(c["id"] != "ipp_territorios_sociais" for c in reg["study_area_candidates"])
+
     t = load_territory("maré", root=MAIN_ROOT)
-    assert "ipp_territorios_sociais" in t.study_area_candidates
-    cand = t.study_area_candidates["ipp_territorios_sociais"]
-    assert cand["area_m2"] > t.study_area.area  # the contiguous outline is bigger than the community union
-    # not active: the registry's *active* study_area kind is still the community union
-    assert load_sites_config()["maré"]["study_area"]["kind"] == "subunits_union_in_extent"
+    cand = t.study_area_candidates["communities_union_in_extent"]
+    assert cand["area_m2"] < t.study_area.area  # the contiguous outline is bigger than the community union
 
 
 def test_build_study_area_raises_on_unknown_kind():
