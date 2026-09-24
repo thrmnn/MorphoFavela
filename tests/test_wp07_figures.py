@@ -66,7 +66,7 @@ def test_staging_produces_a_manifest_and_ledger_only_figures(staged):
     produced = _produced(manifest)
     assert "f3_domain_sensitivity" in produced, "ledger-only figure must always render"
     assert "f4_geometry_constraints" in produced, "ledger-only figure must always render"
-    for fid in ("f1_citywide_position", "f2_direct_sun_reference_days"):
+    for fid in ("f1_citywide_position", "f1_v2_decile_share", "f2_direct_sun_reference_days"):
         f = manifest["figures"][fid]
         if f["status"] == "skipped":
             assert "reason" in f and f["reason"]
@@ -274,6 +274,83 @@ def test_f1_renders_from_synthetic_citywide_parquet(tmp_path, ledger):
         figs.get_value(ledger, lid)
 
 
+# ---------------------------------------------------------------------------
+# f1 v2 — per-favela decile-share companion (PI ruling favela_irradiation_
+# overlay, resolved 2026-09-24). Same skip-cleanly discipline and synthetic-
+# fixture pattern as f1 above; the shapefile fixture additionally needs
+# cod_favela (f1 never reads it — only f1 v2 and the map family's boundary
+# match do), one row per study favela so favela_id i -> exactly one matched
+# favela.
+# ---------------------------------------------------------------------------
+
+def _write_synthetic_decile_parquet(repo_root: Path, n_per_favela: int = 300,
+                                     n_city: int = 5000, seed: int = 0) -> None:
+    """favela_id 0..4 (one id per study favela, matching the synthetic
+    shapefile's cod_favela) each concentrated in the bottom of the citywide
+    kwh_m2 range, plus an unmatched citywide background (favela_id -1) — so
+    every favela's decile-share bars come out concentrated low rather than
+    flat at 10%, a real assertion rather than a vacuous one."""
+    rng = np.random.default_rng(seed)
+    city = pd.DataFrame({
+        "favela_id": np.full(n_city, -1, dtype="int32"),
+        "kwh_m2": rng.uniform(0.0, 1800.0, n_city).astype("float32"),
+    })
+    favelas = []
+    for i in range(5):
+        favelas.append(pd.DataFrame({
+            "favela_id": np.full(n_per_favela, i, dtype="int32"),
+            "kwh_m2": rng.uniform(0.0, 360.0, n_per_favela).astype("float32"),  # bottom ~2 deciles
+        }))
+    df = pd.concat([city, *favelas], ignore_index=True)
+    run_dir = repo_root / "runs" / ledger_mod.RUN_OF_RECORD["wp05"]
+    run_dir.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(run_dir / "wp05_full.parquet")
+
+
+def test_f1_v2_skips_cleanly_when_citywide_parquet_absent(tmp_path, ledger):
+    repo_root = tmp_path / "repo_empty"
+    (repo_root / "runs").mkdir(parents=True)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    result = figs.render_f1_v2(ledger, repo_root, out_dir)
+    assert result["status"] == "skipped"
+    assert "reason" in result
+
+
+def test_f1_v2_skips_cleanly_when_favela_boundary_absent(tmp_path, ledger):
+    repo_root = tmp_path / "repo_no_shp"
+    _write_synthetic_decile_parquet(repo_root)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    result = figs.render_f1_v2(ledger, repo_root, out_dir)
+    assert result["status"] == "skipped"
+    assert "reason" in result
+
+
+def test_f1_v2_renders_from_synthetic_data(tmp_path, ledger):
+    repo_root = tmp_path / "repo"
+    _write_synthetic_decile_parquet(repo_root)
+    _write_synthetic_favela_shapefile(repo_root)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    result = figs.render_f1_v2(ledger, repo_root, out_dir)
+    assert result["status"] == "produced"
+    assert (out_dir / result["svg_path"]).exists()
+    assert (out_dir / result["png_path"]).exists()
+    assert result["checklist"]["svg_path_count"] < 2000
+    assert result["checklist"]["no_coordinates"] is True
+    assert result["checklist"]["no_basemap"] is True
+    assert result["release_class_proposed"] == "staged"
+    assert len(result["ledger_ids_used"]) == 5  # one citywide-percentile id per favela
+    for lid in result["ledger_ids_used"]:
+        figs.get_value(ledger, lid)
+
+    raw = (out_dir / result["svg_path"]).read_text()
+    text = figs._svg_text_content(raw)
+    assert f"{figs.UNIFORM_DECILE_SHARE:.0%}" in text
+
+
 def test_f2_renders_from_synthetic_site_parquets(tmp_path, ledger):
     repo_root = tmp_path / "repo"
     _write_synthetic_site_parquets(repo_root)
@@ -317,7 +394,8 @@ def _write_synthetic_favela_shapefile(repo_root: Path) -> None:
     rows = []
     for i, display in enumerate(figs.FAVELAS.values()):
         x0 = float(i)
-        rows.append({"complexo": display, "nome": display, "geometry": box(x0, x0, x0 + 0.4, x0 + 0.4)})
+        rows.append({"complexo": display, "nome": display, "cod_favela": i,
+                      "geometry": box(x0, x0, x0 + 0.4, x0 + 0.4)})
     gdf = gpd.GeoDataFrame(rows, crs=EXPECTED_CRS)
     out_dir = repo_root / "data" / "RJ"
     out_dir.mkdir(parents=True, exist_ok=True)
