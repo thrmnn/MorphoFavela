@@ -326,3 +326,11 @@ def test_previous_cycle_utc_none_on_first_ever_cycle(tmp_path):
     today = tmp_path / "2026-09-24"
     today.mkdir()
     assert bprf._previous_cycle_utc(today) is None
+
+
+def test_dangling_relative_links_catches_a_missing_target(tmp_path):
+    (tmp_path / "sec").mkdir()
+    (tmp_path / "sec" / "doc.html").write_text("x")
+    (tmp_path / "index.html").write_text('<a href="sec/doc.html">ok</a><a href="doc.html">broken</a><a href="/ops">abs</a>')
+    (tmp_path / "all.html").write_text("")
+    assert bprf.dangling_relative_links(tmp_path) == ["index.html: doc.html"]

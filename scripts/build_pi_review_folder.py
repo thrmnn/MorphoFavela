@@ -20,6 +20,7 @@ import csv
 import hashlib
 import html as _html
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -242,10 +243,10 @@ def _octopus_extra(section_out: Path) -> str | None:
     links = []
     for src, dest, title, label in docs:
         if _render_markdown_file(src, dest, title):
-            links.append((dest.name, label))
+            links.append((f"{section_out.name}/{dest.name}", label))
     if _render_csv_table(pkg / "p08_data_dictionary.csv", section_out / "data_dictionary.html",
                           "OM2 data dictionary"):
-        links.append(("data_dictionary.html", "data dictionary (p08)"))
+        links.append((f"{section_out.name}/data_dictionary.html", "data dictionary (p08)"))
 
     if links:
         parts.append('<p>' + " · ".join(f'<a href="{href}">{label}</a>' for href, label in links) + '</p>')
@@ -578,7 +579,22 @@ def build(out_root: Path) -> dict:
     (out_root / "MANIFEST.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
     (out_root / "index.html").write_text(_render_index(manifest))
     (out_root / "all.html").write_text(_render_all(manifest))
+    broken = dangling_relative_links(out_root)
+    if broken:
+        raise SystemExit(f"review folder links to files that do not exist: {broken[:10]}")
     return manifest
+
+
+def dangling_relative_links(out_root: Path) -> list[str]:
+    """Relative href/src targets on the folder's pages that resolve to nothing —
+    the 2026-09-24 class where a section's documents were written one directory
+    below the links pointing at them."""
+    broken = []
+    for page in (out_root / "index.html", out_root / "all.html"):
+        for target in set(re.findall(r'(?:href|src)="([^"#?:]+)"', page.read_text())):
+            if not target.startswith("/") and not (out_root / target).exists():
+                broken.append(f"{page.name}: {target}")
+    return sorted(broken)
 
 
 _STYLE = """<style>
