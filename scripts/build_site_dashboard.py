@@ -201,8 +201,9 @@ def load_site(site: str, issues: list) -> dict:
     grid = load_grid_table(site)
 
     # Registry-driven (config/sites.yaml, src/sites/territory.py): a site
-    # whose study_area.kind is subunits_union_in_extent (today, only Maré)
-    # has a study area narrower than its data extent, and it governs which
+    # with a genuinely separate study area boundary + declared subunits
+    # (today, only Maré — the promoted IPP Territórios Sociais outline)
+    # has a study area distinct from its data extent, and it governs which
     # grid cells/observers count in that site's statistics + gets outlined
     # on the sheet. `boundary` above stays the DATA EXTENT unconditionally
     # for every site — near_boundary/edge-halo logic in compute_stats() must
@@ -597,7 +598,8 @@ def draw_grid_panel(ax, X: np.ndarray, Y: np.ndarray, Z: np.ndarray, boundary,
     whole caption. Title budget: 2-3 words + a unit, nothing else
     (docs/folha_v3_spec.md's text budget).
 
-    `communities` (Maré only): the 16-community study-area outline, drawn
+    `communities` (Maré only): the 16 named-community outlines (context —
+    the active study area is wider, see src/sites/territory.py), drawn
     THIN — BOUNDARY_STROKE_PX-derived, same technique as
     src/brisa_solar/wp07_figures.py (PI standing complaint: a stroke given
     in points reads as a hairline at one dpi and a masking slab at
@@ -1033,10 +1035,10 @@ def draw_caveats_v2(ax, site: str, stats: dict) -> None:
         n_included = stats.get("study_area_n_communities")
         caveats.append((
             "[H3] STUDY AREA",
-            f"Cells/observers here: {n_included} Redes da Maré "
-            f"communities, clipped to the data extent — not the whole "
-            f"bairro. {excluded} lies outside the extent, excluded. "
-            "Edge-halo still uses the bairro, not this outline."
+            f"Cells/observers here: the study-area outline — {n_included} "
+            f"Redes da Maré communities plus the ground between them, not "
+            f"the whole bairro. {excluded} lies outside the outline, "
+            "excluded. Edge-halo still uses the bairro, not this outline."
         ))
     n = len(caveats)
     col_w = 1.0 / n

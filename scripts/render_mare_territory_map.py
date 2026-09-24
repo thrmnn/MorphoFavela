@@ -83,13 +83,21 @@ def _render_one(site: str, root: Path) -> Path:
 
     handles = []
     has_source_col = t.subunits is not None and "source_parts" in t.subunits.columns
+    # True when the active study area is not simply the union of the
+    # subunits (today: Maré's promoted IPP Territórios Sociais outline,
+    # config/sites.yaml maré.study_area.kind = polygon_file) — then the
+    # outline covers ground the community polygons below don't fill, and
+    # that gap must read as "inside the study area, between communities",
+    # not as "outside the study area" (PI ruling 2026-09-24).
+    has_between = (t.subunits is not None and len(t.subunits)
+                   and t.provenance["study_area"]["kind"] != "subunits_union_in_extent")
     if t.subunits is not None and len(t.subunits):
         included = t.subunits_included if t.subunits_included is not None else t.subunits
         excluded = t.subunits_excluded if t.subunits_excluded is not None else t.subunits.iloc[0:0]
         for _, r in included.iterrows():
             fill = SOURCE_FILL.get(r["source_parts"].split(":")[0], SOURCE_FILL_DEFAULT) if has_source_col else SOURCE_FILL_DEFAULT
             gpd.GeoSeries([r.geometry], crs=31983).plot(ax=ax, color=fill, alpha=0.75, linewidth=0, zorder=0)
-        included.boundary.plot(ax=ax, color=INK, linewidth=1.2 * px * 3, zorder=3)
+        included.boundary.plot(ax=ax, color=INK, linewidth=(0.7 if has_between else 1.2) * px * 3, zorder=3)
         name_col = "name" if "name" in included.columns else included.columns[0]
         for _, r in included.iterrows():
             p = r.geometry.representative_point()
@@ -99,7 +107,18 @@ def _render_one(site: str, root: Path) -> Path:
                         bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.7))
         if has_source_col:
             handles += [Patch(fc=v, label=SOURCE_LABEL[k]) for k, v in SOURCE_FILL.items()]
-        handles.append(Line2D([], [], color=INK, lw=1.2, label="study area: the subunits (site sheet, brief)"))
+        if has_between:
+            # The true study-area boundary (the outline) drawn as its own,
+            # thicker line — communities are filled above; the unfilled
+            # ground inside this line but outside every community fill is
+            # "between communities" (label_subunits), also counted.
+            gpd.GeoSeries([t.study_area], crs=31983).boundary.plot(
+                ax=ax, color=INK, linewidth=1.4 * px * 3, zorder=3.5)
+            handles.append(Line2D([], [], color=INK, lw=1.4,
+                            label="study area boundary — communities filled; unfilled ground "
+                                  "inside the line is \"between communities\" (also counted)"))
+        else:
+            handles.append(Line2D([], [], color=INK, lw=1.2, label="study area: the subunits (site sheet, brief)"))
     else:
         gpd.GeoSeries([t.study_area], crs=31983).boundary.plot(
             ax=ax, color=INK, linewidth=1.2 * px * 3, zorder=3)

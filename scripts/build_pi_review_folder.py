@@ -112,7 +112,7 @@ SECTIONS = [
 EXTRA = {
     "00_mare_territory": (
         "Maré — territory and site deliverables",
-        "What \"Maré\" means in each product: the data extent, the 16-community study area and the citywide "
+        "What \"Maré\" means in each product: the data extent, the study area (IPP Territórios Sociais outline) and the citywide "
         "definition on one map, then the site sheet and brief rebuilt on the study area. The citywide choice is "
         "the open card <a href=\"/ops\">mare_citywide_definition</a>; the interactive twin is "
         "<a href=\"/morphofavela-dash/outputs/_distribution/html_dashboards/maré/index.html\">here</a>.",

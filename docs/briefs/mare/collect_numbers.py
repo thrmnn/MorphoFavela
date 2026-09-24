@@ -67,18 +67,28 @@ def _study_area(numbers: list[dict]) -> dict:
     sub_prov = t.provenance["subunits"]
     rel = "data/" + sub_prov["file"]
     prov_rel = "data/" + sub_prov["provenance_file"]
+    # The study area's own source/expression (not the subunits file above):
+    # since 2026-09-24 (PI ruling) it is the IPP Territórios Sociais outline
+    # (config/sites.yaml maré.study_area.path), not a formula over the
+    # subunits — build the description from the registry rather than
+    # assuming a kind.
+    sa_prov = t.provenance["study_area"]
+    if "path" in sa_prov:
+        sa_source, sa_expr = "data/" + sa_prov["path"], "union(features in config/sites.yaml maré.study_area.path)"
+    else:
+        sa_source, sa_expr = rel, "union(included communities).intersection(data_extent).area"
 
     numbers.append(_entry("mare_study_area_km2", sa["study_area"].area / 1e6, "km²", "float",
-                           rel, "union(included communities).intersection(data_extent).area"))
+                           sa_source, sa_expr))
     numbers.append(_entry("mare_study_area_n_communities_total", len(sa["communities"]), "communities", "int",
                            rel, "len(communities)"))
     numbers.append(_entry("mare_study_area_n_communities_included", len(sa["included"]), "communities", "int",
-                           rel, "len(communities[in_extent])"))
+                           rel, "len(communities[in_study_area])"))
     numbers.append(_entry("mare_study_area_n_communities_excluded", len(sa["excluded"]), "communities", "int",
-                           rel, "len(communities[~in_extent])"))
+                           rel, "len(communities[~in_study_area])"))
     excluded_name = ", ".join(sorted(sa["excluded"]["community"])) if len(sa["excluded"]) else "none"
     numbers.append(_entry("mare_study_area_excluded_name", excluded_name, "", "text",
-                           rel, "communities[~in_extent].community"))
+                           rel, "communities[~in_study_area].community"))
     numbers.append(_entry("mare_study_area_n_inferred_matches", int(sub_prov["provenance"]["qa"]["n_inferred"]),
                            "communities", "int", prov_rel, "qa.n_inferred"))
     return sa
@@ -128,9 +138,11 @@ def _grid_metrics(numbers: list[dict], outputs_root: Path, sa: dict) -> None:
     df = pd.read_csv(path)
     rel = str(path)
     # Study-area filter: every cell/statistic below counts only within the
-    # 16-community study area, never the whole bairro (MAREBOUND). Marcílio
-    # Dias contributes nothing here — it lies entirely outside the site data
-    # extent (grid_metrics.csv has no cells there to begin with).
+    # active study area (the IPP Territórios Sociais outline — communities
+    # plus the ground between them), never the whole bairro (MAREBOUND).
+    # Marcílio Dias contributes nothing here — it lies entirely outside
+    # both the outline and the site data extent (grid_metrics.csv has no
+    # cells there to begin with).
     in_area = msa.within_mask(df["centroid_x"].to_numpy(), df["centroid_y"].to_numpy(), sa["study_area"])
     df = df.loc[in_area].reset_index(drop=True)
     built = df[df["building_count"] > 0]
@@ -281,7 +293,7 @@ def _composition(numbers: list[dict], outputs_root: Path) -> None:
     # per-cell cluster assignment the clustering pipeline used to produce it
     # is not written to outputs/ anywhere, so there is no cell-level source
     # of record to re-filter here. This still describes the whole bairro's
-    # fabric, not the 16-community study area. Recomputing a study-area
+    # fabric, not the study area (the IPP outline). Recomputing a study-area
     # version would mean re-running the cross-site clustering fit restricted
     # to Maré's study area, which changes methodology (the fit is shared
     # across all 5 campaign sites) — out of MAREBOUND's scope; flagged in
