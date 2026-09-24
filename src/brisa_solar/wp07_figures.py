@@ -1,11 +1,12 @@
 """WP-07B — staged C′ figure candidates. Spec: docs/wp07_figures_spec.md.
 
-STAGING ONLY: renders f1-f4 into `runs/wp07_figures_<UTC>/` (PNG 300 dpi +
-SVG each) plus `figure_manifest.json` carrying the guardian-readiness
-checklist per figure. The orchestrator runs the ethics gate afterwards; the
-PI alone promotes anything into `shared/figures/` or `papers/`. No map, no
-per-cell scatter, no favela-vs-formal panel, ever — and every printed number
-is a read from the newest `runs/wp07_ledger_*/ledger.json`, never typed.
+STAGING ONLY: renders f1-f4 (plus f1's decile-share companion, f1 v2) into
+`runs/wp07_figures_<UTC>/` (PNG 300 dpi + SVG each) plus `figure_manifest.json`
+carrying the guardian-readiness checklist per figure. The orchestrator runs
+the ethics gate afterwards; the PI alone promotes anything into
+`shared/figures/` or `papers/`. No map, no per-cell scatter, no favela-vs-
+formal panel, ever — and every printed number is a read from the newest
+`runs/wp07_ledger_*/ledger.json`, never typed.
 
 Distributions come only from the two parquet sources named in the spec
 (`runs/wp05_full_20260914T215419Z/wp05_full.parquet`,
@@ -334,6 +335,103 @@ def render_f1(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
     source_parquets = [str(path.relative_to(repo_root))]
     return _produced(fig, "f1_citywide_position", out_dir, ledger_ids, source_parquets,
                       "publishable-candidate", plotted_ids=plotted_ids)
+
+
+# ---------------------------------------------------------------------------
+# f1 v2 — per-favela share of citywide irradiation deciles. PI ruling
+# favela_irradiation_overlay (shared/facts/tasks.json resolved_decisions,
+# resolved 2026-09-24): "f1 v2 = per-favela decile-share panel, staged
+# beside the current f1". A companion to f1, not a replacement — own id in
+# the same manifest, release_class_proposed "staged" (never folded into
+# f1-f4's default "publishable-candidate"; this one waits on an explicit
+# PI promotion tap). Definition A only (the P1 run-of-record favela
+# polygons matched via wp05_full.match_favela_group) — mare_citywide_
+# definition kept P1's Maré on A, never E the complex outline.
+# ---------------------------------------------------------------------------
+
+#: 1 / n_deciles — what a uniform decile split looks like. A derived
+#: constant, not a measured quantity, so (like ATHENS_CHARTER_FLOOR_HOURS
+#: above) it is not a ledger read.
+UNIFORM_DECILE_SHARE = 0.10
+
+
+def render_f1_v2(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
+    """Deciles are cut on the full citywide kwh_m2 column (the same
+    distribution f1 panel B histograms) into 10 equal-count bins; for each
+    study favela, the share of its own ground cells landing in each bin.
+    Bars near flat at UNIFORM_DECILE_SHARE mean a favela's cells are spread
+    across the city's irradiation range like the city as a whole; bars
+    concentrated in the low deciles mean the opposite — read off the bars,
+    never asserted as a favela-vs-formal contrast (L1: this never compares
+    against a non-favela group, only against the citywide pool each favela
+    cell is itself already a member of)."""
+    path = citywide_parquet_path(repo_root)
+    fig_id = "f1_v2_decile_share"
+    if not path.exists():
+        return _skip(fig_id, f"citywide parquet absent: {path}")
+    shp_path = map_favela_boundary_path(repo_root)
+    if not shp_path.exists():
+        return _skip(fig_id, f"favela boundary shapefile absent: {shp_path}")
+
+    from src.config import EXPECTED_CRS
+    from .wp05_full import match_favela_group
+
+    favelas_gdf = gpd.read_file(shp_path)
+    if favelas_gdf.crs is not None:
+        favelas_gdf = favelas_gdf.to_crs(EXPECTED_CRS)
+
+    matched_ids: dict[str, set[int]] = {}
+    for slug in FIGURE_SITE_ORDER:
+        polys, _method = match_favela_group(favelas_gdf, FAVELAS[slug])
+        if len(polys) > 0:
+            matched_ids[slug] = set(polys["cod_favela"].astype(int))
+    if not matched_ids:
+        return _skip(fig_id, "matched no polygons for any of the five study favelas")
+
+    table = _read_columns(path, ["favela_id", "kwh_m2"])
+    favela_id = table.column("favela_id").to_numpy(zero_copy_only=False)
+    kwh = table.column("kwh_m2").to_numpy(zero_copy_only=False)
+    finite = np.isfinite(kwh)
+    favela_id, kwh = favela_id[finite], kwh[finite]
+
+    # 9 interior cut points from the full citywide column; right=False +
+    # interior-only edges keeps every cell in exactly one of 10 bins.
+    edges = np.percentile(kwh, np.arange(0, 101, 10))
+    decile_idx = np.clip(np.digitize(kwh, edges[1:-1], right=False), 0, 9)
+
+    ledger_ids: list[str] = []
+    fig, axes = plt.subplots(1, len(FIGURE_SITE_ORDER), figsize=(9.4, 2.7), sharey=True)
+    deciles_x = np.arange(1, 11)
+    for ax, slug in zip(axes, FIGURE_SITE_ORDER):
+        display = FAVELAS[slug]
+        ids = matched_ids.get(slug)
+        if not ids:
+            ax.set_visible(False)
+            continue
+        mask = np.isin(favela_id, np.fromiter(ids, dtype=favela_id.dtype))
+        n = int(mask.sum())
+        counts = np.array([np.count_nonzero((decile_idx == d) & mask) for d in range(10)], dtype=float)
+        shares = counts / n if n > 0 else counts
+
+        pct_id = f"favela.{slug}.kwh_m2.percentile"
+        pct_val, _ = get_value(ledger, pct_id)
+        ledger_ids.append(pct_id)
+
+        ax.bar(deciles_x, shares, color=COLORS[slug], width=0.8)
+        ax.axhline(UNIFORM_DECILE_SHARE, color="black", linewidth=0.8, linestyle=":")
+        ax.set_title(f"{display}\nn={n:,} · citywide p{fmt3(pct_val)}", fontsize=6, loc="left")
+        ax.set_xticks(deciles_x)
+        ax.set_xticklabels([str(d) for d in deciles_x], fontsize=5.5)
+        ax.set_xlabel("citywide kWh m$^{-2}$ decile", fontsize=6)
+        ax.tick_params(axis="y", labelsize=5.5)
+    axes[0].set_ylabel("share of favela's own ground cells", fontsize=6.5)
+    fig.suptitle(
+        f"Dotted line: {UNIFORM_DECILE_SHARE:.0%} per decile — the share each decile would "
+        "hold if a favela's cells were spread across the citywide range like the city as a whole.",
+        fontsize=6.5, y=1.08)
+
+    source_parquets = [str(path.relative_to(repo_root))]
+    return _produced(fig, fig_id, out_dir, ledger_ids, source_parquets, "staged")
 
 
 # ---------------------------------------------------------------------------
@@ -1254,6 +1352,7 @@ def stage_all(repo_root: Path, out_dir: Path | None = None) -> dict:
 
     figures = {
         "f1_citywide_position": render_f1(ledger, repo_root, out_dir),
+        "f1_v2_decile_share": render_f1_v2(ledger, repo_root, out_dir),
         "f2_direct_sun_reference_days": render_f2(ledger, repo_root, out_dir),
         "f3_domain_sensitivity": render_f3(ledger, repo_root, out_dir),
         "f4_geometry_constraints": render_f4(ledger, repo_root, out_dir),
