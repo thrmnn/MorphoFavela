@@ -28,6 +28,7 @@ OUT_JSON = HERE / "mare_numbers.json"
 
 sys.path.insert(0, str(REPO_ROOT))
 from src.brisa_solar import mare_study_area as msa  # noqa: E402
+from src.sites.territory import load_territory, within_mask  # noqa: E402,F401
 
 SITE = "maré"
 
@@ -48,17 +49,24 @@ def _entry(id_, value, unit, kind, source, expr):
 
 
 def _study_area(numbers: list[dict]) -> dict:
-    """Load the Maré study area (union of the 16 Redes da Maré communities ∩
-    the site data extent; src/brisa_solar/mare_study_area.py) and append its
-    provenance numbers. Every downstream _* function filters its own source
-    table to this same geometry before computing anything — never a second,
+    """Load the Maré territory (config/sites.yaml maré.study_area; loader
+    src/sites/territory.py — SITETERR, 2026-09-24) and append its provenance
+    numbers. Every downstream _* function filters its own source table to
+    this same geometry before computing anything — never a second,
     independently-typed definition of "Maré".
 
-    Returns the study dict (msa.load_study_area()'s return value) so callers
-    can filter their own tables against sa["study_area"]."""
-    sa = msa.load_study_area()  # msa.ROOT is the hardcoded main checkout, not REPO_ROOT — see its module docstring
-    prov = json.loads(msa.PROVENANCE_JSON.read_text())
-    rel = str(msa.NEIGHBOURHOODS_GPKG.relative_to(msa.ROOT))
+    Returns a dict shaped like src.brisa_solar.mare_study_area.load_study_area
+    (communities/included/excluded/data_extent/study_area) so the rest of
+    this file — written against that shape — is unchanged."""
+    t = load_territory("maré", root=msa.ROOT)  # msa.ROOT is the hardcoded main checkout, not REPO_ROOT
+    sa = {
+        "communities": t.subunits, "included": t.subunits_included,
+        "excluded": t.subunits_excluded, "data_extent": t.data_extent,
+        "study_area": t.study_area,
+    }
+    sub_prov = t.provenance["subunits"]
+    rel = "data/" + sub_prov["file"]
+    prov_rel = "data/" + sub_prov["provenance_file"]
 
     numbers.append(_entry("mare_study_area_km2", sa["study_area"].area / 1e6, "km²", "float",
                            rel, "union(included communities).intersection(data_extent).area"))
@@ -71,8 +79,8 @@ def _study_area(numbers: list[dict]) -> dict:
     excluded_name = ", ".join(sorted(sa["excluded"]["community"])) if len(sa["excluded"]) else "none"
     numbers.append(_entry("mare_study_area_excluded_name", excluded_name, "", "text",
                            rel, "communities[~in_extent].community"))
-    numbers.append(_entry("mare_study_area_n_inferred_matches", int(prov["qa"]["n_inferred"]), "communities", "int",
-                           str(msa.PROVENANCE_JSON.relative_to(msa.ROOT)), "qa.n_inferred"))
+    numbers.append(_entry("mare_study_area_n_inferred_matches", int(sub_prov["provenance"]["qa"]["n_inferred"]),
+                           "communities", "int", prov_rel, "qa.n_inferred"))
     return sa
 
 

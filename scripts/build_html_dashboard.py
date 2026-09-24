@@ -39,6 +39,7 @@ import pandas as pd
 # REPO below, e.g. carrying a module not yet merged to the main checkout).
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.brisa_solar import mare_study_area as msa  # noqa: E402
+from src.sites.territory import has_subunit_study_area  # noqa: E402
 
 # Hard-coded, not Path(__file__).resolve().parents[1]: this script runs
 # from a git worktree whose own outputs/ and data/ dirs are untracked and
@@ -513,11 +514,13 @@ def build_site(site: str) -> dict:
     #                                 never the study area (MAREBOUND rule 2).
 
     communities = None
-    if site in ("maré", "mare"):
-        # Study area (MAREBOUND): which observers/segments count in every
-        # stat below is the 16-community union ∩ data extent, not the
-        # whole bairro. `boundary` itself is passed to compute_site_stats
-        # untouched — see the comment above.
+    if has_subunit_study_area(site):
+        # Registry-driven (config/sites.yaml, src/sites/territory.py): a
+        # site whose study_area.kind is subunits_union_in_extent (today,
+        # only Maré) counts only observers/segments inside that subunit
+        # union ∩ data extent in every stat below, not the whole boundary.
+        # `boundary` itself is passed to compute_site_stats untouched — see
+        # the comment above.
         sa = msa.load_study_area()
         communities = sa["included"]
         obs_in_area = msa.within_mask(obs.geometry.x.to_numpy(), obs.geometry.y.to_numpy(), sa["study_area"])
@@ -2333,10 +2336,12 @@ def main():
             seg = gpd.read_file(REPO / f"outputs/{s}/morphometrics/svf/svf_streets_segments.gpkg")
             bnd = boundary_for(s)
             area_override = None
-            if s in ("maré", "mare"):
+            if has_subunit_study_area(s):
                 # Keep the landing-page tile consistent with the per-site
                 # page below — both must report the study area, not the
-                # whole bairro (MAREBOUND). bnd stays unfiltered.
+                # whole boundary, for a site whose study_area.kind is
+                # subunits_union_in_extent (config/sites.yaml). bnd stays
+                # unfiltered.
                 sa = msa.load_study_area()
                 obs_in_area = msa.within_mask(obs.geometry.x.to_numpy(), obs.geometry.y.to_numpy(), sa["study_area"])
                 obs = obs.loc[obs_in_area].reset_index(drop=True)

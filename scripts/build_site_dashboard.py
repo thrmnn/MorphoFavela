@@ -50,6 +50,7 @@ from src.svf_v2.paths import AREA_FILES
 from src.viz.folha.sites import SHEET_NUMBER
 from src.brisa_solar import mare_study_area as msa
 from src.brisa_solar.wp07_figures import BOUNDARY_STROKE_PX
+from src.sites.territory import has_subunit_study_area
 
 TYPOLOGY = {
     "vidigal": ("hillside canyon", "#2C5F8D"),
@@ -199,17 +200,18 @@ def load_site(site: str, issues: list) -> dict:
         manifest = json.load(f)
     grid = load_grid_table(site)
 
-    # Maré only: the study area (union of the 16 Redes da Maré communities ∩
-    # the site data extent) governs which grid cells/observers count in
-    # Maré's statistics and gets outlined on the sheet (src/brisa_solar/
-    # mare_study_area.py). `boundary` above stays the DATA EXTENT (the
-    # bairro) unconditionally — near_boundary/edge-halo logic in
-    # compute_stats() must keep measuring against it, never the study area.
+    # Registry-driven (config/sites.yaml, src/sites/territory.py): a site
+    # whose study_area.kind is subunits_union_in_extent (today, only Maré)
+    # has a study area narrower than its data extent, and it governs which
+    # grid cells/observers count in that site's statistics + gets outlined
+    # on the sheet. `boundary` above stays the DATA EXTENT unconditionally
+    # for every site — near_boundary/edge-halo logic in compute_stats() must
+    # keep measuring against it, never the study area.
     communities = None
     excluded_communities = None
     study_area_geom = None
     study_area_mask = None
-    if site in ("maré", "mare"):
+    if has_subunit_study_area(site):
         sa = msa.load_study_area()
         communities = sa["included"]
         excluded_communities = sa["excluded"]
@@ -1026,7 +1028,7 @@ def draw_caveats_v2(ax, site: str, stats: dict) -> None:
          "observers were repositioned > 2.5 m from their original "
          "sample location (low-confidence)."),
     ]
-    if site in ("maré", "mare"):
+    if has_subunit_study_area(site):
         excluded = stats.get("study_area_excluded_names") or "none"
         n_included = stats.get("study_area_n_communities")
         caveats.append((
