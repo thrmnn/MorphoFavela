@@ -20,9 +20,9 @@ README_TEMPLATE = """\
 
 Built for Octopus LRP #2 ("Street by street: explaining air temperature
 differences across streets and over time in Complexo da Maré", lead
-Jingxue, PI Simone). Théo (PI, this repo) is a SUPPORT contributor:
-street-form variables only. This package contains no temperature analysis
-and no conclusions — that is the Octopus team's work.
+Jingxue, PI Simone). Théo Hermann contributes street-form variables from
+the MorphoFavela pipeline in a support role. This package contains no
+temperature analysis and no conclusions — those are the Octopus team's work.
 
 Generated {version_date} by `scripts/build_om_package.py`
 (source: `src/om_package/` in the MorphoFavela repo).
