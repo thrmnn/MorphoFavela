@@ -190,3 +190,14 @@ cover all 16 communities, with Marcílio Dias taken from the favela layer's "Cen
 Marcílio Dias" (bairro Penha Circular, outside the official Maré bairro).
 `scripts/data_utils/build_mare_neighbourhoods.py` assembles the layer; the crosswalk and QA are
 in `data/maré/neighbourhoods_provenance.json`. Manual digitising from the Guia de Ruas is not needed.
+
+## Addendum 2026-09-24 — IPP's outline of the whole complex
+
+`https://pgeo3.rio.rj.gov.br/arcgis/rest/services/Territorios_Sociais/TS_Publico/MapServer/0`
+(Abrangencia_GrandesComplexos, VERIFIED by query) carries territory "03" — the Complexo da Maré as one
+contiguous polygon (3.36 km², 99.6 % inside the bairro; holds 94.7 % of the bairro's building
+footprints by count). It covers the blocks between the SABREN community polygons and excludes
+Marcílio Dias. Layer 7 of the same service (Setores_GrandesComplexos) is census tracts with social
+indices, not communities. Saved as `data/maré/raw/ipp_territorios_sociais_territorio03.gpkg`.
+Conclusion: IPP has no layer tiling Maré into its 16 communities; the communities come from SABREN
+(favelas + conjuntos), the outline from Territórios Sociais.
