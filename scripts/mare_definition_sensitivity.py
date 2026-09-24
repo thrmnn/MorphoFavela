@@ -29,6 +29,7 @@ from src.brisa_solar.wp07_ledger import RUN_OF_RECORD  # noqa: E402
 
 FAVELAS = ROOT / "data" / "RJ" / "Favelas_Limit_2019.shp"
 NEIGHBOURHOODS = ROOT / "data" / "maré" / "neighbourhoods.gpkg"
+IPP_OUTLINE = ROOT / "data" / "maré" / "raw" / "ipp_territorios_sociais_territorio03.gpkg"
 
 
 def _summ(sub: pd.DataFrame, city_svf, city_kwh) -> dict:
@@ -60,6 +61,8 @@ def main() -> int:
                                 df[df.favela_id.isin(fav[fav.bairro == "Maré"].cod_favela.astype(int))]),
         "D_sixteen_communities": ("union of the 16 communities (data/maré/neighbourhoods.gpkg)",
                                   _within(df, comm.union_all())),
+        "E_ipp_complex_outline": ("IPP Territórios Sociais outline of the complex (territory 03) — the site study area since 2026-09-24",
+                                  _within(df, gpd.read_file(IPP_OUTLINE).to_crs(31983).union_all())),
     }
     out = {"_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
            "wp05_run": RUN_OF_RECORD["wp05"], "definitions": {}, "per_community": {}}
