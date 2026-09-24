@@ -446,3 +446,8 @@ def test_figure_card_release_badge_is_shown_and_never_hides_the_figure():
     html = bprf._figure_card(e, "sec")
     assert "unclassified" in html
     assert "f.png" in html
+
+
+def test_every_figure_card_names_its_file_for_the_gates():
+    card = bprf._figure_card({"status": "OK", "file": "f9_x.png", "bytes": 1000, "thumb": None}, "sec")
+    assert 'data-file="f9_x.png"' in card

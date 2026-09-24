@@ -803,7 +803,7 @@ def _release_badge_tag(e: dict) -> str:
 
 def _figure_card(e: dict, slug: str) -> str:
     if e["status"] == "MISSING":
-        return f'<figure><div class="nolink">missing: <span class="name">{e["file"]}</span></div></figure>'
+        return f'<figure data-file="{e["file"]}"><div class="nolink">missing: <span class="name">{e["file"]}</span></div></figure>'
     tags = _release_badge_tag(e)
     if e.get("work_package"):
         tags += f'<span class="tag wp">{e["work_package"]}</span>'
@@ -822,7 +822,7 @@ def _figure_card(e: dict, slug: str) -> str:
     img = (f'<a href="{slug}/{e["file"]}"><img src="{slug}/{e["thumb"]}" loading="lazy" alt=""></a>'
            if e.get("thumb") else "")
     link = f'<a href="{slug}/{e["file"]}">{e["file"]}</a>'
-    return (f'<figure>{img}<figcaption>{tags}<div class="name">{link}</div>'
+    return (f'<figure data-file="{e["file"]}">{img}<figcaption>{tags}<div class="name">{link}</div>'
             f'<div class="meta">{" · ".join(bits)}</div></figcaption></figure>')
 
 
