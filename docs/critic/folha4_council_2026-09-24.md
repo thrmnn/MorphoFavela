@@ -134,3 +134,88 @@ oriented (e.g. repeat viewing), not the sheet the PI opens first.
 Merged into `main` locally 2026-09-24, not pushed. Blocking items 1–3 above
 are not yet fixed in this merge — this document records the round-3 council
 verdict as delivered; remediation is separate follow-up work.
+
+## Folha4-all — five-site deck (branch `cyc4b/folha4-all`)
+
+Branch `cyc4b/folha4-all` generalises FOLHA4 from the Maré-only sheet above to
+all five P1 sites (Vidigal, Rocinha, Rio das Pedras, Complexo do Alemão, plus
+Maré's hero/no-hero variants). Merged into `main` locally 2026-09-25, not
+pushed.
+
+### Round 2 — scores per seat
+
+Average: **8.7 / 10**
+
+**Seat 1** — overall 8.8. Per-site: Vidigal 9, Rocinha 9, Rio das Pedras 8.5,
+Complexo do Alemão 9, Maré no-hero 9, Maré hero 9.2. No blocking items.
+Verification notes: all 5 round-1 blocking items + 2 adjacent defects
+confirmed fixed on both the A3 PNG and a pdftoppm 220dpi print-PDF render of
+Vidigal (masthead wrap and colorbar margin hold identically in the
+vector/print path). (1) Vidigal/Rocinha masthead provenance line wraps
+within axes width, no page overrun. (2) Hexbin colorbar (incl. the count=100
+extend-triangle on Rocinha) sits with comfortable right-margin, no bleed.
+(3) Vidigal/Rocinha carry panels 1+2, panel 3 correctly absent (no
+subunits). (4) Rio das Pedras panel-3 boxplots re-centered in a
+category-scaled sub-axes, readable and not stranded across full width. (5)
+Alemão panel-2 title clears the top y-tick and the identity card's OBSERVERS
+label. Adjacent fix: Alemão's leftmost panel-3 category label "Rua Armando
+Sodré" now fully visible, not clipped. Maré's 15-category panel-3 x-axis has
+no clipping at either edge. No new blocking defects found in this
+cartographer-lens pass. Improvements (non-blocking):
+- North-arrow note (carried from round 1): the four small-multiple maps
+  (Terrain/Density/SVF/Sunlight) per site carry only a scale bar, no
+  orientation cue, while the Maré hero variant's large SVF map has a
+  combined "N ◄ 200 m" indicator — a reader with only the small multiples
+  in view can't confirm north-up.
+- Rio das Pedras panel 3: the two-box sub-axes fix is solid (no longer
+  stranded/full-width) but the box cluster sits left-of-page-center rather
+  than centered on the full page width (~40% blank margin remains to its
+  right). A tighter category-count-scaled width or true page-centering
+  would read cleaner at A3.
+
+**Seat 2** — overall 8.9. Per-site: Vidigal 9, Rocinha 9, Rio das Pedras v4
+9, Complexo do Alemão v4 9, Maré no-hero 8.5, Maré hero 8.5. No blocking
+items. Improvements (non-blocking):
+- Mixed v3/v4 layout note across the five-site deck still applies (carried
+  from round 1, correctly left unaddressed this round).
+- Grammar nit on Vidigal/Rocinha panel-1 legend: "1 IPP favela polygon(s)"
+  reads awkwardly for n=1.
+- Jargon glosses, north-arrow note, footer-card parity, and panel-3
+  "between communities" box for non-subunit sites remain open non-blocking
+  improvements from the round-1 council text.
+- Consider an independent test-suite spot check (24 module + 48 scoped
+  tests claimed) before merge, since this review verified pixels/layout
+  only, not the underlying numeric pipeline.
+
+**Seat 3** — overall 8.4. Vidigal 8.5, Rocinha 8.5, Rio das Pedras 8.5,
+Complexo do Alemão 8.5, Maré regression check 8.5; rubric: structure 8.5,
+legibility 8.5, restraint 8, honesty 9. No blocking items. Improvements
+(non-blocking):
+- Masthead provenance line now wraps correctly on both Vidigal and Rocinha,
+  but its content is still dense internal-code jargon ("n_constraints==3",
+  "svf_c_p50 p10", locator-box arithmetic) for a community-facing reader —
+  same register gap the Maré round-3 council already logged as
+  non-blocking; worth a plain-language rewrite before any Redes-facing
+  release.
+- Footer caption boxes ([H1]/[H2]/[M2]/[M3/L1]) across all four non-Maré
+  sites still use un-glossed abbreviations (SVF, λp, "P1 definition
+  (complexo_exact)") and internal IDs ("WP-05", run hashes) — the same
+  non-blocking items flagged for Maré have not yet been ported to the
+  other sheets.
+- The deck still visibly mixes v3 sheets (Vidigal/Rocinha, panels 1+2
+  backported onto an otherwise v3 layout) and native v4 sheets
+  (Alemão/Rio das Pedras) — round 1's non-blocking note still applies; a
+  one-line "why some sheets differ" note would help a reader comparing all
+  five side by side.
+- "OBSERVERS" and "IPP" remain unexplained on every sheet — a reader
+  landing on a single site page has no way to know OBSERVERS means sampled
+  grid-cell centroids, not people, or that IPP is Rio's city planning
+  institute.
+- Vidigal/Rocinha's Zoom A panel prints "no qualifying cluster — largest
+  n_constraints=3 cluster is 16 cells, below the 25-cell floor..." directly
+  on the sheet — correct and honest, but written for an engineer, not a
+  community reader; consider a plainer one-line fallback caption.
+
+No blocking items from any seat this round. Merge status: `cyc4b/folha4-all`
+merged into `main` locally 2026-09-25, gate run from the main checkout; not
+pushed.
