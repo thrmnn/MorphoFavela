@@ -3,8 +3,8 @@ hand-edited — rebuild via scripts/build_om_package.py after any source/method
 change (never hand-edit data/outputs, per CLAUDE.md)."""
 from __future__ import annotations
 
-VERSION = "v0.1.1"
-VERSION_DATE = "2026-09-24"
+VERSION = "v0.1.2"
+VERSION_DATE = "2026-09-25"
 
 #: PI ruling 2026-09-24 (Q6a). Same text goes in the README banner and the
 #: manifest's use_terms field — one string, so the two can never drift.
@@ -106,12 +106,21 @@ available yet — see Known limits.
   `ROUTE_FLAG_MAX_STREET_DIST_M`) — both are signs the OSM-inferred route
   drifted off the street the team actually walked. See Known limits for
   the measured counts.
-- **P-05 shade**: function + CLI (`src/om_package/shade.py`) that takes
-  explicit campaign dates, a time window, and a required (no-default)
-  timezone — campaign dates and timezone are not known yet, so {version}
-  ships an empty-schema table, not a guessed demo run. The schema reserves
-  a `tree_shade` column (always null) so a future building-only release
-  does not need a second schema change when tree shade lands.
+- **P-05 shade**: function + CLI (`src/om_package/shade.py`), now RUN for
+  real against a {n_csv_pilot}-file pilot pull from the team's Drive
+  (`Zenodo_release/fixed_data/`, one CSV per device: I_1/I_3/I_4/O_3/O_4).
+  `infer_campaign_windows()` read {n_campaign_dates} campaign dates/walk
+  windows straight off those files (no epoch-reset rows found in the
+  pilot). `point_horizon_profiles()` is now WIRED to the real WP-02/WP-04
+  horizon engine (`src.brisa_solar.wp02_surface.build_surface` +
+  `wp02_horizon.patch_visibility(..., return_horizon=True)`, real 145-patch
+  Tregenza directions) and was run for all {n_om2_points} OM2 points on the
+  laptop GPU. `compute_shade()` then produced {n_shade_rows} real
+  (point x 5-min-timestamp) rows across the {n_campaign_dates} campaign
+  dates (walk windows padded to the hour), **computed in UTC**
+  ({shade_fraction_pct}% of rows shaded) — see Known limits for why UTC
+  and why `max_dist_m={shade_max_dist_m:g} m`, not WP-04's 500 m citywide
+  default. The schema reserves a `tree_shade` column (always null).
 
 ## Known limits
 
@@ -133,13 +142,41 @@ available yet — see Known limits.
   rebuilds of the same route file, but the place it names may move when
   v0.2 rebuilds on the real route — that release will publish an
   old->new `point_id` crosswalk.
-- **Timezone is UNRESOLVED** for the OM2 campaign: GPS-fix Timestamp rows
-  are UTC per firmware; RTC-fallback (no-fix) rows may be local time or
-  something else the firmware does not record. Every function in
+- **Timezone is still UNRESOLVED** for the OM2 campaign: GPS-fix Timestamp
+  rows are UTC per firmware; RTC-fallback (no-fix) rows may be local time
+  or something else the firmware does not record. Every function in
   `src/om_package/shade.py` that needs a timezone takes it as a required
-  parameter with no default, so this cannot silently default to a wrong
-  assumption. `infer_campaign_windows()` reads per-file dates/timestamps
-  off the raw CSVs the moment they arrive.
+  parameter with no default. **{version}'s P-05 table is computed with
+  `tz="UTC"`** (current operating rule for this cycle) — this is a stated
+  labelling choice, NOT a resolution of the open question; treat every
+  timestamp in `p05_building_shade` as UTC-labelled, re-derive if the team
+  confirms otherwise, and do not read it as local Rio clock time.
+- **The Zenodo_release/fixed_data pilot CSVs have NO Latitude/Longitude
+  column** (`Timestamp,Temperature,Humidity,PM1.0,PM2.5,PM2.5_cal,PM4.0,
+  PM10.0` — confirmed on one CSV per device, I_1/I_3/I_4/O_3/O_4). This
+  looks like a fixed-site indoor/outdoor logger schema, not the OM2
+  GPS-track schema `OCTOPUS_JOIN_EXAMPLE` documents (which needs
+  Latitude/Longitude to pick the nearest OM2 point and to drop 0/0 no-fix
+  rows). Whether I_1/I_3/I_4/O_3/O_4 ARE the OM2 device under another
+  naming convention, or a separate fixed-site deployment, is UNVERIFIED —
+  see `docs/research/octopus_lidar_sources.md` §5 and the team message.
+  `infer_campaign_windows()` was made schema-tolerant (v0.1.2): it reports
+  `has_gps=False`, `n_fix=n_rows`, `n_no_fix=0` for this schema rather
+  than raising. The join example below is exercised on a real file from
+  this pull with its temporal (nearest 5-min timestamp) step only, since
+  the spatial (nearest-OM2-point) step needs a GPS-track CSV this pull
+  did not contain.
+- **max_dist_m={shade_max_dist_m:g} m, not WP-04's 500 m citywide
+  default**, for the horizon march behind P-05: `dtm_extended_300m.tif` /
+  `buildings_extended_300m.gpkg` has real nodata starting {shade_min_nan_dist_m:.0f}
+  m from the nearest OM2 point (measured 2026-09-25 — its raster bounding
+  box is a rectangle, but valid coverage inside it is not). WP-02's
+  horizon march (`wp02_horizon.py`) is not NaN-safe (`torch.maximum`
+  propagates NaN), so a full-radius pilot run returned all-NaN horizon
+  values before this was caught; {shade_max_dist_m:g} m is safely under
+  every OM2 point's measured nodata floor and was NOT patched into the
+  shared WP-02 engine (P1's citywide/WP-04 defended numbers also depend on
+  it) — this scoping fix lives only in `point_horizon_profiles()`.
 - **NaN has two distinct causes** in the point table's joined columns —
   they are not interchangeable and are documented separately per column
   in the data dictionary (P-08): (1) *beyond the join-distance cap*
@@ -150,9 +187,12 @@ available yet — see Known limits.
   here" result, not a join gap).
 - **Terrestrial SVF: PENDING** — needs the team's 2026 OM2 terrestrial
   scan.
-- **Building/tree shade: PENDING** — campaign dates and timezone unknown;
-  no tree canopy/DSM layer for Maré on disk. `tree_shade` is reserved as
-  an always-null column in the shade schema (see P-05 above).
+- **Building shade: computed for {n_campaign_dates} pilot campaign dates**
+  (see P-05 above) — more dates arrive as more of the team's Drive CSVs
+  are pulled; an empty table still ships when no CSVs are found at build
+  time. **Tree shade: PENDING** — no tree canopy/DSM layer for Maré on
+  disk. `tree_shade` is reserved as an always-null column in the shade
+  schema.
 - **Height change 2024->2026: PENDING** — data location being confirmed
   by T. Hermann.
 - Nearest-neighbour joins carry a `*_join_dist_m` column; check it before
@@ -187,6 +227,56 @@ CHANGELOG_TEMPLATE = """\
 # Changelog — mare_om2
 
 ## {version} — {version_date}
+
+P-05 shade goes live on a real pilot pull, per the PI ruling 2026-09-24
+(Q1/Q5: release building-only shade once dates are known, from the raw
+CSVs, timezone stays UNRESOLVED).
+
+- **Pilot pull**: 5 CSVs (one per device — I_1/I_3/I_4/O_3/O_4) downloaded
+  from the PI's Drive `04_Octopus_Maré/_data collection/Zenodo_release/
+  fixed_data/` (created 2026-09-23) via the Drive connector, to
+  `data/maré/octopus/csv/` with a manifest (file id, name, size,
+  modified). The full folder holds far more files than this pilot pulled
+  (catalogued, not all downloaded — see the manifest's `catalogued_not_downloaded`
+  count and `docs/research/octopus_lidar_sources.md` §5).
+- **Schema finding**: all 5 pilot CSVs share
+  `Timestamp,Temperature,Humidity,PM1.0,PM2.5,PM2.5_cal,PM4.0,PM10.0` — NO
+  Latitude/Longitude column. This is a fixed-site indoor/outdoor logger
+  schema, not the OM2 GPS-track schema `OCTOPUS_JOIN_EXAMPLE` documents.
+  Whether I_1/I_3/I_4/O_3/O_4 are the OM2 device under another name, or a
+  separate deployment, is UNVERIFIED — flagged to Carlo, not assumed.
+- `infer_campaign_windows()` made schema-tolerant: reports `has_gps=False`,
+  `n_fix=n_rows`, `n_no_fix=0` for the no-GPS schema instead of raising;
+  added `n_epoch_reset` (2000-01-01 rows) — none found in the pilot.
+- `point_horizon_profiles()` WIRED for real (was `NotImplementedError` in
+  v0.1/v0.1.1): builds the obstruction surface from
+  `dtm_extended_300m.tif` + `buildings_extended_300m.gpkg` (WP-02's
+  `build_surface`, cell_m=1.0) and marches WP-02's
+  `patch_visibility(..., return_horizon=True)` from all 1559 OM2 points
+  at 1.5 m over the real 145-patch Tregenza direction set — same engine
+  WP-04 uses for direct-sun-hours. Runs on the laptop GPU (RTX 4060),
+  ~9 s for all 1559 points.
+- **max_dist_m dropped to 100 m** (from WP-04's 500 m citywide default)
+  for this march: `dtm_extended_300m.tif` has real nodata starting
+  ~104-330 m from OM2 points, and WP-02's running max is not NaN-safe
+  (`torch.maximum` propagates NaN) — an unscoped pilot run returned
+  all-NaN horizon values before this was caught. Not patched into the
+  shared WP-02 engine; scoped locally to `point_horizon_profiles()`.
+- `compute_shade()` run for the 5 pilot campaign dates (walk windows
+  padded to the hour, `tz="UTC"` — a stated labelling choice per the
+  current operating rule, NOT a resolution of the open timezone
+  question), producing a real (not empty-schema) `p05_building_shade`
+  table. `tree_shade` stays reserved and null.
+- `OCTOPUS_JOIN_EXAMPLE` exercised on one real pilot CSV
+  (`O_4_20260106_10durhrs.csv`): the temporal (nearest 5-min timestamp,
+  150 s tolerance) `merge_asof` step runs and matches; the spatial
+  (nearest-OM2-point, 0/0 no-fix drop) step is N/A for this schema and
+  documented as such rather than faked.
+- Package version v0.1.1 -> v0.1.2 across `package_docs.py`,
+  `build_om_package.py`'s default `--version`, and the brisaverse release
+  card (`om_release_v0_1_1` -> `om_release_v0_1_2`).
+
+## v0.1.1 — 2026-09-24
 
 Panel review (docs/critic/octopus_package_panel_2026-09-24.md) and PI
 ruling (interview 2026-09-24) applied on top of v0.1's initial release.
@@ -265,8 +355,14 @@ def render_readme(
     n_lambda_p_ones: int,
     n_lambda_p_ones_flagged: int,
     lambda_p_share_explained_pct: float,
+    n_csv_pilot: int = 0,
+    n_campaign_dates: int = 0,
+    n_shade_rows: int = 0,
+    shade_fraction_pct: float = 0.0,
+    shade_max_dist_m: float = 100.0,
+    shade_min_nan_dist_m: float = 104.15,
 ) -> str:
-    """Render README.md. The route_geometry_flag/lambda_p numbers are
+    """Render README.md. The route_geometry_flag/lambda_p/shade numbers are
     computed by the caller (build_om_package.py) from the actual OM2
     build, never hardcoded here — see CLAUDE.md's 'never fabricate a
     value'."""
@@ -281,6 +377,12 @@ def render_readme(
         n_lambda_p_ones=n_lambda_p_ones,
         n_lambda_p_ones_flagged=n_lambda_p_ones_flagged,
         lambda_p_share_explained_pct=lambda_p_share_explained_pct,
+        n_csv_pilot=n_csv_pilot,
+        n_campaign_dates=n_campaign_dates,
+        n_shade_rows=n_shade_rows,
+        shade_fraction_pct=shade_fraction_pct,
+        shade_max_dist_m=shade_max_dist_m,
+        shade_min_nan_dist_m=shade_min_nan_dist_m,
     )
 
 

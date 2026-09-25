@@ -173,7 +173,10 @@ def test_empty_shade_table_schema():
 # --- P-07: PENDING items are real, named PENDING items --------------------
 
 def test_pending_items_listed():
-    assert "building_shade_per_5min" in PENDING_ITEMS
+    # building_shade_per_5min moved out of PENDING in v0.1.2: point_horizon_profiles()
+    # is wired for real and compute_shade() produced a real (non-empty) table from the
+    # pilot CSV pull — see the 'shaded' dictionary row instead (_SHADE_TABLE_ONLY).
+    assert "building_shade_per_5min" not in PENDING_ITEMS
     assert "sky_view_factor_terrestrial" in PENDING_ITEMS
     assert "tree_shade" in PENDING_ITEMS
 
@@ -307,6 +310,38 @@ def test_infer_campaign_windows(tmp_path):
     assert row["n_no_fix"] == 1
     assert row["first_timestamp"] == pd.Timestamp("2026-03-01 08:00:00")
     assert row["last_timestamp"] == pd.Timestamp("2026-03-01 08:00:10")
+    assert row["has_gps"] == True  # noqa: E712
+    assert row["n_epoch_reset"] == 0
+
+
+def test_infer_campaign_windows_no_gps_schema(tmp_path):
+    # v0.1.2: the Zenodo_release/fixed_data pilot pull (2026-09-25) has no
+    # Latitude/Longitude column at all (I_1/I_3/I_4/O_3/O_4 device schema) —
+    # infer_campaign_windows must report has_gps=False, n_fix=n_rows,
+    # n_no_fix=0 instead of raising a KeyError.
+    csv_path = tmp_path / "O_4_log.csv"
+    csv_path.write_text(
+        "Timestamp,Temperature,Humidity,PM1.0,PM2.5,PM2.5_cal,PM4.0,PM10.0\n"
+        "2026-01-06 13:32:09,30.80,60.1,0.0,0.0,0,0.0,0.0\n"
+        "2026-01-06 13:32:14,30.83,60.2,0.1,0.2,4,0.3,0.4\n"
+    )
+    windows = infer_campaign_windows([csv_path])
+    row = windows.iloc[0]
+    assert row["has_gps"] == False  # noqa: E712
+    assert row["n_fix"] == 2
+    assert row["n_no_fix"] == 0
+
+
+def test_infer_campaign_windows_flags_epoch_reset(tmp_path):
+    csv_path = tmp_path / "log_epoch.csv"
+    csv_path.write_text(
+        "Timestamp,Latitude,Longitude,Temperature\n"
+        "2000-01-01 00:00:00,0.0,0.0,25.0\n"
+        "2000-01-01 00:00:05,0.0,0.0,25.1\n"
+        "2026-03-01 08:00:10,-22.861,-43.241,27.6\n"
+    )
+    windows = infer_campaign_windows([csv_path])
+    assert windows.iloc[0]["n_epoch_reset"] == 2
 
 
 # --- must-fix 7: manifest and GeoParquet -------------------------------------

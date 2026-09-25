@@ -87,7 +87,89 @@ if the remote is scoped to a shared drive instead — `rclone lsd gdrive:` first
 confirm.) Nothing terrestrial (2026 OM2/TLS) to pull yet — no candidate file or
 folder found under that name anywhere in the account.
 
-## 4. Recommended next action
+## 4b. The tile-coded LAS grid (2026-09-25 update)
+
+Walked the parent chain of `1r0XINv550GCI8SUOjlDBh0JIaH5Gxg3g` (metadata
+only — no file content downloaded, per instruction; every `.las`/`.tif`
+here is 36 KB–56 MB, well above "small"):
+
+```
+LIDAR 2019/                              id 1cn_1jPhsGIwumhJtd81u4lhE4U4wvz8y
+  created 2024-11-01, sharedWithMeTime 2025-12-02 (shared TO the PI;
+  owner not surfaced by the connector for this folder — likely a
+  shared-drive item, not one of cmoroz@/thermann.ai@'s own uploads)
+  └── MDT/                               id 1ulCdBKt8qdVW4__g9cjzACtnvVvXNd--
+        ("Modelo Digital do Terreno" — Portuguese for Digital Terrain Model)
+        ├── LAS/                         id 1r0XINv550GCI8SUOjlDBh0JIaH5Gxg3g
+        │     311C43A.las (455 KB, created 2025-05-19), 310B14D.las, … —
+        │     ~30+ tiles seen, more paginated; code format `<3-digit><letter><2-digit><letter>`
+        └── Geotiff/                     id 1CtfFTLKaqe_krgA0VdBFZo0QitAYo62z
+              311C43A.tif (56 MB, modifiedTime 2020-02-19) + .tfw
+              (world file) — SAME tile code as the LAS, different
+              product/date; a sibling folder (id 1uef1hZ8PCoOFKpq1UN5pGVqoxxoy_rY_)
+              holds 311C43A_3.tif / 311C43A_4.tif (modifiedTime 2020-07-17)
+```
+
+**What this answers, and what stays UNVERIFIED:**
+
+- **Survey/year**: the top folder is literally named `LIDAR 2019/`. That is
+  real evidence the *survey* is 2019-vintage — but the files inside it
+  have THREE different `modifiedTime`s (`.las` 2025-05-19/20, `.tif`
+  2020-02-19, `_3/_4.tif` 2020-07-17), which are re-upload/re-export
+  dates, not acquisition dates. **UNVERIFIED**: whether this is the SAME
+  2019 survey the package's own `buildings_mare.shp`/DTM already cite
+  (package README's Sources table: "2019 airborne survey") is plausible
+  given the matching year and Rio/IPP-style tile coding, but nothing in
+  the folder names or metadata says so explicitly — needs a direct
+  confirmation, not an inference from a shared folder name alone.
+- **CRS**: **UNVERIFIED**. A `.las` file's CRS lives in its own binary
+  header (and the `.tfw` gives the `.tif`'s affine transform, not its
+  CRS) — reading either requires downloading the file, which the task
+  scope excludes ("metadata only, never download large files"). The
+  `.tif`'s CRS is very likely SIRGAS 2000/UTM 23S (EPSG:31983, matching
+  every other Maré layer in this repo), but that is an inference from
+  local convention, not a read header.
+- **Which tiles cover OM2**: **UNVERIFIED**. The tile code
+  `311C43A`-style naming (`<3 digits><letter><2 digits><letter>`) matches
+  the general shape of Rio de Janeiro's municipal cartographic base-map
+  sheet index (IPP's Base Cartográfica Digital uses a similar
+  hierarchical zone/quadrant scheme at 1:2000/1:10000), which is
+  consistent with — but does not confirm — this being an IPP-sourced
+  citywide product that happens to cover Maré among many other tiles. No
+  tile-index/grid-reference document was found alongside the LAS/Geotiff
+  folders (a `fullText` search for "articulação"/"malha"/"index" inside
+  this Drive account returned nothing under this folder tree). Confirming
+  coverage needs either (a) the PI/Carlo naming the source survey and its
+  published tile index, or (b) downloading one tile's header (a small
+  read, not the whole point cloud) to check its bounding box against
+  Maré's — neither was done here, per the "metadata only" scope.
+
+**Recommendation**: ask directly (folded into the same message that asks
+about the 2024 airborne LiDAR, §4 below) whether `LIDAR 2019/MDT/` is a
+citywide IPP product, and if so, whether its tile index or a coverage
+shapefile exists so tile-to-Maré coverage can be confirmed without
+downloading the ~30+ candidate tiles one at a time.
+
+## 5. Zenodo_release/fixed_data pull (2026-09-25) — a related, separate finding
+
+Downloaded (not just searched) a 5-file, one-per-device pilot from
+`04_Octopus_Maré/_data collection/Zenodo_release/fixed_data/` (§0/§2
+above; full manifest: `data/maré/octopus/csv/manifest.json`). All 5 share
+`Timestamp,Temperature,Humidity,PM1.0,PM2.5,PM2.5_cal,PM4.0,PM10.0` — **no
+Latitude/Longitude column at all**. This is a fixed-site indoor/outdoor
+logger schema (device codes I_1/I_3/I_4/O_3/O_4), not the OM2 GPS-track
+schema `src/om_package/shade.py`'s `OCTOPUS_JOIN_EXAMPLE` documents (which
+needs Latitude/Longitude to pick the nearest OM2 point and to drop the
+0/0 no-fix sentinel). **UNVERIFIED**: whether I_1/I_3/I_4/O_3/O_4 ARE the
+OM2 walking-route device under a different naming convention (i.e. this
+folder's "fixed_data" means "the corrected/fixed-up data", and the device
+was carried, not stationary), or a genuinely separate fixed-site
+deployment. This is exactly the ambiguity §2 already flagged before any
+file was opened; opening 5 files did not resolve it, only sharpened the
+question — asked of Carlo in the team message (communication/
+team_message_draft.md).
+
+## 6. Recommended next action
 
 Before spending PI time on rclone: ask Carlo Moroz directly whether the 2024
 airborne LiDAR for Maré exists anywhere reachable (the empty scaffold strongly

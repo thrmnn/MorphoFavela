@@ -17,7 +17,6 @@ import pandas as pd
 #: so the quality report and the data dictionary agree.
 PENDING_ITEMS = [
     "sky_view_factor_terrestrial",
-    "building_shade_per_5min",
     "tree_shade",
     "airborne_vs_terrestrial_comparison",
     "height_change_2024_2026",

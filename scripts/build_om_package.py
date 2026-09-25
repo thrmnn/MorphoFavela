@@ -62,7 +62,13 @@ from src.om_package.neighbourhoods import communities_crossed, join_communities
 from src.om_package.package_docs import USE_TERMS, render_changelog, render_readme
 from src.om_package.quality import write_quality_report
 from src.om_package.routes import compute_route_geometry_flag, densify_route, route_length_m
-from src.om_package.shade import build_empty_shade_table
+from src.om_package.shade import (
+    OM2_SHADE_MAX_DIST_M,
+    build_empty_shade_table,
+    compute_shade,
+    infer_campaign_windows,
+    point_horizon_profiles,
+)
 from src.om_package.ventilation import compute_ventilation_proxies
 
 from build_om_package_page import build_page as build_om_package_page
@@ -129,7 +135,13 @@ def main() -> int:
         help="internal build dir for OM1/OM3/OM4 (default: <root>/outputs/_packages/_internal/mare_routes/<version>)",
     )
     ap.add_argument("--root", default=str(Paths().root), help="MorphoFavela repo root (absolute)")
-    ap.add_argument("--version", default="v0.1.1")
+    ap.add_argument("--version", default="v0.1.2")
+    ap.add_argument(
+        "--csv-dir",
+        default=None,
+        help="dir of raw Octopus campaign CSVs for real P-05 shade (default: <root>/data/maré/octopus/csv); "
+        "empty-schema table ships if none found there",
+    )
     args = ap.parse_args()
 
     paths = Paths(args.root)
@@ -173,8 +185,51 @@ def main() -> int:
         print("[build_om_package] OM2 not requested — nothing written to the shared package this run")
         return 0
 
-    # P-05: shade — empty schema, campaign dates unknown (see src/om_package/shade.py). OM2/shared only.
-    shade_table = build_empty_shade_table()
+    # P-05: shade. Real run when campaign CSVs exist under --csv-dir (v0.1.2:
+    # the Zenodo_release/fixed_data pilot pull); empty-schema table otherwise
+    # (no guessed demo run — see src/om_package/shade.py). OM2/shared only.
+    csv_dir = Path(args.csv_dir) if args.csv_dir else paths.root / "data" / "maré" / "octopus" / "csv"
+    csv_paths = sorted(csv_dir.glob("*.csv")) if csv_dir.exists() else []
+    n_csv_pilot = len(csv_paths)
+    n_campaign_dates = 0
+    n_shade_rows = 0
+    shade_fraction_pct = 0.0
+    campaign_windows_df = None
+    if csv_paths:
+        print(f"[build_om_package] P-05: {n_csv_pilot} campaign CSVs found under {csv_dir} — computing real shade")
+        # lat/lon for pvlib sun position: the OM2 route's own centroid, reprojected
+        # WGS84 (EPSG:31983 -> 4326) — a single site-representative point, same
+        # simplification WP-04/WP-05 make for one site's sun position; computed from
+        # the actual route geometry, never a remembered/approximate coordinate.
+        from pyproj import Transformer
+
+        transformer = Transformer.from_crs(CRS, "EPSG:4326", always_xy=True)
+        mare_lon, mare_lat = transformer.transform(om2_df["x"].mean(), om2_df["y"].mean())
+        om2_gdf = gpd.GeoDataFrame(
+            om2_df[["point_id"]], geometry=gpd.points_from_xy(om2_df["x"], om2_df["y"]), crs=CRS
+        )
+        campaign_windows_df = infer_campaign_windows(csv_paths)
+        write_table(campaign_windows_df, out_dir, "p05b_campaign_windows")
+        horizon_deg, horizon_az = point_horizon_profiles(om2_gdf, paths, device="cuda", max_dist_m=OM2_SHADE_MAX_DIST_M)
+        frames = []
+        for _, row in campaign_windows_df.iterrows():
+            d = str(row["date"])
+            start_h = row["first_timestamp"].strftime("%H:00")
+            end_h = min(row["last_timestamp"], row["last_timestamp"].normalize() + pd.Timedelta("23h59min")).strftime("%H:59")
+            frames.append(
+                compute_shade(
+                    om2_gdf, [d], (start_h, end_h), step_min=5,
+                    lat=mare_lat, lon=mare_lon, tz="UTC",
+                    horizon_deg=horizon_deg, horizon_azimuths_deg=horizon_az,
+                )
+            )
+        shade_table = pd.concat(frames, ignore_index=True)
+        n_campaign_dates = len(campaign_windows_df)
+        n_shade_rows = len(shade_table)
+        shade_fraction_pct = round(100 * shade_table["shaded"].mean(), 1) if n_shade_rows else 0.0
+        print(f"[build_om_package] P-05: {n_shade_rows} rows across {n_campaign_dates} campaign dates ({shade_fraction_pct}% shaded, tz=UTC)")
+    else:
+        shade_table = build_empty_shade_table()
     write_table(shade_table, out_dir, "p05_building_shade")
 
     # P-08: data dictionary (package-wide, not per-route). OM2/shared only.
@@ -201,12 +256,26 @@ def main() -> int:
             n_lambda_p_ones=n_lambda_p_ones,
             n_lambda_p_ones_flagged=n_lambda_p_ones_flagged,
             lambda_p_share_explained_pct=lambda_p_share_explained_pct,
+            n_csv_pilot=n_csv_pilot,
+            n_campaign_dates=n_campaign_dates,
+            n_shade_rows=n_shade_rows,
+            shade_fraction_pct=shade_fraction_pct,
+            shade_max_dist_m=OM2_SHADE_MAX_DIST_M,
         )
     )
     (out_dir / "CHANGELOG.md").write_text(render_changelog())
 
     # manifest: sha256 per file, computed last (over everything just written,
     # manifest.json itself does not exist yet so is never self-hashed)
+    manifest["p05_shade"] = {
+        "n_csv_pilot": n_csv_pilot,
+        "n_campaign_dates": n_campaign_dates,
+        "n_rows": n_shade_rows,
+        "shade_fraction_pct": shade_fraction_pct,
+        "tz": "UTC (labelling choice, campaign timezone UNRESOLVED)" if n_shade_rows else None,
+        "max_dist_m": OM2_SHADE_MAX_DIST_M,
+        "campaign_dates": [str(d) for d in campaign_windows_df["date"]] if campaign_windows_df is not None else [],
+    }
     manifest["files"] = hash_tree(out_dir)
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(f"[build_om_package] wrote manifest to {out_dir / 'manifest.json'}")

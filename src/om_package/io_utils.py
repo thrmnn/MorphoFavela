@@ -37,6 +37,10 @@ class Paths:
         return self.root / "data" / "maré" / "buildings_extended_300m.gpkg"
 
     @property
+    def dtm_extended_300m(self) -> Path:
+        return self.root / "data" / "maré" / "dtm_extended_300m.tif"
+
+    @property
     def street_mare(self) -> Path:
         return self.root / "data" / "maré" / "raw" / "street_mare.shp"
 

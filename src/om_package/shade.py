@@ -105,20 +105,75 @@ def is_shaded(sun_altitude_deg: np.ndarray, sun_azimuth_deg: np.ndarray, horizon
     return (sun_altitude_deg <= 0) | (sun_altitude_deg <= horizon_at_sun_az)
 
 
-def point_horizon_profiles(points_gdf, paths, device: str | None = None):
-    """Marched horizon-angle profile per OM2 point (real engine call — not
-    exercised by v0.1's default build; see module docstring). Requires
-    src/brisa_solar/wp02_surface.build_surface over a DSM covering the
-    route corridor and src/brisa_solar/wp02_horizon.patch_visibility(...,
-    return_horizon=True). Returns (horizon_deg [n_points, n_az],
-    azimuths_deg [n_az])."""
-    raise NotImplementedError(
-        "point_horizon_profiles needs a DSM built over the OM2 corridor "
-        "(wp02_surface.build_surface) and a horizon march "
-        "(wp02_horizon.patch_visibility) — a real but non-trivial pipeline "
-        "step out of scope for v0.1's default build. Wire this in when "
-        "campaign dates are known and the run is worth costing."
+#: WP-04's own citywide default (MAX_DIST_M = 500 m) is unsafe on
+#: dtm_extended_300m.tif/buildings_extended_300m.gpkg: that 300m-buffer
+#: layer has real nodata starting ~104-330 m from OM2 route points
+#: (measured empirically 2026-09-25 — the buffer's raster bounding box is
+#: a rectangle, but valid DTM coverage inside it is not, so some march
+#: rays exit real data before reaching 500 m). wp02_horizon.py's running
+#: max is not NaN-safe (torch.maximum propagates NaN), so any ray that
+#: touches nodata poisons that whole direction's horizon value — this was
+#: caught as an all-NaN pilot result before landing v0.1.2's real run
+#: (never silently patched into the shared WP-02 engine, which P1's
+#: citywide/WP-04 defended numbers also depend on). 100 m is safely under
+#: the measured 104.15 m worst-case floor across all 1559 OM2 points, and
+#: is a reasonable near-field radius for pedestrian-height shade in a
+#: dense settlement (a 2-5-storey building beyond 100 m casts a
+#: horizon-relevant shadow only at very low sun altitudes already handled
+#: by is_shaded()'s altitude<=0 branch). Revisit if a wider gap-free
+#: extended layer lands.
+OM2_SHADE_MAX_DIST_M = 100.0
+
+
+def point_horizon_profiles(points_gdf, paths, device: str | None = None, tmp_dir: Path | None = None, max_dist_m: float = OM2_SHADE_MAX_DIST_M):
+    """Marched horizon-angle profile per OM2 point — the real engine call
+    (wired v0.1.2; v0.1/v0.1.1 shipped only this wiring's
+    NotImplementedError). Builds the obstruction surface once
+    (buildings_extended_300m.gpkg rasterised onto dtm_extended_300m.tif —
+    the same 300m-buffer Maré layer WP-02/WP-04 use, cell_m=1.0 to match
+    WP-04's CELL_M) via src/brisa_solar/wp02_surface.build_surface, then
+    marches src/brisa_solar/wp02_horizon.patch_visibility(...,
+    return_horizon=True) from each OM2 point at pedestrian height (1.5 m,
+    WP-04's OBS_HEIGHT_M) over the real 145-patch Tregenza direction set
+    (src.svf_v2.compute.generate_tregenza_patches — the same set WP-04
+    uses, not a second sky), same engine WP-04 uses for its direct-sun-
+    hours number (wp04_sites.py, docstring above).
+
+    horizon_deg is (n_points, 145): multiple Tregenza patches share an
+    azimuth band, so several columns repeat the same marched value at
+    that azimuth (WP-04's own docstring) — is_shaded()'s nearest-azimuth
+    lookup handles that correctly without deduplication.
+
+    Returns (horizon_deg [n_points, 145] float16, azimuths_deg [145]
+    float64 — one per Tregenza patch, from patch_azimuth_deg)."""
+    import tempfile
+
+    import rasterio
+
+    from src.brisa_solar.wp02_horizon import patch_visibility
+    from src.brisa_solar.wp02_surface import build_surface
+    from src.brisa_solar.wp04_sites import CELL_M, OBS_HEIGHT_M, patch_azimuth_deg
+    from src.svf_v2.compute import generate_tregenza_patches
+
+    with tempfile.TemporaryDirectory() as td:
+        out_stem = (Path(tmp_dir) if tmp_dir else Path(td)) / "om2_horizon_surface"
+        surface_tif = build_surface(paths.dtm_extended_300m, paths.buildings_extended_300m, CELL_M, out_stem)
+        with rasterio.open(surface_tif) as src:
+            surface = src.read(1)
+            transform = src.transform
+        with rasterio.open(f"{out_stem}_is_building.tif") as src:
+            is_building = src.read(1).astype(bool)
+
+    directions, _weights = generate_tregenza_patches()
+    azimuths_deg = patch_azimuth_deg(directions)
+
+    obs_xy = np.column_stack([points_gdf.geometry.x.to_numpy(), points_gdf.geometry.y.to_numpy()])
+    _vis, _on_building, horizon_deg = patch_visibility(
+        surface, transform, obs_xy, directions=directions, is_building=is_building,
+        obs_height_m=OBS_HEIGHT_M, max_dist_m=max_dist_m, march_sampling="nearest",
+        device=device, return_horizon=True,
     )
+    return horizon_deg, azimuths_deg
 
 
 def compute_shade(
@@ -183,13 +238,40 @@ def infer_campaign_windows(csv_paths: list) -> pd.DataFrame:
     that stays a required, explicit parameter everywhere else in this
     module.
 
+    Two real CSV schemas exist on the team's Drive (confirmed empirically
+    on the Zenodo_release/fixed_data pull, 2026-09-25): the GPS-track
+    schema documented in OCTOPUS_JOIN_EXAMPLE (Timestamp, Latitude,
+    Longitude, ...), and a Latitude/Longitude-FREE fixed-site
+    indoor/outdoor logger schema (Timestamp, Temperature, Humidity,
+    PM1.0, PM2.5, PM2.5_cal, PM4.0, PM10.0 — device codes I_1/I_3/I_4/
+    O_3/O_4). Files of the second kind report ``n_fix = n_rows``,
+    ``n_no_fix = 0`` and ``has_gps = False`` rather than raising —  the
+    fix/no-fix distinction does not apply to them, and whether they are
+    the OM2 walking-route device under another name or a separate fixed
+    sensor deployment is UNVERIFIED (see
+    docs/research/octopus_lidar_sources.md §5); never assumed either way.
+
+    Also flags epoch-reset rows (Timestamp == 2000-01-01, the common
+    GPS-clock power-on default before a fix is ever acquired) in
+    ``n_epoch_reset`` so a clock-not-yet-set campaign start is visible
+    rather than silently averaged into first_timestamp.
+
     Returns one row per input path: csv_path, date (first row's date),
-    first_timestamp, last_timestamp, n_rows, n_fix, n_no_fix.
+    first_timestamp, last_timestamp, n_rows, n_fix, n_no_fix, has_gps,
+    n_epoch_reset.
     """
     rows = []
     for p in csv_paths:
         df = pd.read_csv(p, parse_dates=["Timestamp"])
-        no_fix = (df["Latitude"] == 0.0) & (df["Longitude"] == 0.0)
+        has_gps = "Latitude" in df.columns and "Longitude" in df.columns
+        if has_gps:
+            no_fix = (df["Latitude"] == 0.0) & (df["Longitude"] == 0.0)
+            n_fix = int((~no_fix).sum())
+            n_no_fix = int(no_fix.sum())
+        else:
+            n_fix = len(df)
+            n_no_fix = 0
+        n_epoch_reset = int((df["Timestamp"].dt.date == pd.Timestamp("2000-01-01").date()).sum()) if len(df) else 0
         rows.append(
             {
                 "csv_path": str(p),
@@ -197,11 +279,16 @@ def infer_campaign_windows(csv_paths: list) -> pd.DataFrame:
                 "first_timestamp": df["Timestamp"].min() if len(df) else pd.NaT,
                 "last_timestamp": df["Timestamp"].max() if len(df) else pd.NaT,
                 "n_rows": len(df),
-                "n_fix": int((~no_fix).sum()),
-                "n_no_fix": int(no_fix.sum()),
+                "n_fix": n_fix,
+                "n_no_fix": n_no_fix,
+                "has_gps": has_gps,
+                "n_epoch_reset": n_epoch_reset,
             }
         )
-    return pd.DataFrame(rows, columns=["csv_path", "date", "first_timestamp", "last_timestamp", "n_rows", "n_fix", "n_no_fix"])
+    return pd.DataFrame(
+        rows,
+        columns=["csv_path", "date", "first_timestamp", "last_timestamp", "n_rows", "n_fix", "n_no_fix", "has_gps", "n_epoch_reset"],
+    )
 
 
 #: Example: joining a per-5-min shade table against an Octopus CSV

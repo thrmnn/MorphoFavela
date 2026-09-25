@@ -217,12 +217,6 @@ _PENDING: dict[str, dict] = {
         "unit": "fraction [0,1]", "source": "PENDING — needs the team's 2026 OM2 terrestrial scan/photography campaign",
         "method": "PENDING", "limits": "Not computed in v0.1 (spec P-04: airborne only).", "status": "PENDING",
     },
-    "building_shade_per_5min": {
-        "definition": "Whether a building shades each OM2 point at each 5-minute timestamp on a campaign date.",
-        "unit": "bool", "source": "PENDING — campaign dates not known yet (PI, 2026-09-23)",
-        "method": "src/om_package/shade.py compute_shade() — implemented, not run; empty-schema table shipped in v0.1",
-        "limits": "-", "status": "PENDING",
-    },
     "tree_shade": {
         "definition": "Whether tree canopy shades each OM2 point. RESERVED column in the shade table schema (SHADE_TABLE_COLUMNS) — present but always null, so the table's shape will not change again once this is computed.",
         "unit": "bool", "source": "PENDING — no DSM/canopy layer for Maré on disk",
@@ -241,11 +235,11 @@ _PENDING: dict[str, dict] = {
 }
 
 _SHADE_TABLE_ONLY = {
-    "timestamp": {"definition": "Clock timestamp of a shade evaluation (5-min step).", "unit": "datetime (timezone UNRESOLVED — see src/om_package/shade.py module docstring; tz is a required, no-default parameter of every shade/join function)", "source": "src/om_package/shade.py", "method": "pd.date_range over the requested time window", "limits": "-", "status": "PENDING"},
-    "date": {"definition": "Calendar date of a shade evaluation.", "unit": "date", "source": "src/om_package/shade.py", "method": "-", "limits": "-", "status": "PENDING"},
-    "sun_altitude_deg": {"definition": "Apparent solar elevation at the evaluation timestamp.", "unit": "degrees", "source": "pvlib.solarposition.get_solarposition", "method": "-", "limits": "-", "status": "PENDING"},
-    "sun_azimuth_deg": {"definition": "Solar azimuth (clockwise from north) at the evaluation timestamp.", "unit": "degrees", "source": "pvlib.solarposition.get_solarposition", "method": "-", "limits": "-", "status": "PENDING"},
-    "shaded": {"definition": "Whether a building (not tree) shades the point at this timestamp.", "unit": "bool", "source": "src/om_package/shade.py is_shaded()", "method": "sun altitude vs. marched horizon angle at the sun's azimuth", "limits": "Needs point_horizon_profiles() (real, not run in v0.1) to be non-empty.", "status": "PENDING"},
+    "timestamp": {"definition": "Clock timestamp of a shade evaluation (5-min step).", "unit": "datetime, LABELLED UTC in v0.1.2 (a stated operating-rule choice, NOT a resolution of the still-UNRESOLVED campaign timezone — see src/om_package/shade.py module docstring; tz is a required, no-default parameter of every shade/join function)", "source": "src/om_package/shade.py", "method": "pd.date_range over the requested time window", "limits": "-", "status": "computed"},
+    "date": {"definition": "Calendar date of a shade evaluation.", "unit": "date", "source": "src/om_package/shade.py", "method": "-", "limits": "-", "status": "computed"},
+    "sun_altitude_deg": {"definition": "Apparent solar elevation at the evaluation timestamp.", "unit": "degrees", "source": "pvlib.solarposition.get_solarposition", "method": "-", "limits": "-", "status": "computed"},
+    "sun_azimuth_deg": {"definition": "Solar azimuth (clockwise from north) at the evaluation timestamp.", "unit": "degrees", "source": "pvlib.solarposition.get_solarposition", "method": "-", "limits": "-", "status": "computed"},
+    "shaded": {"definition": "Whether a building (not tree) shades the point at this timestamp.", "unit": "bool", "source": "src/om_package/shade.py is_shaded()", "method": "sun altitude vs. marched horizon angle at the sun's azimuth (point_horizon_profiles(), wired v0.1.2, max_dist_m=100m — see README Known limits)", "limits": "v0.1.2 covers only the pilot's 5 campaign dates (one CSV per device pulled 2026-09-25); more dates arrive as more CSVs are pulled. tz='UTC' labelling, not a resolved local time.", "status": "computed"},
 }
 
 

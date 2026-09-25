@@ -41,7 +41,7 @@ import hubkit  # noqa: E402
 DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
 
 BRISA_HUB = "https://brisa.theoalessandro.com"
-OPS_DECISION_ID = "om_release_v0_1_1"
+OPS_DECISION_ID = "om_release_v0_1_2"
 OPS_LINK = f"{BRISA_HUB}/ops#dec-{OPS_DECISION_ID}"
 PAPER_LINK = f"{BRISA_HUB}/paper/x1"
 PANEL_DOC_REL = "docs/critic/octopus_package_panel_2026-09-24.md"  # repo-root relative
@@ -53,10 +53,10 @@ PANEL_DOC_REL = "docs/critic/octopus_package_panel_2026-09-24.md"  # repo-root r
 TEAM_RELEASE_STATUS = "draft"  # draft | sent | superseded
 
 TEAM_OWES = [
-    ("Raw OM2 CSVs", "Lets us infer campaign dates directly from the data (interview Q1c)."),
-    ("Clock / timezone confirmation", "GPS-fix rows are UTC per firmware; RTC-fallback rows are unconfirmed. Unblocks P-05 building shade (Q1)."),
+    ("More raw OM2 CSVs", "A 5-file, one-per-device pilot was pulled 2026-09-25 from Zenodo_release/fixed_data/ (which holds far more files than the pilot downloaded) — those 5 files have NO Latitude/Longitude column (I_1/I_3/I_4/O_3/O_4 schema), so whether they ARE the OM2 device is UNVERIFIED; a confirmed GPS-track CSV is still needed to exercise the spatial half of the join example."),
+    ("Clock / timezone confirmation", "GPS-fix rows are UTC per firmware; RTC-fallback rows are unconfirmed. v0.1.2's P-05 table is computed with tz=\"UTC\" as a stated labelling choice, not a resolution (Q1)."),
     ("om_routes.gpkg", "The team's own walked route — repairs point_id from PROVISIONAL to final and removes the route_geometry_flag defect (Q2)."),
-    ("2024 airborne LiDAR + 2026 terrestrial OM2 scan", "Now located by the PI in Google Drive — being fetched (Q3)."),
+    ("2024 airborne LiDAR + 2026 terrestrial OM2 scan", "The PI's Drive LiDAR_DSM_DTM/2024/ folders (Maré, Rio das Pedras, Rocinha_Vidigal) are scaffolded but EMPTY — asked of Carlo Moroz (Q3); see docs/research/octopus_lidar_sources.md."),
 ]
 
 
@@ -266,6 +266,51 @@ def render_page(root: Path) -> str:
   <ul>{pending_html or "<li class='sub'>None.</li>"}</ul>
 </section>"""
 
+    # --- P-05 shade / campaign windows -----------------------------------
+    p05 = manifest.get("p05_shade") or {}
+    windows_csv = version_dir / "p05b_campaign_windows.csv"
+    windows_rows = []
+    if windows_csv.exists():
+        with windows_csv.open(newline="", encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                windows_rows.append(
+                    [
+                        Path(r.get("csv_path", "")).name,
+                        r.get("date"),
+                        r.get("first_timestamp"),
+                        r.get("last_timestamp"),
+                        r.get("n_rows"),
+                        r.get("has_gps"),
+                        r.get("n_epoch_reset"),
+                    ]
+                )
+    if p05.get("n_rows"):
+        shade_html = f"""
+<section id="shade">
+  <h2>P-05 building shade — campaign windows</h2>
+  <p><strong>{p05.get("n_rows")}</strong> (point x 5-min-timestamp) rows across
+  <strong>{p05.get("n_campaign_dates")}</strong> campaign dates, from a
+  <strong>{p05.get("n_csv_pilot")}</strong>-file pilot pull (one CSV per device).
+  <strong>{p05.get("shade_fraction_pct")}%</strong> of rows shaded.
+  Computed <code>tz={html.escape(str(p05.get("tz")))}</code> —
+  a stated labelling choice, the campaign timezone stays UNRESOLVED.
+  Horizon march <code>max_dist_m={p05.get("max_dist_m")}</code> m (not
+  WP-04's 500 m citywide default — the extended-300m DTM/footprints layer
+  has real nodata gaps closer than that; see the package README's Known
+  limits).</p>
+  {_table(["CSV", "date", "first_timestamp", "last_timestamp", "n_rows", "has_gps", "n_epoch_reset"], windows_rows) if windows_rows else "<p class='sub'>No campaign-windows table found.</p>"}
+  <p class="sub">Walk windows above are as read off the raw CSVs by
+  <code>infer_campaign_windows()</code>; the shade table's own windows are
+  each padded to the enclosing hour before the 5-min sweep.</p>
+</section>"""
+    else:
+        shade_html = """
+<section id="shade">
+  <h2>P-05 building shade — campaign windows</h2>
+  <p class="sub">No campaign CSVs found at build time — this version ships the
+  empty-schema P-05 table (see the package README's P-05 section).</p>
+</section>"""
+
     # --- contact sheet ------------------------------------------------
     contact_rel = _rel_to(package_root, version_dir / "OM2" / "contact_sheet.png")
     contact_html = f"""
@@ -334,7 +379,7 @@ def render_page(root: Path) -> str:
 
     body = (
         status_html + decision_html + owes_html + contact_html + quality_html
-        + dict_html + docs_html + paper_html
+        + shade_html + dict_html + docs_html + paper_html
     )
     prov = hubkit.git_provenance(root, "scripts/build_om_package_page.py")
     return hubkit.page(
