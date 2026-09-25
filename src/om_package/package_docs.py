@@ -24,6 +24,10 @@ Jingxue, PI Simone). Théo Hermann contributes street-form variables from
 the MorphoFavela pipeline in a support role. This package contains no
 temperature analysis and no conclusions — those are the Octopus team's work.
 
+**Named team (PI ruling 2026-09-24, Q6a):** Jingxue, Vincent, Simone —
+this release goes to the three of them only, as an internal review draft;
+not for wider redistribution or citation (see Use terms).
+
 Generated {version_date} by `scripts/build_om_package.py`
 (source: `src/om_package/` in the MorphoFavela repo).
 
@@ -275,6 +279,18 @@ CSVs, timezone stays UNRESOLVED).
 - Package version v0.1.1 -> v0.1.2 across `package_docs.py`,
   `build_om_package.py`'s default `--version`, and the brisaverse release
   card (`om_release_v0_1_1` -> `om_release_v0_1_2`).
+- **Package-page fixes** (navigation council panel review 2026-09-24,
+  blocking + top improvements): the "Panel ruling" link on the package
+  page now points at a page rendered into `outputs/_packages/mare_om2/`
+  itself (`panel_review.html`), not at `docs/critic/...md` outside
+  `outputs/` — that path 404s on the live VPS hub, which only rsyncs
+  `outputs/`, never `docs/`. README names Vincent alongside Jingxue and
+  Simone as the release's named team, matching the `/ops` decision card.
+  The Documents section links the actual deliverable data files
+  (`OM2/points.*`, `p05_building_shade.*`, `p05b_campaign_windows.*`)
+  directly instead of requiring a `manifest.json` reverse-engineer. A
+  one-line glossary covers P-02..P-08, WP-02, `lambda_p` and the Tregenza
+  sky for a reader outside MorphoFavela.
 
 ## v0.1.1 — 2026-09-24
 
