@@ -103,6 +103,31 @@ def test_build_site_dashboard_accepts_folha4_mare_flag():
     assert "--folha4-mare" in proc.stdout
 
 
+# ---------------------------------------------------------------------------
+# cyc4b/folha4-all (2026-09-25): FOLHA4 generalised to all five sites.
+# ---------------------------------------------------------------------------
+
+def test_build_site_dashboard_accepts_folha4_all_flag():
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPTS / "build_site_dashboard.py"), "--help"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "--folha4-all" in proc.stdout
+
+
+def test_folha4_site_only_routes_sites_with_subunits():
+    # config/sites.yaml: only these two have subunits AND no separate A/E
+    # study area — build_folha4_site's own docstring says why the other
+    # three sites are not routed through it.
+    from src.sites.territory import load_sites_config
+    cfg = load_sites_config()
+    for site in ("complexo_do_alemao", "riodaspedras"):
+        assert cfg[site]["subunits"] is not None
+    for site in ("vidigal", "rocinha"):
+        assert cfg[site]["subunits"] is None
+
+
 class _FakePoint:
     def __init__(self, x, y):
         self.x, self.y = x, y

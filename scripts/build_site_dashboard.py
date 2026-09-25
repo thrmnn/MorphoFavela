@@ -53,8 +53,12 @@ from src.svf_v2.paths import AREA_FILES
 from src.viz.folha.sites import SHEET_NUMBER
 from src.brisa_solar import mare_study_area as msa
 from src.brisa_solar.wp07_figures import BOUNDARY_STROKE_PX
-from src.sites.territory import has_subunit_study_area, load_territory, north_arrow_angle, rotate_for_display
+from src.sites.territory import (
+    has_subunit_study_area, load_territory, north_arrow_angle,
+    normalize_site_key, rotate_for_display,
+)
 from scripts import render_mare_irradiation_distributions as mare_dist
+from scripts import render_site_irradiation_distributions as site_dist
 
 TYPOLOGY = {
     "vidigal": ("hillside canyon", "#2C5F8D"),
@@ -1456,6 +1460,112 @@ def build_folha4_mare(hero: bool) -> dict:
     return dict(a3_path=a3_path, pdf=pdf_path, web=web_path, issues=issues, panels=panels)
 
 
+def build_folha4_site(site: str) -> dict:
+    """FOLHA4 generalised (cyc4b/folha4-all) to sites with real subunits but
+    no contested A/E definition — Complexo do Alemão and Rio das Pedras.
+    Reuses build_folha4_mare's no-hero layout (masthead, identity card,
+    distributions core, caveat strip; no grid row/zoom inlets/hexbin —
+    same trade-off, see that function's docstring) but draws from
+    scripts/render_site_irradiation_distributions.py's single-definition
+    distributions instead of mare_dist's contested A/E pair, and carries
+    no hero-map row at all: the hero/no-hero split is the PI's
+    folha_hero_map ruling for Maré specifically (docs/critic/
+    folha4_council_2026-09-24.md), not yet extended to any other site —
+    a future council could ask for one here, using the same
+    draw_hero_map_v4 this file already has (it takes site-generic
+    `d`/`territory`/`stats`, nothing Maré-specific left to add).
+
+    Vidigal and Rocinha do NOT go through this path — each is a single
+    "Isolada" polygon with no subunits (config/sites.yaml), so panel 3
+    would be one trivial box with no breakdown, and this layout drops the
+    v3 grid row (terrain/density/SVF/sunlight) and zoom inlets entirely to
+    make room for it. That trade pays off for Alemão/Rio das Pedras (15
+    and 2 named parts respectively) and does not for Vidigal/Rocinha, so
+    scripts/build_site_dashboard.py's main() keeps those two on
+    build_dashboard (v3) this round."""
+    site = normalize_site_key(site)
+    issues: list = []
+    panels: list = []
+
+    out_dir = ROOT / "outputs" / "_distribution" / "site_dashboards" / site
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    d = load_site(site, issues)
+    stats = compute_stats(d)
+    sha = git_sha()
+    build_date = datetime.date.today().isoformat()
+    folha_nn = SHEET_NUMBER.get(site, "00")
+    dist_data = site_dist.compute_distributions(site, ROOT)
+    if dist_data["order"] is None:
+        issues.append(f"{site}: no subunits declared — panel 3 dropped, "
+                      "this site should not be routed through build_folha4_site")
+
+    fig = plt.figure(figsize=(11.69, 16.54), dpi=200, facecolor=PAPER)
+    # Same fixed-ratio-spacer reasoning as build_folha4_mare's no-hero
+    # branch (see its comments) — this sheet always has the no-hero
+    # (tall) distributions_core proportions since it never carries a hero
+    # row to shrink around.
+    SPACER = 0.15
+    SPACER_BEFORE_CAVEATS = 1.3
+    SPACER_BEFORE_PANEL3 = 1.3
+    dist_core = 11.3
+    dist_top, dist_bottom = dist_core / 2.25, dist_core / 2.25 * 1.25
+    height_ratios = [1.3, SPACER, 0.75, SPACER,
+                      dist_top, SPACER_BEFORE_PANEL3, dist_bottom, SPACER_BEFORE_CAVEATS, 1.9]
+    gs = fig.add_gridspec(
+        nrows=len(height_ratios), ncols=1, height_ratios=height_ratios,
+        left=0.04, right=0.97, top=0.985, bottom=0.015, hspace=0.0,
+    )
+
+    subheader = (f"ground irradiation lattice, WP-05 run {dist_data['run_of_record']} · "
+                f"{dist_data['label_a']}")
+
+    ax_mast = fig.add_subplot(gs[0, 0])
+    draw_masthead(ax_mast, site, stats, sha, build_date, folha_nn, subheader)
+    panels.append("masthead")
+
+    row = 2
+    ax_id = fig.add_subplot(gs[row, 0])
+    draw_identity_card(ax_id, site, stats)
+    panels.append("identity_card")
+    row += 2
+
+    with mpl.rc_context(mpl.rcParamsDefault):
+        plt.rcParams.update(site_dist.DISTRIBUTIONS_RC)
+        site_dist.draw_distributions_top(fig, gs[row, 0], dist_data)
+        row += 2
+        drew_panel3 = site_dist.draw_distributions_bottom(fig, gs[row, 0], dist_data) is not None
+    panels.append("distributions_core" if drew_panel3 else "distributions_core_no_subunit_panel")
+    row += 2
+
+    ax_cav = fig.add_subplot(gs[row, 0])
+    draw_caveats_v2(ax_cav, site, stats)
+    panels.append("caveat_strip")
+
+    fig.text(0.005, 0.004, site_dist.provenance_note(dist_data), fontsize=6, color=MUTED)
+
+    a3_path = out_dir / f"folha_{site}_v4_A3.png"
+    fig.savefig(a3_path, dpi=220, facecolor=PAPER, bbox_inches=None)
+    pdf_path = out_dir / f"folha_{site}_v4.pdf"
+    fig.savefig(pdf_path, facecolor=PAPER)
+    web_path = out_dir / f"folha_{site}_v4_web1200.png"
+    fig.savefig(web_path, dpi=85, facecolor=PAPER)
+    plt.close(fig)
+
+    meta = {
+        "site": site, "variant": "no_hero", "sheet_version": "FOLHA4",
+        "build_date": build_date, "git_sha7": sha,
+        "panels_built": panels,
+        "distributions_run_of_record": dist_data["run_of_record"],
+        "issues": issues,
+        "outputs": {"A3_png": str(a3_path), "pdf": str(pdf_path), "web1200": str(web_path)},
+    }
+    with open(out_dir / "metadata_folha4.json", "w") as f:
+        json.dump(meta, f, indent=2, default=str)
+
+    return dict(a3_path=a3_path, pdf=pdf_path, web=web_path, issues=issues, panels=panels)
+
+
 # --- atomic exports ---------------------------------------------------------
 
 
@@ -1691,9 +1801,53 @@ def main():
     p.add_argument("--all", action="store_true", help="build every site")
     p.add_argument("--folha4-mare", action="store_true",
                    help="build FOLHA4's Maré sheet, both hero/no-hero variants (docs/critic, tasks.json id FOLHA4)")
+    p.add_argument("--folha4-all", action="store_true",
+                   help="build FOLHA4 for all five sites: Maré (hero+no-hero), "
+                        "Alemão/Rio das Pedras (v4 no-hero, subunit breakdown), "
+                        "Vidigal/Rocinha (v3 — no subunits, v4 would lose the grid row for a trivial panel 3)")
     args = p.parse_args()
-    if not args.site and not args.all and not args.folha4_mare:
-        p.error("must pass --site <name>, --all, or --folha4-mare")
+    if not args.site and not args.all and not args.folha4_mare and not args.folha4_all:
+        p.error("must pass --site <name>, --all, --folha4-mare, or --folha4-all")
+
+    if args.folha4_all:
+        failed = []
+        v4_subunit_sites = ["complexo_do_alemao", "riodaspedras"]
+        v3_sites = ["vidigal", "rocinha"]
+
+        for hero in (False, True):
+            label = "maré (hero)" if hero else "maré"
+            try:
+                result = build_folha4_mare(hero)
+            except Exception as e:
+                print(f"[{label}] FAILED: {e}")
+                failed.append(label)
+                continue
+            print(f"[{label}] OK — {result['web']} ({len(result['issues'])} issue(s))")
+
+        for site in v4_subunit_sites:
+            try:
+                result = build_folha4_site(site)
+            except Exception as e:
+                print(f"[{site} v4] FAILED: {e}")
+                failed.append(site)
+                continue
+            print(f"[{site} v4] OK — {result['web']} ({len(result['issues'])} issue(s))")
+            if result["issues"]:
+                for i in result["issues"]:
+                    print(f"    - {i}")
+
+        for site in v3_sites:
+            print(f"[{site}] v4 not built — no subunits declared (config/sites.yaml), "
+                  "kept on v3 (grid row + zoom inlets) per build_folha4_site's docstring")
+            try:
+                result = build_dashboard(site)
+            except Exception as e:
+                print(f"[{site} v3] FAILED: {e}")
+                failed.append(site)
+                continue
+            print(f"[{site} v3] OK — {result['web']} ({len(result['issues'])} issue(s))")
+
+        return 1 if failed else 0
 
     if args.folha4_mare:
         failed = []
