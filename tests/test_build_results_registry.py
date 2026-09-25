@@ -242,3 +242,95 @@ def test_baseline_written_once(env):
     finally:
         sys.argv = argv
     assert json.loads(baseline_path.read_text())["unclassified_count"] == 42
+
+
+# --------------------------------------------------------------------------
+# Corrective plan step 4d (docs/critic/incident_dashboard_loop_2026-09-25.md,
+# root cause 6, "the registry build failed the gate once while other agents
+# were writing run directories"): a run directory another agent's producer
+# script has mkdir'd but not finished writing must be SKIPPED and COUNTED,
+# never treated as a legitimate empty/ok run and never allowed to crash the
+# whole build.
+# --------------------------------------------------------------------------
+
+def test_run_dir_with_no_manifest_at_all_is_skipped_not_crashed(env):
+    """The race's plainest shape: another agent has mkdir'd the run
+    directory (so it exists) but has not yet written manifest.json or
+    figure_manifest.json at all — the build must not crash, must not treat
+    the directory as a valid empty run, and must count + name it."""
+    runs = env["runs"]
+    config = env["config"]
+    _write(config / "work_packages.yaml", yaml.dump(_wp_yaml({"wp07_figures": {"script": "src/x.py"}})))
+
+    (runs / "wp07_figures_20260925T120000Z").mkdir(parents=True)  # nothing else written yet — mid-race
+
+    reg = brr.build()  # must not raise
+    assert reg["counts"]["skipped_incomplete_runs"] == 1
+    assert reg["skipped_incomplete_runs"][0]["run_id"] == "wp07_figures_20260925T120000Z"
+    assert "no manifest.json or figure_manifest.json" in reg["skipped_incomplete_runs"][0]["reason"]
+    # the race must never leave a phantom head_run pointing at nothing
+    assert "fam:wp07_figures" not in reg["nodes"] or reg["nodes"]["fam:wp07_figures"]["head_run"] is None
+
+
+def test_run_dir_with_truncated_manifest_json_is_skipped_not_crashed(env):
+    """A manifest write caught mid-flush (crash, OOM-kill, a concurrent
+    writer racing this build) leaves invalid JSON on disk — a real,
+    reproducible shape of "incomplete", distinct from "missing"."""
+    runs = env["runs"]
+    config = env["config"]
+    _write(config / "work_packages.yaml", yaml.dump(_wp_yaml({"wp07_figures": {"script": "src/x.py"}})))
+
+    run_dir = runs / "wp07_figures_20260925T130000Z"
+    _write(run_dir / "figure_manifest.json", '{"_utc": "2026-09-25T13:00:00Z", "figures": {"f1_ci')  # truncated
+
+    reg = brr.build()  # must not raise
+    assert reg["counts"]["skipped_incomplete_runs"] == 1
+    assert reg["skipped_incomplete_runs"][0]["run_id"] == "wp07_figures_20260925T130000Z"
+    assert "unparseable manifest JSON" in reg["skipped_incomplete_runs"][0]["reason"]
+
+
+def test_skipping_an_incomplete_run_still_registers_the_complete_sibling(env):
+    """The race must not take down the whole family: a genuinely complete
+    run in the same family still registers normally alongside the skipped
+    in-progress one."""
+    runs = env["runs"]
+    config = env["config"]
+    _write(config / "work_packages.yaml", yaml.dump(_wp_yaml({"wp07_figures": {"script": "src/x.py"}})))
+
+    good_id = "wp07_figures_20260917T125201Z"
+    good_dir = runs / good_id
+    _write(good_dir / "f1_citywide_position.png")
+    _write_json(good_dir / "figure_manifest.json", {
+        "_utc": brr._run_utc_from_name(good_id),
+        "figures": {"f1_citywide_position": {"id": "f1_citywide_position", "status": "produced",
+                                               "png_path": "f1_citywide_position.png"}},
+    })
+    (runs / "wp07_figures_20260925T140000Z").mkdir(parents=True)  # racing, mid-write
+
+    reg = brr.build()
+    assert reg["counts"]["skipped_incomplete_runs"] == 1
+    art_id = f"art:wp07_figures::{good_id}::f1_citywide_position"
+    assert art_id in reg["nodes"]
+    assert reg["nodes"]["fam:wp07_figures"]["head_run"] == f"run:{good_id}"
+    assert f"run:wp07_figures_20260925T140000Z" not in reg["nodes"]
+
+
+def test_main_prints_skipped_runs_warning_and_still_exits_0(env, capsys):
+    """`main()` must surface the skip as a printed warning (no silent
+    degradation) but a race is expected/benign, so it never fails the gate
+    by itself — exit 0."""
+    runs = env["runs"]
+    config = env["config"]
+    _write(config / "work_packages.yaml", yaml.dump(_wp_yaml({})))
+    (runs / "some_family_20260925T150000Z").mkdir(parents=True)
+
+    argv = sys.argv
+    sys.argv = ["build_results_registry.py"]
+    try:
+        rc = brr.main()
+    finally:
+        sys.argv = argv
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "1 run director" in out
+    assert "some_family_20260925T150000Z" in out

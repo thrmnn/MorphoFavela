@@ -226,14 +226,60 @@ class RunInfo:
         self.status = (self.manifest or {}).get("status") if self.manifest else None
 
 
-def scan_runs() -> dict[str, RunInfo]:
+def _read_json_strict(path: Path):
+    """Like `_read_json` but does NOT swallow a parse failure — raises
+    `json.JSONDecodeError` on truncated/corrupt JSON so the caller (scan_runs,
+    detecting an in-progress write) can tell "unparseable right now" apart
+    from "not written yet"."""
+    return json.loads(path.read_text())
+
+
+def scan_runs() -> tuple[dict[str, RunInfo], list[dict]]:
+    """Corrective plan step 4d (docs/critic/incident_dashboard_loop_2026-09-25.md,
+    root cause 6, "the registry build failed the gate once while other
+    agents were writing run directories"): a run directory a producer script
+    has `mkdir`-ed but not finished writing — no manifest.json AND no
+    figure_manifest.json yet, or one that is present but only half-flushed
+    to disk (invalid JSON) — is a RACE, not a defect in the run itself. It
+    is skipped and counted here rather than either crashing the whole
+    registry build or silently being folded in as a legitimate empty/ok run
+    (the pre-fix behaviour: an empty `figures` dict reads as `not r.figures`
+    == True in `_build_run_backed_family`'s ok_runs filter, so a mid-write
+    run could become `head_run` of its family with zero real figures).
+
+    Returns (runs_by_id, skipped) where each `skipped` entry is
+    {"run_id", "reason"} — surfaced in the registry's own output, never
+    silently dropped."""
     if not RUNS.is_dir():
-        return {}
-    out = {}
+        return {}, []
+    out: dict[str, RunInfo] = {}
+    skipped: list[dict] = []
     for d in sorted(RUNS.iterdir()):
-        if d.is_dir():
-            out[d.name] = RunInfo(d.name, d)
-    return out
+        if not d.is_dir():
+            continue
+        has_manifest = (d / "manifest.json").is_file()
+        has_figure_manifest = (d / "figure_manifest.json").is_file()
+        if not has_manifest and not has_figure_manifest:
+            skipped.append({
+                "run_id": d.name,
+                "reason": "no manifest.json or figure_manifest.json — run directory "
+                          "exists but nothing marks it complete yet (another agent may "
+                          "still be writing it)",
+            })
+            continue
+        try:
+            if has_figure_manifest:
+                _read_json_strict(d / "figure_manifest.json")
+            if has_manifest:
+                _read_json_strict(d / "manifest.json")
+        except json.JSONDecodeError as exc:
+            skipped.append({
+                "run_id": d.name,
+                "reason": f"unparseable manifest JSON ({exc}) — likely caught mid-write",
+            })
+            continue
+        out[d.name] = RunInfo(d.name, d)
+    return out, skipped
 
 
 # --------------------------------------------------------------------------- static / glob family resolution
@@ -335,7 +381,7 @@ def build(*, verbose: bool = False) -> dict:
     all_decisions = [(d, "open") for d in tasks["open_decisions"]] + \
                      [(d, "resolved") for d in tasks["resolved_decisions"]]
 
-    runs = scan_runs()
+    runs, skipped_runs = scan_runs()
     runs_by_family: dict[str, list[RunInfo]] = defaultdict(list)
     for ri in runs.values():
         runs_by_family[ri.family].append(ri)
@@ -500,6 +546,7 @@ def build(*, verbose: bool = False) -> dict:
         "unclassified": unclassified_sweep,
         "archived": archived_sweep,
         "orphan_run_families": orphan_run_families,
+        "skipped_incomplete_runs": skipped_runs,
         "counts": {
             "wp": sum(1 for n in nodes.values() if n.get("kind") == "wp"),
             "family": sum(1 for n in nodes.values() if n.get("kind") == "family"),
@@ -509,6 +556,7 @@ def build(*, verbose: bool = False) -> dict:
             "placed": len(placed_paths),
             "unclassified": unclassified_sweep["count"],
             "archived": archived_sweep["count"],
+            "skipped_incomplete_runs": len(skipped_runs),
         },
     }
     return registry
@@ -639,6 +687,11 @@ def main() -> int:
     if registry["orphan_run_families"]:
         print(f"WARNING: {len(registry['orphan_run_families'])} run families exist on disk but are not "
               f"declared in work_packages.yaml: {', '.join(registry['orphan_run_families'])}")
+    if registry["skipped_incomplete_runs"]:
+        print(f"WARNING: {len(registry['skipped_incomplete_runs'])} run director{'y' if len(registry['skipped_incomplete_runs']) == 1 else 'ies'} "
+              "skipped as incomplete (missing/unparseable manifest — likely mid-write by another agent):")
+        for s in registry["skipped_incomplete_runs"]:
+            print(f"  {s['run_id']}: {s['reason']}")
     return 0
 
 

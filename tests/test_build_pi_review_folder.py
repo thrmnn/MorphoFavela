@@ -711,3 +711,49 @@ def test_all_html_groups_many_superseded_runs_into_one_collapsed_entry():
     # six — the 5 per-run <details> are nested one level inside it
     top_level = re.findall(r'<details class="run-details"><summary>(\d+) (?:earlier run|run)', html)
     assert top_level == ["5", "1"]
+
+
+# --------------------------------------------------------------------------
+# Corrective plan step 4 (docs/critic/incident_dashboard_loop_2026-09-25.md,
+# root cause 4): _load_fresh_registry must fail loudly, never silently
+# degrade to {} — that silence is exactly how "the WP chips shipped empty
+# because the review folder was built while the registry build failed"
+# reached the PI undetected.
+# --------------------------------------------------------------------------
+
+def test_load_fresh_registry_raises_when_build_results_registry_errors(monkeypatch):
+    class _FakeBRR:
+        @staticmethod
+        def build():
+            raise RuntimeError("simulated registry build failure")
+
+    monkeypatch.setitem(sys.modules, "build_results_registry", _FakeBRR())
+    with pytest.raises(RuntimeError, match="results registry could not be built"):
+        bprf._load_fresh_registry()
+
+
+def test_load_fresh_registry_raises_when_import_fails(monkeypatch):
+    real_import = __import__
+
+    def _blocking_import(name, *args, **kwargs):
+        if name == "build_results_registry":
+            raise ImportError("simulated: module not importable")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.delitem(sys.modules, "build_results_registry", raising=False)
+    monkeypatch.setattr("builtins.__import__", _blocking_import)
+    with pytest.raises(RuntimeError, match="cannot import build_results_registry"):
+        bprf._load_fresh_registry()
+
+
+def test_load_fresh_registry_returns_real_registry_on_success(monkeypatch):
+    """Green counterpart to the two red proofs above: a working registry
+    module still returns its built dict, unchanged."""
+    class _FakeBRR:
+        @staticmethod
+        def build():
+            return {"nodes": {}, "counts": {"figure": 0}}
+
+    monkeypatch.setitem(sys.modules, "build_results_registry", _FakeBRR())
+    result = bprf._load_fresh_registry()
+    assert result == {"nodes": {}, "counts": {"figure": 0}}

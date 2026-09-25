@@ -640,20 +640,30 @@ def _load_fresh_registry() -> dict:
     """A fresh results registry (organization_charter.md §2), rebuilt
     in-process from the SAME disk state this cycle is about to sweep —
     never a possibly-stale outputs/_registry/results.json (defended-number
-    drift: measure at point of use, never cache). Returns {} if the
-    registry generator is unavailable or errors, so a broken registry
-    degrades the WP tree to one "Not yet in the registry" bucket rather
-    than breaking the whole review-folder build."""
+    drift: measure at point of use, never cache).
+
+    Corrective plan step 4 (docs/critic/incident_dashboard_loop_2026-09-25.md,
+    root cause 4): the registry is REQUIRED for the WP view (O7 chips /
+    all.html's tree). This used to swallow both an ImportError and any
+    exception from brr.build() and return {}, which let the review folder
+    finish looking normal while the WP tree silently degraded to one
+    "Not yet in the registry" bucket — the exact incident: "the WP chips
+    shipped empty because the review folder was built while the registry
+    build failed" (nothing here told the PI or a caller that had happened).
+    A required view that cannot be built now fails the whole build loudly
+    instead — printed to stderr AND raised, never a quiet fallback."""
     try:
         import build_results_registry as brr
-    except ImportError:
-        return {}
+    except ImportError as exc:
+        msg = f"[review-folder] FATAL: cannot import build_results_registry.py ({exc!r}) — the WP view is required, refusing to build a review folder without it"
+        print(msg, file=sys.stderr)
+        raise RuntimeError(msg) from exc
     try:
         return brr.build()
     except Exception as exc:
-        print(f"[review-folder] WARNING: results registry could not be built ({exc!r}) — "
-              "the WP view falls back to one unregistered bucket", file=sys.stderr)
-        return {}
+        msg = f"[review-folder] FATAL: results registry could not be built ({exc!r}) — the WP view is required, refusing to ship a review folder with a silently-empty WP tree"
+        print(msg, file=sys.stderr)
+        raise RuntimeError(msg) from exc
 
 
 def _group_sweep_by_wp(entries: list[dict], registry: dict) -> dict:
