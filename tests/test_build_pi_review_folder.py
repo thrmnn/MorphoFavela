@@ -654,3 +654,37 @@ def test_render_all_with_no_wp_tree_at_all_still_renders_a_valid_page():
     m = _base_manifest()
     html = bprf._render_all(m)
     assert "<!doctype html>" in html.lower()
+
+
+def test_all_html_groups_many_superseded_runs_into_one_collapsed_entry():
+    """O8 cleanup (organization_charter.md §4 / figure_organization_spec.md
+    §7): a family with many non-current runs (wp02_horizon has ~95) must
+    render ONE collapsed 'N earlier runs' entry, never one <details> per
+    run — that is exactly the card-noise the rubric's criterion 4 forbids.
+    Every run and figure still appears once the group is opened; nothing
+    is deleted, only nested one level deeper."""
+    runs = [{"run_id": "wp07_figures_20260917T125201Z", "lifecycle": "current",
+             "run_utc": "2026-09-17T12:52:01Z",
+             "items": [{"section": "sweep/a", "file": "f1_new.png", "status": "ok", "bytes": 1}]}]
+    for i in range(5):
+        runs.append({"run_id": f"wp07_figures_2026091{i}T000000Z", "lifecycle": "superseded",
+                      "run_utc": f"2026-09-1{i}T00:00:00Z",
+                      "items": [{"section": "sweep/a", "file": f"f1_old_{i}.png", "status": "ok", "bytes": 1}]})
+    runs.append({"run_id": "wp07_figures_20260901T000000Z", "lifecycle": "draft",
+                 "run_utc": "2026-09-01T00:00:00Z",
+                 "items": [{"section": "sweep/a", "file": "f1_draft.png", "status": "ok", "bytes": 1}]})
+    wp_tree = {"wps": [{"key": "WP07", "title": "P1 solar results", "n": 7, "families": [
+        {"key": "wp07_figures", "n": 7, "runs": runs}]}], "unmatched": []}
+    m = _base_manifest(wp_tree=wp_tree)
+    html = bprf._render_all(m)
+
+    # every superseded figure still appears, and the group summary names the count
+    for i in range(5):
+        assert f"f1_old_{i}.png" in html
+    assert "f1_draft.png" in html
+    assert "5 earlier runs — superseded" in html
+    assert "1 run — draft" in html
+    # exactly one TOP-LEVEL <details> for superseded and one for draft, not
+    # six — the 5 per-run <details> are nested one level inside it
+    top_level = re.findall(r'<details class="run-details"><summary>(\d+) (?:earlier run|run)', html)
+    assert top_level == ["5", "1"]

@@ -1172,6 +1172,17 @@ runs are collapsed under their family, never deleted — open the run to see the
             continue
         for fam in wp["families"]:
             parts.append(f'<h3>{_html.escape(fam["key"])} <span class="n">{fam["n"]}</span></h3>')
+            # O8 cleanup (organization_charter.md §4 lifecycle table +
+            # figure_organization_spec.md §7 O8): a family with many
+            # non-current runs (e.g. wp02_horizon's ~95 superseded runs)
+            # used to render one <details> PER RUN — dozens of collapsed
+            # widgets stacked in a row, which is itself noise the charter's
+            # rubric criterion 4 flags ("no more than 4 cards before '+N
+            # more'"). Group by lifecycle instead: ONE collapsed entry per
+            # lifecycle bucket ("N earlier runs — superseded" / "draft" /
+            # "archived"), with each run still nested inside so nothing is
+            # lost — open the group, then open a run, to see its figures.
+            non_current_by_lifecycle: dict[str, list[dict]] = defaultdict(list)
             for run in fam["runs"]:
                 label = run["run_id"] or "static family (no run axis)"
                 if run["run_id"] is None or run["lifecycle"] == "current":
@@ -1181,11 +1192,29 @@ runs are collapsed under their family, never deleted — open the run to see the
                         parts.append(_figure_card(e, e["section"]))
                     parts.append("</div>")
                 else:
+                    non_current_by_lifecycle[run["lifecycle"]].append(run)
+
+            # Fixed order matches the charter §4 table (superseded, draft,
+            # archived); any future lifecycle value still renders, appended.
+            lifecycle_order = ["superseded", "draft", "archived"]
+            for lifecycle in sorted(non_current_by_lifecycle,
+                                     key=lambda lc: (lifecycle_order.index(lc)
+                                                      if lc in lifecycle_order else len(lifecycle_order), lc)):
+                runs_in_group = non_current_by_lifecycle[lifecycle]
+                n_runs = len(runs_in_group)
+                n_figs = sum(len(r["items"]) for r in runs_in_group)
+                noun = "earlier run" if lifecycle == "superseded" else "run"
+                parts.append(f'<details class="run-details"><summary>{n_runs} {noun}'
+                             f'{"s" if n_runs != 1 else ""} — {lifecycle} ({n_figs} figure'
+                             f'{"s" if n_figs != 1 else ""})</summary>')
+                for run in runs_in_group:
+                    label = run["run_id"] or "static family (no run axis)"
                     parts.append(f'<details class="run-details"><summary>{len(run["items"])} figure(s) '
                                  f'— {_html.escape(label)} ({run["lifecycle"]})</summary><div class="grid">')
                     for e in run["items"]:
                         parts.append(_figure_card(e, e["section"]))
                     parts.append("</div></details>")
+                parts.append("</details>")
 
     if wp_tree["unmatched"]:
         parts.append(f'<h2 id="wp-UNCLASSIFIED">Not yet in the registry '
