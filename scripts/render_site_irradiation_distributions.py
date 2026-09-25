@@ -150,6 +150,16 @@ def draw_distributions_top(fig, spec, data: dict) -> tuple:
     ax.set_xticks(idx, [f"D{i + 1}" for i in idx])
     ax.set_xlabel("citywide irradiation decile  (D1 = darkest tenth of the city's ground)")
     ax.set_ylabel(f"share of {display_name}'s ground cells (%)")
+    # Fixed headroom floor, not matplotlib's default ~5% autoscale margin:
+    # a low-peak site (Alemão's deciles top out near 16%) left almost no
+    # gap between the top y-tick label and the top spine, so the title
+    # (loc="left", default pad) sat on the same row as that tick label and
+    # visually overlapped it — confirmed against Maré/Rio das Pedras (both
+    # much higher peaks, so autoscale alone gave them enough headroom) in
+    # the round-2 council. Deriving headroom from this panel's own data
+    # (never a constant tuned to one site) plus a fixed title pad fixes it
+    # for every site's own peak, not just the ones already tall enough.
+    ax.set_ylim(0, max(float(share.max()) * 1.15 + 4.0, 20.0))
     ax.set_title(f"2 · Where {display_name}'s ground falls among the city's deciles",
                 loc="left", fontsize=10, color=INK)
     ax.legend(frameon=False, fontsize=7, loc="upper right")
@@ -168,7 +178,23 @@ def draw_distributions_bottom(fig, spec, data: dict):
     if not order:
         return None
     a = data["a"]
-    ax = fig.add_subplot(spec)
+    n = len(order)
+    # A category count-scaled, centered sub-axes instead of always taking
+    # the row's full physical width: at full width a low subunit count
+    # (Rio das Pedras: 2) left its two boxes "stranded" with roughly half
+    # the sheet blank on either side (round-2 council, blocking) because
+    # matplotlib's own autoscale margin is a fixed *fraction* of the data
+    # range regardless of how few categories that range spans. frac is
+    # derived from this panel's own category count (never a constant tuned
+    # to one site) and capped below 1.0 even at the high end — Alemão's 16
+    # categories (15 + "between") span the same physical row as before,
+    # just with a hairline margin instead of edge-to-edge, which is also
+    # what stopped its leftmost rotated tick label ("Rua Armando Sodré")
+    # from clipping against the raw canvas edge (round-2 council).
+    frac = float(np.clip(n / 10.0, 0.30, 0.97))
+    side = (1.0 - frac) / 2.0
+    sub = spec.subgridspec(1, 3, width_ratios=[side, frac, side], wspace=0.0)
+    ax = fig.add_subplot(sub[0, 1])
     data_by_order = [a.loc[a["sub"] == o, "p"].to_numpy() for o in order]
     bp = ax.boxplot(data_by_order, widths=0.55, showfliers=False, patch_artist=True,
                     medianprops=dict(color=INK, lw=1.6), whiskerprops=dict(color=MUTED),

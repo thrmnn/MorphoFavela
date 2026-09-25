@@ -26,6 +26,7 @@ import json
 import math
 import subprocess
 import sys
+import textwrap
 import warnings
 from pathlib import Path
 
@@ -390,10 +391,27 @@ def draw_masthead(ax, site: str, stats: dict, sha: str, build_date: str,
             fontweight="bold", ha="right", va="center", color=typ_color)
     # Zoom-inlet selection rule (docs/folha_v3_spec.md: "the selection rule
     # printed in the sheet's provenance line") — states the rule AND this
-    # build's actual outcome per site, not just the method.
+    # build's actual outcome per site, not just the method. Wrapped to the
+    # axes' own physical width (round-2 council, blocking): a site whose
+    # zoom inlet drops carries a long "reason" string appended in-line, and
+    # the raw single-line text ran off the right page margin and was cut
+    # off mid-sentence — identical in the PNG and the print PDF, so a real
+    # layout defect, not a raster artifact. DejaVu Sans Mono's advance
+    # width is used (not a hand-picked char count) so the wrap point
+    # tracks the actual font/size rather than a constant that happened to
+    # fit one provenance string.
     if provenance:
-        ax.text(0.005, 0.10, provenance, fontsize=5.8, style="italic",
-                family="DejaVu Sans Mono", color=MUTED, ha="left", va="center")
+        fig_w_in = ax.figure.get_size_inches()[0]
+        ax_w_in = ax.get_position().width * fig_w_in
+        font_pt = 5.4
+        char_w_in = 0.62 * font_pt / 72.0  # conservative monospace advance
+        max_chars = max(40, int(ax_w_in * 0.985 / char_w_in))
+        lines = textwrap.wrap(provenance, width=max_chars)
+        line_step = 0.075
+        y0 = 0.185
+        for i, line in enumerate(lines):
+            ax.text(0.005, y0 - i * line_step, line, fontsize=font_pt, style="italic",
+                    family="DejaVu Sans Mono", color=MUTED, ha="left", va="center")
 
 
 def draw_identity_card(ax, site: str, stats: dict) -> None:
@@ -972,7 +990,7 @@ def draw_hexbin(ax, d: dict, stats: dict) -> None:
     except Exception:
         pass
 
-    cb_ax = ax.inset_axes([1.02, 0.0, 0.025, 1.0])
+    cb_ax = ax.inset_axes([1.05, 0.0, 0.03, 1.0])
     cb = plt.colorbar(hb, cax=cb_ax, extend=cbar_extend)
     cb.ax.tick_params(labelsize=6)
     cb.set_label("count", fontsize=7)
@@ -1482,7 +1500,10 @@ def build_folha4_site(site: str) -> dict:
     make room for it. That trade pays off for Alemão/Rio das Pedras (15
     and 2 named parts respectively) and does not for Vidigal/Rocinha, so
     scripts/build_site_dashboard.py's main() keeps those two on
-    build_dashboard (v3) this round."""
+    build_dashboard (v3) this round — but now with panels 1+2 backported
+    via build_dashboard(..., include_distributions=True) (round-2 council,
+    blocking: panels 1+2 don't depend on subunit count the way panel 3
+    does, so "no subunits" was never a reason to drop them too)."""
     site = normalize_site_key(site)
     issues: list = []
     panels: list = []
@@ -1506,11 +1527,21 @@ def build_folha4_site(site: str) -> dict:
     # (tall) distributions_core proportions since it never carries a hero
     # row to shrink around.
     SPACER = 0.15
+    # Own (larger) constant for the identity-card -> panel-2 transition,
+    # not the plain SPACER: the identity card's own value/label text sits
+    # low in its cell (draw_identity_card's fixed 0.58/0.20 y-fractions),
+    # so the thin plain-SPACER gap left panel 2's title (loc="left",
+    # matplotlib's own small default pad) landing right on top of the
+    # identity card's "OBSERVERS" label — found while re-rendering to
+    # verify the round-2 council's separate "title collides with its own
+    # y-tick" finding (below); same shape of bug (title has too little
+    # clearance), different neighbour.
+    SPACER_AFTER_IDENTITY = 0.55
     SPACER_BEFORE_CAVEATS = 1.3
     SPACER_BEFORE_PANEL3 = 1.3
     dist_core = 11.3
     dist_top, dist_bottom = dist_core / 2.25, dist_core / 2.25 * 1.25
-    height_ratios = [1.3, SPACER, 0.75, SPACER,
+    height_ratios = [1.3, SPACER, 0.75, SPACER_AFTER_IDENTITY,
                       dist_top, SPACER_BEFORE_PANEL3, dist_bottom, SPACER_BEFORE_CAVEATS, 1.9]
     gs = fig.add_gridspec(
         nrows=len(height_ratios), ncols=1, height_ratios=height_ratios,
@@ -1579,10 +1610,23 @@ def _save_atom(out_dir: Path, name: str, renderer, figsize, **kwargs):
     return p
 
 
-def build_dashboard(site: str) -> dict:
+def build_dashboard(site: str, include_distributions: bool = False) -> dict:
     """v3 layout (docs/folha_v3_spec.md): masthead, identity card, the grid
     row (terrain/density/SVF/sunlight, PI's own order), two code-selected
     zoom inlets, the SVF×solar graph, the caveat strip.
+
+    `include_distributions` (round-2 council, blocking — cyc4b/folha4-all):
+    Vidigal and Rocinha's v3 sheets carried NO citywide-distribution
+    comparison at all, because the rationale for keeping them on v3 ("panel
+    3 would be one trivial box") conflated panel 3 (genuinely moot with no
+    subunits) with panels 1+2 (whole-distribution-vs-city histogram and
+    decile-share bar — the round's own central morphometric upgrade, which
+    does not depend on subunit count). When True, this inserts
+    render_site_irradiation_distributions.draw_distributions_top as its own
+    row between the identity card and the grid row — panel 3 is still never
+    called for these sites, matching build_folha4_site's same call. Default
+    False keeps every other v3 caller (main()'s --site/--all path, every
+    other site) byte-identical to before this round.
 
     Two panels from the pre-v3 sheet are gone, both decided this cycle:
 
@@ -1625,6 +1669,8 @@ def build_dashboard(site: str) -> dict:
     build_date = datetime.date.today().isoformat()
     folha_nn = SHEET_NUMBER.get(site, "00")
 
+    dist_data = site_dist.compute_distributions(site, ROOT) if include_distributions else None
+
     grid = d["grid"]
     lat = _grid_lattice(grid)
     X, Y = _grid_coords(lat)
@@ -1659,36 +1705,66 @@ def build_dashboard(site: str) -> dict:
     grid_row = panel_w_frac * site_aspect * (11.69 / 16.54) * 16.54
     grid_row = float(np.clip(grid_row, 1.6, 4.6))   # keep the sheet balanced at the extremes
     zoom_row = float(np.clip(grid_row * 0.85, 1.5, 3.4))
+    if include_distributions:
+        height_ratios = [1.3, 0.75, 3.0, grid_row, zoom_row, 4.0, 1.7]
+    else:
+        height_ratios = [1.3, 0.75, grid_row, zoom_row, 4.0, 1.7]
     gs = fig.add_gridspec(
-        nrows=6, ncols=1,
-        height_ratios=[1.3, 0.75, grid_row, zoom_row, 4.0, 1.7],
+        nrows=len(height_ratios), ncols=1,
+        height_ratios=height_ratios,
         left=0.04, right=0.97, top=0.985, bottom=0.015,
         hspace=0.30,
     )
 
-    ax_mast = fig.add_subplot(gs[0, 0])
+    row = 0
+    ax_mast = fig.add_subplot(gs[row, 0])
     draw_masthead(ax_mast, site, stats, sha, build_date, folha_nn, provenance)
     panels.append("masthead")
+    row += 1
 
-    ax_id = fig.add_subplot(gs[1, 0])
+    ax_id = fig.add_subplot(gs[row, 0])
     draw_identity_card(ax_id, site, stats)
     panels.append("identity_card")
+    row += 1
 
-    draw_grid_row(fig, gs[2, 0], d, lat, X, Y, layer_arrays, panel_norms, windows)
+    if include_distributions:
+        with mpl.rc_context(mpl.rcParamsDefault):
+            plt.rcParams.update(site_dist.DISTRIBUTIONS_RC)
+            site_dist.draw_distributions_top(fig, gs[row, 0], dist_data)
+        panels.append("distributions_top")
+        row += 1
+
+    draw_grid_row(fig, gs[row, 0], d, lat, X, Y, layer_arrays, panel_norms, windows)
     panels.append("grid_row")
+    row += 1
 
-    draw_zoom_row(fig, gs[3, 0], d, X, Y, layer_arrays, panel_norms, windows)
+    draw_zoom_row(fig, gs[row, 0], d, X, Y, layer_arrays, panel_norms, windows)
     panels.append("zoom_inlets")
+    row += 1
 
-    ax_hex = fig.add_subplot(gs[4, 0])
+    # Hexbin's own colorbar is drawn as an inset offset relative to this ax
+    # (draw_hexbin's cb_ax), not a figure-level axes — so this ax must
+    # itself stop short of the row's full width, leaving room within the
+    # PAGE for that inset. Full-width previously meant the colorbar's
+    # inset sat past the page's own right margin: legend, ticks, and unit
+    # label all cut off — identical in the PNG and the print PDF (round-2
+    # council, blocking).
+    ax_hex = fig.add_subplot(gs[row, 0])
+    hex_pos = ax_hex.get_position()
+    ax_hex.set_position([hex_pos.x0, hex_pos.y0, hex_pos.width * 0.82, hex_pos.height])
     draw_hexbin(ax_hex, d, stats)
     ax_hex.set_title("SVF × solar — physical consistency check",
                      fontsize=10, color=INK, pad=4, loc="left")
     panels.append("svf_solar_hexbin")
+    row += 1
 
-    ax_cav = fig.add_subplot(gs[5, 0])
+    ax_cav = fig.add_subplot(gs[row, 0])
     draw_caveats_v2(ax_cav, site, stats)
     panels.append("caveat_strip")
+    row += 1
+
+    if include_distributions:
+        fig.text(0.005, 0.004, site_dist.provenance_note(dist_data), fontsize=6, color=MUTED)
 
     a3_path = out_dir / f"folha_{site}_A3.png"
     fig.savefig(a3_path, dpi=220, facecolor=PAPER, bbox_inches=None)
@@ -1751,6 +1827,18 @@ def build_dashboard(site: str) -> dict:
     except Exception as e:
         issues.append(f"atom caveat: {e}")
 
+    if include_distributions:
+        try:
+            fig2 = plt.figure(figsize=(11.69, 3.6), dpi=200, facecolor=PAPER)
+            gs2 = fig2.add_gridspec(1, 1, left=0.05, right=0.97, top=0.88, bottom=0.16)
+            with mpl.rc_context(mpl.rcParamsDefault):
+                plt.rcParams.update(site_dist.DISTRIBUTIONS_RC)
+                site_dist.draw_distributions_top(fig2, gs2[0, 0], dist_data)
+            fig2.savefig(atoms / "distributions_top.png", dpi=200, facecolor=PAPER)
+            plt.close(fig2)
+        except Exception as e:
+            issues.append(f"atom distributions_top: {e}")
+
     # metadata
     meta = {
         "site": site,
@@ -1785,6 +1873,8 @@ def build_dashboard(site: str) -> dict:
             "atoms_dir": str(atoms),
         },
     }
+    if include_distributions:
+        meta["distributions_run_of_record"] = dist_data["run_of_record"]
     with open(out_dir / "metadata.json", "w") as f:
         json.dump(meta, f, indent=2, default=str)
 
@@ -1804,7 +1894,8 @@ def main():
     p.add_argument("--folha4-all", action="store_true",
                    help="build FOLHA4 for all five sites: Maré (hero+no-hero), "
                         "Alemão/Rio das Pedras (v4 no-hero, subunit breakdown), "
-                        "Vidigal/Rocinha (v3 — no subunits, v4 would lose the grid row for a trivial panel 3)")
+                        "Vidigal/Rocinha (v3 — no subunits, v4 would lose the grid row for a "
+                        "trivial panel 3 — but panels 1+2 citywide-distribution backported)")
     args = p.parse_args()
     if not args.site and not args.all and not args.folha4_mare and not args.folha4_all:
         p.error("must pass --site <name>, --all, --folha4-mare, or --folha4-all")
@@ -1838,9 +1929,10 @@ def main():
 
         for site in v3_sites:
             print(f"[{site}] v4 not built — no subunits declared (config/sites.yaml), "
-                  "kept on v3 (grid row + zoom inlets) per build_folha4_site's docstring")
+                  "kept on v3 (grid row + zoom inlets) per build_folha4_site's docstring, "
+                  "with panels 1+2 (citywide distribution) backported (round-2 council, blocking)")
             try:
-                result = build_dashboard(site)
+                result = build_dashboard(site, include_distributions=True)
             except Exception as e:
                 print(f"[{site} v3] FAILED: {e}")
                 failed.append(site)
