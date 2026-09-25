@@ -60,6 +60,7 @@ sys.path.insert(0, str(ROOT))
 
 from hubkit import badge, breadcrumb, card, git_provenance, page, relativize_page, section  # noqa: E402
 import build_results_registry as brr  # noqa: E402
+import registry_join  # noqa: E402
 from src.sites.territory import normalize_site_key  # noqa: E402
 
 CONFIG = ROOT / "config"
@@ -287,10 +288,19 @@ def _slot_html(root: Path, slot: str, url_note: tuple[str | None, str], caveats:
 
 
 def _wp_row_html(row: dict, caveats: list[dict], ascii_site: str, all_html_exists: bool) -> str:
+    # Corrective step 3 (charter phase D): the badge under each thumbnail is
+    # registry_join.badge_text() applied to the SAME registry node the
+    # thumbnail's src comes from — never a locally reimplemented rule. This
+    # is what makes the badge comparable, word for word, to the one the
+    # review folder shows for the identical artefact (same content_hash).
     thumbs = "".join(
+        f'<span style="display:inline-block;text-align:center;margin-right:4px">'
         f'<a href="{"/" + t["path"]}"><img src="{"/" + t["path"]}" loading="lazy" '
-        f'style="width:90px;height:60px;object-fit:cover;border:1px solid #ddd;margin-right:4px" '
+        f'style="width:90px;height:60px;object-fit:cover;border:1px solid #ddd" '
         f'alt="{_esc(t.get("id", ""))}"></a>'
+        f'<div class="pill doc" style="font-size:.7em;margin-top:2px" '
+        f'data-registry-badge="{_esc(t.get("id", ""))}">{_esc(registry_join.badge_text(t))}</div>'
+        f'</span>'
         for t in row["thumbs"])
     more = row["count"] - len(row["thumbs"])
     # By work package (all.html, the O7 "charter tree" deliverable) does not
