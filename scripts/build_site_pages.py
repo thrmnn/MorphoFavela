@@ -43,6 +43,7 @@ budget as build_results_registry.py / check_registry.py.
 from __future__ import annotations
 
 import argparse
+import csv
 import glob
 import html
 import json
@@ -335,6 +336,70 @@ def _mare_definitions_panel(root: Path, sites_out: Path, sites_cfg: dict) -> str
            f'{table}{note_html}{maredef_html}')
 
 
+_SUBUNIT_TABLE_COLUMNS = [
+    ("name", "Subunit"), ("n_cells", "Cells"), ("n_built_cells", "Built cells"),
+    ("lambda_p_median", "λp (median)"), ("H_mean_median", "H mean (median, m)"),
+    ("far_median", "FAR (median)"), ("svf_median", "SVF (median)"),
+    ("sun_winter_median_h", "Winter sun (median, h)"),
+    ("kwh_m2_median", "Annual irradiation (median, kWh/m²)"),
+]
+
+
+def _subunit_morphology_panel(root: Path, site_key: str, sites_cfg: dict) -> str:
+    """Per-subunit density/height/footprint/sky-view/winter-sun/annual-
+    irradiation (src.sites.subunit_morphology, scripts/build_subunit_morphology.py)
+    for a site that declares subunits in config/sites.yaml but is not Maré
+    (Maré keeps its own dedicated per-neighbourhood brief and the "Both
+    definitions" panel above; this function is never called for it — see
+    build_site_page). Every number is read fresh from the newest
+    runs/subunit_morphology_*/<site>/summary.json + subunit_morphology.csv
+    — never hand-typed. Descriptive only: rows are geographic order (north
+    to south, by mean grid-cell y), never ranked; a site whose subunit
+    polygons tile its study area exactly reports zero "between communities"
+    ground honestly rather than omitting the mechanism.
+    Vidigal and Rocinha declare no subunits at all (single polygon,
+    "Isolada") — that is reported plainly, not silently skipped, so a
+    reviewer sees the gap rather than a missing section."""
+    cfg = sites_cfg.get(site_key, {})
+    if cfg.get("subunits") is None:
+        return ('<h2>Subunits</h2><p class="pill doc">No subunits declared for this site '
+               '(config/sites.yaml) — reported as a single polygon.</p>')
+    runs = sorted(root.glob(f"runs/subunit_morphology_*/{site_key}/summary.json"))
+    if not runs:
+        return (f'<h2>Subunits</h2><p class="pill doc">Subunits declared — no '
+               f'runs/subunit_morphology_*/{_esc(site_key)}/summary.json on this checkout yet.</p>')
+    summary_path = runs[-1]
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    csv_path = root / summary["csv"]
+    if not csv_path.exists():
+        return f'<h2>Subunits</h2><p class="pill doc">summary.json found but {_esc(str(csv_path))} is missing.</p>'
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    thead = "".join(f"<th>{_esc(label)}</th>" for _, label in _SUBUNIT_TABLE_COLUMNS)
+    trs = []
+    for r in rows:
+        tds = []
+        for key, _ in _SUBUNIT_TABLE_COLUMNS:
+            v = r.get(key, "")
+            if key == "name":
+                tds.append(f"<td>{_esc(v)}</td>")
+                continue
+            try:
+                tds.append(f"<td>{float(v):.2f}</td>")
+            except (TypeError, ValueError):
+                tds.append(f"<td>{_esc(v)}</td>")
+        trs.append(f"<tr>{''.join(tds)}</tr>")
+    table_html = f'<table><thead><tr>{thead}</tr></thead><tbody>{"".join(trs)}</tbody></table>'
+    between_note = (" No study-area ground fell outside a named subunit (0 &quot;between&quot; cells)."
+                    if not summary.get("has_between_subunits") else "")
+    note = (f'<p class="lead">Per-subunit density, height, footprint, sky view, winter sun and '
+           f'annual irradiation — geographic order (north to south), never ranked.{between_note} '
+           f'{summary["n_subunits"]} subunits, source: '
+           f'<code>{_esc(str(summary_path.relative_to(root)))}</code>, WP-04 run '
+           f'<code>{_esc(summary.get("wp04_run", ""))}</code>.</p>')
+    return f'<h2>Subunits</h2>{note}{table_html}'
+
+
 def build_site_page(root: Path, sites_out: Path, site_key: str, cfg: dict, sites_cfg: dict,
                     work_packages: dict, nodes: dict, open_decisions: list[dict], prov: str) -> str:
     display = cfg["display_name"]
@@ -376,8 +441,9 @@ def build_site_page(root: Path, sites_out: Path, site_key: str, cfg: dict, sites
                         for r in rows))
 
     mare_html = _mare_definitions_panel(root, sites_out, sites_cfg) if site_key == "maré" else ""
+    subunit_html = "" if site_key == "maré" else _subunit_morphology_panel(root, site_key, sites_cfg)
 
-    body = dec_html + slots_html + mare_html + rows_html
+    body = dec_html + slots_html + mare_html + subunit_html + rows_html
     crumb = breadcrumb([("← Project hub", "../index.html"), (display, None)])
     return page(display, " ".join(badges), body, crumb=crumb, provenance=prov)
 
