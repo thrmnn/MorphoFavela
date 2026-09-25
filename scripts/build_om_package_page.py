@@ -45,6 +45,13 @@ OPS_DECISION_ID = "om_release_v0_1_2"
 OPS_LINK = f"{BRISA_HUB}/ops#dec-{OPS_DECISION_ID}"
 PAPER_LINK = f"{BRISA_HUB}/paper/x1"
 PANEL_DOC_REL = "docs/critic/octopus_package_panel_2026-09-24.md"  # repo-root relative
+# Rendered inside outputs/_packages/mare_om2/ (stable across versions, like
+# index.html) so the "Panel ruling" link never points outside outputs/ — the
+# live VPS hub only ever rsyncs outputs/ subtrees (cockpit_bridge_tick.sh),
+# never docs/, so a direct docs/ link 404s on the real deployment.
+PANEL_PAGE_NAME = "panel_review.html"
+
+NAMED_TEAM = ["Jingxue", "Vincent", "Simone"]  # PI ruling 2026-09-24, Q6a — must match the /ops decision card
 
 # Independent of BRISA release_class (this package belongs to Octopus LRP
 # #2, not the P1 figure lifecycle, so it is never in that scheme at all).
@@ -229,13 +236,14 @@ def render_page(root: Path) -> str:
 </section>"""
 
     # --- PI decision ----------------------------------------------------
+    named_team_str = ", ".join(NAMED_TEAM)
     decision_html = f"""
 <section id="decision">
   <h2>What the PI decides</h2>
   <p>Release <strong>{html.escape(version)}</strong> to the named Octopus team
-  now? The panel's must-fix list (see the panel ruling below) has been
-  applied. This page states the decision; it carries no tap of its own —
-  the PI rules on it in the brisaverse cockpit.</p>
+  — {html.escape(named_team_str)} — now? The panel's must-fix list (see the
+  panel ruling below) has been applied. This page states the decision; it
+  carries no tap of its own — the PI rules on it in the brisaverse cockpit.</p>
   <p><a href="{OPS_LINK}" target="_blank" rel="noopener"
   style="display:inline-block;padding:8px 14px;background:var(--accent);color:#fff;
   border-radius:8px;text-decoration:none;font-weight:600">
@@ -325,7 +333,24 @@ def render_page(root: Path) -> str:
     changelog_rel = _rel_to(package_root, version_dir / "CHANGELOG.md")
     manifest_rel = _rel_to(package_root, version_dir / "manifest.json")
     dict_rel = _rel_to(package_root, version_dir / "p08_data_dictionary.csv")
-    panel_rel = _rel_to(package_root, root / PANEL_DOC_REL)
+    panel_rel = _rel_to(package_root, package_root / PANEL_PAGE_NAME)
+
+    # Deliverable data files this release exists to ship — linked directly so
+    # a recipient never has to reverse-engineer paths out of manifest.json's
+    # files map to reach them.
+    data_files = [
+        (version_dir / "OM2" / "points.parquet", "OM2/points.parquet", "route-point table (GeoParquet)"),
+        (version_dir / "OM2" / "points.gpkg", "OM2/points.gpkg", "route-point table (GeoPackage)"),
+        (version_dir / "OM2" / "points.csv", "OM2/points.csv", "route-point table (plain CSV)"),
+        (version_dir / "p05_building_shade.parquet", "p05_building_shade.parquet", "P-05 shade (point x 5-min timestamp)"),
+        (version_dir / "p05_building_shade.csv", "p05_building_shade.csv", "P-05 shade (CSV)"),
+        (version_dir / "p05b_campaign_windows.parquet", "p05b_campaign_windows.parquet", "P-05 campaign walk windows"),
+        (version_dir / "p05b_campaign_windows.csv", "p05b_campaign_windows.csv", "P-05 campaign walk windows (CSV)"),
+    ]
+    data_files_html = "".join(
+        f'<li><a href="{_rel_to(package_root, p)}"><code>{html.escape(label)}</code></a> — {html.escape(desc)}</li>'
+        for p, label, desc in data_files if p.exists()
+    )
 
     dict_table_rows = [
         [r.get("id", ""), r.get("definition", ""), r.get("unit", ""), r.get("status", "")]
@@ -365,10 +390,33 @@ def render_page(root: Path) -> str:
     <li><a href="{manifest_rel}">manifest.json</a> — per-file sha256, package_version, crs, use_terms.</li>
     <li><a href="{panel_rel}">Panel ruling</a> — the expert-panel review v0.1's must-fix list came from.</li>
   </ul>
+  <h3>Data files</h3>
+  <p class="sub">The actual deliverable — linked directly, not just via manifest.json's files map.</p>
+  <ul>{data_files_html or "<li class='sub'>None found on disk for this version.</li>"}</ul>
   <h3>Version history</h3>
   {_table(["Version", "Date", "On disk", "Built (UTC)", "OM2 points"], history_rows)}
   <details><summary>Changelog detail</summary><ul>{changelog_items}</ul></details>
 </section>"""
+
+    # --- glossary ---------------------------------------------------------
+    # Same one-line <details class="glossary"> convention as the project hub
+    # (build_project_hub.py::_recent_results_section) — for a reader outside
+    # MorphoFavela (e.g. Jingxue) meeting this package's shorthand cold.
+    glossary_html = (
+        '<section id="glossary"><div class="callout">'
+        '<details class="glossary"><summary>Glossary</summary>'
+        '<span class="gloss">'
+        "P-02..P-08 this package's own pipeline steps (route points, buffer/segment "
+        "aggregation, airborne form variables, building shade, ventilation proxies, "
+        "quality report, data dictionary) · "
+        "WP-02 MorphoFavela's shared horizon/sky-obstruction engine, reused unmodified "
+        "for P-05 shade · "
+        "lambda_p (plan_density_lambda_p) building plan-area fraction of a 10&nbsp;m grid "
+        "cell, 0-1, 1.0 = fully built · "
+        "Tregenza sky the 145-patch sky-hemisphere subdivision the sky-view-factor / "
+        "shade computations sample directions from"
+        '</span></details></div></section>'
+    )
 
     paper_html = f"""
 <section id="paper">
@@ -378,8 +426,8 @@ def render_page(root: Path) -> str:
 </section>"""
 
     body = (
-        status_html + decision_html + owes_html + contact_html + quality_html
-        + shade_html + dict_html + docs_html + paper_html
+        status_html + decision_html + glossary_html + owes_html + contact_html
+        + quality_html + shade_html + dict_html + docs_html + paper_html
     )
     prov = hubkit.git_provenance(root, "scripts/build_om_package_page.py")
     return hubkit.page(
@@ -391,7 +439,23 @@ def render_page(root: Path) -> str:
     )
 
 
+def build_panel_page(root: Path) -> Path | None:
+    """Render the panel-ruling markdown (repo docs/, never synced to the VPS)
+    into a standalone page inside outputs/_packages/mare_om2/, so the package
+    page's own link to it never points outside outputs/. Returns None if the
+    source doc is missing (rendered page then also absent — check() reports
+    the resulting dangling link rather than silently linking nothing)."""
+    package_root = root / "outputs" / "_packages" / "mare_om2"
+    src = root / PANEL_DOC_REL
+    if not src.exists():
+        return None
+    dest = package_root / PANEL_PAGE_NAME
+    hubkit.render_doc_page(src, dest, root=root, mirror_dir=package_root)
+    return dest
+
+
 def build_page(root: Path = DEFAULT_ROOT) -> Path:
+    build_panel_page(root)
     out = root / "outputs" / "_packages" / "mare_om2" / "index.html"
     out.write_text(render_page(root), encoding="utf-8")
     return out
