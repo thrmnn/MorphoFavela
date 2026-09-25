@@ -45,6 +45,7 @@ import csv
 import hashlib
 import html as _html
 import json
+import sys
 import re
 import os
 import re
@@ -649,7 +650,9 @@ def _load_fresh_registry() -> dict:
         return {}
     try:
         return brr.build()
-    except Exception:
+    except Exception as exc:
+        print(f"[review-folder] WARNING: results registry could not be built ({exc!r}) — "
+              "the WP view falls back to one unregistered bucket", file=sys.stderr)
         return {}
 
 
@@ -884,6 +887,9 @@ def build(out_root: Path) -> dict:
     (out_root / "MANIFEST.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
     (out_root / "index.html").write_text(_render_index(manifest))
     (out_root / "all.html").write_text(_render_all(manifest))
+    if _wp_key_order() and 'class="wp-chips"' not in (out_root / "index.html").read_text():
+        raise SystemExit("config/work_packages.yaml declares work packages but the review page has no "
+                         "'By work package' chip row — the O7 view rendered nothing (2026-09-25 class)")
     broken = dangling_relative_links(out_root)
     if broken:
         raise SystemExit(f"review folder links to files that do not exist: {broken[:10]}")
@@ -1091,7 +1097,7 @@ def _render_wp_chips(wp_tree: dict) -> str:
     wps = wp_tree.get("wps") or []
     if not wps:
         return ""
-    parts = ['<nav class="wp-chips" aria-label="By work package"><strong>By work package</strong>'
+    parts = ['<nav class="wp-chips" id="wp-chips" aria-label="By work package"><strong>By work package</strong>'
              '<div class="chip-row">']
     for wp in wps:
         cls = "chip chip-muted" if wp["n"] == 0 else "chip"
