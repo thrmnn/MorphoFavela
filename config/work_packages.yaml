@@ -28,7 +28,8 @@ work_packages:
   WP05: {title: Pilot to full campaign, papers: [p1], families: {}}
   WP06: {title: Core morphometrics, papers: [p1], families:
     {site_morphometrics: {script: scripts/compute_urban_morphology.py, glob: "outputs/<site>/morphometrics{,_5m,_15m,_20m,_30m}/**"},
-     wp06_geometry: {script: src/brisa_solar/wp06_geometry.py}, brisa_ventilation_fix: {script: scripts/brisa_ventilation/, script_confidence: low}}}
+     wp06_geometry: {script: src/brisa_solar/wp06_geometry.py}, brisa_ventilation_fix: {script: scripts/brisa_ventilation/, script_confidence: low},
+     subunit_morphology: {script: scripts/build_subunit_morphology.py}}}
   WP07: {title: P1 solar results, papers: [p1], families:
     {wp07_figures: {script: src/brisa_solar/wp07_figures.py}, wp07_zoom: {script: src/brisa_solar/wp07_figures.py},
      wp07_map: {script: src/brisa_solar/wp07_figures.py}, wp07_method: {script: src/brisa_solar/wp07_method_figures.py},
