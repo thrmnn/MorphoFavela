@@ -465,12 +465,35 @@ def test_compute_awaiting_selects_only_staged_ok_entries_sorted():
 
 
 def test_render_awaiting_links_badge_to_ops_promotion_card():
+    # No governing_decision on this entry -> falls back to the pre-split id,
+    # never a fabricated guess (see test_release_badge_tag_* below for the
+    # per-family routing this fell back from).
     awaiting = [{"section": "p1_solar_figures", "file": "f1.png", "status": "ok", "bytes": 1,
                  "release_badge": "staged", "register_id": "f1_citywide_position"}]
     html = bprf._render_awaiting(awaiting)
     assert 'id="s-awaiting"' in html
-    assert bprf.OPS_PROMOTION_ANCHOR in html
+    assert f"/ops#dec-{bprf._FALLBACK_PROMOTION_DECISION}" in html
     assert "Awaiting your call <span class=\"n\">(1)</span>" in html
+
+
+def test_governing_decision_routes_by_run_of_record_prefix():
+    assert bprf._governing_decision("wp07_figures_20260924T212023Z") == "wp07_promote_solar"
+    assert bprf._governing_decision("wp07_method_20260917T125027Z") == "wp07_promote_method"
+    assert bprf._governing_decision("terrain_split_full_20260917T130045Z") == "wp07_promote_terrain"
+    # unknown / missing run -> the old pre-split id, never a guess
+    assert bprf._governing_decision("some_other_run_20260101T000000Z") == bprf._FALLBACK_PROMOTION_DECISION
+    assert bprf._governing_decision(None) == bprf._FALLBACK_PROMOTION_DECISION
+
+
+def test_release_badge_tag_routes_staged_figure_to_its_own_decision_card():
+    # round-1 critic finding (criterion 4/6): every staged figure's badge
+    # used to point at the single, now-resolved wp07_figure_promotion id
+    # regardless of which of the three post-split decisions actually
+    # governs it — the tag must now carry the figure's own family.
+    e = {"release_badge": "staged", "governing_decision": "wp07_promote_terrain"}
+    html = bprf._release_badge_tag(e)
+    assert "/ops#dec-wp07_promote_terrain" in html
+    assert "wp07_figure_promotion" not in html
 
 
 def test_render_awaiting_renders_zero_state_without_omitting_section():

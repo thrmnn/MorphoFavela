@@ -64,7 +64,30 @@ BRISAVERSE_ROOT = Path.home() / "SCL" / "SCR" / "brisaverse"
 THUMB_W = 1100
 KEEP_DATED_FOLDERS = 3  # PI decision, ruling §7.1: 3 dated review folders
 NEW_SINCE_CAP = 30  # "New this cycle" thumbnail cap before "see sections below"
-OPS_PROMOTION_ANCHOR = "/ops#dec-wp07_figure_promotion"  # hub/gallery/paper.html's own link
+
+# Which open-decision id a staged figure's "rule on this" link should point
+# at, keyed off run_of_record prefix — mirrors brisaverse's own
+# shared/facts/gen_dossiers.py DECISION_RUN_PREFIXES and hub/gallery/
+# paper.html's WP07_PROMOTE_DECISION table (kept in sync by hand, same
+# precedent as MORPHOFAVELA_DASH_ALLOW / gen_p1_artifacts.py's RUN_OF_RECORD
+# table). The single wp07_figure_promotion card these all used to point at
+# was split into three on 2026-09-24 (docs/critic/navigation_council_2026-09-24.md);
+# a hardcoded OPS_PROMOTION_ANCHOR constant here silently kept pointing at the
+# old, now-resolved id after the split (round-1 critic finding, criterion 4/6).
+_DECISION_RUN_PREFIXES = {
+    "wp07_figures_": "wp07_promote_solar",
+    "wp07_method_": "wp07_promote_method",
+    "terrain_split_": "wp07_promote_terrain",
+}
+_FALLBACK_PROMOTION_DECISION = "wp07_figure_promotion"  # only if a run matches no known family — never fabricated, just the old id as a last resort
+
+
+def _governing_decision(run_of_record: str | None) -> str:
+    if run_of_record:
+        for prefix, decision_id in _DECISION_RUN_PREFIXES.items():
+            if run_of_record.startswith(prefix):
+                return decision_id
+    return _FALLBACK_PROMOTION_DECISION
 
 
 def _image_dir(run_dir: Path) -> Path:
@@ -219,6 +242,7 @@ def _join_release(name: str, src: Path, run_name: str | None,
     if row is not None:
         out["register_id"] = row.get("id")
         out["register_state"] = row.get("state")
+        out["governing_decision"] = _governing_decision(row.get("run_of_record"))
     return out
 
 
@@ -954,7 +978,7 @@ _MARK_REVIEWED_SCRIPT = """<script>
       .then(function(d){
         btn.textContent='Reviewed \\u2713';
         msg.className='mr-msg mr-ok';
-        msg.textContent='as of '+(d.last_reviewed_utc||'now')+' \\u2014 /now\\u2019s \\u201cNew this cycle\\u201d count will read 0.';
+        msg.textContent='as of '+(d.last_reviewed_utc||'now')+' \\u2014 /now\\u2019s \\u201cUnreviewed since your last tap\\u201d count will read 0.';
       })
       .catch(function(){
         btn.disabled=false; btn.textContent=label;
@@ -980,7 +1004,8 @@ def _release_badge_tag(e: dict) -> str:
         return ""
     label = f"register: {badge}" if badge != "unclassified" else "unclassified"
     if badge == "staged":
-        return f'<a class="tag reg reg-staged" href="{OPS_PROMOTION_ANCHOR}">{label} → rule on this</a>'
+        anchor = f"/ops#dec-{e.get('governing_decision') or _FALLBACK_PROMOTION_DECISION}"
+        return f'<a class="tag reg reg-staged" href="{anchor}">{label} → rule on this</a>'
     return f'<span class="tag reg reg-{badge}">{label}</span>'
 
 
@@ -1043,11 +1068,16 @@ def _render_awaiting(awaiting: list[dict]) -> str:
     if not awaiting:
         return ('<section id="s-awaiting"><h2>Awaiting your call <span class="n">(0)</span></h2>'
                 '<p class="blurb">Nothing staged this cycle.</p></section>')
+    # Bare /ops, never a specific #dec-<id> anchor: this section mixes
+    # figures from several different open decisions (solar/method/terrain),
+    # each with its own card — a single anchor here would be right for at
+    # most one of them and stale-looking for the rest. Each figure's own
+    # badge below carries the correct per-figure anchor.
     parts = [f'<section id="s-awaiting"><h2>Awaiting your call <span class="n">({len(awaiting)})</span></h2>'
              f'<p class="blurb">Every figure the register (brisaverse '
              f'<code>shared/facts/p1_artifacts.json</code>) marks <code>staged</code> — '
              f'promoting or holding each one is your tap on '
-             f'<a href="{OPS_PROMOTION_ANCHOR}">/ops</a>, not an agent\'s.</p><div class="grid">']
+             f'<a href="/ops">/ops</a>, not an agent\'s.</p><div class="grid">']
     for e in awaiting:
         parts.append(_figure_card(e, e["section"]))
     parts.append("</div></section>")
