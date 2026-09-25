@@ -110,6 +110,13 @@ RUN_SUFFIX_RE = re.compile(r"_(\d{8}T\d{6}Z)$")
 # (`copies[]`) is charter §6 / O8 (cleanup), out of scope for O2.
 EXCLUDED_TOP_DIRS = {"_hub", "_review"}
 EXCLUDED_SUBSTRINGS = ("/_packages/_internal/",)
+# O8 cleanup (charter phase E / figure_organization_spec.md §6-§7): bytes
+# moved here by the cleanup pass (never deleted — "Nothing leaves the PI's
+# view. Archiving moves bytes, never rows"). Scanned separately from
+# `unclassified` so a file the PI already dismissed doesn't keep inflating
+# the "needs review" count every cycle; it renders in its own collapsed
+# "Archived (N)" bucket instead (organization_charter.md §4 lifecycle table).
+ARCHIVE_TOP_DIR = "_archive"
 
 
 # --------------------------------------------------------------------------- helpers
@@ -417,31 +424,81 @@ def build(*, verbose: bool = False) -> dict:
         n["content_hash"] for n in nodes.values()
         if n.get("kind") == "figure" and n.get("content_hash")
     }
-    unclassified_by_folder: dict[str, int] = defaultdict(int)
-    unclassified_total = 0
+    # O8 cleanup (figure_organization_spec.md §1/§6): "Rows with the same
+    # content_hash become one canonical row, with the other paths in
+    # copies[]." Applied here to the unclassified sweep itself — a review
+    # snapshot (`_review/<date>/sweep/**`) that mirrors an ALREADY-
+    # unclassified original is real content seen twice, not two pieces of
+    # unaccounted content, so it collapses to one counted row + a copies[]
+    # entry rather than inflating the count. A candidate under _review/_hub
+    # is never chosen as the canonical when a non-mirror path with the same
+    # hash exists, so the canonical path a PI is shown is always the real
+    # output location, never a dated snapshot.
+    def _bucket_of(rel: str) -> str:
+        parts = Path(rel).parts  # outputs/<top>/<sub>/.../<file>
+        # Two levels when the file sits at least that deep (parts[1:3] are
+        # both directories); one level — never the filename itself — when
+        # the file sits directly inside a single top folder.
+        return "/".join(parts[1:3]) if len(parts) > 3 else parts[1]
+
+    def _dedup_sweep(candidates: list[tuple[str, Path]]) -> dict:
+        by_hash: dict[str, list[str]] = defaultdict(list)
+        hashless: list[str] = []
+        for rel, f in candidates:
+            h = _sha256(f)
+            if h is None:
+                hashless.append(rel)
+                continue
+            if h in placed_hashes and _is_excluded(rel):
+                continue  # genuine mirror of a registered artifact — not counted at all
+            by_hash[h].append(rel)
+
+        by_folder: dict[str, int] = defaultdict(int)
+        copies: dict[str, list[str]] = {}
+        total = 0
+        for h, rels in by_hash.items():
+            non_mirror = [r for r in rels if not _is_excluded(r)]
+            canonical = sorted(non_mirror or rels)[0]
+            dupes = sorted(r for r in rels if r != canonical)
+            by_folder[_bucket_of(canonical)] += 1
+            total += 1
+            if dupes:
+                copies[canonical] = dupes
+        for rel in hashless:
+            by_folder[_bucket_of(rel)] += 1
+            total += 1
+        return {
+            "count": total,
+            "by_folder": dict(sorted(by_folder.items())),
+            "copies": dict(sorted(copies.items())),
+            "duplicate_files_collapsed": sum(len(v) for v in copies.values()),
+        }
+
+    unclassified_candidates: list[tuple[str, Path]] = []
+    archived_candidates: list[tuple[str, Path]] = []
     if OUTPUTS.is_dir():
-        for f in OUTPUTS.rglob("*"):
+        for f in sorted(OUTPUTS.rglob("*")):
             if not f.is_file() or f.suffix.lower() not in IMG_EXTS:
                 continue
             rel = _posix(f)
             if rel in placed_paths:
                 continue
-            if _is_excluded(rel) and _sha256(f) in placed_hashes:
-                continue
-            parts = Path(rel).parts  # outputs/<top>/<sub>/.../<file>
-            # Two levels when the file sits at least that deep (parts[1:3]
-            # are both directories); one level — never the filename itself
-            # — when the file sits directly inside a single top folder.
-            bucket = "/".join(parts[1:3]) if len(parts) > 3 else parts[1]
-            unclassified_by_folder[bucket] += 1
-            unclassified_total += 1
+            top = rel.split("/", 2)
+            if len(top) >= 2 and top[0] == "outputs" and top[1] == ARCHIVE_TOP_DIR:
+                archived_candidates.append((rel, f))
+            else:
+                unclassified_candidates.append((rel, f))
+
+    unclassified_sweep = _dedup_sweep(unclassified_candidates)
+    archived_sweep = _dedup_sweep(archived_candidates)
 
     registry = {
         "_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "generator": "scripts/build_results_registry.py",
         "charter": "docs/charter/organization_charter.md §2",
         "nodes": nodes,
-        "unclassified": {"count": unclassified_total, "by_folder": dict(sorted(unclassified_by_folder.items()))},
+        "unclassified": unclassified_sweep,
+        "archived": archived_sweep,
         "orphan_run_families": orphan_run_families,
         "counts": {
             "wp": sum(1 for n in nodes.values() if n.get("kind") == "wp"),
@@ -450,7 +507,8 @@ def build(*, verbose: bool = False) -> dict:
             "figure": sum(1 for n in nodes.values() if n.get("kind") == "figure"),
             "alias": sum(1 for n in nodes.values() if n.get("kind") == "alias"),
             "placed": len(placed_paths),
-            "unclassified": unclassified_total,
+            "unclassified": unclassified_sweep["count"],
+            "archived": archived_sweep["count"],
         },
     }
     return registry

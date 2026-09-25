@@ -163,6 +163,53 @@ def test_unclassified_excludes_only_hash_matched_hub_review_mirrors(env):
     }
 
 
+def test_unclassified_collapses_byte_identical_copies_to_one_canonical_row(env):
+    """O8 cleanup (figure_organization_spec.md §1/§6): 'Rows with the same
+    content_hash become one canonical row, with the other paths in
+    copies[].' A review-folder mirror that duplicates an already-unclassified
+    original must not double the unclassified count — it collapses to one
+    counted row, and the duplicate path is named in copies[], never
+    dropped. The canonical path is always the real (non-_review/_hub)
+    location when one exists, never the dated snapshot."""
+    config = env["config"]
+    outputs = env["outputs"]
+    _write(config / "work_packages.yaml", yaml.dump(_wp_yaml({})))
+    _write(outputs / "cidade_de_deus" / "svf_v2" / "svf_dashboard.png", "same bytes")
+    _write(outputs / "_review" / "2026-09-24" / "sweep" / "svf_dashboard.png", "same bytes")
+    _write(outputs / "_review" / "2026-09-17" / "sweep" / "svf_dashboard.png", "same bytes")
+
+    reg = brr.build()
+    assert reg["unclassified"]["count"] == 1
+    assert reg["unclassified"]["duplicate_files_collapsed"] == 2
+    canonical = "outputs/cidade_de_deus/svf_v2/svf_dashboard.png"
+    assert canonical in reg["unclassified"]["copies"]
+    assert set(reg["unclassified"]["copies"][canonical]) == {
+        "outputs/_review/2026-09-24/sweep/svf_dashboard.png",
+        "outputs/_review/2026-09-17/sweep/svf_dashboard.png",
+    }
+
+
+def test_archived_bytes_counted_separately_from_unclassified(env):
+    """O8 cleanup: bytes moved to outputs/_archive/** (the cleanup pass —
+    'archive, never delete') stop inflating the PI's 'needs review'
+    unclassified count and show in their own 'archived' bucket instead;
+    the row is never lost (organization_charter.md §4: 'Nothing leaves the
+    PI's view. Archiving moves bytes, never rows')."""
+    config = env["config"]
+    outputs = env["outputs"]
+    _write(config / "work_packages.yaml", yaml.dump(_wp_yaml({})))
+    _write(outputs / "_archive" / "cross_site" / "old_map.png", "archived content")
+    _write(outputs / "live_dir" / "new_map.png", "live content")
+
+    reg = brr.build()
+    assert reg["unclassified"]["count"] == 1
+    assert reg["archived"]["count"] == 1
+    assert "outputs/_archive/cross_site/old_map.png" in reg["archived"]["by_folder"] or \
+        reg["archived"]["by_folder"] == {"_archive/cross_site": 1}
+    assert reg["counts"]["archived"] == 1
+    assert reg["counts"]["unclassified"] == 1
+
+
 def test_orphan_run_family_reported(env):
     config = env["config"]
     runs = env["runs"]
