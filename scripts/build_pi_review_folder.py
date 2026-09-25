@@ -58,6 +58,8 @@ from pathlib import Path
 import yaml
 from PIL import Image
 
+import registry_join
+
 Image.MAX_IMAGE_PIXELS = None  # the citywide pair is 21298x6211 by design
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -158,79 +160,33 @@ def _manifest_classes(run_dir: Path) -> dict[str, dict]:
 # gen_p1_artifacts.py stays the only authority for release_class (it parses
 # red_lines.md §5 and cross-checks run manifests, ethics-critical); this
 # generator only joins by (run_of_record, filename), never re-derives.
+#
+# Corrective step 3 (charter phase D, docs/critic/incident_dashboard_loop_
+# 2026-09-25.md): the join itself and the 4-word badge rule now live in
+# registry_join.py — the SAME module build_results_registry.py calls to
+# populate results.json's own `release` field — so this generator and the
+# registry agree on what "staged"/"withheld"/"publishable"/"unclassified"
+# means by construction, not by two authors staying in sync by hand. The
+# names below are kept as local aliases so every call site in this file
+# reads exactly as it did before the move.
 # --------------------------------------------------------------------------
 
-def _load_p1_register() -> list[dict]:
-    path = BRISAVERSE_ROOT / "shared" / "facts" / "p1_artifacts.json"
-    if not path.exists():
-        return []
-    try:
-        return json.loads(path.read_text()).get("artifacts", [])
-    except (json.JSONDecodeError, OSError):
-        return []
-
-
-def _register_index(register: list[dict]) -> dict[tuple[str, str], dict]:
-    """(run_of_record, filename) -> register row. Filename alone collides
-    across runs (every WP-07 figure family reuses f1_/f2_/f3_/f4_): the run
-    each figure actually came from is what disambiguates it."""
-    idx: dict[tuple[str, str], dict] = {}
-    for row in register:
-        run = row.get("run_of_record")
-        name = Path(row.get("image_url") or "").name
-        if run and name:
-            idx[(run, name)] = row
-    return idx
+_load_p1_register = registry_join.load_p1_register
+_register_index = registry_join.register_index
+_release_badge = registry_join.release_badge
 
 
 def _register_hash_index(register: list[dict]) -> dict[tuple[str, str], dict]:
-    """(filename, md5) -> register row, resolved against the register's own
-    run_of_record on THIS disk. A fallback for the case the primary
-    (run, filename) key misses because the review folder picked a
-    differently-timestamped run of the same family — content hash still
-    proves it is the figure the register describes, not a same-named one."""
-    idx: dict[tuple[str, str], dict] = {}
-    for row in register:
-        run = row.get("run_of_record")
-        name = Path(row.get("image_url") or "").name
-        if not (run and name):
-            continue
-        run_dir = ROOT / "runs" / run
-        if not run_dir.is_dir():
-            continue
-        src = _image_dir(run_dir) / name
-        if not src.exists():
-            continue
-        try:
-            h = hashlib.md5(src.read_bytes()).hexdigest()
-        except OSError:
-            continue
-        idx[(name, h)] = row
-    return idx
+    return registry_join.register_hash_index(register, ROOT / "runs")
 
 
-def _release_badge(row: dict | None) -> str:
-    """withheld / staged / publishable / unclassified — the only four badges
-    the ruling allows (§2). `state` decides first (staged is a state, not a
-    class); release_class text decides the rest."""
-    if row is None:
-        return "unclassified"
-    if row.get("state") == "staged":
-        return "staged"
-    rc = (row.get("release_class") or "").lower()
-    if row.get("state") == "withheld" or "withheld" in rc:
-        return "withheld"
-    if "publishable" in rc:
-        return "publishable"
-    return "unclassified"
-
-
-def _join_release(name: str, src: Path, run_name: str | None,
-                   by_run_file: dict, by_hash: dict, hash_names: set) -> dict:
-    """The joined fields folded into a figure's row: release_badge always
-    present; register_id/register_state only when a row matched. Hashing is
-    skipped unless the filename is one the register could plausibly know
-    (hash_names) — the 628-file sweep must never pay for 628 reads."""
+def _cta_fields(name: str, src: Path, run_name: str | None,
+                 by_run_file: dict, by_hash: dict, hash_names: set) -> dict:
+    """register_id/register_state/governing_decision for the "→ rule on
+    this" CTA — fields the results registry does not carry, so these still
+    come from the direct p1_artifacts.json join. The badge WORD itself does
+    not come from here any more (see `_apply_release_badges`); this is
+    metadata about the decision to route to, not the classification shown."""
     row = by_run_file.get((run_name, name)) if run_name else None
     if row is None and name in hash_names and src.exists():
         try:
@@ -239,22 +195,28 @@ def _join_release(name: str, src: Path, run_name: str | None,
             h = None
         if h is not None:
             row = by_hash.get((name, h))
-    out = {"release_badge": _release_badge(row)}
-    if row is not None:
-        out["register_id"] = row.get("id")
-        out["register_state"] = row.get("state")
-        out["governing_decision"] = _governing_decision(row.get("run_of_record"))
-    return out
+    if row is None:
+        return {}
+    return {
+        "register_id": row.get("id"),
+        "register_state": row.get("state"),
+        "governing_decision": _governing_decision(row.get("run_of_record")),
+    }
 
 
 _RUN_SOURCE_RE = re.compile(r"^runs/([^/]+)/")
 
 
-def _apply_release_badges(entries: list[dict], register: list[dict]) -> None:
-    """Phase 4 join (G2/G3's counterpart on the MorphoFavela side): stamp
-    every 'ok' entry with a release_badge from brisaverse's register, keyed
-    off the same (run, filename) each entry was already copied under — no
-    entry is re-classified by anything other than the register."""
+def _apply_release_badges(entries: list[dict], register: list[dict], registry: dict) -> None:
+    """Corrective step 3 (charter phase D): stamp every 'ok' entry's
+    `release_badge` from the results registry (release + lifecycle,
+    `registry_join.badge_text`), resolved by the entry's own path — the
+    exact key `build_site_pages.py` and `results.json` itself use, so all
+    three surfaces read the same node for the same artefact. CTA metadata
+    (register_id/state/governing_decision) still comes from the direct
+    p1_artifacts.json join (`_cta_fields`), since the registry does not
+    carry those fields."""
+    by_path = registry_join.node_by_path(registry)
     by_run_file = _register_index(register)
     by_hash = _register_hash_index(register)
     hash_names = {name for (name, _h) in by_hash}
@@ -262,10 +224,13 @@ def _apply_release_badges(entries: list[dict], register: list[dict]) -> None:
         if e.get("status") != "ok":
             continue
         name = e["file"]
-        m = _RUN_SOURCE_RE.match(e.get("source", ""))
+        source = e.get("source", "")
+        node = by_path.get(source)
+        e["release_badge"] = registry_join.badge_text(node) if node is not None else "unclassified"
+        m = _RUN_SOURCE_RE.match(source)
         run_name = m.group(1) if m else None
-        src_abs = ROOT / e["source"]
-        e.update(_join_release(name, src_abs, run_name, by_run_file, by_hash, hash_names))
+        src_abs = ROOT / source
+        e.update(_cta_fields(name, src_abs, run_name, by_run_file, by_hash, hash_names))
 
 
 # --------------------------------------------------------------------------
@@ -880,10 +845,17 @@ def build(out_root: Path) -> dict:
     already = {e["file"] for e in entries if e["status"] == "ok"}
     other_sections = sweep_remaining(out_root, already, entries)
 
-    # Phase 4 join: stamp every entry (curated and swept) with a release_badge
-    # from brisaverse's register, then pull the staged rows into their own
+    # Phase 4 join, rewired under corrective step 3 (charter phase D): the
+    # badge word itself now comes from the results registry (release +
+    # lifecycle, registry_join.badge_text) by PATH — the same registry
+    # build_site_pages.py reads and results.json is generated from — never
+    # re-derived a second time against p1_artifacts.json directly. The
+    # p1_artifacts join is still consulted, but only for the "→ rule on
+    # this" CTA routing (register_id/state/governing_decision), fields the
+    # registry does not carry. Then pull the staged rows into their own
     # "Awaiting your call" list — G3's page-side half.
-    _apply_release_badges(entries, _load_p1_register())
+    fresh_registry = _load_fresh_registry()
+    _apply_release_badges(entries, _load_p1_register(), fresh_registry)
     awaiting = _compute_awaiting(entries)
 
     prev_utc = _previous_cycle_utc(out_root)
@@ -902,7 +874,7 @@ def build(out_root: Path) -> dict:
     # place (falls into `unmatched`, shown not hidden), so widening the input
     # set here cannot fabricate a WP membership the registry doesn't have.
     wp_eligible_entries = _wp_eligible_entries(entries)
-    wp_tree = _group_sweep_by_wp(wp_eligible_entries, _load_fresh_registry())
+    wp_tree = _group_sweep_by_wp(wp_eligible_entries, fresh_registry)
 
     manifest = {
         "_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),

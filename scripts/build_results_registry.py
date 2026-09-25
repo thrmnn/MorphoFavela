@@ -8,15 +8,20 @@ that already exists on disk: `runs/*/figure_manifest.json`, the declared
 §5), `config/sites.yaml`, and `shared/facts/tasks.json` in the sibling
 brisaverse checkout for decision_ids.
 
-Writes `outputs/_registry/results.json`. This phase (O2 / charter phase B,
-"registry input") does NOT join `gen_p1_artifacts.py` -> `p1_artifacts.json`
-(release/guardian_verdict/paper_ref stay null) — that join is charter phase C
-(O3), which owns those three fields exclusively per the charter's field-
-ownership table (§2). This generator only ever writes the fields that same
-table assigns to it: `lifecycle`, `head_run`, `superseded_by`, `thumb_hash`,
-`unclassified`, plus the pass-through fields whose authority is the run's own
-writer (`path`, `content_hash`, `produced_utc`, `generator`, `derived_from`,
-`site`) and `work_packages.yaml` (`wp`, `papers`, family membership).
+Writes `outputs/_registry/results.json`. Charter phase C (O3, landed
+2026-09-25 together with phase D — corrective step 3,
+docs/critic/incident_dashboard_loop_2026-09-25.md) joins
+`gen_p1_artifacts.py` -> `p1_artifacts.json` in at the end of `build()`,
+via `registry_join.join_p1_release()`: `release`, `guardian_verdict` and
+`paper_ref` are COPIED onto each figure node from that join, by
+`(run_of_record, filename)` with a content-hash fallback — never re-derived
+here (that stays gen_p1_artifacts.py's job, ethics-critical; this generator
+only ever reads its output file). Every other field is written by the parts
+of this generator the charter's field-ownership table (§2) assigns them to:
+`lifecycle`, `head_run`, `superseded_by`, `thumb_hash`, `unclassified`, plus
+the pass-through fields whose authority is the run's own writer (`path`,
+`content_hash`, `produced_utc`, `generator`, `derived_from`, `site`) and
+`work_packages.yaml` (`wp`, `papers`, family membership).
 
 ID scheme (per the O2 task ruling, correcting the round-1 prototype's bug —
 see `check_registry.py`'s self-test and `tests/test_build_results_registry.py`
@@ -54,6 +59,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
+
+import registry_join
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -538,6 +545,18 @@ def build(*, verbose: bool = False) -> dict:
     unclassified_sweep = _dedup_sweep(unclassified_candidates)
     archived_sweep = _dedup_sweep(archived_candidates)
 
+    # Charter phase C (O3): join release/guardian_verdict/paper_ref in from
+    # brisaverse's shared/facts/p1_artifacts.json, via registry_join.py's
+    # single (run_of_record, filename)/hash matcher — the same one
+    # build_pi_review_folder.py's own join now calls, so there is one
+    # implementation, not two. Landed together with phase D (corrective
+    # step 3, docs/critic/incident_dashboard_loop_2026-09-25.md): phase D's
+    # consumers cannot read a real badge out of `results.json` until this
+    # join populates it, so shipping D without C first would just make the
+    # consumers agree on "unclassified" for everything — a silent
+    # regression, not a fix (no-silent-degradation rule).
+    n_joined = registry_join.join_p1_release(nodes, RUNS)
+
     registry = {
         "_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "generator": "scripts/build_results_registry.py",
@@ -557,6 +576,7 @@ def build(*, verbose: bool = False) -> dict:
             "unclassified": unclassified_sweep["count"],
             "archived": archived_sweep["count"],
             "skipped_incomplete_runs": len(skipped_runs),
+            "p1_release_joined": n_joined,
         },
     }
     return registry

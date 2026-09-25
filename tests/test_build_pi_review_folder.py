@@ -427,7 +427,12 @@ def test_register_index_keys_by_run_and_filename():
     assert len(idx) == 1
 
 
-def test_apply_release_badges_joins_by_run_and_filename(tmp_path, monkeypatch):
+def test_apply_release_badges_reads_badge_from_registry_by_path(tmp_path, monkeypatch):
+    """Corrective step 3 (charter phase D): the badge WORD comes from the
+    results registry, resolved by the entry's own `source` path — not
+    re-derived against p1_artifacts.json a second time. CTA metadata
+    (register_id/state) still comes from the direct p1_artifacts join,
+    since the registry does not carry those fields."""
     monkeypatch.setattr(bprf, "ROOT", tmp_path)
     register = [
         {"id": "f1", "state": "staged", "run_of_record": "wp07_figures_X",
@@ -435,6 +440,16 @@ def test_apply_release_badges_joins_by_run_and_filename(tmp_path, monkeypatch):
         {"id": "f5", "state": "withheld", "release_class": "withheld",
          "run_of_record": "wp07_map_Y", "image_url": "/x/f5_citywide_svf_map.png"},
     ]
+    registry = {"nodes": {
+        "art:wp07_figures::wp07_figures_X::f1": {
+            "kind": "figure", "path": "runs/wp07_figures_X/f1_citywide_position.png",
+            "release": "staged", "lifecycle": "current",
+        },
+        "art:wp07_map::wp07_map_Y::f5": {
+            "kind": "figure", "path": "runs/wp07_map_Y/f5_citywide_svf_map.png",
+            "release": "withheld", "lifecycle": "superseded",
+        },
+    }}
     entries = [
         {"section": "p1_solar_figures", "file": "f1_citywide_position.png", "status": "ok",
          "source": "runs/wp07_figures_X/f1_citywide_position.png"},
@@ -444,13 +459,30 @@ def test_apply_release_badges_joins_by_run_and_filename(tmp_path, monkeypatch):
          "source": "outputs/maré/territory/mare_territory_map.png"},
         {"section": "sweep/foo", "file": "unrelated.png", "status": "MISSING"},
     ]
-    bprf._apply_release_badges(entries, register)
-    assert entries[0]["release_badge"] == "staged"
+    bprf._apply_release_badges(entries, register, registry)
+    assert entries[0]["release_badge"] == "staged"  # current lifecycle: bare release word
     assert entries[0]["register_id"] == "f1"
-    assert entries[1]["release_badge"] == "withheld"
-    assert entries[2]["release_badge"] == "unclassified"
+    assert entries[1]["release_badge"] == "withheld · superseded"  # non-current: lifecycle suffix
+    assert entries[2]["release_badge"] == "unclassified"  # no registry node at this path
     assert "register_id" not in entries[2]
     assert "release_badge" not in entries[3]  # MISSING entries are never joined
+
+
+def test_apply_release_badges_agrees_with_site_pages_badge_for_same_node():
+    """The literal corrective-step-3 invariant: for the SAME registry node,
+    the review folder's badge word and build_site_pages.py's badge word
+    (both now `registry_join.badge_text`) must be identical. Proven here by
+    construction (both call sites route through the same function), and
+    guarded against regressing back to two implementations by
+    tests/test_registry_join.py's cross-surface render-and-compare test."""
+    node = {"kind": "figure", "path": "runs/r1/f1.png", "release": "staged", "lifecycle": "draft"}
+    entries = [{"section": "s", "file": "f1.png", "status": "ok", "source": "runs/r1/f1.png"}]
+    registry = {"nodes": {"art:x::r1::f1": node}}
+    bprf._apply_release_badges(entries, [], registry)
+    from build_site_pages import _wp_row_html
+    row = {"wp": "WP07", "title": "WP07", "count": 1, "thumbs": [dict(node, id="f1")]}
+    site_html = _wp_row_html(row, [], "site", False)
+    assert entries[0]["release_badge"] in site_html
 
 
 def test_compute_awaiting_selects_only_staged_ok_entries_sorted():
