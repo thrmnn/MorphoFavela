@@ -64,6 +64,16 @@ from src.sites.territory import normalize_site_key  # noqa: E402
 
 CONFIG = ROOT / "config"
 BRISAVERSE_TASKS = Path.home() / "SCL" / "SCR" / "brisaverse" / "shared" / "facts" / "tasks.json"
+# gen_dossiers.py's own generated "sites" field per dossier (shared/facts/
+# gen_dossiers.py, _ledger_site_tokens) — the mechanical, ledger/claim-text
+# -derived list of which of the fixed five sites a decision's own figures
+# touch. Read alongside tasks.json (never instead of it): a decision whose
+# id/prose IS the site-scoping (e.g. mare_citywide_definition) still matches
+# through _site_variants below; this covers the citywide-figure class that
+# prose alone under-reports (2026-09-25 live-round-1 finding 5 — a WP-07
+# figure plotting all five favelas read as "touches Maré only" because only
+# Maré happened to be named in the decision's own worked-example prose).
+BRISAVERSE_DOSSIERS = Path.home() / "SCL" / "SCR" / "brisaverse" / "shared" / "facts" / "dossiers.json"
 # Full external URL, not a root-relative "/ops#..." href: /ops is brisaverse's
 # own hub route (a different repo/server), so it must never pass through this
 # script's relativize_page (which treats a bare "/..." href as a path inside
@@ -118,13 +128,40 @@ def _load_open_decisions() -> list[dict]:
     return data.get("open_decisions") or []
 
 
-def decisions_for_site(site_key: str, display_name: str, open_decisions: list[dict]) -> list[dict]:
+def _load_dossier_sites() -> dict[str, list[str]]:
+    """{decision_id: [ascii site slugs]} from brisaverse's generated
+    dossiers.json, or {} if it's missing/unparseable — this is an ADDITION
+    to the tasks.json prose match below, never a replacement, so a missing/
+    stale dossiers.json degrades this to the old prose-only behaviour
+    instead of hiding a decision entirely."""
+    if not BRISAVERSE_DOSSIERS.exists():
+        return {}
+    try:
+        data = json.loads(BRISAVERSE_DOSSIERS.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    out = {}
+    for ds in data.get("dossiers") or []:
+        did = ds.get("id")
+        sites = ds.get("sites") or []
+        if did and sites:
+            out[did] = [str(s).lower() for s in sites]
+    return out
+
+
+def decisions_for_site(site_key: str, display_name: str, open_decisions: list[dict],
+                        dossier_sites: dict[str, list[str]] | None = None) -> list[dict]:
     variants = _site_variants(site_key, display_name)
+    ascii_site = _ascii_slug(site_key)
+    dossier_sites = dossier_sites or {}
     hits = []
     for d in open_decisions:
         text = " ".join(str(d.get(k, "")) for k in ("id", "question", "plain_summary", "context")).lower()
         text_norm = _strip_accents(text)
         if any(v in text or _strip_accents(v) in text_norm for v in variants):
+            hits.append(d)
+            continue
+        if ascii_site in dossier_sites.get(d.get("id"), []):
             hits.append(d)
     return hits
 
@@ -401,7 +438,8 @@ def _subunit_morphology_panel(root: Path, site_key: str, sites_cfg: dict) -> str
 
 
 def build_site_page(root: Path, sites_out: Path, site_key: str, cfg: dict, sites_cfg: dict,
-                    work_packages: dict, nodes: dict, open_decisions: list[dict], prov: str) -> str:
+                    work_packages: dict, nodes: dict, open_decisions: list[dict], prov: str,
+                    dossier_sites: dict[str, list[str]] | None = None) -> str:
     display = cfg["display_name"]
     tp_path = root / "data" / site_key / "territory_provenance.json"
     tp = json.loads(tp_path.read_text(encoding="utf-8")) if tp_path.exists() else None
@@ -419,7 +457,7 @@ def build_site_page(root: Path, sites_out: Path, site_key: str, cfg: dict, sites
     for c in caveats:
         caveats_by_target.setdefault(c.get("affects", ""), []).append(c)
 
-    dec_hits = decisions_for_site(site_key, display, open_decisions)
+    dec_hits = decisions_for_site(site_key, display, open_decisions, dossier_sites)
     dec_html = ""
     if dec_hits:
         items = "".join(f'<li><a href="{BRISA_HUB}/ops#dec-{_esc(d["id"])}">{_esc(d.get("question", d["id"]))}</a></li>'
@@ -500,10 +538,12 @@ def main(root: Path | None = None, do_check: bool = False) -> int:
     registry = brr.build()
     nodes = registry["nodes"]
     open_decisions = _load_open_decisions()
+    dossier_sites = _load_dossier_sites()
     prov = git_provenance(ROOT, "scripts/build_site_pages.py")
 
     for site_key, cfg in sites_cfg.items():
-        html_out = build_site_page(data_root, sites_out, site_key, cfg, sites_cfg, work_packages, nodes, open_decisions, prov)
+        html_out = build_site_page(data_root, sites_out, site_key, cfg, sites_cfg, work_packages, nodes, open_decisions, prov,
+                                    dossier_sites)
         html_out = relativize_page(html_out, sites_out, data_root, mirror_dir=docs_out)
         (sites_out / f"{site_key}.html").write_text(html_out, encoding="utf-8")
 

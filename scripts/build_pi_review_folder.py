@@ -666,6 +666,16 @@ def _load_fresh_registry() -> dict:
         raise RuntimeError(msg) from exc
 
 
+def _wp_eligible_entries(entries: list[dict]) -> list[dict]:
+    """Every successfully-copied entry — curated (named RECORDS section) or
+    swept — is eligible for the WP tree/chip join; only a real "MISSING"/
+    "thumb_error" row is excluded. Kept as its own function (not inlined in
+    build()) so the class of bug this closes — the WP tree silently seeing
+    only a subset of what the page actually shows — has one small,
+    independently testable surface."""
+    return [e for e in entries if e.get("status") == "ok"]
+
+
 def _group_sweep_by_wp(entries: list[dict], registry: dict) -> dict:
     """`{"wps": [...], "unmatched": [...]}`. `wps` covers every declared
     work_packages.yaml key in order (§ _wp_key_order), each with its
@@ -879,10 +889,20 @@ def build(out_root: Path) -> dict:
     prev_utc = _previous_cycle_utc(out_root)
     new_since = _compute_new_since(entries, sections, prev_utc)
 
-    # O7 (WP chips): group the sweep by the registry's WP -> family -> run,
-    # for all.html's tree and index.html's chip row.
-    sweep_entries = [e for e in entries if e.get("section", "").startswith("sweep/")]
-    wp_tree = _group_sweep_by_wp(sweep_entries, _load_fresh_registry())
+    # O7 (WP chips): group EVERY registry-matched figure by WP -> family -> run
+    # for all.html's tree and index.html's chip row — not only the leftover
+    # "sweep" catch-all. A curated RECORDS section (e.g. wp07_staged,
+    # site_territory) is section-named for its own place on the main page,
+    # never "sweep/...", so filtering on that prefix silently dropped every
+    # curated figure out of the WP tree even when the registry has a real
+    # node for it: a figure could be live on its own section AND in "New
+    # this cycle" while its WP chip read 0 and grep of all.html found it
+    # nowhere (2026-09-25 live-round-1 finding 3 — "merged but not visible").
+    # `_group_sweep_by_wp` itself already skips anything the registry can't
+    # place (falls into `unmatched`, shown not hidden), so widening the input
+    # set here cannot fabricate a WP membership the registry doesn't have.
+    wp_eligible_entries = _wp_eligible_entries(entries)
+    wp_tree = _group_sweep_by_wp(wp_eligible_entries, _load_fresh_registry())
 
     manifest = {
         "_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),

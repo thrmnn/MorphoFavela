@@ -5,6 +5,7 @@ same pattern as tests/test_build_results_registry.py.
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -74,6 +75,41 @@ def test_decisions_for_site_matches_display_name_only():
     decisions = [{"id": "d1", "question": "Rocinha's dashboard needs a rebuild"}]
     hits = bsp.decisions_for_site("rocinha", "Rocinha", decisions)
     assert [h["id"] for h in hits] == ["d1"]
+
+
+def test_decisions_for_site_matches_via_dossier_sites_when_prose_names_no_site():
+    """2026-09-25 live-round-1 finding 5: a citywide WP-07 figure whose own
+    decision prose names only Maré as its worked example (or names no site
+    at all) still touches every site its own dossier 'sites' list carries —
+    gen_dossiers.py's _ledger_site_tokens is the mechanical source, not this
+    script re-parsing prose a second time."""
+    decisions = [{"id": "wp07_promote_terrain", "question": "Promote the terrain split chart?"}]
+    dossier_sites = {"wp07_promote_terrain": ["vidigal", "rocinha", "complexo_do_alemao", "mare", "riodaspedras"]}
+    hits = bsp.decisions_for_site("vidigal", "Vidigal", decisions, dossier_sites)
+    assert [h["id"] for h in hits] == ["wp07_promote_terrain"]
+    hits_mare = bsp.decisions_for_site("maré", "Maré", decisions, dossier_sites)
+    assert [h["id"] for h in hits_mare] == ["wp07_promote_terrain"]
+
+
+def test_decisions_for_site_dossier_sites_no_false_positive_for_uncoupled_site():
+    decisions = [{"id": "wp07_promote_method", "question": "Promote the method schematics?"}]
+    dossier_sites = {}  # gen_dossiers.py: method schematics carry no site coupling
+    assert bsp.decisions_for_site("vidigal", "Vidigal", decisions, dossier_sites) == []
+
+
+def test_load_dossier_sites_missing_file_degrades_to_empty(monkeypatch, tmp_path):
+    monkeypatch.setattr(bsp, "BRISAVERSE_DOSSIERS", tmp_path / "nope.json")
+    assert bsp._load_dossier_sites() == {}
+
+
+def test_load_dossier_sites_reads_sites_per_dossier(monkeypatch, tmp_path):
+    p = tmp_path / "dossiers.json"
+    p.write_text(json.dumps({"dossiers": [
+        {"id": "wp07_promote_solar", "sites": ["mare", "vidigal"]},
+        {"id": "om_release_v0_1_2", "sites": []},
+    ]}), encoding="utf-8")
+    monkeypatch.setattr(bsp, "BRISAVERSE_DOSSIERS", p)
+    assert bsp._load_dossier_sites() == {"wp07_promote_solar": ["mare", "vidigal"]}
 
 
 # -------------------------------------------------------------- resolve_slots

@@ -534,6 +534,26 @@ def test_every_figure_card_names_its_file_for_the_gates():
 # row linking all.html#wp-<KEY>.
 # --------------------------------------------------------------------------
 
+def test_wp_eligible_entries_includes_curated_sections_not_only_sweep():
+    """2026-09-25 live-round-1 finding 3: a curated RECORDS entry (e.g.
+    section="wp07_staged" or "site_territory") is exactly as WP-eligible as
+    a sweep/-prefixed one — build()'s wp_tree must not silently see only
+    the leftover catch-all sweep while the main page (and /figures, and a
+    site page) show the curated figure. Only a failed copy is excluded."""
+    entries = [
+        {"status": "ok", "section": "wp07_staged", "file": "f1_citywide_position.png",
+         "source": "outputs/_hub/wp07_staged/f1_citywide_position.png"},
+        {"status": "ok", "section": "site_territory", "file": "mare_territory_map.png",
+         "source": "outputs/mare/territory/mare_territory_map.png"},
+        {"status": "ok", "section": "sweep/misc", "file": "other.png",
+         "source": "outputs/misc/other.png"},
+        {"status": "MISSING", "section": "wp07_staged", "file": "gone.png",
+         "source": "outputs/_hub/wp07_staged/gone.png"},
+    ]
+    files = {e["file"] for e in bprf._wp_eligible_entries(entries)}
+    assert files == {"f1_citywide_position.png", "mare_territory_map.png", "other.png"}
+
+
 def _fake_registry():
     """One run-backed family (WP07/wp07_figures) with a current + a
     superseded run, and one static family (WP04F/site_print) with no run
