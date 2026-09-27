@@ -41,7 +41,7 @@ import hubkit  # noqa: E402
 DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
 
 BRISA_HUB = "https://brisa.theoalessandro.com"
-OPS_DECISION_ID = "om_release_v0_1_2"
+OPS_DECISION_ID = "om_release_v0_1_3"
 OPS_LINK = f"{BRISA_HUB}/ops#dec-{OPS_DECISION_ID}"
 PAPER_LINK = f"{BRISA_HUB}/paper/x1"
 PANEL_DOC_REL = "docs/critic/octopus_package_panel_2026-09-24.md"  # repo-root relative

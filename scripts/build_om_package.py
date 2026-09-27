@@ -146,7 +146,7 @@ def dtm_native_resolution_m(paths: Paths) -> float:
 #: auto-removed: the PI decides each one (p00_disclosure_hits.txt).
 DISCLOSURE_PATTERN = re.compile(
     r"party.?wall|dissolve|lancet|nature cities|morphofavela|airflow|brisaverse|"
-    r"drive.?sync|solstice|grimmond|oke|sondotecnica|IPP|mingze|gobatti|fabio",
+    r"drive.?sync|solstice|grimmond|\boke\b|sondotecnica|\bIPP\b|mingze|gobatti|fabio",
     re.IGNORECASE,
 )
 
