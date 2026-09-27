@@ -66,7 +66,7 @@ Jingxue, PI Simone). Théo Hermann contributes street-form variables from
 the MorphoFavela pipeline in a support role. This package contains no
 temperature analysis and no conclusions — those are the Octopus team's work.
 
-**Named team (PI decision `om_use_terms`, {om_use_terms_date}):** Jingxue,
+**Named team (release card `om_release_v0_1_3`; use terms per PI decision `om_use_terms`, {om_use_terms_date}):** Jingxue,
 Vincent, Simone — this release goes to the three of them only, as an
 internal review draft; not for wider redistribution or citation (see Use
 terms). The decision's full resolution text travels in this package's
@@ -114,7 +114,7 @@ densification.
 | data/maré/raw/mare_dtm.tif (+ extended DTM) | vintage not recorded in data/README.md | canyon H/W, SVF |
 | data/maré/raw/street_mare.shp | vintage not recorded in data/README.md | street network for SVF/canyon sampling, route_geometry_flag |
 | outputs/maré/svf_v2/svf_streets.gpkg | ray-cast from the above, 1.5 m pedestrian height, 145-patch Tregenza sky (src/svf_v2) | P-04 sky_view_factor |
-| outputs/maré/morphometrics/canyon/hw_streets.gpkg | derived from the above (src/urban_morphology.py projected-width method) | P-04 street_width_m, building_height_m, height_width_ratio |
+| outputs/maré/morphometrics/canyon/hw_streets.gpkg | derived from the above (scripts/brisa_ventilation/02_hw_canyon_proxy.py: flanking-building cross-section at each street sample, search radius = that script's SEARCH_RADIUS) | P-04 street_width_m, building_height_m, height_width_ratio |
 | outputs/maré/features/features_grid.parquet | 10 m grid, derived from the above | P-04 plan_density_lambda_p, grid_cell_id, P-06 ventilation proxies incl. lambda_f_<dir> |
 | data/maré/wind_rose.json | ASOS Galeão (SBGL) METAR, 2015-2024 | P-06 wind-alignment proxy |
 | data/maré/neighbourhoods.gpkg | community boundary crosswalk | neighbourhood attribution |
@@ -195,7 +195,7 @@ is used or available yet — see Known limits.
   `timestamp`. Usage (run from inside the package directory):
   ```
   python OM2/join_shade_example.py --shade p05_building_shade.parquet \\
-      --device path/to/octopus_log.csv --out joined_example.csv
+      --device path/to/octopus_log_with_point_id.csv --out joined_example.csv
   ```
 
 - **Figures** (`src/om_package/figures.py`, PI ruling 2026-09-27 — spatial
@@ -252,13 +252,17 @@ is used or available yet — see Known limits.
   `infer_campaign_windows()` was made schema-tolerant (v0.1.2): it reports
   `has_gps=False`, `n_fix=n_rows`, `n_no_fix=0` for this schema rather
   than raising. The join example shipped in this package
-  (`OM2/join_shade_example.py`, see Methods above, P-05) is exercised on a
-  real file from this pull with its temporal (nearest 5-min timestamp)
-  step only, since the spatial (nearest-OM2-point) step needs a GPS-track
-  CSV this pull did not contain.
+  (`OM2/join_shade_example.py`, see Methods above, P-05) joins by a
+  pre-assigned `point_id` plus an exact floor-to-5-minutes `timestamp`
+  match; it cannot run on these pilot CSVs as they are (no `point_id`, no
+  GPS column), and its only exercise so far is the package's own test with
+  a synthetic device file. The repo-internal example (`OCTOPUS_JOIN_EXAMPLE`
+  in `src/om_package/shade.py`, nearest 5-min timestamp with a tolerance)
+  is the one that was run on a real pilot file, temporal step only.
 - **max_dist_m={shade_max_dist_m:g} m, not WP-04's 500 m citywide
-  default**, for the horizon march behind P-05: `dtm_extended_300m.tif` /
-  `buildings_extended_300m.gpkg` has real nodata starting between
+  default**, for the horizon march behind P-05: `dtm_extended_300m.tif`
+  (the DTM raster only — the footprint layer has no nodata) has real
+  nodata starting between
   {nodata_floor_min_m:.0f} m and {nodata_floor_max_m:.0f} m from OM2
   points (median {nodata_floor_median_m:.0f} m; measured per point at
   build time via `shade.nodata_floor_m()` — its raster bounding box is a
@@ -524,8 +528,8 @@ package. Both addressed directly, not just documented around.
   `point_id` and 5-min-floored `timestamp`, states the UTC-labelling
   caveat in its own docstring.
 - **Documentation corrections after audit** ({version_date}): fixed the
-  numerical-audit findings against v0.1.2's README/CHANGELOG — see this
-  commit's message for the itemised list (release-scope internal-routes
+  numerical-audit findings against v0.1.2's README/CHANGELOG — itemised
+  here (release-scope internal-routes
   claim, route fetch dates, the nodata floor, the manifest self-hash, the
   frozen historical entries, the join-example pointer, "PI ruling Qxx"
   citations replaced by `provenance.decisions` ids, source vintages, and

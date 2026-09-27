@@ -9,7 +9,7 @@ Sources (all EPSG:31983):
   - building_height_m, street_width_m, height_width_ratio:
     outputs/maré/morphometrics/canyon/hw_streets.gpkg (H, W, HW), nearest-
     joined. hw_streets is a canyon cross-section sample along the street
-    network (src/urban_morphology.py's projected-width canyon method):
+    network (scripts/brisa_ventilation/02_hw_canyon_proxy.py's flanking-building cross-section):
     H/W either side of each sample point, built from buildings_mare
     'altura' + mare_dtm.
   - plan_density_lambda_p: outputs/maré/features/features_grid.parquet

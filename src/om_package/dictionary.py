@@ -82,7 +82,7 @@ _BASE: dict[str, dict] = {
     "street_width_m": {
         "definition": "Canyon street width at this point (building face to building face).",
         "unit": "m", "source": "outputs/maré/morphometrics/canyon/hw_streets.gpkg column W",
-        "method": "nearest-neighbour join (<=20 m), src/urban_morphology.py projected-width canyon method",
+        "method": "nearest-neighbour join (<=20 m), scripts/brisa_ventilation/02_hw_canyon_proxy.py flanking-building cross-section (search radius = its SEARCH_RADIUS)",
         "limits": "NaN beyond 20 m of any canyon sample.",
         "status": "computed",
     },

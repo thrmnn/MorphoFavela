@@ -177,7 +177,7 @@ def write_disclosure_hits(out_dir: Path) -> Path:
         "# Disclosure greplist hits — PI decides each one before this package leaves.\n"
         "# Pattern: party-wall|dissolve|lancet|nature cities|morphofavela|airflow|\n"
         "#          brisaverse|drive-sync|solstice|grimmond|oke|sondotecnica|IPP|\n"
-        "#          mingze|gobatti|fabio (case-insensitive)\n"
+        "#          mingze|gobatti|fabio (case-insensitive; oke and IPP matched as whole words)\n"
         f"# {len(hits)} hit(s) across {', '.join(targets)}.\n\n"
     )
     out_path.write_text(header + ("\n".join(hits) + "\n" if hits else "(no hits)\n"))
