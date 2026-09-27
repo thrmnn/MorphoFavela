@@ -30,13 +30,26 @@ SLOW_TRIGGERS = {
     "scripts/check_registry.py",
 }
 
-FAST_CMD = (
-    "python3 -m pytest tests/ -m \"not integration\" -q && "
+def pytest_cmd(repo_root: Path) -> str:
+    """Integration-marked tests read the gitignored data/ tree. A worktree or a
+    merge trial copy has no data/, so there they are deselected — loudly, and
+    only there. The main checkout, where data/ exists, always runs them
+    (2026-09-27: an unconditional -m "not integration" had silently removed
+    them from the push gate too)."""
+    if (repo_root / "data").is_dir():
+        return "python3 -m pytest tests/ -q"
+    print("gate_lane: data/ absent (worktree or trial copy) — integration-marked tests deselected here; "
+          "the main checkout runs them", file=sys.stderr)
+    return "python3 -m pytest tests/ -m \"not integration\" -q"
+
+
+FAST_TMPL = (
+    "{pytest} && "
     "python3 scripts/lint_p1_columns.py && "
     "python3 scripts/lint_p1_tokens.py"
 )
-SLOW_CMD = (
-    "python3 -m pytest tests/ -m \"not integration\" -q && "
+SLOW_TMPL = (
+    "{pytest} && "
     "python3 scripts/lint_p1_columns.py && "
     "python3 scripts/lint_p1_tokens.py && "
     "[ ! -f scripts/check_registry.py ] || python3 scripts/check_registry.py --self-test"
@@ -114,7 +127,21 @@ def self_test() -> int:
         print("SELF-TEST FAIL: fixtures do not discriminate a looser (always-fast) classifier", file=sys.stderr)
         return 1
 
-    print(f"SELF-TEST PASSED: {len(fixtures)} fixtures, sabotage-detection confirmed")
+    # The integration deselection must follow data/ presence, never be
+    # unconditional: with data/ the pytest command runs everything, without
+    # it the marker filter appears.
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        bare = Path(td)
+        if "not integration" not in pytest_cmd(bare):
+            print("SELF-TEST FAIL: no data/ but integration tests not deselected", file=sys.stderr)
+            return 1
+        (bare / "data").mkdir()
+        if "not integration" in pytest_cmd(bare):
+            print("SELF-TEST FAIL: data/ present but integration tests deselected from the gate", file=sys.stderr)
+            return 1
+
+    print(f"SELF-TEST PASSED: {len(fixtures)} fixtures, sabotage-detection confirmed, integration gating follows data/")
     return 0
 
 
@@ -130,7 +157,7 @@ def main() -> int:
     paths = changed_paths(repo_root)
     lane = classify(paths)
     print(f"gate_lane: lane={lane} files={sorted(paths) or '(none — ambiguous)'}")
-    cmd = FAST_CMD if lane == FAST else SLOW_CMD
+    cmd = (FAST_TMPL if lane == FAST else SLOW_TMPL).format(pytest=pytest_cmd(repo_root))
     return subprocess.run(["bash", "-c", cmd], cwd=repo_root).returncode
 
 
