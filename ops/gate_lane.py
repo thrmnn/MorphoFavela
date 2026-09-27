@@ -36,10 +36,13 @@ def pytest_cmd(repo_root: Path) -> str:
     only there. The main checkout, where data/ exists, always runs them
     (2026-09-27: an unconditional -m "not integration" had silently removed
     them from the push gate too)."""
-    if (repo_root / "data").is_dir():
+    # data/README.md is tracked, so every checkout has a data/ DIRECTORY; only a
+    # checkout with the gitignored site trees has subdirectories under it.
+    data = repo_root / "data"
+    if data.is_dir() and any(p.is_dir() for p in data.iterdir()):
         return "python3 -m pytest tests/ -q"
-    print("gate_lane: data/ absent (worktree or trial copy) — integration-marked tests deselected here; "
-          "the main checkout runs them", file=sys.stderr)
+    print("gate_lane: no site data under data/ (worktree or trial copy) — integration-marked tests "
+          "deselected here; the main checkout runs them", file=sys.stderr)
     return "python3 -m pytest tests/ -m \"not integration\" -q"
 
 
@@ -137,8 +140,13 @@ def self_test() -> int:
             print("SELF-TEST FAIL: no data/ but integration tests not deselected", file=sys.stderr)
             return 1
         (bare / "data").mkdir()
+        (bare / "data" / "README.md").write_text("tracked placeholder\n")
+        if "not integration" not in pytest_cmd(bare):
+            print("SELF-TEST FAIL: data/ holding only the tracked README counted as real data", file=sys.stderr)
+            return 1
+        (bare / "data" / "somesite").mkdir()
         if "not integration" in pytest_cmd(bare):
-            print("SELF-TEST FAIL: data/ present but integration tests deselected from the gate", file=sys.stderr)
+            print("SELF-TEST FAIL: site data present but integration tests deselected from the gate", file=sys.stderr)
             return 1
 
     print(f"SELF-TEST PASSED: {len(fixtures)} fixtures, sabotage-detection confirmed, integration gating follows data/")
