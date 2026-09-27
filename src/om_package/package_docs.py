@@ -158,6 +158,13 @@ available yet — see Known limits.
   python OM2/join_shade_example.py --shade p05_building_shade.parquet \\
       --device path/to/octopus_log.csv --out joined_example.csv
   ```
+- **Figures** (`src/om_package/figures.py`, PI ruling 2026-09-27 — spatial
+  result first, then the sampling along the route): `OM2/map_form.png`
+  (route over the Maré buildings, coloured by `sky_view_factor`),
+  `OM2/map_shade.png` (same base map, coloured by mean shaded fraction),
+  `OM2/profiles.png` (1 m raw + 10 m segment means for the form/shade
+  variables along the route), `OM2/shade_calendar.png` (one strip per
+  campaign date, distance vs time of day, shaded/sunlit).
 
 ## Known limits
 
@@ -293,6 +300,17 @@ package. Both addressed directly, not just documented around.
   caveat in its own docstring.
 - Package version v0.1.2 -> v0.1.3 across `package_docs.py` and
   `build_om_package.py`'s default `--version`.
+- **Figures rebuilt** (PI, 2026-09-27: "I would like to see the spatial
+  result and then the sampling along the route; overlay the route on top
+  of the favela buildings to be easier to understand"): the old
+  `contact_sheet.py` (route floating in blank space, three noisy 1 m
+  profiles) is replaced by `src/om_package/figures.py`'s four figures —
+  `OM2/map_form.png` and `OM2/map_shade.png` (route over the Maré
+  buildings and community outlines, coloured by `sky_view_factor` and by
+  mean shaded fraction), `OM2/profiles.png` (1 m raw + 10 m segment means
+  along the route) and `OM2/shade_calendar.png` (shaded/sunlit per
+  campaign date). The package page shows them in that order (F1, F2
+  stacked at 800 px, then F3, then F4).
 
 ## v0.1.2 — 2026-09-25
 

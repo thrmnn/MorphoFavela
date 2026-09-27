@@ -269,8 +269,11 @@ def _newest_om2_package() -> Path | None:
 
 
 def _octopus_contact_sheet() -> list[Path]:
+    """Headline figure for the review folder — the spatial result (F1),
+    route overlaid on the favela buildings; contact_sheet.png was retired
+    2026-09-27 in favour of src/om_package/figures.py's four figures."""
     pkg = _newest_om2_package()
-    return [pkg / "OM2" / "contact_sheet.png"] if pkg else []
+    return [pkg / "OM2" / "map_form.png"] if pkg else []
 
 
 def _has_pandoc() -> bool:

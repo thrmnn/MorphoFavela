@@ -55,8 +55,13 @@ import geopandas as gpd
 import pandas as pd
 
 from src.om_package.buffers import BUFFER_RADII_M, compute_buffer_variables
-from src.om_package.contact_sheet import build_contact_sheet
 from src.om_package.dictionary import dictionary_dataframe
+from src.om_package.figures import (
+    build_map_form,
+    build_map_shade,
+    build_profiles,
+    build_shade_calendar,
+)
 from src.om_package.formvars import compute_form_variables
 from src.om_package.io_utils import Paths, hash_tree, write_table
 from src.om_package.neighbourhoods import communities_crossed, join_communities
@@ -64,6 +69,7 @@ from src.om_package.package_docs import USE_TERMS, render_changelog, render_read
 from src.om_package.quality import write_quality_report
 from src.om_package.routes import compute_route_geometry_flag, densify_route, route_length_m
 from src.om_package.spec import render_conformance_markdown, write_conformance
+from src.sites.territory import load_territory
 from src.om_package.shade import (
     OM2_SHADE_MAX_DIST_M,
     build_empty_shade_table,
@@ -238,9 +244,37 @@ def main() -> int:
     dict_df = dictionary_dataframe()
     write_table(dict_df, out_dir, "p08_data_dictionary")
 
-    contact_sheet_path = out_dir / "OM2" / "contact_sheet.png"
-    build_contact_sheet(om2_df, contact_sheet_path, route_id="OM2", version=args.version)
-    print(f"[build_om_package] contact sheet: {contact_sheet_path}")
+    # Figures (PI, 2026-09-27): spatial result first (F1/F2, route overlaid
+    # on the favela buildings), then the sampling along the route (F3/F4) —
+    # replaces the old contact_sheet.py (route floating in blank space).
+    try:
+        buildings = gpd.read_file(paths.buildings_mare)
+    except Exception as exc:  # pragma: no cover - missing source is a build-config error, not a figure bug
+        print(f"[build_om_package] WARNING: could not load buildings_mare ({exc}); figures will ship without the building base layer")
+        buildings = None
+    try:
+        territory = load_territory("maré", root=paths.root)
+        subunits = territory.subunits
+    except Exception as exc:  # pragma: no cover - same: a missing/broken territory registry entry, not a figure bug
+        print(f"[build_om_package] WARNING: could not load Maré territory ({exc}); figures will ship without community outlines")
+        subunits = None
+
+    tz_label = "UTC" if n_shade_rows else "n/a (no campaign rows)"
+    map_form_path = out_dir / "OM2" / "map_form.png"
+    build_map_form(om2_df, buildings, subunits, map_form_path, route_id="OM2", version=args.version)
+    print(f"[build_om_package] F1 map (form/SVF): {map_form_path}")
+
+    map_shade_path = out_dir / "OM2" / "map_shade.png"
+    build_map_shade(om2_df, shade_table, buildings, subunits, map_shade_path, route_id="OM2", version=args.version, tz=tz_label)
+    print(f"[build_om_package] F2 map (shade): {map_shade_path}")
+
+    profiles_path = out_dir / "OM2" / "profiles.png"
+    build_profiles(om2_df, shade_table, profiles_path, dictionary_df=dict_df, route_id="OM2", version=args.version)
+    print(f"[build_om_package] F3 profiles: {profiles_path}")
+
+    shade_calendar_path = out_dir / "OM2" / "shade_calendar.png"
+    build_shade_calendar(om2_df, shade_table, campaign_windows_df, shade_calendar_path, route_id="OM2", version=args.version)
+    print(f"[build_om_package] F4 shade calendar: {shade_calendar_path}")
 
     # P-03/P-05, structural fix (PI, 2026-09-27): the aggregation script and
     # the shade join example now travel INSIDE the package, not just in the

@@ -356,13 +356,50 @@ def render_page(root: Path) -> str:
   empty-schema P-05 table (see the package README's P-05 section).</p>
 </section>"""
 
-    # --- contact sheet ------------------------------------------------
-    contact_rel = _rel_to(package_root, version_dir / "OM2" / "contact_sheet.png")
+    # --- figures (PI, 2026-09-27: spatial result first, then the sampling
+    # along the route) — F1/F2 stacked at a fixed 800 px width, then F3,
+    # then F4, replacing the old single contact-sheet section. ------------
+    n_campaign_dates_fig = p05.get("n_campaign_dates") or 0
+    tz_fig = p05.get("tz") or "n/a (no campaign rows)"
+    shade_pct_fig = p05.get("shade_fraction_pct")
+
+    def _fig_block(rel_path: str, alt: str, caption: str, width_800: bool) -> str:
+        img_style = "width:800px;max-width:100%;" if width_800 else "max-width:100%;"
+        return f"""
+  <figure style="margin:0 0 20px 0">
+    <a href="{rel_path}" target="_blank" rel="noopener">
+    <img src="{rel_path}" alt="{html.escape(alt)}" style="{img_style}border:1px solid var(--line);border-radius:8px"></a>
+    <figcaption class="sub" style="margin-top:6px">{caption}</figcaption>
+  </figure>"""
+
+    map_form_rel = _rel_to(package_root, version_dir / "OM2" / "map_form.png")
+    map_shade_rel = _rel_to(package_root, version_dir / "OM2" / "map_shade.png")
+    profiles_rel = _rel_to(package_root, version_dir / "OM2" / "profiles.png")
+    shade_calendar_rel = _rel_to(package_root, version_dir / "OM2" / "shade_calendar.png")
+
     contact_html = f"""
-<section id="contact-sheet">
-  <h2>Contact sheet</h2>
-  <a href="{contact_rel}" target="_blank" rel="noopener">
-  <img src="{contact_rel}" alt="OM2 contact sheet {html.escape(version)}" style="max-width:100%;border:1px solid var(--line);border-radius:8px"></a>
+<section id="figures">
+  <h2>Figures</h2>
+  {_fig_block(map_form_rel, f"OM2 route over Maré buildings, coloured by sky_view_factor ({version})",
+              f"F1 — the spatial result: {om2_route.get('n_points', '?')} OM2 points over the Maré buildings, route coloured by sky_view_factor.",
+              width_800=True)}
+  {_fig_block(map_shade_rel, f"OM2 route coloured by mean shaded fraction ({version})",
+              (f"F2 — same base map, route coloured by mean shaded fraction across {n_campaign_dates_fig} "
+               f"campaign date(s) ({shade_pct_fig}% shaded, computed {html.escape(str(tz_fig))}); building-only, tree_shade PENDING."
+               if n_campaign_dates_fig else
+               "F2 — same base map; no campaign-date shade rows in this build (empty-schema P-05 table)."),
+              width_800=True)}
+  {_fig_block(profiles_rel, f"OM2 sampling along the route ({version})",
+              "F3 — sampling along the route: 1 m raw values (faint) and 10 m segment means (bold) for "
+              "building height, H/W ratio, sky view factor, plan density (λp), the ventilation "
+              "frontal-area PROXY, and mean shaded fraction, with community names at 100 m distance guides.",
+              width_800=False)}
+  {_fig_block(shade_calendar_rel, f"OM2 shade calendar ({version})",
+              (f"F4 — building shade across {n_campaign_dates_fig} campaign date(s): distance along the route "
+               "vs time of day (UTC), shaded (dark) vs sunlit (light), walk window bracketed."
+               if n_campaign_dates_fig else
+               "F4 — no campaign-date shade rows in this build (empty-schema P-05 table)."),
+              width_800=False)}
 </section>"""
 
     # --- documents ------------------------------------------------------
