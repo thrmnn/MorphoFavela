@@ -134,6 +134,92 @@ def test_compute_community_stats_duplicated_name_produces_two_matching_rows():
     assert len(stats) == len(dup_names)
 
 
+# ---------------------------------------------------------------------------
+# community_color_limits (FOLHA4 round 5, F2): the choropleth's vmin/vmax
+# must be DERIVED from the community medians every render, never a typed
+# constant — the red test below proves that by construction: two different
+# median sets must produce two different limits.
+# ---------------------------------------------------------------------------
+
+def _stats(medians: list) -> list:
+    return [{"name": f"c{i}", "n_cells": 10, "median_percentile": m}
+            for i, m in enumerate(medians)]
+
+
+def test_community_color_limits_rounds_outward_to_nearest_5():
+    stats = _stats([1.9, 12.4, 38.4])
+    vmin, vmax = mid.community_color_limits(stats)
+    assert (vmin, vmax) == (0.0, 40.0)
+
+
+def test_community_color_limits_changes_when_the_medians_change():
+    # The red test: a hardcoded/typed (vmin, vmax) return would pass the
+    # rounding test above by coincidence but fail this one — feeding a
+    # second, disjoint median set through the SAME function must move
+    # both limits, proving they are read from `community_stats`, not
+    # baked into the function body.
+    low = mid.community_color_limits(_stats([1.9, 12.4, 38.4]))
+    high = mid.community_color_limits(_stats([61.0, 74.2, 88.5]))
+    assert low != high
+    assert high == (60.0, 90.0)
+
+
+def test_community_color_limits_ignores_flagged_zero_cell_communities():
+    # Marcílio Dias (n_cells=0, median_percentile=None) must not widen the
+    # range or crash the min/max — same "flagged, not fabricated" contract
+    # compute_community_stats itself gives a zero-cell community.
+    stats = _stats([5.0, 35.0])
+    stats.append({"name": "Marcílio Dias", "n_cells": 0, "median_percentile": None})
+    assert mid.community_color_limits(stats) == (5.0, 35.0)
+
+
+# ---------------------------------------------------------------------------
+# Panel numbering (FOLHA4 round 5, F1): draw_distributions_top/bottom must
+# print whatever `panel_num` the caller passes, not a number they invented
+# — this is what lets build_site_dashboard.py's folha4_mare_panel_numbers
+# be the single source of the sheet's reading-order numbers.
+# ---------------------------------------------------------------------------
+
+def test_draw_distributions_top_title_carries_the_passed_panel_num():
+    import matplotlib
+    import pandas as pd
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    data = dict(
+        city=np.array([0.0, 500.0, 1000.0, 1000.0]),
+        a=pd.DataFrame({"kwh_m2": [100.0, 200.0]}),
+        e=pd.DataFrame({"kwh_m2": [300.0, 400.0]}),
+        deciles=np.linspace(0, 1000, 11),
+        label_a="A", label_e="E",
+    )
+    fig = plt.figure()
+    spec = fig.add_gridspec(1, 1)[0, 0]
+    ax, = mid.draw_distributions_top(fig, spec, data, panel_num=3)
+    title = ax.get_title(loc="left")
+    plt.close(fig)
+    assert title.startswith("3 ·")
+
+
+def test_draw_distributions_bottom_title_carries_the_passed_panel_num():
+    import matplotlib
+    import pandas as pd
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    names, sub, p = _stub_cells()
+    community_stats = mid.compute_community_stats(names, sub, p)
+    e = pd.DataFrame({"sub": sub, "p": p})
+    data = dict(community_stats=community_stats, e=e)
+
+    fig = plt.figure()
+    spec = fig.add_gridspec(1, 1)[0, 0]
+    ax, = mid.draw_distributions_bottom(fig, spec, data, panel_num=4)
+    title = ax.get_title(loc="left")
+    plt.close(fig)
+    assert title.startswith("4 ·")
+
+
 def test_draw_distributions_bottom_reads_community_stats_verbatim_not_recomputed():
     # F5b: the sidecar JSON build_site_dashboard.py writes IS
     # data['community_stats'] (json.dump'd directly) — this proves panel 3

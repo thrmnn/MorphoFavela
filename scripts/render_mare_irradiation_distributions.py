@@ -26,6 +26,7 @@ independently-computed answers that could drift apart.
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
@@ -157,17 +158,53 @@ def compute_community_stats(names: list, sub, p) -> list[dict]:
     return out
 
 
-def draw_distributions_top(fig, spec, data: dict) -> tuple:
-    """Panel 1 (city-vs-Maré histogram) alone. Named `_top` (rather than
+def community_color_limits(community_stats: list) -> tuple:
+    """The choropleth's colour scale (FOLHA4 round 5, F2): every community
+    median here is far below the city median (50), so the old fixed
+    0..100 percentile scale left every polygon pale — the ramp's upper
+    half was dead space no community ever reached. vmin/vmax are the data
+    range of the community medians themselves, rounded OUTWARD to the
+    nearest 5 (floor for vmin, ceil for vmax) so a small render-to-render
+    jitter in the underlying WP-05 run can't flip a boundary community's
+    fill by a hair — never typed constants, and never rounded inward
+    (that would clip the extreme community's own colour). Marcílio Dias
+    (n_cells=0, median_percentile=None) is excluded from the range the
+    same way it is excluded from the ranked box plot — a null median
+    cannot widen or narrow a numeric range.
+
+    Proof this cannot silently freeze into a typed constant: TEST_RED in
+    tests/test_render_mare_irradiation_distributions.py feeds two
+    different median sets through this function and asserts the two
+    outputs differ — a hardcoded return value fails that test by
+    construction."""
+    medians = [r["median_percentile"] for r in community_stats
+               if r.get("median_percentile") is not None]
+    if not medians:
+        raise ValueError("community_color_limits: no community has a median_percentile")
+    vmin = 5.0 * math.floor(min(medians) / 5.0)
+    vmax = 5.0 * math.ceil(max(medians) / 5.0)
+    if vmax <= vmin:
+        vmax = vmin + 5.0
+    return vmin, vmax
+
+
+def draw_distributions_top(fig, spec, data: dict, panel_num: int = 1) -> tuple:
+    """The city-vs-Maré histogram panel alone. Named `_top` (rather than
     renamed to match its now-single panel) so it keeps slotting into the
     same outer-gridspec row build_site_dashboard.py already gives it.
     FOLHA4 round 4 (PI 2026-09-27, "some graphs don't make sense such as
     the decile decomposition") removed the second, decile-share-bars axis
-    this used to draw beside panel 1 — nothing else in this repo read it,
-    so it is gone rather than kept dead. The colour scale this histogram's
-    x-axis implies (0..deciles[-1]) is also what build_site_dashboard.py's
-    hero map colours its street observers by, so map and histogram read as
-    one (FOLHA4 round 4 F2)."""
+    this used to draw beside this panel — nothing else in this repo read
+    it, so it is gone rather than kept dead. The colour scale this
+    histogram's x-axis implies (0..deciles[-1]) is also what
+    build_site_dashboard.py's hero map colours its street observers by, so
+    map and histogram read as one (FOLHA4 round 4 F2).
+
+    `panel_num` (round 5): the sheet numbers panels in reading order (hero
+    map, choropleth, whole distributions, per-community spread) — a caller
+    with a hero map and a choropleth ahead of this panel passes 3;
+    standalone callers (this module's own main(), below) keep the default
+    1."""
     city, a, e, deciles = data["city"], data["a"], data["e"], data["deciles"]
     label_a, label_e = data["label_a"], data["label_e"]
 
@@ -181,25 +218,30 @@ def draw_distributions_top(fig, spec, data: dict) -> tuple:
         ax.axvline(q, color=GRID, lw=0.8, zorder=0)
     ax.set_xlabel("annual irradiation at ground (kWh/m²·yr)")
     ax.set_yticks([])
-    ax.set_title("1 · Whole distributions, not one number", loc="left", fontsize=10, color=INK)
+    ax.set_title(f"{panel_num} · Whole distributions, not one number", loc="left", fontsize=10, color=INK)
     ax.legend(frameon=False, fontsize=7, loc="upper left")
     ax.text(deciles[1], ax.get_ylim()[1] * 0.97, "  city deciles", color=MUTED, fontsize=6.5, va="top")
 
     return (ax,)
 
 
-def draw_distributions_bottom(fig, spec, data: dict) -> tuple:
-    """Panel 3 alone: each community's spread of citywide percentiles,
-    ordered by rank (best median first) rather than north-to-south (FOLHA4
-    round 4, PI 2026-09-27: ranking is the more legible ordering once the
-    sheet also carries a ranked choropleth). Numbers on the x labels are
-    `compute_community_stats`'s own `number` field — the same numbers the
-    choropleth and (for the 15 communities it shows) the hero map carry.
-    'between communities' (ground inside the study area but no named
-    community) is dropped from this ranked view — it is not a community
-    and has no number to share with the map; it stays visible on the
-    unranked standalone review PNG only through `data['order']`, which
-    this function no longer reads."""
+def draw_distributions_bottom(fig, spec, data: dict, panel_num: int = 2) -> tuple:
+    """The ranked box-plot panel alone: each community's spread of
+    citywide percentiles, ordered by rank (best median first) rather than
+    north-to-south (FOLHA4 round 4, PI 2026-09-27: ranking is the more
+    legible ordering once the sheet also carries a ranked choropleth).
+    Numbers on the x labels are `compute_community_stats`'s own `number`
+    field — the same numbers the choropleth and (for the 15 communities it
+    shows) the hero map carry. 'between communities' (ground inside the
+    study area but no named community) is dropped from this ranked view —
+    it is not a community and has no number to share with the map; it
+    stays visible on the unranked standalone review PNG only through
+    `data['order']`, which this function no longer reads.
+
+    `panel_num` (round 5) — see draw_distributions_top's docstring; this
+    panel is always the LAST on the page, so a caller passes it its
+    draw_distributions_top `panel_num + 1` (build_folha4_mare's
+    `folha4_mare_panel_numbers` names both together)."""
     community_stats = data["community_stats"]
     ranked = [r for r in community_stats if r["rank"] is not None]
     flagged = [r for r in community_stats if r["rank"] is None]
@@ -230,7 +272,7 @@ def draw_distributions_bottom(fig, spec, data: dict) -> tuple:
     ax.set_ylim(0, 100)
     ax.set_ylabel("citywide percentile of each ground cell")
     ax.grid(axis="y", color=GRID, lw=0.6)
-    ax.set_title("3 · Each community's spread against the city — listed by rank, best median first",
+    ax.set_title(f"{panel_num} · Each community's spread against the city — listed by rank, best median first",
                 loc="left", fontsize=10, color=INK)
 
     return (ax,)
