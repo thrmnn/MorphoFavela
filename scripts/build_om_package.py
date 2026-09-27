@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -62,6 +63,7 @@ from src.om_package.neighbourhoods import communities_crossed, join_communities
 from src.om_package.package_docs import USE_TERMS, render_changelog, render_readme
 from src.om_package.quality import write_quality_report
 from src.om_package.routes import compute_route_geometry_flag, densify_route, route_length_m
+from src.om_package.spec import render_conformance_markdown, write_conformance
 from src.om_package.shade import (
     OM2_SHADE_MAX_DIST_M,
     build_empty_shade_table,
@@ -135,7 +137,7 @@ def main() -> int:
         help="internal build dir for OM1/OM3/OM4 (default: <root>/outputs/_packages/_internal/mare_routes/<version>)",
     )
     ap.add_argument("--root", default=str(Paths().root), help="MorphoFavela repo root (absolute)")
-    ap.add_argument("--version", default="v0.1.2")
+    ap.add_argument("--version", default="v0.1.3")
     ap.add_argument(
         "--csv-dir",
         default=None,
@@ -240,6 +242,15 @@ def main() -> int:
     build_contact_sheet(om2_df, contact_sheet_path, route_id="OM2", version=args.version)
     print(f"[build_om_package] contact sheet: {contact_sheet_path}")
 
+    # P-03/P-05, structural fix (PI, 2026-09-27): the aggregation script and
+    # the shade join example now travel INSIDE the package, not just in the
+    # repo's scripts/ — a recipient with only this directory can still
+    # re-aggregate to any segment length and exercise the join example.
+    shipped_dir = Path(__file__).resolve().parents[1] / "src" / "om_package" / "shipped"
+    for shipped_name in ("aggregate_to_segments.py", "join_shade_example.py"):
+        shutil.copyfile(shipped_dir / shipped_name, out_dir / "OM2" / shipped_name)
+    print(f"[build_om_package] shipped P-03/P-05 scripts into {out_dir / 'OM2'}")
+
     n_om2_points = len(om2_df)
     n_route_geometry_flagged = int(om2_df["route_geometry_flag"].sum())
     lambda_p_ones = om2_df[om2_df["plan_density_lambda_p"] >= 1.0 - 1e-9]
@@ -249,21 +260,38 @@ def main() -> int:
         round(100 * n_lambda_p_ones_flagged / n_lambda_p_ones, 1) if n_lambda_p_ones else 0.0
     )
 
-    (out_dir / "README.md").write_text(
-        render_readme(
-            n_om2_points=n_om2_points,
-            n_route_geometry_flagged=n_route_geometry_flagged,
-            n_lambda_p_ones=n_lambda_p_ones,
-            n_lambda_p_ones_flagged=n_lambda_p_ones_flagged,
-            lambda_p_share_explained_pct=lambda_p_share_explained_pct,
-            n_csv_pilot=n_csv_pilot,
-            n_campaign_dates=n_campaign_dates,
-            n_shade_rows=n_shade_rows,
-            shade_fraction_pct=shade_fraction_pct,
-            shade_max_dist_m=OM2_SHADE_MAX_DIST_M,
-        )
+    readme_kwargs = dict(
+        n_om2_points=n_om2_points,
+        n_route_geometry_flagged=n_route_geometry_flagged,
+        n_lambda_p_ones=n_lambda_p_ones,
+        n_lambda_p_ones_flagged=n_lambda_p_ones_flagged,
+        lambda_p_share_explained_pct=lambda_p_share_explained_pct,
+        n_csv_pilot=n_csv_pilot,
+        n_campaign_dates=n_campaign_dates,
+        n_shade_rows=n_shade_rows,
+        shade_fraction_pct=shade_fraction_pct,
+        shade_max_dist_m=OM2_SHADE_MAX_DIST_M,
     )
+    # First pass: README/CHANGELOG without the conformance section, so
+    # p00_spec_conformance can be computed over a package directory that
+    # already has every other P-01..P-09 artefact (including a README with
+    # its required headings) on disk.
+    (out_dir / "README.md").write_text(render_readme(**readme_kwargs))
     (out_dir / "CHANGELOG.md").write_text(render_changelog())
+
+    # P-00: mechanical conformance to the PI's package spec (P-01..P-09),
+    # computed from the files just written — never typed by hand (see
+    # src/om_package/spec.py).
+    conf = write_conformance(out_dir)
+    delivered = sum(1 for it in conf["items"] if it["status"] == "delivered")
+    partial = sum(1 for it in conf["items"] if it["status"] == "partial")
+    pending = sum(1 for it in conf["items"] if it["status"] == "pending")
+    print(f"[build_om_package] P-00 spec conformance: {delivered} delivered, {partial} partial, {pending} pending (of {len(conf['items'])})")
+
+    # Second pass: README with the conformance section filled in.
+    (out_dir / "README.md").write_text(
+        render_readme(conformance_section=render_conformance_markdown(conf) + "\n", **readme_kwargs)
+    )
 
     # manifest: sha256 per file, computed last (over everything just written,
     # manifest.json itself does not exist yet so is never self-hashed)

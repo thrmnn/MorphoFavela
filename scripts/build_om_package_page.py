@@ -235,6 +235,43 @@ def render_page(root: Path) -> str:
   as equivalent.</p></div>
 </section>"""
 
+    # --- P-00 spec conformance -------------------------------------------
+    conformance_rel = _rel_to(package_root, version_dir / "p00_spec_conformance.json")
+    conformance_csv_rel = _rel_to(package_root, version_dir / "p00_spec_conformance.csv")
+    conformance = load_json(version_dir / "p00_spec_conformance.json")
+    if conformance is None:
+        conformance_html = """
+<section id="conformance">
+  <h2>Spec conformance</h2>
+  <p class="sub">No p00_spec_conformance.json found for this version — rebuild with
+  scripts/build_om_package.py.</p>
+</section>"""
+    else:
+        _STATUS_BADGE = {"delivered": "ok", "partial": "amber", "pending": "warn"}
+        conf_rows = [
+            [
+                it["id"],
+                it["requirement"],
+                hubkit.badge(_STATUS_BADGE.get(it["status"], "info"), it["status"]),
+                it["evidence"],
+                ", ".join(it.get("pending_on") or []) or "—",
+            ]
+            for it in conformance.get("items", [])
+        ]
+        n_delivered = sum(1 for it in conformance.get("items", []) if it["status"] == "delivered")
+        n_partial = sum(1 for it in conformance.get("items", []) if it["status"] == "partial")
+        n_pending = sum(1 for it in conformance.get("items", []) if it["status"] == "pending")
+        conformance_html = f"""
+<section id="conformance">
+  <h2>Spec conformance (P-01…P-09)</h2>
+  <p>{n_delivered} delivered · {n_partial} partial · {n_pending} pending
+  (of {len(conformance.get("items", []))}) — computed mechanically by
+  <code>src/om_package/spec.py</code> against this build
+  (<a href="{conformance_rel}">p00_spec_conformance.json</a>,
+  <a href="{conformance_csv_rel}">.csv</a>), never typed by hand.</p>
+  {_table(["id", "requirement", "status", "evidence", "pending on"], conf_rows, escape_cols={0, 1, 3, 4})}
+</section>"""
+
     # --- PI decision ----------------------------------------------------
     named_team_str = ", ".join(NAMED_TEAM)
     decision_html = f"""
@@ -433,7 +470,7 @@ def render_page(root: Path) -> str:
 </section>"""
 
     body = (
-        status_html + decision_html + glossary_html + owes_html + contact_html
+        status_html + conformance_html + decision_html + glossary_html + owes_html + contact_html
         + quality_html + shade_html + dict_html + docs_html + paper_html
     )
     prov = hubkit.git_provenance(root, "scripts/build_om_package_page.py")
