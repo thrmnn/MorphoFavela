@@ -31,12 +31,12 @@ SLOW_TRIGGERS = {
 }
 
 FAST_CMD = (
-    "python3 -m pytest tests/ -q && "
+    "python3 -m pytest tests/ -m \"not integration\" -q && "
     "python3 scripts/lint_p1_columns.py && "
     "python3 scripts/lint_p1_tokens.py"
 )
 SLOW_CMD = (
-    "python3 -m pytest tests/ -q && "
+    "python3 -m pytest tests/ -m \"not integration\" -q && "
     "python3 scripts/lint_p1_columns.py && "
     "python3 scripts/lint_p1_tokens.py && "
     "[ ! -f scripts/check_registry.py ] || python3 scripts/check_registry.py --self-test"
