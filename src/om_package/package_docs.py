@@ -3,8 +3,19 @@ hand-edited — rebuild via scripts/build_om_package.py after any source/method
 change (never hand-edit data/outputs, per CLAUDE.md)."""
 from __future__ import annotations
 
-VERSION = "v0.1.2"
-VERSION_DATE = "2026-09-25"
+from datetime import date
+
+VERSION = "v0.1.3"
+#: read from the clock at import time, never typed — this is the date this
+#: version is BUILT, not the date any source data was fetched (see
+#: ROUTE_FETCH_DATE below for that).
+VERSION_DATE = date.today().isoformat()
+#: the route JSONs were last fetched 2026-09-25 (v0.1.2) — unchanged by
+#: v0.1.3, which touches no input data, only the spec-conformance/shipped-
+#: script additions. Kept as its own constant so the README's "fetched"
+#: date never silently drifts to whatever day a later version happens to
+#: be built on.
+ROUTE_FETCH_DATE = "2026-09-25"
 
 #: PI ruling 2026-09-24 (Q6a). Same text goes in the README banner and the
 #: manifest's use_terms field — one string, so the two can never drift.
@@ -18,6 +29,7 @@ README_TEMPLATE = """\
 
 # Maré morphology, OM2 — data package {version}
 
+{conformance_section}
 Built for Octopus LRP #2 ("Street by street: explaining air temperature
 differences across streets and over time in Complexo da Maré", lead
 Jingxue, PI Simone). Théo Hermann contributes street-form variables from
@@ -63,7 +75,7 @@ densification.
 
 | Source | Date / vintage | Used for |
 |---|---|---|
-| OM_1..OM_4_inferred_route.json (Google Drive, PI-owned folder) | fetched {version_date} | P-02 route points |
+| OM_1..OM_4_inferred_route.json (Google Drive, PI-owned folder) | fetched {route_fetch_date} | P-02 route points |
 | data/maré/raw/buildings_mare.shp + buildings_extended_300m.gpkg | 2019 airborne survey | P-04 building height/plan density, P-03 buffers, route_geometry_flag |
 | data/maré/raw/mare_dtm.tif (+ extended DTM) | 2019 | canyon H/W, SVF |
 | data/maré/raw/street_mare.shp | 2019 | street network for SVF/canyon sampling, route_geometry_flag |
@@ -89,8 +101,20 @@ available yet — see Known limits.
   and PROVISIONAL (see Known limits).
 - **P-03 aggregation**: buffer variables (5/10/20/50 m circular buffers
   around each point) and segment aggregation (any length, on demand) are
-  both re-runnable — `scripts/aggregate_om_points.py` for segments, buffer
-  variables are computed at build time.
+  both re-runnable. Buffer variables are computed at build time. Segment
+  aggregation ships two ways: `scripts/aggregate_om_points.py` (repo-only
+  CLI, same logic) and, new in v0.1.3, **`OM2/aggregate_to_segments.py`
+  travels inside this package itself** — standalone (pandas + pyarrow
+  only, no MorphoFavela import), so a recipient with only this directory
+  can still re-aggregate. Usage (run from inside the package directory):
+  ```
+  python OM2/aggregate_to_segments.py --points OM2/points.parquet \\
+      --segment-length-m 20 --out OM2/segments_20m.parquet
+  ```
+  Point count is conserved (every point lands in exactly one segment);
+  the four buffer radii (5/10/20/50 m) are already columns on
+  `OM2/points.*` — this script only groups points into segments, it does
+  not recompute buffers.
 - **P-04 form variables**: nearest-neighbour spatial joins from the
   airborne sources above (each capped at a max join distance — beyond it
   a point gets NaN, never a guessed value) plus street_orientation_deg,
@@ -124,7 +148,16 @@ available yet — see Known limits.
   dates (walk windows padded to the hour), **computed in UTC**
   ({shade_fraction_pct}% of rows shaded) — see Known limits for why UTC
   and why `max_dist_m={shade_max_dist_m:g} m`, not WP-04's 500 m citywide
-  default. The schema reserves a `tree_shade` column (always null).
+  default. The schema reserves a `tree_shade` column (always null). New in
+  v0.1.3, **`OM2/join_shade_example.py` travels inside this package** —
+  joins `p05_building_shade` (`point_id`, `timestamp` at 5-min steps,
+  **UTC-labelled, not a resolved local time** — see Known limits) against
+  a real Octopus device CSV, matching `point_id` and floor-to-5-minutes
+  `timestamp`. Usage (run from inside the package directory):
+  ```
+  python OM2/join_shade_example.py --shade p05_building_shade.parquet \\
+      --device path/to/octopus_log.csv --out joined_example.csv
+  ```
 
 ## Known limits
 
@@ -231,6 +264,37 @@ CHANGELOG_TEMPLATE = """\
 # Changelog — mare_om2
 
 ## {version} — {version_date}
+
+Structural fix (PI, 2026-09-27): the P-01..P-09 package spec was only
+mentioned in README prose — conformance to it was invisible, and P-03's
+aggregation script lived in the repo instead of travelling with the
+package. Both addressed directly, not just documented around.
+
+- **Spec conformance (P-00)**: the PI's package spec (P-01..P-09, verbatim,
+  2026-09-23) is now encoded as data (`src/om_package/spec.py`), each part
+  a mechanical predicate over the built package directory (file presence,
+  required columns + coverage read from `p07_quality_report.json`,
+  dictionary rows, README headings, changelog dating). Every build emits
+  `p00_spec_conformance.json` + `.csv` at the package root — delivered /
+  partial / pending per item, with evidence and, for a pending part, which
+  `tasks.json` id(s) unblock it. The README gains a "Conformance to the
+  package spec" section (right after the title) rendered from the same
+  computed result. Nothing here is typed by hand: every count/coverage
+  number is read from the file it describes.
+- **P-03 ships inside the package**: `OM2/aggregate_to_segments.py` is a
+  standalone (pandas + pyarrow only, no MorphoFavela import) mirror of
+  `src/om_package/segments.py`'s `aggregate_to_segments` — a recipient
+  with only this directory can re-aggregate to any segment length without
+  the repo. `scripts/aggregate_om_points.py` (the repo-only CLI) is
+  unchanged.
+- **P-05 join example ships inside the package**: `OM2/join_shade_example.py`
+  joins `p05_building_shade` against a real Octopus device CSV by
+  `point_id` and 5-min-floored `timestamp`, states the UTC-labelling
+  caveat in its own docstring.
+- Package version v0.1.2 -> v0.1.3 across `package_docs.py` and
+  `build_om_package.py`'s default `--version`.
+
+## v0.1.2 — 2026-09-25
 
 P-05 shade goes live on a real pilot pull, per the PI ruling 2026-09-24
 (Q1/Q5: release building-only shade once dates are known, from the raw
@@ -377,15 +441,23 @@ def render_readme(
     shade_fraction_pct: float = 0.0,
     shade_max_dist_m: float = 100.0,
     shade_min_nan_dist_m: float = 104.15,
+    route_fetch_date: str = ROUTE_FETCH_DATE,
+    conformance_section: str = "",
 ) -> str:
     """Render README.md. The route_geometry_flag/lambda_p/shade numbers are
     computed by the caller (build_om_package.py) from the actual OM2
     build, never hardcoded here — see CLAUDE.md's 'never fabricate a
-    value'."""
+    value'. ``conformance_section`` is the rendered P-00 conformance table
+    (src/om_package/spec.py render_conformance_markdown) — the build calls
+    this twice: once with it empty to get a package directory conformance
+    can be computed over, once with the computed table to produce the
+    README actually shipped."""
     route_flag_pct = round(100 * n_route_geometry_flagged / n_om2_points, 1) if n_om2_points else 0.0
     return README_TEMPLATE.format(
         version=VERSION,
         version_date=VERSION_DATE,
+        route_fetch_date=route_fetch_date,
+        conformance_section=conformance_section,
         use_terms=USE_TERMS,
         n_om2_points=n_om2_points,
         n_route_geometry_flagged=n_route_geometry_flagged,
