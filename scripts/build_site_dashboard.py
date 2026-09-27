@@ -1364,7 +1364,10 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict, dist_data: dict, panel
         # not a re-fit of the underlying radiative model.
         kwh_annual = solar["irradiance_annual_wh"].to_numpy() * 365.0 / 1000.0
         vmax = dist_data["deciles"][-1]
-        cmap = mpl.colormaps.get_cmap("YlOrRd")
+        # cividis, not YlOrRd: with YlOrRd the sunniest (widest) streets drew
+        # as heavy dark-red lines that read as boundaries (PI round 2,
+        # 2026-09-27); here dark = shaded ground, bright = sunny ground.
+        cmap = mpl.colormaps.get_cmap("cividis")
         norm_v = mpl.colors.Normalize(vmin=0.0, vmax=vmax)
         is_zero = solar["svf"].to_numpy() == 0.0 if "svf" in solar.columns else np.zeros(len(solar), dtype=bool)
         is_offset = (solar["offset_distance"].to_numpy() > 2.5) & ~is_zero
@@ -1385,7 +1388,7 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict, dist_data: dict, panel
         # d['solar'] missing/unreadable (see load_site's own issues list) —
         # colourbar/legend still need a cmap+norm to draw, on the same
         # 0..deciles[-1] scale; no observers get plotted.
-        cmap = mpl.colormaps.get_cmap("YlOrRd")
+        cmap = mpl.colormaps.get_cmap("cividis")
         norm_v = mpl.colors.Normalize(vmin=0.0, vmax=dist_data["deciles"][-1])
 
     minx, miny, maxx, maxy = boundary.total_bounds

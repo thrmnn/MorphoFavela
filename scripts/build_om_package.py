@@ -375,6 +375,10 @@ def main() -> int:
     # Figures (PI, 2026-09-27): spatial result first (F1/F2, route overlaid
     # on the favela buildings), then the sampling along the route (F3/F4) —
     # replaces the old contact_sheet.py (route floating in blank space).
+    # A rebuild into an existing version directory must not carry the
+    # superseded sheet along: the manifest hashes the whole tree, so a stale
+    # file would ship (and be sworn to) as part of the package.
+    (out_dir / "OM2" / "contact_sheet.png").unlink(missing_ok=True)
     try:
         buildings = gpd.read_file(paths.buildings_mare)
     except Exception as exc:  # pragma: no cover - missing source is a build-config error, not a figure bug
