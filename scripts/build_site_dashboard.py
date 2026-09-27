@@ -1176,22 +1176,89 @@ def _pick_inset_corner(boundary, buildings, minx, miny, maxx, maxy, pad_x, pad_y
     return ox, oy, sx, sy
 
 
-def draw_hero_map_v4(ax, d: dict, territory, stats: dict) -> None:
-    """FOLHA4's street-level SVF hero map: every layer rotated by the same
-    amount, about the same point, so the site's own long axis
-    (territory.display_rotation_deg — derived from the study-area geometry
-    by src.sites.territory.rotation_deg, never typed) renders horizontal,
-    with a north arrow rotated to match (north_arrow_angle) and thin
-    community outlines for orientation. Adapted from the pre-v3 hero map
-    (git dee25e8's draw_hero_map) for the marker styling (resolved / offset
-    / unresolved-SVF observers) and scale bar, but fixes that version's
-    standing "~19% panel width, wide blank margins" defect (round 1/2/3):
-    that defect came from fitting an axis-aligned box around a diagonal
-    footprint, where more padding cannot help because the gap IS the
-    mismatch between the footprint's long axis and the panel's. Rotating
-    the footprint itself removes the mismatch instead of padding around
-    it — the same principle draw_grid_panel's _fit_square_axes already
-    uses for the (now-rotated) bounds it is handed."""
+def _nudge_label_points(points: list, min_dist: float, iters: int = 80) -> list:
+    """Greedy pairwise repulsion: push any two points closer than `min_dist`
+    directly apart, split evenly between them, repeated until stable or
+    `iters` is spent. Not a real label-placement solver (no collision test
+    against the text bbox itself, no candidate positions) — just enough to
+    de-clutter ~15 single-digit-to-two-digit numbers scattered over one
+    community layout, which a fixed offset cannot do since the communities'
+    own representative points are unevenly spaced."""
+    pts = [list(p) for p in points]
+    n = len(pts)
+    for _ in range(iters):
+        moved = False
+        for i in range(n):
+            for j in range(i + 1, n):
+                dx, dy = pts[j][0] - pts[i][0], pts[j][1] - pts[i][1]
+                dist = math.hypot(dx, dy)
+                if dist < min_dist:
+                    moved = True
+                    if dist < 1e-9:
+                        dx, dy, dist = min_dist, 0.0, min_dist
+                    push = (min_dist - dist) / 2.0
+                    ux, uy = dx / dist, dy / dist
+                    pts[i][0] -= ux * push
+                    pts[i][1] -= uy * push
+                    pts[j][0] += ux * push
+                    pts[j][1] += uy * push
+        if not moved:
+            break
+    return [tuple(p) for p in pts]
+
+
+def _number_communities(ax, communities_r, community_stats: list, min_dist: float) -> None:
+    """Numbers, at each rotated community's own representative point (never
+    its centroid — a concave/L-shaped community's centroid can fall outside
+    it), nudged apart from each other (`_nudge_label_points`) so adjacent
+    small communities' labels don't overlap. The number is
+    `compute_community_stats`'s own `number` field, joined by name — the
+    same number panel 3's x labels and the choropleth carry, never a
+    separately-assigned index. Only draws for communities `communities_r`
+    actually has a row for (Marcílio Dias, entirely outside Maré's data
+    extent, is never in this rotated layer — see draw_hero_map_v4)."""
+    by_name = {r["name"]: r for r in community_stats}
+    name_col = "name" if "name" in communities_r.columns else "community"
+    pts, labels = [], []
+    for _, row in communities_r.iterrows():
+        stat = by_name.get(row[name_col])
+        if stat is None:
+            continue
+        rp = row.geometry.representative_point()
+        pts.append((rp.x, rp.y))
+        labels.append(str(stat["number"]))
+    if not pts:
+        return
+    pts = _nudge_label_points(pts, min_dist)
+    halo = [patheffects.withStroke(linewidth=2.2, foreground=PAPER)]
+    for (x, y), label in zip(pts, labels):
+        ax.text(x, y, label, fontsize=7.5, fontweight="bold", color=MARE_COMMUNITY_STROKE,
+                ha="center", va="center", zorder=6.5, path_effects=halo)
+
+
+def draw_hero_map_v4(ax, d: dict, territory, stats: dict, dist_data: dict) -> None:
+    """FOLHA4's street-level annual-irradiation hero map: every layer
+    rotated by the same amount, about the same point, so the site's own
+    long axis (territory.display_rotation_deg — derived from the study-area
+    geometry by src.sites.territory.rotation_deg, never typed) renders
+    horizontal, with a north arrow rotated to match (north_arrow_angle) and
+    heavy, numbered community outlines for orientation. Adapted from the
+    pre-v3 hero map (git dee25e8's draw_hero_map) for the marker styling
+    (resolved / offset / unresolved observers) and scale bar, but fixes
+    that version's standing "~19% panel width, wide blank margins" defect
+    (round 1/2/3): that defect came from fitting an axis-aligned box around
+    a diagonal footprint, where more padding cannot help because the gap
+    IS the mismatch between the footprint's long axis and the panel's.
+    Rotating the footprint itself removes the mismatch instead of padding
+    around it — the same principle draw_grid_panel's _fit_square_axes
+    already uses for the (now-rotated) bounds it is handed.
+
+    Round 4 (PI 2026-09-27: "it lacks a spatial map ... show the
+    neighbourhood delineation and the most relevant metric spatialized")
+    recolours the street observers by annual ground irradiation
+    (d['solar']) instead of SVF, on the SAME 0..deciles[-1] scale panel 1's
+    x-axis uses (`dist_data['deciles']`) so the map and the distributions
+    read as one figure, not two independently-scaled ones."""
     fig = ax.figure
     ax.set_facecolor(PAPER)
 
@@ -1202,7 +1269,7 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict) -> None:
     communities = d.get("communities")
     communities_r = (rotate_for_display(communities, rot, origin=origin)
                       if communities is not None and len(communities) else None)
-    svf = rotate_for_display(d["svf"], rot, origin=origin)
+    solar = rotate_for_display(d["solar"], rot, origin=origin) if d.get("solar") is not None else None
 
     if buildings is not None:
         try:
@@ -1224,30 +1291,54 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict) -> None:
 
     if communities_r is not None:
         try:
-            community_lw = BOUNDARY_STROKE_PX / fig.dpi * 72.0
+            # Heavier than round 3 (2x BOUNDARY_STROKE_PX, not 1x) — PI
+            # 2026-09-27: the community delineation itself is now load
+            # -bearing content (every number on the map/panel-3 axis keys
+            # off one of these polygons), not background orientation.
+            community_lw = 2.0 * BOUNDARY_STROKE_PX / fig.dpi * 72.0
             communities_r.boundary.plot(ax=ax, color=MARE_COMMUNITY_STROKE,
                                         linewidth=community_lw, zorder=3.2)
+            minx0, miny0, maxx0, maxy0 = boundary.total_bounds
+            min_dist = 0.045 * max(maxx0 - minx0, maxy0 - miny0)
+            _number_communities(ax, communities_r, dist_data["community_stats"], min_dist)
         except Exception:
             pass
 
-    is_zero = svf["svf"] == 0.0
-    is_offset = (svf["offset_distance"] > 2.5) & ~is_zero
-    normal = ~is_zero & ~is_offset
-    cmap = mpl.colormaps.get_cmap("YlGnBu_r")
-    norm_v = mpl.colors.Normalize(vmin=0.0, vmax=1.0)
-    if normal.any():
-        ax.scatter(svf.loc[normal].geometry.x, svf.loc[normal].geometry.y,
-                  c=cmap(norm_v(svf.loc[normal, "svf"].values)),
-                  s=1.6, alpha=0.85, linewidths=0, zorder=4)
-    if is_offset.any():
-        ax.scatter(svf.loc[is_offset].geometry.x, svf.loc[is_offset].geometry.y,
-                  facecolors="none", edgecolors=cmap(norm_v(svf.loc[is_offset, "svf"].values)),
-                  s=4.0, linewidths=0.6, zorder=5)
-    if is_zero.any():
-        ax.scatter(svf.loc[is_zero].geometry.x, svf.loc[is_zero].geometry.y,
-                  marker="o", facecolors=MAGENTA, edgecolors="none", s=3.0, alpha=0.30, linewidths=0, zorder=6)
-        ax.scatter(svf.loc[is_zero].geometry.x, svf.loc[is_zero].geometry.y,
-                  marker="+", c=MAGENTA, s=11.0, linewidths=0.8, alpha=0.7, zorder=7)
+    if solar is not None and len(solar):
+        # Tregenza-style 4-reference-day proxy (scripts/run_street_solar.py)
+        # stored in Wh as a mean DAILY value, not a literal year integral —
+        # *365 turns it into the same annual-kWh/m² basis dist_data['city']
+        # (wp05's ray-marched citywide raster) uses, so the hero map's
+        # colour scale and panel 1's x-axis are the same physical quantity,
+        # not two differently-scaled proxies sharing a colourbar by
+        # coincidence. Flagged here rather than silently assumed: this
+        # conversion is a unit/calendar scaling (Wh/day x 365 days = Wh/yr),
+        # not a re-fit of the underlying radiative model.
+        kwh_annual = solar["irradiance_annual_wh"].to_numpy() * 365.0 / 1000.0
+        vmax = dist_data["deciles"][-1]
+        cmap = mpl.colormaps.get_cmap("YlOrRd")
+        norm_v = mpl.colors.Normalize(vmin=0.0, vmax=vmax)
+        is_zero = solar["svf"].to_numpy() == 0.0 if "svf" in solar.columns else np.zeros(len(solar), dtype=bool)
+        is_offset = (solar["offset_distance"].to_numpy() > 2.5) & ~is_zero
+        normal = ~is_zero & ~is_offset
+        if normal.any():
+            ax.scatter(solar.geometry.x.to_numpy()[normal], solar.geometry.y.to_numpy()[normal],
+                      c=cmap(norm_v(kwh_annual[normal])), s=1.6, alpha=0.85, linewidths=0, zorder=4)
+        if is_offset.any():
+            ax.scatter(solar.geometry.x.to_numpy()[is_offset], solar.geometry.y.to_numpy()[is_offset],
+                      facecolors="none", edgecolors=cmap(norm_v(kwh_annual[is_offset])),
+                      s=4.0, linewidths=0.6, zorder=5)
+        if is_zero.any():
+            ax.scatter(solar.geometry.x.to_numpy()[is_zero], solar.geometry.y.to_numpy()[is_zero],
+                      marker="o", facecolors=MAGENTA, edgecolors="none", s=3.0, alpha=0.30, linewidths=0, zorder=6)
+            ax.scatter(solar.geometry.x.to_numpy()[is_zero], solar.geometry.y.to_numpy()[is_zero],
+                      marker="+", c=MAGENTA, s=11.0, linewidths=0.8, alpha=0.7, zorder=7)
+    else:
+        # d['solar'] missing/unreadable (see load_site's own issues list) —
+        # colourbar/legend still need a cmap+norm to draw, on the same
+        # 0..deciles[-1] scale; no observers get plotted.
+        cmap = mpl.colormaps.get_cmap("YlOrRd")
+        norm_v = mpl.colors.Normalize(vmin=0.0, vmax=dist_data["deciles"][-1])
 
     minx, miny, maxx, maxy = boundary.total_bounds
     pad_x = 0.04 * (maxx - minx)
@@ -1259,7 +1350,7 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict) -> None:
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
-    ax.set_title("street-level sky view factor (SVF) · rotated to the site's own long axis",
+    ax.set_title("street-level annual irradiation · numbered communities · rotated to the site's own long axis",
                 fontsize=9.5, color=INK, pad=3, loc="left")
 
     # Scale bar and north arrow are drawn in the ROTATED frame's own
@@ -1308,13 +1399,95 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict) -> None:
     cbar_ax = fig.add_axes([cbar_x0, cbar_y0, cbar_w, cbar_h])
     sm = mpl.cm.ScalarMappable(norm=norm_v, cmap=cmap)
     sm.set_array([])
-    cb = plt.colorbar(sm, cax=cbar_ax, orientation="horizontal", format="%.1f", ticks=[0.0, 0.5, 1.0])
+    cb = plt.colorbar(sm, cax=cbar_ax, orientation="horizontal", format="%.0f")
     cb.outline.set_linewidth(0.3)
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
-    cb.set_label("SVF — share of open sky seen from the street", fontsize=6.5, color=INK, labelpad=2)
+    cb.set_label("annual irradiation at ground (kWh/m²·yr) — same scale as panel 1's x-axis",
+                fontsize=6.5, color=INK, labelpad=2)
     fig.text(cbar_x0 + cbar_w + 0.012, cbar_y0 + cbar_h * 0.5,
              "resolved · pale ring = offset > 2.5 m · magenta = unresolved (SVF = 0)",
              fontsize=6.5, color=MUTED, ha="left", va="center")
+
+
+def draw_community_choropleth(ax, territory, dist_data: dict) -> None:
+    """FOLHA4 round 4 panel 2 (PI 2026-09-27: "show ... the most relevant
+    metric spatialized"), replacing the decile-share bars the PI rejected
+    ("some graphs don't make sense such as the decile decomposition"):
+    every named community, filled by its own median citywide percentile of
+    annual ground irradiation — `dist_data['community_stats']`, the exact
+    numbers panel 3's ranked box plots draw, never recomputed here — under
+    the same rotation as the hero map. Marcílio Dias (excluded from the
+    study area by geometry, PI ruling 2026-09-24 — zero matched cells) is
+    hatched grey rather than silently coloured at percentile 0, the same
+    "flagged, not fabricated" treatment `compute_community_stats` gives it."""
+    fig = ax.figure
+    ax.set_facecolor(PAPER)
+    rot = territory.display_rotation_deg
+    origin = _mare_rotation_origin(territory)
+    subunits_r = rotate_for_display(territory.subunits, rot, origin=origin)
+    # Bounds/rendering come from the IN-STUDY-AREA communities only (same
+    # set the hero map's outlines show) — Marcílio Dias sits entirely
+    # outside the data extent (config/sites.yaml's definition_note), and
+    # including its geometry in the bbox shrinks the other 15 communities
+    # to a corner of the panel. It still gets a row in dist_data
+    # ['community_stats'] (flagged, not dropped) and is named in the
+    # off-map note below; it is just not drawn as a polygon here.
+    in_area_col = "in_study_area" if "in_study_area" in subunits_r.columns else None
+    drawn = subunits_r[subunits_r[in_area_col]] if in_area_col else subunits_r
+    off_map = subunits_r[~subunits_r[in_area_col]] if in_area_col else subunits_r.iloc[0:0]
+
+    by_name = {r["name"]: r for r in dist_data["community_stats"]}
+    cmap = mpl.colormaps.get_cmap("YlOrRd")
+    norm_v = mpl.colors.Normalize(vmin=0.0, vmax=100.0)
+
+    for _, row in drawn.iterrows():
+        stat = by_name.get(row["name"])
+        geom = gpd.GeoSeries([row.geometry], crs=subunits_r.crs)
+        if stat is None or stat["n_cells"] == 0:
+            geom.plot(ax=ax, facecolor="#D9D9D3", edgecolor=MARE_COMMUNITY_STROKE,
+                      linewidth=1.0, hatch="///", zorder=3)
+        else:
+            geom.plot(ax=ax, facecolor=cmap(norm_v(stat["median_percentile"])),
+                      edgecolor=MARE_COMMUNITY_STROKE, linewidth=1.0, zorder=3)
+
+    minx, miny, maxx, maxy = drawn.total_bounds
+    pad_x, pad_y = 0.04 * (maxx - minx), 0.04 * (maxy - miny)
+    ax.set_xlim(minx - pad_x, maxx + pad_x)
+    ax.set_ylim(miny - pad_y, maxy + pad_y)
+    _fit_square_axes(ax)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_title("2 · Where each community sits in the city (median citywide percentile)",
+                fontsize=9.5, color=INK, pad=3, loc="left")
+
+    min_dist = 0.05 * max(maxx - minx, maxy - miny)
+    _number_communities(ax, drawn, dist_data["community_stats"], min_dist)
+
+    panel_box = ax.get_position()
+    fig_w_in, fig_h_in = fig.get_size_inches()
+    cbar_w = panel_box.width * 0.30
+    cbar_h = 0.05 / fig_h_in
+    cbar_x0 = panel_box.x0
+    cbar_y0 = panel_box.y0 - _CBAR_GAP_IN / fig_h_in - cbar_h
+    cbar_ax = fig.add_axes([cbar_x0, cbar_y0, cbar_w, cbar_h])
+    sm = mpl.cm.ScalarMappable(norm=norm_v, cmap=cmap)
+    sm.set_array([])
+    cb = plt.colorbar(sm, cax=cbar_ax, orientation="horizontal", format="%.0f", ticks=[0, 25, 50, 75, 100])
+    cb.outline.set_linewidth(0.3)
+    cb.ax.tick_params(labelsize=6, length=2, pad=1)
+    cb.set_label("median citywide percentile of annual ground irradiation", fontsize=6.5, color=INK, labelpad=2)
+    # City median (50th percentile, by definition) marked on the same bar
+    # every community's own fill colour is drawn from — not a separate
+    # reference line the reader has to translate between two scales.
+    cb.ax.axvline(50, color=INK, lw=1.1, zorder=5)
+    caption = "city median = 50 · grey hatch = no cells (excluded from study area)"
+    if len(off_map):
+        names = ", ".join(f"{by_name[n]['number']} {n}" for n in off_map["name"] if n in by_name)
+        caption += f" · off map (outside the data extent): {names}"
+    fig.text(cbar_x0 + cbar_w + 0.012, cbar_y0 + cbar_h * 0.5,
+             caption, fontsize=6.5, color=MUTED, ha="left", va="center")
 
 
 def build_folha4_mare(hero: bool) -> dict:
@@ -1394,15 +1567,28 @@ def build_folha4_mare(hero: bool) -> dict:
     # flagged as too tight), applied evenly to both variants now instead
     # of scaling with distributions_core's own height.
     SPACER_BEFORE_PANEL3 = 1.3
+    # The choropleth's own colorbar + label sit close to its cell's bottom
+    # edge (_CBAR_RESERVE_IN is a tight fixed 0.34in) — plain SPACER (sized
+    # for single-line masthead/identity-card gaps) left panel 1's title
+    # landing right on the colorbar's label text (first render, this
+    # round); reuses the same "needs real clearance below the axes" shape
+    # as SPACER_BEFORE_PANEL3, at a smaller value since a colorbar label is
+    # one short line, not a rotated multi-line tick label.
+    SPACER_AFTER_CHOROPLETH = 0.6
+    # community_choropleth (FOLHA4 round 4, F3) is a spatial panel of the
+    # same kind as the hero map — sized the same way (own fixed-ratio row,
+    # not squeezed into the distributions block) so its map keeps a
+    # readable amount of the page regardless of variant. Bigger in no-hero
+    # (no hero-map row above it to carry the sheet's spatial content).
     if hero:
         dist_core = 7.6
         dist_top, dist_bottom = dist_core / 2.25, dist_core / 2.25 * 1.25
-        height_ratios = [1.3, SPACER, 0.75, SPACER, 4.5, SPACER,
+        height_ratios = [1.3, SPACER, 0.75, SPACER, 4.5, SPACER, 3.4, SPACER_AFTER_CHOROPLETH,
                           dist_top, SPACER_BEFORE_PANEL3, dist_bottom, SPACER_BEFORE_CAVEATS, 1.9]
     else:
         dist_core = 11.3
         dist_top, dist_bottom = dist_core / 2.25, dist_core / 2.25 * 1.25
-        height_ratios = [1.3, SPACER, 0.75, SPACER,
+        height_ratios = [1.3, SPACER, 0.75, SPACER, 4.5, SPACER_AFTER_CHOROPLETH,
                           dist_top, SPACER_BEFORE_PANEL3, dist_bottom, SPACER_BEFORE_CAVEATS, 1.9]
     gs = fig.add_gridspec(
         nrows=len(height_ratios), ncols=1, height_ratios=height_ratios,
@@ -1429,7 +1615,7 @@ def build_folha4_mare(hero: bool) -> dict:
     if hero:
         ax_hero = fig.add_subplot(gs[row, 0])
         try:
-            draw_hero_map_v4(ax_hero, d, territory, stats)
+            draw_hero_map_v4(ax_hero, d, territory, stats, dist_data)
             panels.append("hero_map_v4")
         except Exception as e:
             ax_hero.axis("off")
@@ -1437,6 +1623,17 @@ def build_folha4_mare(hero: bool) -> dict:
                         fontsize=8, color=MUTED, transform=ax_hero.transAxes)
             issues.append(f"maré: hero map failed — {e}")
         row += 2  # skip the spacer after the hero map
+
+    ax_choro = fig.add_subplot(gs[row, 0])
+    try:
+        draw_community_choropleth(ax_choro, territory, dist_data)
+        panels.append("community_choropleth")
+    except Exception as e:
+        ax_choro.axis("off")
+        ax_choro.text(0.5, 0.5, f"community choropleth unavailable: {e}", ha="center", va="center",
+                    fontsize=8, color=MUTED, transform=ax_choro.transAxes)
+        issues.append(f"maré: community choropleth failed — {e}")
+    row += 2  # skip the spacer after the choropleth
 
     with mpl.rc_context(mpl.rcParamsDefault):
         plt.rcParams.update(mare_dist.DISTRIBUTIONS_RC)
@@ -1454,7 +1651,14 @@ def build_folha4_mare(hero: bool) -> dict:
 
     fig.text(0.005, 0.004, mare_dist.provenance_note(dist_data), fontsize=6, color=MUTED)
 
-    suffix = "_hero" if hero else ""
+    # Canonical = hero (FOLHA4 round 4, F1: the PI's spatial-map ask makes
+    # the hero variant the one every consumer must embed). The hero variant
+    # takes the plain names; the no-hero variant — nothing in
+    # build_site_pages.py/build_pi_review_folder.py/build_results_registry.py
+    # /config/work_packages.yaml/tests reads it by name (checked 2026-09-27)
+    # — is suffixed instead of removed, so it stays reproducible without
+    # anyone mistaking it for the sheet the PI sees.
+    suffix = "" if hero else "_nohero"
     a3_path = out_dir / f"folha_{site}{suffix}_A3.png"
     fig.savefig(a3_path, dpi=220, facecolor=PAPER, bbox_inches=None)
     pdf_path = out_dir / f"folha_{site}{suffix}.pdf"
@@ -1463,6 +1667,13 @@ def build_folha4_mare(hero: bool) -> dict:
     fig.savefig(web_path, dpi=85, facecolor=PAPER)
     plt.close(fig)
 
+    # Per-community table sidecar (F3): the figure's own numbers, readable
+    # by code rather than re-extracted from the PNG. Same rows
+    # draw_community_choropleth/draw_distributions_bottom drew from.
+    communities_path = out_dir / f"folha_{site}{suffix}_communities.json"
+    with open(communities_path, "w") as f:
+        json.dump(dist_data["community_stats"], f, indent=2, default=str)
+
     meta = {
         "site": site, "variant": "hero" if hero else "no_hero",
         "sheet_version": "FOLHA4", "build_date": build_date, "git_sha7": sha,
@@ -1470,7 +1681,8 @@ def build_folha4_mare(hero: bool) -> dict:
         "panels_built": panels,
         "distributions_run_of_record": dist_data["run_of_record"],
         "issues": issues,
-        "outputs": {"A3_png": str(a3_path), "pdf": str(pdf_path), "web1200": str(web_path)},
+        "outputs": {"A3_png": str(a3_path), "pdf": str(pdf_path), "web1200": str(web_path),
+                    "communities_json": str(communities_path)},
     }
     with open(out_dir / f"metadata_folha4{suffix}.json", "w") as f:
         json.dump(meta, f, indent=2, default=str)
@@ -1491,7 +1703,10 @@ def build_folha4_site(site: str) -> dict:
     folha4_council_2026-09-24.md), not yet extended to any other site —
     a future council could ask for one here, using the same
     draw_hero_map_v4 this file already has (it takes site-generic
-    `d`/`territory`/`stats`, nothing Maré-specific left to add).
+    `d`/`territory`/`stats` plus a distributions dict for its colour
+    scale — FOLHA4 round 4 colours it by annual irradiation on the same
+    scale as panel 1, so it now needs `dist_data` too; nothing else
+    Maré-specific left to add).
 
     Vidigal and Rocinha do NOT go through this path — each is a single
     "Isolada" polygon with no subunits (config/sites.yaml), so panel 3
