@@ -20,13 +20,67 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Colours this hub-generated page may hardcode outside the three token blocks
+# below (bare :root = light, the two dark blocks). Everything else must go
+# through a --token so a page rendered inside the brisaverse hub's dark-mode
+# body (which the hub forces via `body{background;color}`) doesn't end up with
+# light-mode component colours painting text dark-on-dark. These are the
+# exceptions: the lightbox overlay is a fixed black scrim in both schemes, and
+# `.doc pre` is already a dark code block that reads fine on either background.
+# tests/test_hubkit_tokens.py enforces this list mechanically.
+CSS_LITERAL_WHITELIST = (
+    "rgba(0,0,0,.9)",   # #lb overlay scrim — always-black regardless of scheme
+    "#eee",             # #lb #lbcap text on that always-black scrim
+    "#fff",             # #lb #lbx text on that always-black scrim
+    "#bcd",             # #lb #lbx hover/focus on that always-black scrim
+    "#1d2127",          # .doc pre — dark code block, dark-on-dark-safe
+    "#e6e9ee",          # .doc pre text — pairs with the literal above
+    "rgba(0,0,0,.05)",  # .card / .doc table box-shadow — neutral, non-text
+    "rgba(0,0,0,.08)",  # .card:hover box-shadow — neutral, non-text
+    "rgba(0,0,0,.06)",  # .doc img box-shadow — neutral, non-text
+)
+
 CSS = """
-:root{--ink:#1a1d21;--mut:#5b6470;--line:#e3e7ec;--accent:#0f766e;--ok:#177243;
---warn:#b3261e;--amber:#9a5b00;--pend:#1f5fa8;--bg:#fbfcfd;--card:#fff;--lh:1.6;
+:root{--ink:#1a1d21;--mut:#5b6470;--line:#e3e7ec;--accent:#0f766e;--accent-ink:#fff;--ok:#177243;
+--warn:#b3261e;--amber:#9a5b00;--pend:#1f5fa8;--bg:#fbfcfd;--card:#fff;
+--bg-soft:#f3f5f7;--doc-text:#2a2d31;--lede:#444;
+--pill-ok-bg:#e6f4ec;--pill-ok-line:#bfe2cd;
+--pill-warn-bg:#fdeceb;--pill-warn-line:#f3c9c5;
+--pill-amber-bg:#fbf1e0;--pill-amber-line:#ecd9b3;
+--pill-info-bg:#e8f1fb;--pill-info-line:#c7ddf5;
+--pill-doc-bg:#eef0f2;--pill-doc-line:#dde1e5;
+--lh:1.6;
 --serif:"Source Serif 4","Iowan Old Style",Georgia,"Times New Roman",serif}
+/* Dark palette aligned to brisaverse's hub/gallery/design.css §1 token
+   contract (ground/panel/panel-2/line/ink/ink-soft/ink-faint), since this
+   page is served embedded inside that hub and must survive its dark body.
+   Two selectors carry the same values: the media query answers the OS/
+   browser preference; the attribute selector answers an explicit host
+   override (e.g. a hub that forces data-theme regardless of OS preference).
+   :not([data-theme="light"]) lets an explicit light override win over an
+   OS dark preference. */
+@media (prefers-color-scheme: dark){
+:root:not([data-theme="light"]){--ink:#f4f0ea;--mut:#b8b1a7;--line:#2b2825;
+--accent:#3ecab2;--accent-ink:#0c0b0a;--ok:#6fb07f;--warn:#e8795a;--amber:#e6b345;--pend:#5aa6dd;
+--bg:#0c0b0a;--card:#151312;--bg-soft:#1c1917;--doc-text:#f4f0ea;--lede:#b8b1a7;
+--pill-ok-bg:#16261c;--pill-ok-line:#2c4433;
+--pill-warn-bg:#2a1712;--pill-warn-line:#4a2b23;
+--pill-amber-bg:#2a2011;--pill-amber-line:#4a3a1c;
+--pill-info-bg:#16212b;--pill-info-line:#223649;
+--pill-doc-bg:#1c1917;--pill-doc-line:#2b2825}
+}
+:root[data-theme="dark"]{--ink:#f4f0ea;--mut:#b8b1a7;--line:#2b2825;
+--accent:#3ecab2;--accent-ink:#0c0b0a;--ok:#6fb07f;--warn:#e8795a;--amber:#e6b345;--pend:#5aa6dd;
+--bg:#0c0b0a;--card:#151312;--bg-soft:#1c1917;--doc-text:#f4f0ea;--lede:#b8b1a7;
+--pill-ok-bg:#16261c;--pill-ok-line:#2c4433;
+--pill-warn-bg:#2a1712;--pill-warn-line:#4a2b23;
+--pill-amber-bg:#2a2011;--pill-amber-line:#4a3a1c;
+--pill-info-bg:#16212b;--pill-info-line:#223649;
+--pill-doc-bg:#1c1917;--pill-doc-line:#2b2825}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
 font:16px/var(--lh) -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+a{color:var(--accent)}
 .wrap{max-width:1040px;margin:0 auto;padding:20px 22px 80px}
 header.hd{border-bottom:2px solid var(--ink);padding-bottom:12px;margin-bottom:6px}
 header.hd h1{font-family:var(--serif);font-size:28px;margin:0 0 4px;letter-spacing:-.01em}
@@ -40,16 +94,16 @@ h2{font-family:var(--serif);font-size:19px;margin:30px 0 12px;padding-bottom:5px
 .card{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;
 overflow:hidden;text-decoration:none;color:inherit;transition:.12s;box-shadow:0 1px 3px rgba(0,0,0,.05)}
 .card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.08)}
-.card img{width:100%;height:auto;display:block;border-bottom:1px solid #eee;cursor:zoom-in}
+.card img{width:100%;height:auto;display:block;border-bottom:1px solid var(--line);cursor:zoom-in}
 .cap{padding:13px 15px}.cap h3{margin:6px 0 4px;font-size:15px}
 .cap p{margin:0;color:var(--mut);font-size:13px}.cap code{font-size:11px;color:var(--mut)}
 .pill{display:inline-block;padding:2px 8px;border-radius:11px;font-size:11px;font-weight:700;
 text-transform:uppercase;letter-spacing:.03em;border:1px solid transparent}
-.pill.ok{background:#e6f4ec;color:var(--ok);border-color:#bfe2cd}
-.pill.warn{background:#fdeceb;color:var(--warn);border-color:#f3c9c5}
-.pill.amber{background:#fbf1e0;color:var(--amber);border-color:#ecd9b3}
-.pill.info{background:#e8f1fb;color:var(--pend);border-color:#c7ddf5}
-.pill.doc{background:#eef0f2;color:var(--mut);border-color:#dde1e5}
+.pill.ok{background:var(--pill-ok-bg);color:var(--ok);border-color:var(--pill-ok-line)}
+.pill.warn{background:var(--pill-warn-bg);color:var(--warn);border-color:var(--pill-warn-line)}
+.pill.amber{background:var(--pill-amber-bg);color:var(--amber);border-color:var(--pill-amber-line)}
+.pill.info{background:var(--pill-info-bg);color:var(--pend);border-color:var(--pill-info-line)}
+.pill.doc{background:var(--pill-doc-bg);color:var(--mut);border-color:var(--pill-doc-line)}
 footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--mut);font-size:12px}
 .callout{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--ok);
 border-radius:10px;padding:14px 18px}
@@ -67,22 +121,22 @@ border-radius:10px;padding:14px 18px}
 .doc{max-width:820px}.doc h1{font-size:24px}.doc h2{font-size:19px}.doc h3{font-size:16px}
 .doc table{border-collapse:collapse;margin:14px 0;font-size:14px;width:100%}
 .doc th,.doc td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
-.doc th{background:#f3f5f7}.doc code{background:#f3f5f7;padding:1px 5px;border-radius:4px;font-size:13px}
+.doc th{background:var(--bg-soft)}.doc code{background:var(--bg-soft);padding:1px 5px;border-radius:4px;font-size:13px}
 .doc pre{background:#1d2127;color:#e6e9ee;padding:14px;border-radius:8px;overflow:auto;font-size:13px}
 .doc pre code{background:none;color:inherit;padding:0}.doc blockquote{border-left:3px solid var(--line);
 margin:0;padding:2px 14px;color:var(--mut)}
-.doc{font-size:15.5px;color:#2a2d31}
+.doc{font-size:15.5px;color:var(--doc-text)}
 .doc h1{font-family:var(--serif);font-size:26px;line-height:1.2;margin:0 0 4px}
 .doc h2{font-family:var(--serif);margin:34px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--ink)}
 .doc h3{font-family:var(--serif);margin:22px 0 8px;color:var(--accent)}
-.doc>p:first-of-type{font-size:17px;color:#444;line-height:1.6}
+.doc>p:first-of-type{font-size:17px;color:var(--lede);line-height:1.6}
 .doc img{max-width:100%;height:auto;display:block;margin:18px auto 4px;border:1px solid var(--line);
 border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.06)}
 /* an italics-only paragraph right after a figure reads as its caption */
 .doc img+p em:only-child,.doc p>em:only-child{display:block;text-align:center;font-size:13px;
 color:var(--mut);margin:0 auto 18px;max-width:80%;font-style:italic}
-.doc table{box-shadow:0 1px 4px rgba(0,0,0,.05)}.doc th{background:#eef1f4}
-.doc tr:nth-child(even) td{background:#fafbfc}
+.doc table{box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.doc tr:nth-child(even) td{background:var(--bg-soft)}
 .doc strong{color:var(--ink)}
 #lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;cursor:zoom-out;
 flex-direction:column;align-items:center;justify-content:center}

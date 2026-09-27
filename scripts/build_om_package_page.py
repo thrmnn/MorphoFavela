@@ -282,9 +282,9 @@ def render_page(root: Path) -> str:
   panel ruling below) has been applied. This page states the decision; it
   carries no tap of its own — the PI rules on it in the brisaverse cockpit.</p>
   <p><a href="{OPS_LINK}" target="_blank" rel="noopener"
-  style="display:inline-block;padding:8px 14px;background:var(--accent);color:#fff !important;
+  style="display:inline-block;padding:8px 14px;background:var(--accent);color:var(--accent-ink) !important;
   border-radius:8px;text-decoration:none;font-weight:600">
-  → Rule on <code style="background:none;color:#fff !important">{OPS_DECISION_ID}</code> at /ops</a></p>
+  → Rule on <code style="background:none;color:var(--accent-ink) !important">{OPS_DECISION_ID}</code> at /ops</a></p>
 </section>"""
 
     # --- what the team owes ---------------------------------------------
