@@ -536,12 +536,12 @@ def _write_synthetic_zoom_windows(repo_root: Path, extra: list[dict] | None = No
         __import__("yaml").safe_dump({"windows": windows}, allow_unicode=True))
 
 
-def test_load_zoom_windows_reads_the_real_config_five_favelas_plus_ipanema():
+def test_load_zoom_windows_reads_the_real_config_five_favelas_only():
+    # ipanema_boundary was dropped by the PI on 2026-09-27: no bairro polygon
+    # will be supplied, so the config carries the five study favelas only.
     windows = figs.load_zoom_windows(ROOT)
     ids = {w["id"] for w in windows}
-    assert ids == {"vidigal", "rocinha", "complexo_do_alemao", "mare", "riodaspedras", "ipanema"}
-    ipanema = next(w for w in windows if w["id"] == "ipanema")
-    assert ipanema["source"] == "bairro:Ipanema"
+    assert ids == {"vidigal", "rocinha", "complexo_do_alemao", "mare", "riodaspedras"}
     for slug, display in ledger_mod.FAVELAS.items():
         w = next(w for w in windows if w["id"] == slug)
         assert w["source"] == f"favela_boundary:{display}"

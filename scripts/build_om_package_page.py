@@ -245,9 +245,9 @@ def render_page(root: Path) -> str:
   panel ruling below) has been applied. This page states the decision; it
   carries no tap of its own — the PI rules on it in the brisaverse cockpit.</p>
   <p><a href="{OPS_LINK}" target="_blank" rel="noopener"
-  style="display:inline-block;padding:8px 14px;background:var(--accent);color:#fff;
+  style="display:inline-block;padding:8px 14px;background:var(--accent);color:#fff !important;
   border-radius:8px;text-decoration:none;font-weight:600">
-  → Rule on <code style="background:none;color:inherit">{OPS_DECISION_ID}</code> at /ops</a></p>
+  → Rule on <code style="background:none;color:#fff !important">{OPS_DECISION_ID}</code> at /ops</a></p>
 </section>"""
 
     # --- what the team owes ---------------------------------------------
@@ -331,6 +331,12 @@ def render_page(root: Path) -> str:
     # --- documents ------------------------------------------------------
     readme_rel = _rel_to(package_root, version_dir / "README.md")
     changelog_rel = _rel_to(package_root, version_dir / "CHANGELOG.md")
+    # Served as text/markdown under the hub's MorphoFavela mount, a .md file
+    # reaches the tablet as raw markdown (PI, 2026-09-27: "impossible to
+    # read"); the hub's /doc viewer renders any same-origin src through md.js.
+    dash_version = "/morphofavela-dash/" + version_dir.relative_to(root).as_posix()
+    readme_view = f"/doc?src={dash_version}/README.md"
+    changelog_view = f"/doc?src={dash_version}/CHANGELOG.md"
     manifest_rel = _rel_to(package_root, version_dir / "manifest.json")
     dict_rel = _rel_to(package_root, version_dir / "p08_data_dictionary.csv")
     panel_rel = _rel_to(package_root, package_root / PANEL_PAGE_NAME)
@@ -385,8 +391,9 @@ def render_page(root: Path) -> str:
 <section id="documents">
   <h2>Documents</h2>
   <ul>
-    <li><a href="{readme_rel}">README.md</a> — release scope, coverage vs Table 1, sources, methods, known limits.</li>
-    <li><a href="{changelog_rel}">CHANGELOG.md</a></li>
+    <li><a href="{readme_view}">README</a> — release scope, coverage vs Table 1, sources, methods, known limits
+        (<a href="{readme_rel}">raw .md</a>).</li>
+    <li><a href="{changelog_view}">Changelog</a> (<a href="{changelog_rel}">raw .md</a>)</li>
     <li><a href="{manifest_rel}">manifest.json</a> — per-file sha256, package_version, crs, use_terms.</li>
     <li><a href="{panel_rel}">Panel ruling</a> — the expert-panel review v0.1's must-fix list came from.</li>
   </ul>
@@ -502,7 +509,13 @@ def check(root: Path = DEFAULT_ROOT) -> int:
         target_path = target.split("#", 1)[0]
         if not target_path:
             continue
-        resolved = (package_root / target_path).resolve()
+        if target_path.startswith("/doc?src=/morphofavela-dash/"):
+            # hub markdown viewer over a file under the MorphoFavela mount:
+            # the file it will fetch must exist in this checkout
+            target_path = target_path[len("/doc?src=/morphofavela-dash/"):]
+            resolved = (root / target_path).resolve()
+        else:
+            resolved = (package_root / target_path).resolve()
         if not resolved.exists():
             fails.append(f"link does not resolve: {target} -> {resolved}")
 

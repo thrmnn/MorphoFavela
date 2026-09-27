@@ -38,7 +38,3 @@ windows:
     source: "favela_boundary:Rio das Pedras"
     pad_m: 120.0
 
-  - id: ipanema
-    label: Ipanema
-    source: "bairro:Ipanema"
-    pad_m: 120.0
