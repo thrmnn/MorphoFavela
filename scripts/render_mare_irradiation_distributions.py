@@ -1,16 +1,25 @@
 """Maré's annual ground irradiation as distributions against the city, not one
 percentile: (1) Maré's density over the city's for two definitions of Maré,
-(2) the share of Maré's ground in each citywide decile, (3) each community's
-spread of citywide percentiles, listed north to south — never ranked.
-Per-community contrasts are staged for the PI and ethics-gated before release.
+(2, FOLHA4 round 4 — PI 2026-09-27: "some graphs don't make sense such as the
+decile decomposition" — the decile-share bars this panel used to be are gone;
+nothing else in this repo drew them, so they are deleted rather than kept
+dead) each community's spread of citywide percentiles, ranked best to worst
+by median. Per-community contrasts are staged for the PI and ethics-gated
+before release.
 
-`compute_distributions` (the numbers) and `draw_distributions` (the three
-panels, onto a caller-supplied figure + gridspec slot) are split out so a
-second sheet can embed the identical analysis without re-deriving it —
-FOLHA4's Maré site sheet (scripts/build_site_dashboard.py) calls both
-directly rather than reading this module's own PNG or re-computing
-percentiles/deciles itself. `main()` below is unchanged in output: it calls
-the same two functions into a standalone figure.
+`compute_distributions` (the numbers) and `draw_distributions` (the panels,
+onto a caller-supplied figure + gridspec slot) are split out so a second
+sheet can embed the identical analysis without re-deriving it — FOLHA4's
+Maré site sheet (scripts/build_site_dashboard.py) calls both directly rather
+than reading this module's own PNG or re-computing percentiles/deciles
+itself. `main()` below calls the same functions into a standalone figure.
+
+`compute_community_stats` is the one place per-community median citywide
+percentile / cell count / rank are computed — panel 3 (ranked ordering) and
+build_site_dashboard.py's community choropleth (FOLHA4 round 4) both call it
+rather than deriving their own groupby, so the numbers on the map and the
+numbers on the box plot are the same numbers by construction, not two
+independently-computed answers that could drift apart.
 
     python scripts/render_mare_irradiation_distributions.py
 """
@@ -93,33 +102,76 @@ def compute_distributions(root: Path = ROOT) -> dict:
     north_to_south = comm.assign(cy=comm.geometry.centroid.y).sort_values("cy", ascending=False)["community"]
     order = [c for c in north_to_south if (e["sub"] == c).any()] + [BETWEEN]
 
+    community_stats = compute_community_stats(
+        comm["community"].tolist(), e["sub"].to_numpy(), e["p"].to_numpy())
+
     return dict(
         city=city, a=a, e=e, a_p=a_p, deciles=deciles,
         label_a=label_a, label_e=label_e, comm=comm, order=order,
+        community_stats=community_stats,
         run_of_record=RUN_OF_RECORD["wp05"],
     )
 
 
+def compute_community_stats(names: list, sub, p) -> list[dict]:
+    """Per-community median citywide percentile, cell count and rank — the
+    ONE place this is computed, so panel 3 (ranked box plots) and
+    build_site_dashboard.py's community choropleth (FOLHA4 round 4) draw
+    numbers that are identical by construction, never two independently
+    -grouped answers. `sub`/`p` are per-ground-cell arrays (data['e']['sub']
+    /data['e']['p']); `names` is every community's own name (order does not
+    matter — the return is always sorted by rank, so a shuffled or
+    duplicated `names` input reorders/duplicates the OUTPUT rows but never
+    changes any single community's own median/n_cells/rank, see
+    tests/test_render_mare_irradiation_distributions.py).
+
+    A community with zero matching cells is never dropped the way
+    compute_distributions()'s own `order` list silently drops one (real
+    data: Marcílio Dias, excluded from the Maré study area by geometry —
+    PI ruling 2026-09-24, config/sites.yaml's definition_note). It gets a
+    row here too — `n_cells=0`, `median_percentile=None`, `rank=None` — so
+    a caller that maps every row to a map/axis label still accounts for
+    every named community instead of one silently vanishing. `number` is
+    assigned 1..N by rank (ranked communities first, then any zero-cell
+    ones), and is what the hero map / choropleth / panel 3 all key their
+    numbering off of."""
+    sub = np.asarray(sub, dtype=object)
+    p = np.asarray(p, dtype=float)
+    rows = []
+    for name in names:
+        mask = sub == name
+        n = int(mask.sum())
+        rows.append({
+            "name": name, "n_cells": n,
+            "median_percentile": float(np.median(p[mask])) if n else None,
+        })
+    ranked = sorted((r for r in rows if r["n_cells"] > 0), key=lambda r: -r["median_percentile"])
+    for i, r in enumerate(ranked, start=1):
+        r["rank"] = i
+    flagged = [r for r in rows if r["n_cells"] == 0]
+    for r in flagged:
+        r["rank"] = None
+    out = ranked + flagged
+    for i, r in enumerate(out, start=1):
+        r["number"] = i
+    return out
+
+
 def draw_distributions_top(fig, spec, data: dict) -> tuple:
-    """Panels 1 & 2 (city-vs-Maré histogram, decile-share bars) side by
-    side. Split out from `draw_distributions` (FOLHA4 round 3) because a
-    single hspace fraction inside one shared sub-gridspec scales with
-    whatever outer-cell height the caller gives it — fine for
-    `draw_distributions`'s own equal-height callers, but FOLHA4's hero and
-    no-hero variants give the distributions block very different outer
-    heights (~7.6 vs ~11.3 page-ratio units), so a fixed *fraction* gap
-    ballooned into ~250px of dead space in no-hero while staying tight in
-    hero (round-2 council finding). Returning top/bottom as separate specs
-    lets the host sheet place a fixed-*ratio* spacer row between them on
-    its own outer gridspec — the same absolute-gap-regardless-of-variant
-    trick already used for the gap before the caveat strip
-    (SPACER_BEFORE_CAVEATS in build_site_dashboard.py)."""
-    city, a, e, a_p, deciles = data["city"], data["a"], data["e"], data["a_p"], data["deciles"]
+    """Panel 1 (city-vs-Maré histogram) alone. Named `_top` (rather than
+    renamed to match its now-single panel) so it keeps slotting into the
+    same outer-gridspec row build_site_dashboard.py already gives it.
+    FOLHA4 round 4 (PI 2026-09-27, "some graphs don't make sense such as
+    the decile decomposition") removed the second, decile-share-bars axis
+    this used to draw beside panel 1 — nothing else in this repo read it,
+    so it is gone rather than kept dead. The colour scale this histogram's
+    x-axis implies (0..deciles[-1]) is also what build_site_dashboard.py's
+    hero map colours its street observers by, so map and histogram read as
+    one (FOLHA4 round 4 F2)."""
+    city, a, e, deciles = data["city"], data["a"], data["e"], data["deciles"]
     label_a, label_e = data["label_a"], data["label_e"]
 
-    gs = spec.subgridspec(1, 2, wspace=0.22)
-
-    ax = fig.add_subplot(gs[0, 0])
+    ax = fig.add_subplot(spec)
     bins = np.linspace(0, deciles[-1], 90)
     mids = 0.5 * (bins[1:] + bins[:-1])
     ax.fill_between(mids, np.histogram(city, bins, density=True)[0], color=CITY, lw=0, label="Rio — all ground cells")
@@ -132,72 +184,69 @@ def draw_distributions_top(fig, spec, data: dict) -> tuple:
     ax.set_title("1 · Whole distributions, not one number", loc="left", fontsize=10, color=INK)
     ax.legend(frameon=False, fontsize=7, loc="upper left")
     ax.text(deciles[1], ax.get_ylim()[1] * 0.97, "  city deciles", color=MUTED, fontsize=6.5, va="top")
-    ax1 = ax
 
-    ax = fig.add_subplot(gs[0, 1])
-    idx, w = np.arange(10), 0.38
-    for off, values, col, lab in [(-w / 2, a_p, DEF_A, "A · IPP favela polygons"),
-                                   (w / 2, e["p"].to_numpy(), DEF_E, "E · IPP complex outline")]:
-        share = np.histogram(values, np.linspace(0, 100, 11))[0] / len(values) * 100
-        ax.bar(idx + off, share, w - 0.04, color=col, label=lab)
-        ax.text(idx[0] + off, share[0] + 1, f"{share[0]:.0f}%", ha="center", fontsize=7, color=INK)
-    ax.axhline(10, color=MUTED, lw=1, ls=(0, (3, 2)))
-    ax.text(9.6, 10.6, "city = 10% in each", ha="right", fontsize=6.5, color=MUTED)
-    ax.set_xticks(idx, [f"D{i + 1}" for i in idx])
-    ax.set_xlabel("citywide irradiation decile  (D1 = darkest tenth of the city's ground)")
-    ax.set_ylabel("share of Maré's ground cells (%)")
-    ax.set_title("2 · Where Maré's ground falls among the city's deciles", loc="left", fontsize=10, color=INK)
-    ax.legend(frameon=False, fontsize=7, loc="upper right")
-    ax2 = ax
-
-    return ax1, ax2
+    return (ax,)
 
 
 def draw_distributions_bottom(fig, spec, data: dict) -> tuple:
-    """Panel 3 alone (each community's spread of citywide percentiles,
-    listed north to south). Split out from `draw_distributions` — see
-    `draw_distributions_top`'s docstring for why."""
-    e, order = data["e"], data["order"]
+    """Panel 3 alone: each community's spread of citywide percentiles,
+    ordered by rank (best median first) rather than north-to-south (FOLHA4
+    round 4, PI 2026-09-27: ranking is the more legible ordering once the
+    sheet also carries a ranked choropleth). Numbers on the x labels are
+    `compute_community_stats`'s own `number` field — the same numbers the
+    choropleth and (for the 15 communities it shows) the hero map carry.
+    'between communities' (ground inside the study area but no named
+    community) is dropped from this ranked view — it is not a community
+    and has no number to share with the map; it stays visible on the
+    unranked standalone review PNG only through `data['order']`, which
+    this function no longer reads."""
+    community_stats = data["community_stats"]
+    ranked = [r for r in community_stats if r["rank"] is not None]
+    flagged = [r for r in community_stats if r["rank"] is None]
+    rows = ranked + flagged
+    e = data["e"]
 
     ax = fig.add_subplot(spec)
-    data_by_order = [e.loc[e["sub"] == o, "p"].to_numpy() for o in order]
-    bp = ax.boxplot(data_by_order, widths=0.55, showfliers=False, patch_artist=True,
-                    medianprops=dict(color=INK, lw=1.6), whiskerprops=dict(color=MUTED), capprops=dict(color=MUTED))
-    for box, o in zip(bp["boxes"], order):
-        between = o == BETWEEN
-        box.set(facecolor="#f2f1ec" if between else DEF_E, edgecolor=MUTED if between else DEF_E, alpha=0.55)
+    box_positions, box_data = [], []
+    for i, r in enumerate(rows, start=1):
+        if r["n_cells"] > 0:
+            box_positions.append(i)
+            box_data.append(e.loc[e["sub"] == r["name"], "p"].to_numpy())
+    if box_data:
+        bp = ax.boxplot(box_data, positions=box_positions, widths=0.55, showfliers=False, patch_artist=True,
+                        medianprops=dict(color=INK, lw=1.6), whiskerprops=dict(color=MUTED), capprops=dict(color=MUTED))
+        for box in bp["boxes"]:
+            box.set(facecolor=DEF_E, edgecolor=DEF_E, alpha=0.55)
+    for i, r in enumerate(rows, start=1):
+        if r["n_cells"] == 0:
+            ax.text(i, 15, "no cells\n(excluded from\nstudy area)", ha="center", va="center",
+                    fontsize=6, color=MUTED, style="italic")
     ax.axhline(50, color=MUTED, lw=1, ls=(0, (3, 2)))
-    ax.text(len(order) + 0.45, 51, "city median", fontsize=6.5, color=MUTED, ha="right")
-    ax.set_xticks(range(1, len(order) + 1), [f"{o}\n(n={len(d):,})" for o, d in zip(order, data_by_order)],
+    ax.text(0.55, 53, "city median", fontsize=6.5, color=MUTED, ha="left")
+    ax.set_xticks(range(1, len(rows) + 1),
+                 [f"{r['number']} {r['name']}\n(n={r['n_cells']:,})" for r in rows],
                  rotation=35, ha="right", fontsize=7)
+    ax.set_xlim(0.3, len(rows) + 0.7)
     ax.set_ylim(0, 100)
     ax.set_ylabel("citywide percentile of each ground cell")
     ax.grid(axis="y", color=GRID, lw=0.6)
-    ax.set_title("3 · Each community's spread against the city — listed north to south, not ranked",
+    ax.set_title("3 · Each community's spread against the city — listed by rank, best median first",
                 loc="left", fontsize=10, color=INK)
-    ax3 = ax
 
-    return (ax3,)
+    return (ax,)
 
 
 def draw_distributions(fig, spec, data: dict) -> tuple:
-    """Combined convenience wrapper: all three panels into one 2-row
+    """Combined convenience wrapper: both panels into one 2-row
     sub-gridspec carved out of `spec` (a SubplotSpec — pass
     `fig.add_gridspec(1, 1)[0, 0]` for "the whole figure", or a cell of a
     host sheet's own outer gridspec to embed). Caller is responsible for
     the `matplotlib.rc_context(DISTRIBUTIONS_RC)` wrapper (see module
-    docstring) — this function only draws. Safe here because this
-    wrapper's two callers (this module's own `main()` and, historically,
-    FOLHA4 round 1/2) always give it one fixed-height figure — the
-    variant-height mismatch that broke a shared hspace fraction only
-    shows up when a host sheet's hero/no-hero variants hand the block
-    very different outer heights, which is why FOLHA4 now calls
-    `draw_distributions_top`/`draw_distributions_bottom` directly instead
-    of this wrapper (see build_site_dashboard.py)."""
+    docstring) — this function only draws."""
     gs = spec.subgridspec(2, 1, height_ratios=[1, 1.25], hspace=0.42)
-    ax1, ax2 = draw_distributions_top(fig, gs[0, 0], data)
+    ax1, = draw_distributions_top(fig, gs[0, 0], data)
     ax3, = draw_distributions_bottom(fig, gs[1, 0], data)
-    return ax1, ax2, ax3
+    return ax1, ax3
 
 
 def provenance_note(data: dict) -> str:
