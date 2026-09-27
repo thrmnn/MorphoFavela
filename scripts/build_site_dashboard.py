@@ -127,12 +127,24 @@ MAGENTA = "#C026D3"
 MUTED = "#6B7280"
 GREEN = "#5B7C5B"
 RED = "#B91C1C"
-# Maré study-area community outlines: thin (BOUNDARY_STROKE_PX-derived, like
-# src/brisa_solar/wp07_figures.py), a distinct colour from INK (the site
-# boundary / data extent outline) so the two boundaries in play never read
-# as one line, but muted — this is an administrative-unit outline for
-# geographic orientation, not a value encoding.
-MARE_COMMUNITY_STROKE = "#7C3AED"
+# Maré study-area community outlines (FOLHA4 round 5, PI legibility pass:
+# the previous purple read as dark-red once thinned against the YlOrRd
+# irradiation ramp's own hot end — same problem the hot end itself has
+# against INK, just less obvious at a glance). Thin, neutral slate/grey —
+# never a hue the irradiation ramp or the badge disc also uses, so outline
+# vs. hot street vs. badge never compete for the same read. The study-area
+# (data-extent) outline stays INK but draws slightly heavier so the two
+# boundaries in play (administrative community vs. data extent) stay
+# visually ordered without relying on hue.
+MARE_COMMUNITY_STROKE = "#52525B"
+MARE_STUDY_AREA_LW_PT = 0.9
+MARE_COMMUNITY_LW_PT = 0.6
+# Community-number badges (round 5): a small dark-neutral disc behind the
+# digit, not bare coloured text with a halo — a halo alone still loses to a
+# dark-red street directly behind it, since halo and disc share no fixed
+# minimum-contrast guarantee the way an opaque disc does.
+MARE_BADGE_FACE = "#27272A"
+MARE_BADGE_RADIUS_PT = 5.2
 
 mpl.rcParams.update({
     "font.family": "DejaVu Sans",
@@ -1207,19 +1219,33 @@ def _nudge_label_points(points: list, min_dist: float, iters: int = 80) -> list:
     return [tuple(p) for p in pts]
 
 
-def _number_communities(ax, communities_r, community_stats: list, min_dist: float) -> None:
-    """Numbers, at each rotated community's own representative point (never
-    its centroid — a concave/L-shaped community's centroid can fall outside
-    it), nudged apart from each other (`_nudge_label_points`) so adjacent
-    small communities' labels don't overlap. The number is
-    `compute_community_stats`'s own `number` field, joined by name — the
-    same number panel 3's x labels and the choropleth carry, never a
-    separately-assigned index. Only draws for communities `communities_r`
-    actually has a row for (Marcílio Dias, entirely outside Maré's data
-    extent, is never in this rotated layer — see draw_hero_map_v4)."""
+def _draw_community_badges(ax, communities_r, community_stats: list, min_dist: float,
+                            value_fmt=None) -> None:
+    """Round-5 replacement for the old bare coloured-number labels: each
+    community gets a small round badge (white digit on a dark-neutral disc,
+    thin white edge) at its own representative point (never its centroid —
+    a concave/L-shaped community's centroid can fall outside it), nudged
+    apart from its neighbours (`_nudge_label_points`) so adjacent small
+    communities' badges don't overlap. An opaque disc reads on ANY
+    background (pale street, dark-red hot street, building fill) the way a
+    coloured-text-plus-halo never fully guaranteed — the halo's own
+    contrast against a same-luminance neighbour was exactly the legibility
+    complaint this round fixes. The digit is `compute_community_stats`'s
+    own `number` field, joined by name — the same number panel 4's x labels
+    and (on whichever of hero map / choropleth is the OTHER caller) the
+    other spatial panel carry, never a separately-assigned index. Only
+    draws for communities `communities_r` actually has a row for (Marcílio
+    Dias, entirely outside Maré's data extent, is never in this rotated
+    layer — see draw_hero_map_v4).
+
+    `value_fmt(stat) -> str`, when given, prints one more small label just
+    beside the badge (never inside the disc, which is sized for one or two
+    digits only) — the choropleth's per-community median value (FOLHA4
+    round 5, F2). The hero map passes no `value_fmt`; its badges carry only
+    the community number, orientation being its own job."""
     by_name = {r["name"]: r for r in community_stats}
     name_col = "name" if "name" in communities_r.columns else "community"
-    pts, labels = [], []
+    pts, labels, stats_list = [], [], []
     for _, row in communities_r.iterrows():
         stat = by_name.get(row[name_col])
         if stat is None:
@@ -1227,16 +1253,28 @@ def _number_communities(ax, communities_r, community_stats: list, min_dist: floa
         rp = row.geometry.representative_point()
         pts.append((rp.x, rp.y))
         labels.append(str(stat["number"]))
+        stats_list.append(stat)
     if not pts:
         return
     pts = _nudge_label_points(pts, min_dist)
-    halo = [patheffects.withStroke(linewidth=2.2, foreground=PAPER)]
-    for (x, y), label in zip(pts, labels):
-        ax.text(x, y, label, fontsize=7.5, fontweight="bold", color=MARE_COMMUNITY_STROKE,
-                ha="center", va="center", zorder=6.5, path_effects=halo)
+    value_halo = [patheffects.withStroke(linewidth=2.0, foreground=PAPER)]
+    badge_size_pt2 = (2.0 * MARE_BADGE_RADIUS_PT) ** 2
+    for (x, y), label, stat in zip(pts, labels, stats_list):
+        # Opaque disc (never bare text+halo) is the actual fix: a halo's
+        # contrast against a same-luminance neighbour (dark-red street
+        # directly behind pale text) is not guaranteed the way an opaque
+        # fill is — the white digit only ever sits on MARE_BADGE_FACE.
+        ax.scatter([x], [y], s=badge_size_pt2, marker="o", facecolor=MARE_BADGE_FACE,
+                   edgecolor="white", linewidths=1.0, zorder=6.4)
+        ax.text(x, y, label, fontsize=6.5, fontweight="bold", color="white",
+                ha="center", va="center", zorder=6.6)
+        if value_fmt is not None and stat.get("median_percentile") is not None:
+            ax.text(x + min_dist * 0.6, y, value_fmt(stat), fontsize=6.0, color=INK,
+                    fontweight="bold", ha="left", va="center", zorder=6.6,
+                    path_effects=value_halo)
 
 
-def draw_hero_map_v4(ax, d: dict, territory, stats: dict, dist_data: dict) -> None:
+def draw_hero_map_v4(ax, d: dict, territory, stats: dict, dist_data: dict, panel_num: int = 1) -> None:
     """FOLHA4's street-level annual-irradiation hero map: every layer
     rotated by the same amount, about the same point, so the site's own
     long axis (territory.display_rotation_deg — derived from the study-area
@@ -1256,9 +1294,13 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict, dist_data: dict) -> No
     Round 4 (PI 2026-09-27: "it lacks a spatial map ... show the
     neighbourhood delineation and the most relevant metric spatialized")
     recolours the street observers by annual ground irradiation
-    (d['solar']) instead of SVF, on the SAME 0..deciles[-1] scale panel 1's
+    (d['solar']) instead of SVF, on the SAME 0..deciles[-1] scale panel 3's
     x-axis uses (`dist_data['deciles']`) so the map and the distributions
-    read as one figure, not two independently-scaled ones."""
+    read as one figure, not two independently-scaled ones. Round 5 also
+    renumbers this panel to 1 (reading order: hero map, choropleth, whole
+    distributions, per-community spread), replaces the heavy same-hue
+    community outline with a thin neutral one, and gives community numbers
+    a dark-disc badge (see MARE_COMMUNITY_STROKE/MARE_BADGE_FACE)."""
     fig = ax.figure
     ax.set_facecolor(PAPER)
 
@@ -1282,7 +1324,11 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict, dist_data: dict) -> No
         tick_spacing = 9.0 if busy else 6.5
         tick_length = 0.5 if busy else 0.7
         halo_pe = [patheffects.withTickedStroke(angle=-45, length=tick_length, spacing=tick_spacing)]
-        boundary.boundary.plot(ax=ax, color=INK, linewidth=0.7, zorder=3, path_effects=halo_pe)
+        # Study-area (data-extent) outline — the slightly HEAVIER of the two
+        # boundaries in play (round 5), INK, so it still reads over dense
+        # hot-red streets without needing to compete on hue.
+        boundary.boundary.plot(ax=ax, color=INK, linewidth=MARE_STUDY_AREA_LW_PT,
+                               zorder=3, path_effects=halo_pe)
         inner = boundary.buffer(-15.0)
         gpd.GeoSeries(inner, crs=boundary.crs).boundary.plot(
             ax=ax, color=INK, linewidth=0.5, linestyle="--", zorder=2.5, alpha=0.6)
@@ -1291,16 +1337,18 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict, dist_data: dict) -> No
 
     if communities_r is not None:
         try:
-            # Heavier than round 3 (2x BOUNDARY_STROKE_PX, not 1x) — PI
-            # 2026-09-27: the community delineation itself is now load
-            # -bearing content (every number on the map/panel-3 axis keys
-            # off one of these polygons), not background orientation.
-            community_lw = 2.0 * BOUNDARY_STROKE_PX / fig.dpi * 72.0
+            # Round 5 (PI legibility pass): thin and neutral, not heavy and
+            # coloured — a heavy same-hue-as-the-ramp's-hot-end outline was
+            # exactly the "outlines and hot streets blur together" defect
+            # this round fixes. The community delineation stays load
+            # -bearing content (every number on the map/panel-4 axis keys
+            # off one of these polygons) via the badges below, not via
+            # outline weight.
             communities_r.boundary.plot(ax=ax, color=MARE_COMMUNITY_STROKE,
-                                        linewidth=community_lw, zorder=3.2)
+                                        linewidth=MARE_COMMUNITY_LW_PT, zorder=3.2)
             minx0, miny0, maxx0, maxy0 = boundary.total_bounds
             min_dist = 0.045 * max(maxx0 - minx0, maxy0 - miny0)
-            _number_communities(ax, communities_r, dist_data["community_stats"], min_dist)
+            _draw_community_badges(ax, communities_r, dist_data["community_stats"], min_dist)
         except Exception:
             pass
 
@@ -1309,7 +1357,7 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict, dist_data: dict) -> No
         # stored in Wh as a mean DAILY value, not a literal year integral —
         # *365 turns it into the same annual-kWh/m² basis dist_data['city']
         # (wp05's ray-marched citywide raster) uses, so the hero map's
-        # colour scale and panel 1's x-axis are the same physical quantity,
+        # colour scale and panel 3's x-axis are the same physical quantity,
         # not two differently-scaled proxies sharing a colourbar by
         # coincidence. Flagged here rather than silently assumed: this
         # conversion is a unit/calendar scaling (Wh/day x 365 days = Wh/yr),
@@ -1350,7 +1398,7 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict, dist_data: dict) -> No
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
-    ax.set_title("street-level annual irradiation · numbered communities · rotated to the site's own long axis",
+    ax.set_title(f"{panel_num} · street-level annual irradiation · numbered communities · rotated to the site's own long axis",
                 fontsize=9.5, color=INK, pad=3, loc="left")
 
     # Scale bar and north arrow are drawn in the ROTATED frame's own
@@ -1402,29 +1450,49 @@ def draw_hero_map_v4(ax, d: dict, territory, stats: dict, dist_data: dict) -> No
     cb = plt.colorbar(sm, cax=cbar_ax, orientation="horizontal", format="%.0f")
     cb.outline.set_linewidth(0.3)
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
-    cb.set_label("annual irradiation at ground (kWh/m²·yr) — same scale as panel 1's x-axis",
+    cb.set_label("annual irradiation at ground (kWh/m²·yr) — same scale as panel 3's x-axis",
                 fontsize=6.5, color=INK, labelpad=2)
     fig.text(cbar_x0 + cbar_w + 0.012, cbar_y0 + cbar_h * 0.5,
              "resolved · pale ring = offset > 2.5 m · magenta = unresolved (SVF = 0)",
              fontsize=6.5, color=MUTED, ha="left", va="center")
 
 
-def draw_community_choropleth(ax, territory, dist_data: dict) -> None:
-    """FOLHA4 round 4 panel 2 (PI 2026-09-27: "show ... the most relevant
-    metric spatialized"), replacing the decile-share bars the PI rejected
-    ("some graphs don't make sense such as the decile decomposition"):
-    every named community, filled by its own median citywide percentile of
-    annual ground irradiation — `dist_data['community_stats']`, the exact
-    numbers panel 3's ranked box plots draw, never recomputed here — under
-    the same rotation as the hero map. Marcílio Dias (excluded from the
-    study area by geometry, PI ruling 2026-09-24 — zero matched cells) is
-    hatched grey rather than silently coloured at percentile 0, the same
-    "flagged, not fabricated" treatment `compute_community_stats` gives it."""
+def draw_community_choropleth(ax, territory, dist_data: dict, color_limits: tuple,
+                              buildings=None, panel_num: int = 2) -> None:
+    """FOLHA4 round 4's spatial panel (PI 2026-09-27: "show ... the most
+    relevant metric spatialized"), replacing the decile-share bars the PI
+    rejected ("some graphs don't make sense such as the decile
+    decomposition"): every named community, filled by its own median
+    citywide percentile of annual ground irradiation —
+    `dist_data['community_stats']`, the exact numbers the ranked box plots
+    draw, never recomputed here — under the same rotation as the hero map.
+    Marcílio Dias (excluded from the study area by geometry, PI ruling
+    2026-09-24 — zero matched cells) is hatched grey rather than silently
+    coloured at percentile 0, the same "flagged, not fabricated" treatment
+    `compute_community_stats` gives it.
+
+    Round 5 (PI legibility pass) fixes:
+    - `color_limits` (vmin, vmax): the caller's own
+      `render_mare_irradiation_distributions.community_color_limits(...)`
+      result, passed in rather than recomputed here — the SAME two numbers
+      this function draws with are also what `build_folha4_mare` writes
+      into metadata_folha4.json, by construction, never two independently
+      -derived answers. The old fixed 0..100 scale left every community
+      pale (every median sits far below the city's own 50th percentile);
+      this scale spans only the data range the medians actually occupy.
+    - `buildings` (optional, rotated the same way as the hero map's) draws
+      faintly under the polygons so the choropleth reads as a place, not
+      an abstract set of coloured blobs.
+    - `panel_num`: this sheet numbers panels in reading order (see
+      draw_hero_map_v4/draw_distributions_top); the hero variant passes 2,
+      the no-hero variant (no hero-map row ahead of this one) passes 1."""
     fig = ax.figure
     ax.set_facecolor(PAPER)
     rot = territory.display_rotation_deg
     origin = _mare_rotation_origin(territory)
     subunits_r = rotate_for_display(territory.subunits, rot, origin=origin)
+    buildings_r = (rotate_for_display(buildings, rot, origin=origin)
+                   if buildings is not None and len(buildings) else None)
     # Bounds/rendering come from the IN-STUDY-AREA communities only (same
     # set the hero map's outlines show) — Marcílio Dias sits entirely
     # outside the data extent (config/sites.yaml's definition_note), and
@@ -1438,17 +1506,24 @@ def draw_community_choropleth(ax, territory, dist_data: dict) -> None:
 
     by_name = {r["name"]: r for r in dist_data["community_stats"]}
     cmap = mpl.colormaps.get_cmap("YlOrRd")
-    norm_v = mpl.colors.Normalize(vmin=0.0, vmax=100.0)
+    vmin, vmax = color_limits
+    norm_v = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+
+    if buildings_r is not None:
+        try:
+            buildings_r.plot(ax=ax, color="#DCDCD6", edgecolor="none", linewidth=0, zorder=1)
+        except Exception:
+            pass
 
     for _, row in drawn.iterrows():
         stat = by_name.get(row["name"])
         geom = gpd.GeoSeries([row.geometry], crs=subunits_r.crs)
         if stat is None or stat["n_cells"] == 0:
             geom.plot(ax=ax, facecolor="#D9D9D3", edgecolor=MARE_COMMUNITY_STROKE,
-                      linewidth=1.0, hatch="///", zorder=3)
+                      linewidth=1.0, hatch="///", zorder=3, alpha=0.92)
         else:
             geom.plot(ax=ax, facecolor=cmap(norm_v(stat["median_percentile"])),
-                      edgecolor=MARE_COMMUNITY_STROKE, linewidth=1.0, zorder=3)
+                      edgecolor=MARE_COMMUNITY_STROKE, linewidth=1.0, zorder=3, alpha=0.92)
 
     minx, miny, maxx, maxy = drawn.total_bounds
     pad_x, pad_y = 0.04 * (maxx - minx), 0.04 * (maxy - miny)
@@ -1459,11 +1534,12 @@ def draw_community_choropleth(ax, territory, dist_data: dict) -> None:
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
-    ax.set_title("2 · Where each community sits in the city (median citywide percentile)",
+    ax.set_title(f"{panel_num} · Where each community sits in the city (median citywide percentile)",
                 fontsize=9.5, color=INK, pad=3, loc="left")
 
     min_dist = 0.05 * max(maxx - minx, maxy - miny)
-    _number_communities(ax, drawn, dist_data["community_stats"], min_dist)
+    _draw_community_badges(ax, drawn, dist_data["community_stats"], min_dist,
+                           value_fmt=lambda r: f"{r['median_percentile']:.0f}")
 
     panel_box = ax.get_position()
     fig_w_in, fig_h_in = fig.get_size_inches()
@@ -1474,20 +1550,58 @@ def draw_community_choropleth(ax, territory, dist_data: dict) -> None:
     cbar_ax = fig.add_axes([cbar_x0, cbar_y0, cbar_w, cbar_h])
     sm = mpl.cm.ScalarMappable(norm=norm_v, cmap=cmap)
     sm.set_array([])
-    cb = plt.colorbar(sm, cax=cbar_ax, orientation="horizontal", format="%.0f", ticks=[0, 25, 50, 75, 100])
+    # Ticks every 5 units across [vmin, vmax] — the same granularity
+    # color_limits() rounds to, so every tick lands exactly on a colour
+    # boundary a reader could pick off the ramp.
+    step = 5
+    ticks = list(np.arange(vmin, vmax + 0.01, step))
+    cb = plt.colorbar(sm, cax=cbar_ax, orientation="horizontal", format="%.0f", ticks=ticks)
     cb.outline.set_linewidth(0.3)
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
     cb.set_label("median citywide percentile of annual ground irradiation", fontsize=6.5, color=INK, labelpad=2)
-    # City median (50th percentile, by definition) marked on the same bar
-    # every community's own fill colour is drawn from — not a separate
-    # reference line the reader has to translate between two scales.
-    cb.ax.axvline(50, color=INK, lw=1.1, zorder=5)
-    caption = "city median = 50 · grey hatch = no cells (excluded from study area)"
+    # City median (50th percentile, by definition) marked against the same
+    # bar every community's own fill colour is drawn from — not a separate
+    # reference line the reader has to translate between two scales. Every
+    # community here sits below the city median (that is the whole reason
+    # color_limits() had to shrink the scale), so 50 is typically OFF the
+    # visible bar — drawn as an arrow annotation pointing past its edge
+    # rather than an axvline that would silently fall outside [0, 1] and
+    # not render at all.
+    caption = f"scale = {vmin:.0f}–{vmax:.0f} (community medians only) · grey hatch = no cells (excluded from study area)"
+    if vmin <= 50.0 <= vmax:
+        cb.ax.axvline(50, color=INK, lw=1.1, zorder=5)
+        caption = f"city median = 50 (on this bar) · {caption}"
+    else:
+        # Annotation sits ABOVE the bar's own right edge (offset in points,
+        # not axes-fraction — the bar itself is only ~0.05in tall, so an
+        # axes-fraction offset would land far too close to it) rather than
+        # beside it, so it never collides with the side caption drawn at
+        # the bar's own vertical centre just to its right.
+        cb.ax.annotate("city median = 50", xy=(1.0, 1.0), xycoords="axes fraction",
+                       xytext=(0, 13), textcoords="offset points",
+                       fontsize=6, color=INK, ha="right", va="bottom",
+                       arrowprops=dict(arrowstyle="->", color=INK, lw=0.8, shrinkB=1))
     if len(off_map):
         names = ", ".join(f"{by_name[n]['number']} {n}" for n in off_map["name"] if n in by_name)
         caption += f" · off map (outside the data extent): {names}"
     fig.text(cbar_x0 + cbar_w + 0.012, cbar_y0 + cbar_h * 0.5,
              caption, fontsize=6.5, color=MUTED, ha="left", va="center")
+
+
+def folha4_mare_panel_numbers(hero: bool) -> dict:
+    """FOLHA4 Maré's panel numbers, in reading order (round 5: the sheet
+    used to read masthead -> hero map -> choropleth -> distributions ->
+    box plots while the titles printed '2 ·' above '1 ·' — the choropleth
+    and the histogram panel were numbered as if the choropleth came after
+    the whole-distributions panel, when on the page it draws first). One
+    place assigns these so every title-drawing call (draw_hero_map_v4 is
+    always panel 1 when it draws at all; the other three shift by whether
+    the hero map is present) and the numbering test agree by construction,
+    never by two call sites independently counting rows."""
+    if hero:
+        return {"hero_map": 1, "community_choropleth": 2,
+                "distributions_top": 3, "distributions_bottom": 4}
+    return {"community_choropleth": 1, "distributions_top": 2, "distributions_bottom": 3}
 
 
 def build_folha4_mare(hero: bool) -> dict:
@@ -1523,6 +1637,8 @@ def build_folha4_mare(hero: bool) -> dict:
     build_date = datetime.date.today().isoformat()
     folha_nn = SHEET_NUMBER.get(site, "00")
     dist_data = mare_dist.compute_distributions(ROOT)
+    choropleth_vmin, choropleth_vmax = mare_dist.community_color_limits(dist_data["community_stats"])
+    panel_num = folha4_mare_panel_numbers(hero)
 
     fig = plt.figure(figsize=(11.69, 16.54), dpi=200, facecolor=PAPER)
     # Explicit spacer rows instead of a single hspace fraction: GridSpec's
@@ -1615,7 +1731,8 @@ def build_folha4_mare(hero: bool) -> dict:
     if hero:
         ax_hero = fig.add_subplot(gs[row, 0])
         try:
-            draw_hero_map_v4(ax_hero, d, territory, stats, dist_data)
+            draw_hero_map_v4(ax_hero, d, territory, stats, dist_data,
+                            panel_num=panel_num["hero_map"])
             panels.append("hero_map_v4")
         except Exception as e:
             ax_hero.axis("off")
@@ -1626,7 +1743,10 @@ def build_folha4_mare(hero: bool) -> dict:
 
     ax_choro = fig.add_subplot(gs[row, 0])
     try:
-        draw_community_choropleth(ax_choro, territory, dist_data)
+        draw_community_choropleth(ax_choro, territory, dist_data,
+                                  color_limits=(choropleth_vmin, choropleth_vmax),
+                                  buildings=d["buildings"],
+                                  panel_num=panel_num["community_choropleth"])
         panels.append("community_choropleth")
     except Exception as e:
         ax_choro.axis("off")
@@ -1637,10 +1757,13 @@ def build_folha4_mare(hero: bool) -> dict:
 
     with mpl.rc_context(mpl.rcParamsDefault):
         plt.rcParams.update(mare_dist.DISTRIBUTIONS_RC)
-        mare_dist.draw_distributions_top(fig, gs[row, 0], dist_data)
-        row += 2  # skip the fixed SPACER before panel 3 (round-3 fix for
-        # the no-hero dead-space gap — see the height_ratios comment above)
-        mare_dist.draw_distributions_bottom(fig, gs[row, 0], dist_data)
+        mare_dist.draw_distributions_top(fig, gs[row, 0], dist_data,
+                                         panel_num=panel_num["distributions_top"])
+        row += 2  # skip the fixed SPACER before the ranked panel (round-3
+        # fix for the no-hero dead-space gap — see the height_ratios
+        # comment above)
+        mare_dist.draw_distributions_bottom(fig, gs[row, 0], dist_data,
+                                            panel_num=panel_num["distributions_bottom"])
     panels.append("distributions_core")
     row += 2  # skip SPACER_BEFORE_CAVEATS, the wider gap panel 3's rotated
     # tick labels need to clear the caveat strip's top rule
@@ -1679,7 +1802,15 @@ def build_folha4_mare(hero: bool) -> dict:
         "sheet_version": "FOLHA4", "build_date": build_date, "git_sha7": sha,
         "display_rotation_deg": territory.display_rotation_deg,
         "panels_built": panels,
+        "panel_numbers": panel_num,
         "distributions_run_of_record": dist_data["run_of_record"],
+        # Round 5, F2: the SAME (vmin, vmax) draw_community_choropleth was
+        # actually called with above — computed once via
+        # render_mare_irradiation_distributions.community_color_limits(),
+        # never retyped here, so a test can assert these follow the data
+        # (tests/test_render_mare_irradiation_distributions.py's
+        # community_color_limits red test) rather than trusting a comment.
+        "choropleth_color_limits": {"vmin": choropleth_vmin, "vmax": choropleth_vmax},
         "issues": issues,
         "outputs": {"A3_png": str(a3_path), "pdf": str(pdf_path), "web1200": str(web_path),
                     "communities_json": str(communities_path)},
