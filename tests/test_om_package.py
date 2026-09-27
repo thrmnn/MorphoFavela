@@ -21,7 +21,7 @@ from src.om_package.buffers import BUFFER_RADII_M, compute_buffer_variables
 from src.om_package.dictionary import dictionary_dataframe, full_dictionary
 from src.om_package.formvars import compute_form_variables
 from src.om_package.io_utils import Paths, hash_tree, write_table
-from src.om_package.package_docs import USE_TERMS, render_readme
+from src.om_package.package_docs import USE_TERMS, render_changelog, render_readme
 from src.om_package.quality import PENDING_ITEMS, coverage_report
 from src.om_package.routes import (
     POINT_SPACING_M,
@@ -379,12 +379,34 @@ def test_write_table_geo_keeps_geoparquet_metadata_and_xy(tmp_path):
 
 # --- must-fix 3: use-terms banner, no PLACEHOLDER --------------------------
 
+#: Fake but well-formed decisions fixture — same shape provenance.read_om_decisions()
+#: returns, so render_readme/render_changelog can be exercised without a real
+#: brisaverse checkout. Covers all seven ids the audit requires (2026-09-27).
+_FAKE_DECISIONS = [
+    {"id": "om_use_terms", "question": "q", "resolution": "Named team only, internal review draft.", "resolved_utc": "2026-09-24T18:39:11Z"},
+    {"id": "om_scope", "question": "q", "resolution": "Surface structure only.", "resolved_utc": "2026-09-24T18:39:11Z"},
+    {"id": "om_shade_release", "question": "q", "resolution": "Release building-only shade once dates are known.", "resolved_utc": "2026-09-24T18:39:11Z"},
+    {"id": "om_credit", "question": "q", "resolution": "Acknowledgment now, authorship later.", "resolved_utc": "2026-09-24T18:39:11Z"},
+    {"id": "om_dates_tz", "question": "q", "resolution": "Timezone stays an open question until confirmed.", "resolved_utc": "2026-09-24T18:39:11Z"},
+    {"id": "om_lidar", "question": "q", "resolution": "Location pending from the PI.", "resolved_utc": "2026-09-24T18:39:11Z"},
+    {"id": "om_route_geometry", "question": "q", "resolution": "Flag now; v0.2 rebuilds with a crosswalk.", "resolved_utc": "2026-09-24T18:39:11Z"},
+]
+
+_FAKE_NODATA_FLOOR_M = {"min": 105.1, "median": 338.4, "max": 598.9}
+
 _README_STATS = dict(
     n_om2_points=1559,
     n_route_geometry_flagged=38,
     n_lambda_p_ones=124,
     n_lambda_p_ones_flagged=38,
     lambda_p_share_explained_pct=30.6,
+    n_lambda_p_remainder=86,
+    n_lambda_p_remainder_plausible=80,
+    route_fetch_date_label="file dates 2026-09-24 (route JSON mtimes; no fetch manifest recorded)",
+    nodata_floor_m=_FAKE_NODATA_FLOOR_M,
+    internal_routes_status="not built in this version — no `outputs/_packages/_internal/mare_routes/v0.1.3` directory exists yet.",
+    decisions=_FAKE_DECISIONS,
+    dtm_native_resolution_m=5.0,
 )
 
 
@@ -420,3 +442,166 @@ def test_readme_no_pending_surface_cover_row():
     from src.om_package.dictionary import _PENDING
 
     assert not any("surface_cover" in k or "surface cover" in v.get("definition", "").lower() for k, v in _PENDING.items())
+
+
+# --- 2026-09-27 numerical audit: docs/provenance defects --------------------
+
+_CHANGELOG_KWARGS = dict(
+    n_om2_points=1559,
+    nodata_floor_m=_FAKE_NODATA_FLOOR_M,
+    csv_catalogued_note="The pilot manifest's own note on the rest of the Drive folder: fake note.",
+    decisions=_FAKE_DECISIONS,
+)
+
+
+def test_render_readme_requires_nodata_floor_m_no_default():
+    """A sabotaged call missing nodata_floor_m must fail loudly (TypeError:
+    missing required argument), never silently render a default number —
+    this used to be `shade_min_nan_dist_m: float = 104.15`."""
+    stats = {k: v for k, v in _README_STATS.items() if k != "nodata_floor_m"}
+    with pytest.raises(TypeError):
+        render_readme(**stats)
+
+
+def test_render_changelog_requires_nodata_floor_m_no_default():
+    kwargs = {k: v for k, v in _CHANGELOG_KWARGS.items() if k != "nodata_floor_m"}
+    with pytest.raises(TypeError):
+        render_changelog(**kwargs)
+
+
+def test_require_nodata_floor_m_fails_loudly_on_a_sabotaged_manifest():
+    """A manifest whose p05_shade block lacks nodata_floor_m (e.g. from a
+    build that skipped the measurement) must raise, not default, when a
+    consumer tries to read it out for rendering."""
+    from src.om_package.package_docs import require_nodata_floor_m
+
+    sabotaged_p05_shade = {"n_csv_pilot": 5, "n_campaign_dates": 5}  # no nodata_floor_m key
+    with pytest.raises(KeyError):
+        require_nodata_floor_m(sabotaged_p05_shade)
+
+    intact_p05_shade = {"nodata_floor_m": _FAKE_NODATA_FLOOR_M}
+    assert require_nodata_floor_m(intact_p05_shade) == _FAKE_NODATA_FLOOR_M
+
+
+def test_readme_cites_decision_ids_not_interview_codes():
+    readme = render_readme(**_README_STATS)
+    assert "Q6a" not in readme
+    assert "om_use_terms" in readme
+
+
+def test_readme_states_internal_routes_status_not_a_fixed_claim():
+    readme = render_readme(**_README_STATS)
+    assert _README_STATS["internal_routes_status"] in readme
+
+
+def test_readme_lambda_p_remainder_is_a_computed_check():
+    readme = render_readme(**_README_STATS)
+    known_limits = readme.split("## Known limits")[1].split("## Manifest")[0]
+    assert "building_count_buffer_10m > 0" in known_limits
+    assert "86" in known_limits and "80" in known_limits
+
+
+def test_readme_join_example_points_at_shipped_script():
+    readme = render_readme(**_README_STATS)
+    assert "OM2/join_shade_example.py" in readme
+    known_limits = readme.split("## Known limits")[1].split("## Manifest")[0]
+    assert "OM2/join_shade_example.py" in known_limits
+
+
+def test_readme_manifest_section_states_self_hash_exclusion():
+    readme = render_readme(**_README_STATS)
+    manifest_section = readme.split("## Manifest")[1].split("## Use terms")[0]
+    assert "excludes its own hash" in manifest_section
+
+
+def test_readme_sources_no_invented_vintage():
+    readme = render_readme(**_README_STATS)
+    sources = readme.split("## Sources and dates")[1].split("## Methods")[0]
+    assert "vintage not recorded in data/README.md" in sources
+    assert "2019 cadastral clip" in sources
+    assert "5 m native resolution" in sources
+
+
+def test_render_changelog_v01_entry_byte_identical_to_v012_shipped():
+    """v0.1's frozen entry must match, byte-for-byte, the v0.1 section of
+    outputs/_packages/mare_om2/v0.1.2/CHANGELOG.md (the last shipped file
+    that carries it) — no defect was flagged in it by the 2026-09-27
+    audit, so freezing it must not silently change a single character."""
+    shipped_path = PATHS.root / "outputs" / "_packages" / "mare_om2" / "v0.1.2" / "CHANGELOG.md"
+    if not shipped_path.exists():
+        pytest.skip("v0.1.2/CHANGELOG.md not present at the default root")
+    shipped = shipped_path.read_text(encoding="utf-8")
+    shipped_v01 = "## v0.1 — 2026-09-24\n" + shipped.split("## v0.1 — 2026-09-24\n", 1)[1]
+    rendered = render_changelog(**_CHANGELOG_KWARGS)
+    rendered_v01 = "## v0.1 — 2026-09-24\n" + rendered.split("## v0.1 — 2026-09-24\n", 1)[1]
+    assert rendered_v01 == shipped_v01
+
+
+def test_render_changelog_v011_entry_fixes_the_version_drift_bug():
+    """The shipped v0.1.1 entry says 'now build to .../v0.1.2/' — a
+    version-drift bug (the CURRENT version leaking into historical text).
+    The frozen, corrected entry must name v0.1.1, OM1 only, and must not
+    repeat that bug."""
+    rendered = render_changelog(**_CHANGELOG_KWARGS)
+    v011 = rendered.split("## v0.1.1 — 2026-09-24\n", 1)[1].split("## v0.1 — 2026-09-24", 1)[0]
+    assert "mare_routes/v0.1.1/" in v011
+    assert "OM1" in v011
+    assert "mare_routes/v0.1.2/" not in v011
+
+
+def test_render_changelog_v012_entry_no_qcodes_no_hardcoded_floor():
+    rendered = render_changelog(**_CHANGELOG_KWARGS)
+    v012 = rendered.split("## v0.1.2 — 2026-09-25\n", 1)[1].split("## v0.1.1 — 2026-09-24", 1)[0]
+    assert "Q1/Q5" not in v012
+    assert "~104-330" not in v012
+    assert "om_shade_release" in v012 and "om_dates_tz" in v012
+    assert "docs/critic/octopus_package_panel_2026-09-24.md" in v012
+
+
+def test_render_changelog_v012_entry_reads_point_count_from_kwargs_not_hardcoded():
+    kwargs = dict(_CHANGELOG_KWARGS, n_om2_points=42)
+    rendered = render_changelog(**kwargs)
+    v012 = rendered.split("## v0.1.2 — 2026-09-25\n", 1)[1].split("## v0.1.1 — 2026-09-24", 1)[0]
+    assert "42 OM2" in v012 or "42\n" in v012 or "all 42" in v012
+    assert "1559" not in v012
+    assert "~9 s" not in v012
+
+
+TASKS_JSON = Path("/home/theo/SCL/SCR/brisaverse/shared/facts/tasks.json")
+
+
+@pytest.mark.skipif(not TASKS_JSON.exists(), reason="brisaverse shared/facts/tasks.json not found at the default root")
+def test_provenance_decisions_present_with_the_seven_ids():
+    from src.om_package.provenance import OM_DECISION_IDS, read_om_decisions
+
+    decisions = read_om_decisions()
+    assert [d["id"] for d in decisions] == OM_DECISION_IDS
+    for d in decisions:
+        assert d["resolution"]
+        assert d["resolved_utc"]
+
+
+def test_hash_tree_excludes_manifest_self_hash(tmp_path):
+    (tmp_path / "a.txt").write_text("hello")
+    # simulate a STALE manifest.json already on disk from a previous build
+    (tmp_path / "manifest.json").write_text('{"package_version": "stale"}')
+    files = hash_tree(tmp_path, exclude={"manifest.json"})
+    assert "manifest.json" not in files
+    assert "a.txt" in files
+
+
+def test_internal_routes_status_and_route_fetch_date_label(tmp_path):
+    build_mod = _load_build_module()
+    root = tmp_path
+    (root / "outputs" / "_packages" / "_internal" / "mare_routes" / "v9.9.9" / "OM1").mkdir(parents=True)
+    status = build_mod.internal_routes_status(root, "v9.9.9")
+    assert "OM1" in status
+    status_missing = build_mod.internal_routes_status(root, "v0.0.0")
+    assert "not built in this version" in status_missing
+
+    routes_dir = root / "data" / "maré" / "octopus" / "routes"
+    routes_dir.mkdir(parents=True)
+    (routes_dir / "OM_2_inferred_route.json").write_text("{}")
+    fake_paths = Paths(root)
+    label = build_mod.route_fetch_date_label(fake_paths)
+    assert "file dates" in label

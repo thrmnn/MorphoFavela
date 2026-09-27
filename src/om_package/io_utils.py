@@ -114,13 +114,26 @@ def read_gpkg(path: Path) -> gpd.GeoDataFrame:
     return gpd.read_file(path)
 
 
-def hash_tree(root: Path) -> dict[str, str]:
+def hash_tree(root: Path, exclude: set[str] | None = None) -> dict[str, str]:
     """sha256 of every regular file under root, keyed by its path relative
     to root (POSIX separators) — used to build the manifest's per-file
-    checksums. Excludes nothing; call it only after every other file in
-    the package has been written."""
+    checksums. Call it only after every other file in the package has
+    been written.
+
+    ``exclude`` is a set of relative (POSIX) paths to leave out — always
+    pass ``{"manifest.json"}`` when hashing a package's own root: on a
+    rebuild of the same version, manifest.json already exists on disk
+    from the PREVIOUS build (this run hasn't written its own copy yet, so
+    without excluding it here this function hashes stale prior content,
+    which is then immediately overwritten — a self-hash that can never
+    verify). manifest.json is written after this call anyway, so it is
+    never a real omission."""
+    exclude = exclude or set()
     out: dict[str, str] = {}
     for p in sorted(Path(root).rglob("*")):
         if p.is_file():
-            out[p.relative_to(root).as_posix()] = hashlib.sha256(p.read_bytes()).hexdigest()
+            rel = p.relative_to(root).as_posix()
+            if rel in exclude:
+                continue
+            out[rel] = hashlib.sha256(p.read_bytes()).hexdigest()
     return out

@@ -1,28 +1,58 @@
 """P-01 README + P-09 CHANGELOG for the mare_om2 package. Generated, not
 hand-edited — rebuild via scripts/build_om_package.py after any source/method
-change (never hand-edit data/outputs, per CLAUDE.md)."""
+change (never hand-edit data/outputs, per CLAUDE.md).
+
+Audit fix (2026-09-27): every value rendered here that describes a
+measured or provenance fact (fetch dates, the nodata floor, which
+internal routes actually exist on disk, the named-team decision date) is
+now a REQUIRED parameter with no default — see ``require_nodata_floor_m``
+below. A caller that cannot supply one must compute it (see
+``scripts/build_om_package.py``) rather than let this module quietly fall
+back to a stale number.
+"""
 from __future__ import annotations
 
 from datetime import date
 
 VERSION = "v0.1.3"
 #: read from the clock at import time, never typed — this is the date this
-#: version is BUILT, not the date any source data was fetched (see
-#: ROUTE_FETCH_DATE below for that).
+#: version is BUILT, not the date any source data was fetched (the
+#: "fetched" date in the README is computed at build time from the route
+#: files' own mtimes, or a routes manifest if one exists — see
+#: ``scripts/build_om_package.py``'s ``route_fetch_date_label``).
 VERSION_DATE = date.today().isoformat()
-#: the route JSONs were last fetched 2026-09-25 (v0.1.2) — unchanged by
-#: v0.1.3, which touches no input data, only the spec-conformance/shipped-
-#: script additions. Kept as its own constant so the README's "fetched"
-#: date never silently drifts to whatever day a later version happens to
-#: be built on.
-ROUTE_FETCH_DATE = "2026-09-25"
 
-#: PI ruling 2026-09-24 (Q6a). Same text goes in the README banner and the
-#: manifest's use_terms field — one string, so the two can never drift.
+#: Same text goes in the README banner and the manifest's use_terms field
+#: — one string, so the two can never drift. The decision behind it
+#: (``om_use_terms``) and its date travel in manifest.json's
+#: ``provenance.decisions``, not as a prose interview code (audit fix,
+#: 2026-09-27 — see src/om_package/provenance.py).
 USE_TERMS = (
     "INTERNAL REVIEW DRAFT — Octopus LRP #2 team members only; not for "
     "redistribution or citation; to be revisited at submission."
 )
+
+
+def _decision(decisions: list[dict], decision_id: str) -> dict:
+    """The one entry in ``decisions`` (provenance.read_om_decisions()'s
+    output) with this id. Raises — never silently substitutes another
+    entry or an empty string — if it's absent, since every call site below
+    needs that specific decision's resolution text."""
+    for d in decisions:
+        if d["id"] == decision_id:
+            return d
+    raise KeyError(f"decision '{decision_id}' not found in {[d.get('id') for d in decisions]}")
+
+
+def require_nodata_floor_m(p05_shade: dict) -> dict:
+    """Pulls {"min", "median", "max"} nodata-floor stats (metres) out of a
+    manifest's ``p05_shade`` block. Raises KeyError, never a default —
+    this number used to be hardcoded (104.15 m) and drifted from what was
+    actually measured; a manifest missing it means the build skipped the
+    measurement (see shade.nodata_floor_m), and rendering must fail
+    loudly rather than paper over that with a stale constant."""
+    return p05_shade["nodata_floor_m"]
+
 
 README_TEMPLATE = """\
 > **{use_terms}**
@@ -36,9 +66,12 @@ Jingxue, PI Simone). Théo Hermann contributes street-form variables from
 the MorphoFavela pipeline in a support role. This package contains no
 temperature analysis and no conclusions — those are the Octopus team's work.
 
-**Named team (PI ruling 2026-09-24, Q6a):** Jingxue, Vincent, Simone —
-this release goes to the three of them only, as an internal review draft;
-not for wider redistribution or citation (see Use terms).
+**Named team (PI decision `om_use_terms`, {om_use_terms_date}):** Jingxue,
+Vincent, Simone — this release goes to the three of them only, as an
+internal review draft; not for wider redistribution or citation (see Use
+terms). The decision's full resolution text travels in this package's
+`manifest.json` under `provenance.decisions` (id `om_use_terms`), not as
+an interview shorthand a reader outside this repo cannot resolve.
 
 Generated {version_date} by `scripts/build_om_package.py`
 (source: `src/om_package/` in the MorphoFavela repo).
@@ -47,10 +80,11 @@ Generated {version_date} by `scripts/build_om_package.py`
 
 **OM2 only.** This directory (`outputs/_packages/mare_om2/{version}/`)
 contains OM2 exclusively. OM1/OM3/OM4 are built by the exact same code
-path (`--route ALL`) but written to an internal build directory outside
-this package (`outputs/_packages/_internal/mare_routes/{version}/`) — they
-are never copied or symlinked into `mare_om2/`, so zipping/sharing this
-directory cannot leak them. **{version} supports RQ2's within-route
+path (`--route ALL`) writing to an internal build directory outside this
+package (`outputs/_packages/_internal/mare_routes/{version}/`) whenever
+that path is run — they are never copied or symlinked into `mare_om2/`,
+so zipping/sharing this directory cannot leak them. **For {version}:
+{internal_routes_status}** **{version} supports RQ2's within-route
 spatial/temporal analysis only.** RQ3's between-route holdout needs
 OM1/OM3/OM4 released, which is a PI decision for a later version.
 
@@ -75,19 +109,24 @@ densification.
 
 | Source | Date / vintage | Used for |
 |---|---|---|
-| OM_1..OM_4_inferred_route.json (Google Drive, PI-owned folder) | fetched {route_fetch_date} | P-02 route points |
-| data/maré/raw/buildings_mare.shp + buildings_extended_300m.gpkg | 2019 airborne survey | P-04 building height/plan density, P-03 buffers, route_geometry_flag |
-| data/maré/raw/mare_dtm.tif (+ extended DTM) | 2019 | canyon H/W, SVF |
-| data/maré/raw/street_mare.shp | 2019 | street network for SVF/canyon sampling, route_geometry_flag |
+| OM_1..OM_4_inferred_route.json (Google Drive, PI-owned folder) | {route_fetch_date_label} | P-02 route points |
+| data/maré/raw/buildings_mare.shp + buildings_extended_300m.gpkg | 2019 cadastral clip (RJ IPP municipal layer, `buildings_RJ_2019.shp` — see data/README.md) | P-04 building height/plan density, P-03 buffers, route_geometry_flag |
+| data/maré/raw/mare_dtm.tif (+ extended DTM) | vintage not recorded in data/README.md | canyon H/W, SVF |
+| data/maré/raw/street_mare.shp | vintage not recorded in data/README.md | street network for SVF/canyon sampling, route_geometry_flag |
 | outputs/maré/svf_v2/svf_streets.gpkg | ray-cast from the above, 1.5 m pedestrian height, 145-patch Tregenza sky (src/svf_v2) | P-04 sky_view_factor |
 | outputs/maré/morphometrics/canyon/hw_streets.gpkg | derived from the above (src/urban_morphology.py projected-width method) | P-04 street_width_m, building_height_m, height_width_ratio |
 | outputs/maré/features/features_grid.parquet | 10 m grid, derived from the above | P-04 plan_density_lambda_p, grid_cell_id, P-06 ventilation proxies incl. lambda_f_<dir> |
 | data/maré/wind_rose.json | ASOS Galeão (SBGL) METAR, 2015-2024 | P-06 wind-alignment proxy |
 | data/maré/neighbourhoods.gpkg | community boundary crosswalk | neighbourhood attribution |
 
-**2019 buildings + terrain is the "airborne" source for every {version}
-variable.** No terrestrial (ground-instrument) source is used or
-available yet — see Known limits.
+The extended DTM (`dtm_extended_300m.tif`, used for P-05 shade's horizon
+march) is **{dtm_native_resolution_m:g} m native resolution** (read from
+the raster at build time), resampled to 1 m by
+`src/brisa_solar/wp02_surface.build_surface` to match WP-04's `CELL_M`.
+
+**The buildings + terrain cadastral layer is the source for every
+{version} P-04/P-06 variable.** No terrestrial (ground-instrument) source
+is used or available yet — see Known limits.
 
 ## Methods
 
@@ -161,8 +200,9 @@ available yet — see Known limits.
 
 ## Known limits
 
-- **Airborne only.** Every P-04/P-06 variable is 2019 buildings+terrain
-  derived. No terrestrial ground-truth comparison exists yet.
+- **No terrestrial ground-truth comparison exists yet.** Every P-04/P-06
+  variable is derived from the cadastral buildings + DTM layers in
+  Sources and dates above.
 - **Sky-view factor is an UPPER BOUND under canopy.** The ray-cast mesh is
   buildings + bare-earth terrain only — no vegetation is in the scene — so
   a tree-covered point's real sky view is <= the reported
@@ -172,22 +212,26 @@ available yet — see Known limits.
   or more than 10 m from the nearest street centreline. Of the
   {n_lambda_p_ones} points with `plan_density_lambda_p == 1.0`,
   {n_lambda_p_ones_flagged} ({lambda_p_share_explained_pct}%) are
-  explained by this flag; the remainder are plausible fully-built 10 m
-  cells, not a join defect.
+  explained by this flag. Of the remaining {n_lambda_p_remainder} points,
+  {n_lambda_p_remainder_plausible} have `building_count_buffer_10m > 0`
+  and a recorded `building_height_mean_buffer_10m` (consistent with a
+  fully-built 10 m cell rather than a join defect) — {n_lambda_p_remainder_not_checked}
+  remain unchecked.
 - **point_id is PROVISIONAL.** It is minted from the OSM-inferred route
   file, not the team's own om_routes.gpkg. The ID string is stable across
   rebuilds of the same route file, but the place it names may move when
   v0.2 rebuilds on the real route — that release will publish an
-  old->new `point_id` crosswalk.
-- **Timezone is still UNRESOLVED** for the OM2 campaign: GPS-fix Timestamp
-  rows are UTC per firmware; RTC-fallback (no-fix) rows may be local time
-  or something else the firmware does not record. Every function in
-  `src/om_package/shade.py` that needs a timezone takes it as a required
-  parameter with no default. **{version}'s P-05 table is computed with
-  `tz="UTC"`** (current operating rule for this cycle) — this is a stated
-  labelling choice, NOT a resolution of the open question; treat every
-  timestamp in `p05_building_shade` as UTC-labelled, re-derive if the team
-  confirms otherwise, and do not read it as local Rio clock time.
+  old->new `point_id` crosswalk (decision `om_route_geometry`).
+- **Timezone is still UNRESOLVED** for the OM2 campaign (decision
+  `om_dates_tz`): GPS-fix Timestamp rows are UTC per firmware;
+  RTC-fallback (no-fix) rows may be local time or something else the
+  firmware does not record. Every function in `src/om_package/shade.py`
+  that needs a timezone takes it as a required parameter with no default.
+  **{version}'s P-05 table is computed with `tz="UTC"`** (current
+  operating rule for this cycle) — this is a stated labelling choice, NOT
+  a resolution of the open question; treat every timestamp in
+  `p05_building_shade` as UTC-labelled, re-derive if the team confirms
+  otherwise, and do not read it as local Rio clock time.
 - **The Zenodo_release/fixed_data pilot CSVs have NO Latitude/Longitude
   column** (`Timestamp,Temperature,Humidity,PM1.0,PM2.5,PM2.5_cal,PM4.0,
   PM10.0` — confirmed on one CSV per device, I_1/I_3/I_4/O_3/O_4). This
@@ -199,21 +243,24 @@ available yet — see Known limits.
   see `docs/research/octopus_lidar_sources.md` §5 and the team message.
   `infer_campaign_windows()` was made schema-tolerant (v0.1.2): it reports
   `has_gps=False`, `n_fix=n_rows`, `n_no_fix=0` for this schema rather
-  than raising. The join example below is exercised on a real file from
-  this pull with its temporal (nearest 5-min timestamp) step only, since
-  the spatial (nearest-OM2-point) step needs a GPS-track CSV this pull
-  did not contain.
+  than raising. The join example shipped in this package
+  (`OM2/join_shade_example.py`, see Methods above, P-05) is exercised on a
+  real file from this pull with its temporal (nearest 5-min timestamp)
+  step only, since the spatial (nearest-OM2-point) step needs a GPS-track
+  CSV this pull did not contain.
 - **max_dist_m={shade_max_dist_m:g} m, not WP-04's 500 m citywide
   default**, for the horizon march behind P-05: `dtm_extended_300m.tif` /
-  `buildings_extended_300m.gpkg` has real nodata starting {shade_min_nan_dist_m:.0f}
-  m from the nearest OM2 point (measured 2026-09-25 — its raster bounding
-  box is a rectangle, but valid coverage inside it is not). WP-02's
-  horizon march (`wp02_horizon.py`) is not NaN-safe (`torch.maximum`
-  propagates NaN), so a full-radius pilot run returned all-NaN horizon
-  values before this was caught; {shade_max_dist_m:g} m is safely under
-  every OM2 point's measured nodata floor and was NOT patched into the
-  shared WP-02 engine (P1's citywide/WP-04 defended numbers also depend on
-  it) — this scoping fix lives only in `point_horizon_profiles()`.
+  `buildings_extended_300m.gpkg` has real nodata starting between
+  {nodata_floor_min_m:.0f} m and {nodata_floor_max_m:.0f} m from OM2
+  points (median {nodata_floor_median_m:.0f} m; measured per point at
+  build time via `shade.nodata_floor_m()` — its raster bounding box is a
+  rectangle, but valid coverage inside it is not). WP-02's horizon march
+  (`wp02_horizon.py`) is not NaN-safe (`torch.maximum` propagates NaN), so
+  a full-radius pilot run returned all-NaN horizon values before this was
+  caught; {shade_max_dist_m:g} m is safely under every OM2 point's
+  measured nodata floor and was NOT patched into the shared WP-02 engine
+  (P1's citywide/WP-04 defended numbers also depend on it) — this scoping
+  fix lives only in `point_horizon_profiles()`.
 - **NaN has two distinct causes** in the point table's joined columns —
   they are not interchangeable and are documented separately per column
   in the data dictionary (P-08): (1) *beyond the join-distance cap*
@@ -222,16 +269,17 @@ available yet — see Known limits.
   sample); (2) *no feature in the buffer* (`building_height_mean_buffer_*m`
   — zero buildings intersect that point's buffer, a real "no building
   here" result, not a join gap).
-- **Terrestrial SVF: PENDING** — needs the team's 2026 OM2 terrestrial
-  scan.
+- **Terrestrial SVF: PENDING** (decision `om_lidar`) — needs the team's
+  2026 OM2 terrestrial scan; PI knows where the 2024 airborne and 2026
+  terrestrial data are, location pending from the PI.
 - **Building shade: computed for {n_campaign_dates} pilot campaign dates**
-  (see P-05 above) — more dates arrive as more of the team's Drive CSVs
-  are pulled; an empty table still ships when no CSVs are found at build
-  time. **Tree shade: PENDING** — no tree canopy/DSM layer for Maré on
-  disk. `tree_shade` is reserved as an always-null column in the shade
-  schema.
+  (see P-05 above, decision `om_shade_release`) — more dates arrive as
+  more of the team's Drive CSVs are pulled; an empty table still ships
+  when no CSVs are found at build time. **Tree shade: PENDING** — no tree
+  canopy/DSM layer for Maré on disk. `tree_shade` is reserved as an
+  always-null column in the shade schema.
 - **Height change 2024->2026: PENDING** — data location being confirmed
-  by T. Hermann.
+  by T. Hermann (decision `om_lidar`).
 - Nearest-neighbour joins carry a `*_join_dist_m` column; check it before
   trusting a value near a data-layer edge.
 - Ventilation columns are geometry-derived PROXIES, not simulated or
@@ -242,12 +290,15 @@ available yet — see Known limits.
 
 ## Manifest
 
-`manifest.json` records `package_version`, `crs`, `use_terms`, per-route
-build stats (relative output paths), and a `sha256` per file in this
-package (recompute and compare before trusting a copy). Parquet tables
-built from a GeoDataFrame (`points.parquet`) carry GeoParquet `geo`
-metadata as well as plain `x`/`y` columns, so both GeoParquet-aware and
-plain-pandas readers work without extra steps.
+`manifest.json` records `package_version`, `crs`, `use_terms`,
+`provenance.decisions` (the seven Octopus panel decisions, id +
+resolution text — see above), per-route build stats (relative output
+paths), and a `sha256` per OTHER file in this package (recompute and
+compare before trusting a copy — `manifest.json` excludes its own hash,
+since a file cannot record its own checksum before it is written).
+Parquet tables built from a GeoDataFrame (`points.parquet`) carry
+GeoParquet `geo` metadata as well as plain `x`/`y` columns, so both
+GeoParquet-aware and plain-pandas readers work without extra steps.
 
 ## Use terms
 
@@ -257,113 +308,58 @@ plain-pandas readers work without extra steps.
 
 This package was produced with the MorphoFavela pipeline (Théo Hermann).
 Authorship is to be discussed with the lead author when the Octopus LRP #2
-contribution list is drafted.
+contribution list is drafted (decision `om_credit`).
 """
 
-CHANGELOG_TEMPLATE = """\
-# Changelog — mare_om2
+#: Frozen literal text — v0.1's shipped CHANGELOG entry, read verbatim
+#: from outputs/_packages/mare_om2/v0.1.2/CHANGELOG.md (audit fix,
+#: 2026-09-27: CHANGELOG_TEMPLATE used to run the WHOLE changelog through
+#: .format(version=..., version_date=...), so a stray `{version}` inside
+#: this historical text would have silently drifted to whatever version
+#: is current at build time — never happened here, but v0.1.1's entry
+#: below had exactly that bug). No defect was flagged in v0.1's own text,
+#: so it is reproduced unchanged.
+CHANGELOG_V01_ENTRY = """\
+## v0.1 — 2026-09-24
 
-## {version} — {version_date}
+Initial release. Built from the 2019 airborne source (buildings + DTM)
+against OM_2's inferred route (OM_1/OM_3/OM_4 built by the same code path,
+`--route ALL`).
 
-Structural fix (PI, 2026-09-27): the P-01..P-09 package spec was only
-mentioned in README prose — conformance to it was invisible, and P-03's
-aggregation script lived in the repo instead of travelling with the
-package. Both addressed directly, not just documented around.
+- P-02 route points at 1 m spacing, pedestrian height 1.5 m, stable IDs.
+- P-03 buffer variables at 5/10/20/50 m; segment aggregation script
+  (any length, re-runnable).
+- P-04 airborne form variables: building height, plan density, street
+  width, height-to-width ratio, street orientation, sky-view factor.
+  Terrestrial SVF PENDING.
+- P-05 shade function/CLI shipped; output table empty (campaign dates
+  unknown). Tree shade PENDING.
+- P-06 ventilation proxies (wind alignment, frontal area, openness,
+  distance to open space) — all labelled PROXY.
+- P-07 quality report (per-variable coverage + join gaps).
+- P-08 data dictionary (every variable this package is designed to carry,
+  including PENDING rows).
+- Contact sheet PNG for OM2.
+"""
 
-- **Spec conformance (P-00)**: the PI's package spec (P-01..P-09, verbatim,
-  2026-09-23) is now encoded as data (`src/om_package/spec.py`), each part
-  a mechanical predicate over the built package directory (file presence,
-  required columns + coverage read from `p07_quality_report.json`,
-  dictionary rows, README headings, changelog dating). Every build emits
-  `p00_spec_conformance.json` + `.csv` at the package root — delivered /
-  partial / pending per item, with evidence and, for a pending part, which
-  `tasks.json` id(s) unblock it. The README gains a "Conformance to the
-  package spec" section (right after the title) rendered from the same
-  computed result. Nothing here is typed by hand: every count/coverage
-  number is read from the file it describes.
-- **P-03 ships inside the package**: `OM2/aggregate_to_segments.py` is a
-  standalone (pandas + pyarrow only, no MorphoFavela import) mirror of
-  `src/om_package/segments.py`'s `aggregate_to_segments` — a recipient
-  with only this directory can re-aggregate to any segment length without
-  the repo. `scripts/aggregate_om_points.py` (the repo-only CLI) is
-  unchanged.
-- **P-05 join example ships inside the package**: `OM2/join_shade_example.py`
-  joins `p05_building_shade` against a real Octopus device CSV by
-  `point_id` and 5-min-floored `timestamp`, states the UTC-labelling
-  caveat in its own docstring.
-- Package version v0.1.2 -> v0.1.3 across `package_docs.py` and
-  `build_om_package.py`'s default `--version`.
-
-## v0.1.2 — 2026-09-25
-
-P-05 shade goes live on a real pilot pull, per the PI ruling 2026-09-24
-(Q1/Q5: release building-only shade once dates are known, from the raw
-CSVs, timezone stays UNRESOLVED).
-
-- **Pilot pull**: 5 CSVs (one per device — I_1/I_3/I_4/O_3/O_4) downloaded
-  from the PI's Drive `04_Octopus_Maré/_data collection/Zenodo_release/
-  fixed_data/` (created 2026-09-23) via the Drive connector, to
-  `data/maré/octopus/csv/` with a manifest (file id, name, size,
-  modified). The full folder holds far more files than this pilot pulled
-  (catalogued, not all downloaded — see the manifest's `catalogued_not_downloaded`
-  count and `docs/research/octopus_lidar_sources.md` §5).
-- **Schema finding**: all 5 pilot CSVs share
-  `Timestamp,Temperature,Humidity,PM1.0,PM2.5,PM2.5_cal,PM4.0,PM10.0` — NO
-  Latitude/Longitude column. This is a fixed-site indoor/outdoor logger
-  schema, not the OM2 GPS-track schema `OCTOPUS_JOIN_EXAMPLE` documents.
-  Whether I_1/I_3/I_4/O_3/O_4 are the OM2 device under another name, or a
-  separate deployment, is UNVERIFIED — flagged to Carlo, not assumed.
-- `infer_campaign_windows()` made schema-tolerant: reports `has_gps=False`,
-  `n_fix=n_rows`, `n_no_fix=0` for the no-GPS schema instead of raising;
-  added `n_epoch_reset` (2000-01-01 rows) — none found in the pilot.
-- `point_horizon_profiles()` WIRED for real (was `NotImplementedError` in
-  v0.1/v0.1.1): builds the obstruction surface from
-  `dtm_extended_300m.tif` + `buildings_extended_300m.gpkg` (WP-02's
-  `build_surface`, cell_m=1.0) and marches WP-02's
-  `patch_visibility(..., return_horizon=True)` from all 1559 OM2 points
-  at 1.5 m over the real 145-patch Tregenza direction set — same engine
-  WP-04 uses for direct-sun-hours. Runs on the laptop GPU (RTX 4060),
-  ~9 s for all 1559 points.
-- **max_dist_m dropped to 100 m** (from WP-04's 500 m citywide default)
-  for this march: `dtm_extended_300m.tif` has real nodata starting
-  ~104-330 m from OM2 points, and WP-02's running max is not NaN-safe
-  (`torch.maximum` propagates NaN) — an unscoped pilot run returned
-  all-NaN horizon values before this was caught. Not patched into the
-  shared WP-02 engine; scoped locally to `point_horizon_profiles()`.
-- `compute_shade()` run for the 5 pilot campaign dates (walk windows
-  padded to the hour, `tz="UTC"` — a stated labelling choice per the
-  current operating rule, NOT a resolution of the open timezone
-  question), producing a real (not empty-schema) `p05_building_shade`
-  table. `tree_shade` stays reserved and null.
-- `OCTOPUS_JOIN_EXAMPLE` exercised on one real pilot CSV
-  (`O_4_20260106_10durhrs.csv`): the temporal (nearest 5-min timestamp,
-  150 s tolerance) `merge_asof` step runs and matches; the spatial
-  (nearest-OM2-point, 0/0 no-fix drop) step is N/A for this schema and
-  documented as such rather than faked.
-- Package version v0.1.1 -> v0.1.2 across `package_docs.py`,
-  `build_om_package.py`'s default `--version`, and the brisaverse release
-  card (`om_release_v0_1_1` -> `om_release_v0_1_2`).
-- **Package-page fixes** (navigation council panel review 2026-09-24,
-  blocking + top improvements): the "Panel ruling" link on the package
-  page now points at a page rendered into `outputs/_packages/mare_om2/`
-  itself (`panel_review.html`), not at `docs/critic/...md` outside
-  `outputs/` — that path 404s on the live VPS hub, which only rsyncs
-  `outputs/`, never `docs/`. README names Vincent alongside Jingxue and
-  Simone as the release's named team, matching the `/ops` decision card.
-  The Documents section links the actual deliverable data files
-  (`OM2/points.*`, `p05_building_shade.*`, `p05b_campaign_windows.*`)
-  directly instead of requiring a `manifest.json` reverse-engineer. A
-  one-line glossary covers P-02..P-08, WP-02, `lambda_p` and the Tregenza
-  sky for a reader outside MorphoFavela.
-
+#: Frozen literal text — v0.1.1's shipped entry, corrected for the one
+#: audit-flagged defect (2026-09-27 audit, item 1): the shipped text read
+#: "OM1/OM3/OM4 now build to `.../mare_routes/v0.1.2/`" — the CURRENT
+#: version at whatever later date this was rendered, not v0.1.1, the
+#: version this entry describes, and only OM1 was actually built to that
+#: internal directory in v0.1.1 (confirmed on disk:
+#: outputs/_packages/_internal/mare_routes/v0.1.1/OM1 exists; OM3/OM4 do
+#: not). Every other bullet is reproduced unchanged.
+CHANGELOG_V011_ENTRY = """\
 ## v0.1.1 — 2026-09-24
 
 Panel review (docs/critic/octopus_package_panel_2026-09-24.md) and PI
 ruling (interview 2026-09-24) applied on top of v0.1's initial release.
 
-- Release scope narrowed to **OM2 only** in the shared package path; OM1/
-  OM3/OM4 now build to `outputs/_packages/_internal/mare_routes/{version}/`,
-  never inside `mare_om2/`.
+- Release scope narrowed to **OM2 only** in the shared package path; OM1
+  now builds to `outputs/_packages/_internal/mare_routes/v0.1.1/` (OM3
+  and OM4 were not run in v0.1.1) — the internal directory is never
+  copied into `mare_om2/`.
 - Added `route_geometry_flag` (within a building OR >10 m from the nearest
   street centreline), counted in the P-07 quality report, documented in
   P-08, and the README's lambda_p note rewritten with the measured share
@@ -405,27 +401,130 @@ ruling (interview 2026-09-24) applied on top of v0.1's initial release.
   Théo Hermann); authorship to be raised with the lead author when the
   contribution list is drafted. No PLACEHOLDER remains anywhere in the
   README.
+"""
 
-## v0.1 — 2026-09-24
+#: v0.1.2's entry, corrected for four audit-flagged defects (2026-09-27
+#: audit, items 3/5/7/10) the first time it is frozen into history (it
+#: was still the dynamically-templated "current" entry through v0.1.2's
+#: own build). Fixed: the "PI ruling 2026-09-24 (Q1/Q5: ...)" interview
+#: shorthand -> plain decision-id citations; the hardcoded "~104-330 m"
+#: nodata range -> the measured {nodata_floor_*} figures; the hardcoded
+#: "1559"/"~9 s" -> the actual point count (no timing figure is recorded
+#: anywhere, so it is dropped rather than kept as an unsourced number);
+#: "see the manifest's catalogued_not_downloaded count" (that key holds a
+#: prose note, not a count) -> the note's own text; "navigation council
+#: panel review 2026-09-24" -> the review document's real name. Every
+#: other bullet is reproduced unchanged. From v0.1.4 onward this entry, as
+#: written here, is itself frozen literal text.
+V012_ENTRY_TEMPLATE = """\
+## v0.1.2 — 2026-09-25
 
-Initial release. Built from the 2019 airborne source (buildings + DTM)
-against OM_2's inferred route (OM_1/OM_3/OM_4 built by the same code path,
-`--route ALL`).
+P-05 shade goes live on a real pilot pull, per two decisions from the
+{decisions_date} panel ruling: `om_shade_release` ({om_shade_release_resolution})
+and `om_dates_tz` ({om_dates_tz_resolution}).
 
-- P-02 route points at 1 m spacing, pedestrian height 1.5 m, stable IDs.
-- P-03 buffer variables at 5/10/20/50 m; segment aggregation script
-  (any length, re-runnable).
-- P-04 airborne form variables: building height, plan density, street
-  width, height-to-width ratio, street orientation, sky-view factor.
-  Terrestrial SVF PENDING.
-- P-05 shade function/CLI shipped; output table empty (campaign dates
-  unknown). Tree shade PENDING.
-- P-06 ventilation proxies (wind alignment, frontal area, openness,
-  distance to open space) — all labelled PROXY.
-- P-07 quality report (per-variable coverage + join gaps).
-- P-08 data dictionary (every variable this package is designed to carry,
-  including PENDING rows).
-- Contact sheet PNG for OM2.
+- **Pilot pull**: 5 CSVs (one per device — I_1/I_3/I_4/O_3/O_4) downloaded
+  from the PI's Drive `04_Octopus_Maré/_data collection/Zenodo_release/
+  fixed_data/` (created 2026-09-23) via the Drive connector, to
+  `data/maré/octopus/csv/` with a manifest (file id, name, size,
+  modified). {csv_catalogued_note}
+- **Schema finding**: all 5 pilot CSVs share
+  `Timestamp,Temperature,Humidity,PM1.0,PM2.5,PM2.5_cal,PM4.0,PM10.0` — NO
+  Latitude/Longitude column. This is a fixed-site indoor/outdoor logger
+  schema, not the OM2 GPS-track schema `OCTOPUS_JOIN_EXAMPLE` documents.
+  Whether I_1/I_3/I_4/O_3/O_4 are the OM2 device under another name, or a
+  separate deployment, is UNVERIFIED — flagged to Carlo, not assumed.
+- `infer_campaign_windows()` made schema-tolerant: reports `has_gps=False`,
+  `n_fix=n_rows`, `n_no_fix=0` for the no-GPS schema instead of raising;
+  added `n_epoch_reset` (2000-01-01 rows) — none found in the pilot.
+- `point_horizon_profiles()` WIRED for real (was `NotImplementedError` in
+  v0.1/v0.1.1): builds the obstruction surface from
+  `dtm_extended_300m.tif` + `buildings_extended_300m.gpkg` (WP-02's
+  `build_surface`, cell_m=1.0) and marches WP-02's
+  `patch_visibility(..., return_horizon=True)` from all {n_om2_points} OM2
+  points at 1.5 m over the real 145-patch Tregenza direction set — same
+  engine WP-04 uses for direct-sun-hours. Runs on the laptop GPU
+  (RTX 4060); no timing figure is recorded for this run.
+- **max_dist_m dropped to 100 m** (from WP-04's 500 m citywide default)
+  for this march: `dtm_extended_300m.tif` has real nodata starting
+  between {nodata_floor_min_m:.0f} m and {nodata_floor_max_m:.0f} m from
+  OM2 points (median {nodata_floor_median_m:.0f} m; measured via
+  `shade.nodata_floor_m()`), and WP-02's running max is not NaN-safe
+  (`torch.maximum` propagates NaN) — an unscoped pilot run returned
+  all-NaN horizon values before this was caught. Not patched into the
+  shared WP-02 engine; scoped locally to `point_horizon_profiles()`.
+- `compute_shade()` run for the 5 pilot campaign dates (walk windows
+  padded to the hour, `tz="UTC"` — a stated labelling choice per the
+  current operating rule, NOT a resolution of the open timezone
+  question), producing a real (not empty-schema) `p05_building_shade`
+  table. `tree_shade` stays reserved and null.
+- `OCTOPUS_JOIN_EXAMPLE` exercised on one real pilot CSV
+  (`O_4_20260106_10durhrs.csv`): the temporal (nearest 5-min timestamp,
+  150 s tolerance) `merge_asof` step runs and matches; the spatial
+  (nearest-OM2-point, 0/0 no-fix drop) step is N/A for this schema and
+  documented as such rather than faked.
+- Package version v0.1.1 -> v0.1.2 across `package_docs.py`,
+  `build_om_package.py`'s default `--version`, and the brisaverse release
+  card (`om_release_v0_1_1` -> `om_release_v0_1_2`).
+- **Package-page fixes** ({panel_review_doc}, blocking + top
+  improvements): the "Panel ruling" link on the package page now points
+  at a page rendered into `outputs/_packages/mare_om2/` itself
+  (`panel_review.html`), not at `docs/critic/...md` outside `outputs/` —
+  that path 404s on the live VPS hub, which only rsyncs `outputs/`, never
+  `docs/`. README names Vincent alongside Jingxue and Simone as the
+  release's named team, matching the `/ops` decision card. The Documents
+  section links the actual deliverable data files (`OM2/points.*`,
+  `p05_building_shade.*`, `p05b_campaign_windows.*`) directly instead of
+  requiring a `manifest.json` reverse-engineer. A one-line glossary
+  covers P-02..P-08, WP-02, `lambda_p` and the Tregenza sky for a reader
+  outside MorphoFavela.
+"""
+
+#: The newest entry — the only part of CHANGELOG.md still rendered fresh
+#: on every build (audit fix, 2026-09-27: everything above this used to
+#: run through the same .format() call, which is exactly how a stray
+#: `{version}` leaked into v0.1.1's historical text).
+CURRENT_ENTRY_TEMPLATE = """\
+# Changelog — mare_om2
+
+## {version} — {version_date}
+
+Structural fix (PI, 2026-09-27): the P-01..P-09 package spec was only
+mentioned in README prose — conformance to it was invisible, and P-03's
+aggregation script lived in the repo instead of travelling with the
+package. Both addressed directly, not just documented around.
+
+- **Spec conformance (P-00)**: the PI's package spec (P-01..P-09, verbatim,
+  2026-09-23) is now encoded as data (`src/om_package/spec.py`), each part
+  a mechanical predicate over the built package directory (file presence,
+  required columns + coverage read from `p07_quality_report.json`,
+  dictionary rows, README headings, changelog dating). Every build emits
+  `p00_spec_conformance.json` + `.csv` at the package root — delivered /
+  partial / pending per item, with evidence and, for a pending part, which
+  `tasks.json` id(s) unblock it. The README gains a "Conformance to the
+  package spec" section (right after the title) rendered from the same
+  computed result. Nothing here is typed by hand: every count/coverage
+  number is read from the file it describes.
+- **P-03 ships inside the package**: `OM2/aggregate_to_segments.py` is a
+  standalone (pandas + pyarrow only, no MorphoFavela import) mirror of
+  `src/om_package/segments.py`'s `aggregate_to_segments` — a recipient
+  with only this directory can re-aggregate to any segment length without
+  the repo. `scripts/aggregate_om_points.py` (the repo-only CLI) is
+  unchanged.
+- **P-05 join example ships inside the package**: `OM2/join_shade_example.py`
+  joins `p05_building_shade` against a real Octopus device CSV by
+  `point_id` and 5-min-floored `timestamp`, states the UTC-labelling
+  caveat in its own docstring.
+- **Documentation corrections after audit** ({version_date}): fixed the
+  numerical-audit findings against v0.1.2's README/CHANGELOG — see this
+  commit's message for the itemised list (release-scope internal-routes
+  claim, route fetch dates, the nodata floor, the manifest self-hash, the
+  frozen historical entries, the join-example pointer, "PI ruling Qxx"
+  citations replaced by `provenance.decisions` ids, source vintages, and
+  the lambda_p==1.0 check).
+- Package version v0.1.2 -> v0.1.3 across `package_docs.py` and
+  `build_om_package.py`'s default `--version`.
+
 """
 
 
@@ -435,44 +534,92 @@ def render_readme(
     n_lambda_p_ones: int,
     n_lambda_p_ones_flagged: int,
     lambda_p_share_explained_pct: float,
+    n_lambda_p_remainder: int,
+    n_lambda_p_remainder_plausible: int,
+    route_fetch_date_label: str,
+    nodata_floor_m: dict,
+    internal_routes_status: str,
+    decisions: list[dict],
+    dtm_native_resolution_m: float,
     n_csv_pilot: int = 0,
     n_campaign_dates: int = 0,
     n_shade_rows: int = 0,
     shade_fraction_pct: float = 0.0,
     shade_max_dist_m: float = 100.0,
-    shade_min_nan_dist_m: float = 104.15,
-    route_fetch_date: str = ROUTE_FETCH_DATE,
     conformance_section: str = "",
 ) -> str:
-    """Render README.md. The route_geometry_flag/lambda_p/shade numbers are
-    computed by the caller (build_om_package.py) from the actual OM2
-    build, never hardcoded here — see CLAUDE.md's 'never fabricate a
-    value'. ``conformance_section`` is the rendered P-00 conformance table
-    (src/om_package/spec.py render_conformance_markdown) — the build calls
-    this twice: once with it empty to get a package directory conformance
-    can be computed over, once with the computed table to produce the
-    README actually shipped."""
+    """Render README.md. The route_geometry_flag/lambda_p/shade numbers,
+    the nodata floor, the internal-routes on-disk state, the route fetch
+    date label and the resolution decisions are all computed by the
+    caller (build_om_package.py) from the actual OM2 build or from
+    brisaverse's tasks.json, never hardcoded here (CLAUDE.md's 'never
+    fabricate a value') — every one of them is a REQUIRED parameter, so a
+    caller that forgets to compute one gets a loud TypeError instead of a
+    silently-defaulted number. ``conformance_section`` is the rendered
+    P-00 conformance table (src/om_package/spec.py
+    render_conformance_markdown) — the build calls this twice: once with
+    it empty to get a package directory conformance can be computed over,
+    once with the computed table to produce the README actually shipped.
+    """
     route_flag_pct = round(100 * n_route_geometry_flagged / n_om2_points, 1) if n_om2_points else 0.0
+    n_lambda_p_remainder_not_checked = n_lambda_p_remainder - n_lambda_p_remainder_plausible
+    floor = nodata_floor_m
     return README_TEMPLATE.format(
         version=VERSION,
         version_date=VERSION_DATE,
-        route_fetch_date=route_fetch_date,
+        route_fetch_date_label=route_fetch_date_label,
         conformance_section=conformance_section,
         use_terms=USE_TERMS,
+        om_use_terms_date=_decision(decisions, "om_use_terms")["resolved_utc"][:10],
+        internal_routes_status=internal_routes_status,
+        dtm_native_resolution_m=dtm_native_resolution_m,
         n_om2_points=n_om2_points,
         n_route_geometry_flagged=n_route_geometry_flagged,
         route_flag_pct=route_flag_pct,
         n_lambda_p_ones=n_lambda_p_ones,
         n_lambda_p_ones_flagged=n_lambda_p_ones_flagged,
         lambda_p_share_explained_pct=lambda_p_share_explained_pct,
+        n_lambda_p_remainder=n_lambda_p_remainder,
+        n_lambda_p_remainder_plausible=n_lambda_p_remainder_plausible,
+        n_lambda_p_remainder_not_checked=n_lambda_p_remainder_not_checked,
         n_csv_pilot=n_csv_pilot,
         n_campaign_dates=n_campaign_dates,
         n_shade_rows=n_shade_rows,
         shade_fraction_pct=shade_fraction_pct,
         shade_max_dist_m=shade_max_dist_m,
-        shade_min_nan_dist_m=shade_min_nan_dist_m,
+        nodata_floor_min_m=floor["min"],
+        nodata_floor_median_m=floor["median"],
+        nodata_floor_max_m=floor["max"],
     )
 
 
-def render_changelog() -> str:
-    return CHANGELOG_TEMPLATE.format(version=VERSION, version_date=VERSION_DATE)
+def render_changelog(
+    n_om2_points: int,
+    nodata_floor_m: dict,
+    csv_catalogued_note: str,
+    decisions: list[dict],
+    panel_review_doc: str = "docs/critic/octopus_package_panel_2026-09-24.md",
+) -> str:
+    """Render CHANGELOG.md: the newest entry ({version}) is templated
+    fresh every build; v0.1/v0.1.1/v0.1.2 are frozen literal text (see the
+    module-level comments above each), corrected only where the
+    2026-09-27 audit found a defect in the shipped text itself. Every
+    number in the v0.1.2 entry is a required parameter — no defaults —
+    so a caller that omits one (e.g. a sabotaged rebuild) fails loudly
+    instead of re-typing a stale figure."""
+    floor = nodata_floor_m
+    om_shade_release = _decision(decisions, "om_shade_release")
+    om_dates_tz = _decision(decisions, "om_dates_tz")
+    current = CURRENT_ENTRY_TEMPLATE.format(version=VERSION, version_date=VERSION_DATE)
+    v012 = V012_ENTRY_TEMPLATE.format(
+        n_om2_points=n_om2_points,
+        nodata_floor_min_m=floor["min"],
+        nodata_floor_median_m=floor["median"],
+        nodata_floor_max_m=floor["max"],
+        csv_catalogued_note=csv_catalogued_note,
+        panel_review_doc=panel_review_doc,
+        decisions_date=om_shade_release["resolved_utc"][:10],
+        om_shade_release_resolution=om_shade_release["resolution"],
+        om_dates_tz_resolution=om_dates_tz["resolution"],
+    )
+    return current + v012 + CHANGELOG_V011_ENTRY + CHANGELOG_V01_ENTRY

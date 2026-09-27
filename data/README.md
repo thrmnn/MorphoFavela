@@ -115,6 +115,18 @@ tz=Etc/UTC&format=onlycomma&latlon=yes&missing=M&trace=T" \
 python scripts/build_wind_rose.py --site maré --asos-csv data/asos/SBGL_2015_2024.csv
 ```
 
+## Data provenance — Maré OM2 package layers
+
+Added 2026-09-27 (Octopus OM2 package audit): the three raw Maré layers
+the `mare_om2` package cites in its README "Sources and dates" table,
+with what is and isn't recorded about each one here.
+
+| File | Vintage recorded here? |
+|------|------------------------|
+| `maré/raw/buildings_mare.shp` | Not itself dated; it is a clip of `RJ/buildings_RJ_2019.shp` (2019 vintage, per the City-wide layers table above) to the Maré boundary — the 2019 date is the cadastral layer's, not a separate Maré-specific survey. |
+| `maré/raw/mare_dtm.tif` (and `maré/dtm_extended_300m.tif`) | vintage not recorded. |
+| `maré/raw/street_mare.shp` | vintage not recorded. |
+
 ## Manual steps that are *not* in scripts
 
 A small number of inputs are clipped by hand in QGIS rather than via

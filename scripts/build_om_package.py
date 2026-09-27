@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -61,6 +62,7 @@ from src.om_package.formvars import compute_form_variables
 from src.om_package.io_utils import Paths, hash_tree, write_table
 from src.om_package.neighbourhoods import communities_crossed, join_communities
 from src.om_package.package_docs import USE_TERMS, render_changelog, render_readme
+from src.om_package.provenance import read_om_decisions
 from src.om_package.quality import write_quality_report
 from src.om_package.routes import compute_route_geometry_flag, densify_route, route_length_m
 from src.om_package.spec import render_conformance_markdown, write_conformance
@@ -69,6 +71,7 @@ from src.om_package.shade import (
     build_empty_shade_table,
     compute_shade,
     infer_campaign_windows,
+    nodata_floor_m as compute_nodata_floor_m,
     point_horizon_profiles,
 )
 from src.om_package.ventilation import compute_ventilation_proxies
@@ -84,6 +87,113 @@ def route_output_dir(om: str, out_dir: Path, internal_dir: Path) -> Path:
     internal build directory (PI ruling 2026-09-24: the shared package
     contains OM2 only)."""
     return out_dir if om == "OM_2" else internal_dir
+
+
+def internal_routes_status(root: Path, version: str) -> str:
+    """What actually exists under outputs/_packages/_internal/mare_routes/
+    <version>/ right now — never a claim about what the code path CAN do
+    (that's always true) versus what it HAS done for this version (audit
+    fix, 2026-09-27: the README used to assert OM1/OM3/OM4 land there
+    unconditionally, which is false for any version where --route ALL was
+    never run)."""
+    internal_dir = root / "outputs" / "_packages" / "_internal" / "mare_routes" / version
+    if not internal_dir.is_dir():
+        return f"not built in this version — no `{internal_dir.relative_to(root).as_posix()}` directory exists yet."
+    present = sorted(p.name for p in internal_dir.iterdir() if p.is_dir())
+    if not present:
+        return f"not built in this version — `{internal_dir.relative_to(root).as_posix()}` exists but is empty."
+    return f"on disk in this version under `{internal_dir.relative_to(root).as_posix()}`: {', '.join(present)}."
+
+
+def route_fetch_date_label(paths: Paths) -> str:
+    """Date label for the README's route-JSON 'Date / vintage' cell.
+    Prefers a routes manifest.json's own recorded fetch date if one
+    exists (same pattern as data/maré/octopus/csv/manifest.json); falls
+    back to the route JSON files' own mtimes (audit fix, 2026-09-27: this
+    used to be a hand-typed constant, ROUTE_FETCH_DATE, that silently
+    drifted every release since nothing re-checked it)."""
+    manifest_p = paths.routes_dir / "manifest.json"
+    if manifest_p.exists():
+        try:
+            data = json.loads(manifest_p.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            data = {}
+        fetched = data.get("fetched_utc") or data.get("fetched") or data.get("fetch_date")
+        if fetched:
+            return f"fetched {str(fetched)[:10]} (data/maré/octopus/routes/manifest.json)"
+    route_files = sorted(paths.routes_dir.glob("OM_*_inferred_route.json"))
+    if not route_files:
+        return "file dates unavailable — no route JSON files found at build time"
+    dates = sorted({datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc).date() for p in route_files})
+    if len(dates) == 1:
+        return f"file dates {dates[0].isoformat()} (route JSON mtimes; no fetch manifest recorded)"
+    return f"file dates {dates[0].isoformat()} to {dates[-1].isoformat()} (route JSON mtimes; no fetch manifest recorded)"
+
+
+def dtm_native_resolution_m(paths: Paths) -> float:
+    """The extended DTM's own native pixel size, read from the raster
+    (never assumed) — WP-02's build_surface resamples it to 1 m
+    (CELL_M) before the horizon march."""
+    import rasterio
+
+    with rasterio.open(paths.dtm_extended_300m) as src:
+        return abs(src.transform.a)
+
+
+#: Same pattern the PI runs by hand before a package leaves — kept here so
+#: every build re-checks it and writes the hit list next to the package,
+#: rather than relying on someone remembering to grep. Hits are NEVER
+#: auto-removed: the PI decides each one (p00_disclosure_hits.txt).
+DISCLOSURE_PATTERN = re.compile(
+    r"party.?wall|dissolve|lancet|nature cities|morphofavela|airflow|brisaverse|"
+    r"drive.?sync|solstice|grimmond|oke|sondotecnica|IPP|mingze|gobatti|fabio",
+    re.IGNORECASE,
+)
+
+
+def write_disclosure_hits(out_dir: Path) -> Path:
+    """Runs DISCLOSURE_PATTERN over every line of README.md, CHANGELOG.md
+    and p08_data_dictionary.csv in the built package, and writes
+    (file, line, term, sentence) per hit to p00_disclosure_hits.txt at the
+    package root. Hits are reported, never stripped — disclosure is the
+    PI's call, not this script's."""
+    targets = ["README.md", "CHANGELOG.md", "p08_data_dictionary.csv"]
+    hits: list[str] = []
+    for name in targets:
+        p = out_dir / name
+        if not p.exists():
+            continue
+        for lineno, line in enumerate(p.read_text(encoding="utf-8").splitlines(), start=1):
+            for m in DISCLOSURE_PATTERN.finditer(line):
+                hits.append(f"{name}:{lineno}: [{m.group(0)}] {line.strip()}")
+    out_path = out_dir / "p00_disclosure_hits.txt"
+    header = (
+        "# Disclosure greplist hits — PI decides each one before this package leaves.\n"
+        "# Pattern: party-wall|dissolve|lancet|nature cities|morphofavela|airflow|\n"
+        "#          brisaverse|drive-sync|solstice|grimmond|oke|sondotecnica|IPP|\n"
+        "#          mingze|gobatti|fabio (case-insensitive)\n"
+        f"# {len(hits)} hit(s) across {', '.join(targets)}.\n\n"
+    )
+    out_path.write_text(header + ("\n".join(hits) + "\n" if hits else "(no hits)\n"))
+    return out_path
+
+
+def csv_catalogued_note(csv_dir: Path) -> str:
+    """The pilot CSV manifest's own note on files seen-but-not-downloaded
+    — reworded from a prose reference to a nonexistent 'count' field
+    (audit fix, 2026-09-27) to the manifest's actual content: a text note
+    under catalogued_not_downloaded, not a count."""
+    manifest_p = csv_dir / "manifest.json"
+    if not manifest_p.exists():
+        return "No CSV manifest was found at build time to report catalogued-but-not-downloaded files."
+    try:
+        data = json.loads(manifest_p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return "The CSV manifest exists but could not be parsed at build time."
+    note = (data.get("catalogued_not_downloaded") or {}).get("note")
+    if not note:
+        return "The CSV manifest records no catalogued_not_downloaded note."
+    return f"The pilot manifest's own note on the rest of the Drive folder: {note}"
 
 
 def build_one_route(om: str, paths: Paths, out_dir: Path, radii=BUFFER_RADII_M) -> dict:
@@ -197,6 +307,27 @@ def main() -> int:
     n_shade_rows = 0
     shade_fraction_pct = 0.0
     campaign_windows_df = None
+
+    # om2_gdf is needed regardless of whether real shade runs this build:
+    # the nodata floor (README Known limits, manifest p05_shade) is a
+    # property of the OM2 points against the extended DTM, not of the
+    # shade computation itself.
+    om2_gdf = gpd.GeoDataFrame(
+        om2_df[["point_id"]], geometry=gpd.points_from_xy(om2_df["x"], om2_df["y"]), crs=CRS
+    )
+    print("[build_om_package] P-05: measuring the nodata floor (shade.nodata_floor_m) ...")
+    nodata_floor = compute_nodata_floor_m(om2_gdf, paths)
+    print(
+        f"[build_om_package] P-05: nodata floor min={nodata_floor['min']:.1f}m "
+        f"median={nodata_floor['median']:.1f}m max={nodata_floor['max']:.1f}m "
+        f"(OM2_SHADE_MAX_DIST_M={OM2_SHADE_MAX_DIST_M:g}m)"
+    )
+    assert OM2_SHADE_MAX_DIST_M <= nodata_floor["min"], (
+        f"OM2_SHADE_MAX_DIST_M={OM2_SHADE_MAX_DIST_M} exceeds the measured nodata floor "
+        f"minimum {nodata_floor['min']:.1f}m — the horizon march would hit nodata; revisit "
+        "shade.py's OM2_SHADE_MAX_DIST_M before shipping"
+    )
+
     if csv_paths:
         print(f"[build_om_package] P-05: {n_csv_pilot} campaign CSVs found under {csv_dir} — computing real shade")
         # lat/lon for pvlib sun position: the OM2 route's own centroid, reprojected
@@ -207,9 +338,6 @@ def main() -> int:
 
         transformer = Transformer.from_crs(CRS, "EPSG:4326", always_xy=True)
         mare_lon, mare_lat = transformer.transform(om2_df["x"].mean(), om2_df["y"].mean())
-        om2_gdf = gpd.GeoDataFrame(
-            om2_df[["point_id"]], geometry=gpd.points_from_xy(om2_df["x"], om2_df["y"]), crs=CRS
-        )
         campaign_windows_df = infer_campaign_windows(csv_paths)
         write_table(campaign_windows_df, out_dir, "p05b_campaign_windows")
         horizon_deg, horizon_az = point_horizon_profiles(om2_gdf, paths, device="cuda", max_dist_m=OM2_SHADE_MAX_DIST_M)
@@ -259,6 +387,28 @@ def main() -> int:
     lambda_p_share_explained_pct = (
         round(100 * n_lambda_p_ones_flagged / n_lambda_p_ones, 1) if n_lambda_p_ones else 0.0
     )
+    # The lambda_p==1.0 points NOT explained by route_geometry_flag used to
+    # be asserted "plausible fully-built 10 m cells" with no check (audit
+    # fix, 2026-09-27) — actually check building_count_buffer_10m > 0 and a
+    # recorded building_height_mean_buffer_10m for each of them.
+    lambda_p_remainder = lambda_p_ones[~lambda_p_ones["route_geometry_flag"].astype(bool)]
+    n_lambda_p_remainder = len(lambda_p_remainder)
+    n_lambda_p_remainder_plausible = (
+        int(
+            (
+                (lambda_p_remainder["building_count_buffer_10m"] > 0)
+                & lambda_p_remainder["building_height_mean_buffer_10m"].notna()
+            ).sum()
+        )
+        if n_lambda_p_remainder
+        else 0
+    )
+
+    decisions = read_om_decisions()
+    internal_status = internal_routes_status(paths.root, args.version)
+    fetch_date_label = route_fetch_date_label(paths)
+    dtm_res_m = dtm_native_resolution_m(paths)
+    catalogued_note = csv_catalogued_note(csv_dir)
 
     readme_kwargs = dict(
         n_om2_points=n_om2_points,
@@ -266,18 +416,31 @@ def main() -> int:
         n_lambda_p_ones=n_lambda_p_ones,
         n_lambda_p_ones_flagged=n_lambda_p_ones_flagged,
         lambda_p_share_explained_pct=lambda_p_share_explained_pct,
+        n_lambda_p_remainder=n_lambda_p_remainder,
+        n_lambda_p_remainder_plausible=n_lambda_p_remainder_plausible,
+        route_fetch_date_label=fetch_date_label,
+        nodata_floor_m=nodata_floor,
+        internal_routes_status=internal_status,
+        decisions=decisions,
+        dtm_native_resolution_m=dtm_res_m,
         n_csv_pilot=n_csv_pilot,
         n_campaign_dates=n_campaign_dates,
         n_shade_rows=n_shade_rows,
         shade_fraction_pct=shade_fraction_pct,
         shade_max_dist_m=OM2_SHADE_MAX_DIST_M,
     )
+    changelog_kwargs = dict(
+        n_om2_points=n_om2_points,
+        nodata_floor_m=nodata_floor,
+        csv_catalogued_note=catalogued_note,
+        decisions=decisions,
+    )
     # First pass: README/CHANGELOG without the conformance section, so
     # p00_spec_conformance can be computed over a package directory that
     # already has every other P-01..P-09 artefact (including a README with
     # its required headings) on disk.
     (out_dir / "README.md").write_text(render_readme(**readme_kwargs))
-    (out_dir / "CHANGELOG.md").write_text(render_changelog())
+    (out_dir / "CHANGELOG.md").write_text(render_changelog(**changelog_kwargs))
 
     # P-00: mechanical conformance to the PI's package spec (P-01..P-09),
     # computed from the files just written — never typed by hand (see
@@ -293,8 +456,14 @@ def main() -> int:
         render_readme(conformance_section=render_conformance_markdown(conf) + "\n", **readme_kwargs)
     )
 
-    # manifest: sha256 per file, computed last (over everything just written,
-    # manifest.json itself does not exist yet so is never self-hashed)
+    # manifest: sha256 per file, computed last (over everything just
+    # written). manifest.json is EXCLUDED from its own file list — audit
+    # fix, 2026-09-27: on a rebuild of the same version, manifest.json
+    # already exists on disk from the PREVIOUS build (this run has not
+    # written its own copy yet), so hashing out_dir here would capture
+    # that stale prior content as manifest.json's own sha256 entry, a
+    # self-hash that could never verify. See io_utils.hash_tree's
+    # ``exclude`` docstring.
     manifest["p05_shade"] = {
         "n_csv_pilot": n_csv_pilot,
         "n_campaign_dates": n_campaign_dates,
@@ -302,15 +471,21 @@ def main() -> int:
         "shade_fraction_pct": shade_fraction_pct,
         "tz": "UTC (labelling choice, campaign timezone UNRESOLVED)" if n_shade_rows else None,
         "max_dist_m": OM2_SHADE_MAX_DIST_M,
+        "nodata_floor_m": nodata_floor,
         "campaign_dates": [str(d) for d in campaign_windows_df["date"]] if campaign_windows_df is not None else [],
     }
-    manifest["files"] = hash_tree(out_dir)
+    manifest["provenance"] = {"decisions": decisions}
+    manifest["files"] = hash_tree(out_dir, exclude={"manifest.json"})
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(f"[build_om_package] wrote manifest to {out_dir / 'manifest.json'}")
     print(
         f"[build_om_package] route_geometry_flag: {n_route_geometry_flagged}/{n_om2_points} OM2 points flagged; "
         f"lambda_p=1.0 explained by flag: {n_lambda_p_ones_flagged}/{n_lambda_p_ones} ({lambda_p_share_explained_pct}%)"
     )
+
+    # Disclosure greplist (PI decides each hit — never auto-removed).
+    write_disclosure_hits(out_dir)
+    print(f"[build_om_package] wrote disclosure hits to {out_dir / 'p00_disclosure_hits.txt'}")
 
     page_path = build_om_package_page(paths.root)
     print(f"[build_om_package] rebuilt package page: {page_path}")

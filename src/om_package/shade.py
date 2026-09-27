@@ -107,22 +107,66 @@ def is_shaded(sun_altitude_deg: np.ndarray, sun_azimuth_deg: np.ndarray, horizon
 
 #: WP-04's own citywide default (MAX_DIST_M = 500 m) is unsafe on
 #: dtm_extended_300m.tif/buildings_extended_300m.gpkg: that 300m-buffer
-#: layer has real nodata starting ~104-330 m from OM2 route points
-#: (measured empirically 2026-09-25 — the buffer's raster bounding box is
-#: a rectangle, but valid DTM coverage inside it is not, so some march
-#: rays exit real data before reaching 500 m). wp02_horizon.py's running
-#: max is not NaN-safe (torch.maximum propagates NaN), so any ray that
-#: touches nodata poisons that whole direction's horizon value — this was
-#: caught as an all-NaN pilot result before landing v0.1.2's real run
-#: (never silently patched into the shared WP-02 engine, which P1's
-#: citywide/WP-04 defended numbers also depend on). 100 m is safely under
-#: the measured 104.15 m worst-case floor across all 1559 OM2 points, and
-#: is a reasonable near-field radius for pedestrian-height shade in a
-#: dense settlement (a 2-5-storey building beyond 100 m casts a
-#: horizon-relevant shadow only at very low sun altitudes already handled
-#: by is_shaded()'s altitude<=0 branch). Revisit if a wider gap-free
-#: extended layer lands.
+#: layer has real nodata starting some distance from OM2 route points —
+#: see ``nodata_floor_m()`` below for the measured per-point floor (the
+#: buffer's raster bounding box is a rectangle, but valid DTM coverage
+#: inside it is not, so some march rays exit real data before reaching
+#: 500 m). wp02_horizon.py's running max is not NaN-safe (torch.maximum
+#: propagates NaN), so any ray that touches nodata poisons that whole
+#: direction's horizon value — this was caught as an all-NaN pilot result
+#: before landing v0.1.2's real run (never silently patched into the
+#: shared WP-02 engine, which P1's citywide/WP-04 defended numbers also
+#: depend on). 100 m is a reasonable near-field radius for pedestrian-
+#: height shade in a dense settlement regardless (a 2-5-storey building
+#: beyond 100 m casts a horizon-relevant shadow only at very low sun
+#: altitudes already handled by is_shaded()'s altitude<=0 branch); the
+#: build asserts it stays under the measured floor's minimum every run
+#: (see build_om_package.py) rather than trusting a number typed here.
+#: Revisit if a wider gap-free extended layer lands.
 OM2_SHADE_MAX_DIST_M = 100.0
+
+
+def nodata_floor_m(points_gdf, paths) -> dict:
+    """Measured per-point distance from each OM2 point to the nearest
+    nodata cell of the extended DTM (``paths.dtm_extended_300m``) — the
+    empirical floor behind ``OM2_SHADE_MAX_DIST_M``'s scoping decision
+    above. Never hardcoded (CLAUDE.md's 'never fabricate a value'): a
+    Euclidean distance transform (scipy.ndimage.distance_transform_edt)
+    over the raster's own valid/nodata mask gives every pixel's distance
+    to the nearest nodata cell in raster units; multiplying by the pixel
+    size and sampling at each point's nearest cell gives that point's
+    floor. Returns {"min", "median", "max"} in metres across
+    ``points_gdf``. The build stores this dict verbatim into
+    ``manifest.json``'s ``p05_shade.nodata_floor_m`` and renders it into
+    the README/CHANGELOG — see ``require_nodata_floor_m`` in
+    ``package_docs.py``, which refuses to render a default when this key
+    is missing."""
+    import rasterio
+    from rasterio.transform import rowcol
+    from scipy.ndimage import distance_transform_edt
+
+    with rasterio.open(paths.dtm_extended_300m) as src:
+        arr = src.read(1)
+        nodata = src.nodata
+        transform = src.transform
+        pixel_m = abs(transform.a)
+
+    valid = np.isfinite(arr)
+    if nodata is not None:
+        valid &= ~np.isclose(arr, nodata, rtol=1e-3)
+    dist_m = distance_transform_edt(valid) * pixel_m
+
+    xs = points_gdf.geometry.x.to_numpy()
+    ys = points_gdf.geometry.y.to_numpy()
+    rows, cols = rowcol(transform, xs, ys)
+    rows = np.clip(np.asarray(rows), 0, arr.shape[0] - 1)
+    cols = np.clip(np.asarray(cols), 0, arr.shape[1] - 1)
+    per_point = dist_m[rows, cols]
+    return {
+        "min": float(np.min(per_point)),
+        "median": float(np.median(per_point)),
+        "max": float(np.max(per_point)),
+    }
 
 
 def point_horizon_profiles(points_gdf, paths, device: str | None = None, tmp_dir: Path | None = None, max_dist_m: float = OM2_SHADE_MAX_DIST_M):
