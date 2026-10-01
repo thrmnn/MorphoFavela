@@ -88,13 +88,13 @@ def test_records_have_unique_positive_int_orders():
     assert all(isinstance(o, int) and o > 0 for o in orders)
 
 
-def test_mare_and_octopus_records_added_at_orders_1_and_2():
+def test_review_today_then_mare_then_octopus_lead_the_page():
     by_order = {r["order"]: r for r in bprf.RECORDS}
-    assert "Maré" in by_order[1]["title"] or "Maré" in by_order[1]["title"]
-    assert "territory" in by_order[1]["title"].lower()
-    assert "octopus" in by_order[2]["title"].lower()
-    assert "om2" in by_order[2]["title"].lower()
-    assert by_order[2].get("badge") == "internal review draft — Octopus team only"
+    assert by_order[1]["slug"] == "review_today"
+    assert "territory" in by_order[2]["title"].lower()
+    assert "octopus" in by_order[3]["title"].lower()
+    assert "om2" in by_order[3]["title"].lower()
+    assert by_order[3].get("badge") == "internal review draft — Octopus team only"
 
 
 # --------------------------------------------------------------------------

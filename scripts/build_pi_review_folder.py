@@ -415,13 +415,13 @@ def _review_today() -> list[Path]:
 
 RECORDS: list[dict] = [
     dict(
-        order=0, slug="review_today", title="For your review today",
+        order=1, slug="review_today", title="For your review today",
         blurb="Octopus OM2 package report (README.pdf) and its results deck; the main paper deck rebuilt "
               "for C′ (brisa_v3); the P1 C′ manuscript draft (main_cprime.pdf). Each deck has its contact sheet.",
         paths=_review_today,
     ),
     dict(
-        order=1, slug="mare_territory", title="Maré — territory and site deliverables",
+        order=2, slug="mare_territory", title="Maré — territory and site deliverables",
         blurb=(
             "What \"Maré\" means in each product: the data extent, the 16-community study area and "
             "the citywide definition on one map, then the site sheet and brief rebuilt on the study "
@@ -436,7 +436,7 @@ RECORDS: list[dict] = [
         paths=_mare_territory_paths,
     ),
     dict(
-        order=2, slug="octopus_om2", title="Octopus OM2 morphology package (X1, contributor)",
+        order=3, slug="octopus_om2", title="Octopus OM2 morphology package (X1, contributor)",
         blurb=(
             "Street-form variables MorphoFavela contributed to Octopus LRP #2 (\"Street by street\", "
             "lead Jingxue, PI Simone) — built by <code>scripts/build_om_package.py</code>. No "
@@ -448,7 +448,7 @@ RECORDS: list[dict] = [
         extra=_octopus_extra,
     ),
     dict(
-        order=3, slug="p1_solar_figures", title="P1 solar figures (f1-f4)",
+        order=4, slug="p1_solar_figures", title="P1 solar figures (f1-f4)",
         blurb=(
             "The four figures staged for the paper, each tagged with the work package its numbers come "
             "from. Your promotion ruling is the only thing between these and shared/figures. The "
@@ -461,31 +461,31 @@ RECORDS: list[dict] = [
         resolve=lambda: _latest("wp07_figures_*"),
     ),
     dict(
-        order=4, slug="citywide_maps", title="Citywide maps (f5, f5b, f6)",
+        order=5, slug="citywide_maps", title="Citywide maps (f5, f5b, f6)",
         blurb="Sky-view and irradiation across the whole 8.4 M-cell domain. Withheld under red line "
               "L1 — yours to read, not to circulate.",
         resolve=lambda: _latest("wp07_map_*"),
     ),
     dict(
-        order=5, slug="zoom_favelas", title="Per-favela zoom extracts",
+        order=6, slug="zoom_favelas", title="Per-favela zoom extracts",
         blurb="Each study favela at the run's sampling pitch, sharing the citywide colour limits. "
               "Ipanema is absent: no bairro boundary exists on disk.",
         resolve=lambda: _latest("wp07_zoom_*"),
     ),
     dict(
-        order=6, slug="terrain_vs_buildings", title="Terrain versus buildings",
+        order=7, slug="terrain_vs_buildings", title="Terrain versus buildings",
         blurb="How much of the sun lost to an open flat horizon is the hill, and how much is what was "
               "built on it. The maps put terrain-only beside terrain-with-buildings on one colour scale.",
         resolve=lambda: _latest("terrain_split_*"),
     ),
     dict(
-        order=7, slug="method_schematics", title="How the method works",
+        order=8, slug="method_schematics", title="How the method works",
         blurb="The obstruction surface built from terrain and building tops, the ray march that decides "
               "whether a sky patch is blocked, and the matrix step that turns visibility into irradiation.",
         resolve=lambda: _latest("wp07_method_*"),
     ),
     dict(
-        order=8, slug="morphotypes", title="Morphotypes and morphotopes",
+        order=9, slug="morphotypes", title="Morphotypes and morphotopes",
         blurb="The cross-site signature work the weekly deck draws on.",
         paths=lambda: [ROOT / "outputs/cross_site/signature/figures_v2" / n for n in (
             "morphotype_schematics.png", "maps_morphotypes.png", "morphotope_maps.png",
@@ -496,13 +496,13 @@ RECORDS: list[dict] = [
         )] + [ROOT / "outputs/cross_site/presentation_figures/fig_morpho_violins.png"],
     ),
     dict(
-        order=9, slug="folha_de_rua", title="Folha de Rua site sheets",
+        order=10, slug="folha_de_rua", title="Folha de Rua site sheets",
         blurb="One A3 sheet per site: grid, terrain, density, then sky view and sunlight.",
         paths=lambda: sorted(ROOT.glob("outputs/_distribution/site_dashboards/*/folha_*_A3.png"))
                       + sorted(ROOT.glob("outputs/_distribution/site_dashboards/*/folha_*.pdf")),
     ),
     dict(
-        order=10, slug="weekly_deck", title="Weekly update deck (W39)",
+        order=11, slug="weekly_deck", title="Weekly update deck (W39)",
         blurb="Tomorrow's deck and its contact sheet.",
         paths=lambda: [Path.home() / "SCL/SCR/brisaverse/slides/brisa_wk39_update.pdf",
                         Path.home() / "SCL/SCR/brisaverse/slides/contact_wk39_update.png"],
