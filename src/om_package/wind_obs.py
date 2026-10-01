@@ -35,6 +35,8 @@ WINDOW_END = "2026-04-30"
 CACHE_STEM = "sbgl_metar_20251201_20260430"
 MAX_GAP_MIN = 60
 LOCAL_UTC_OFFSET_H = -3
+CLIM_YEAR_START = 2015
+CLIM_YEAR_END = 2024
 ASOS_URL = "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py"
 
 
@@ -189,11 +191,11 @@ def campaign_window_rose(obs: pd.DataFrame | None = None, root: Path | str = DEF
 
 
 def climatology_rose(root: Path | str = DEFAULT_ROOT, n_sectors: int = 16,
-                     year_start: int = 2015, year_end: int = 2024) -> dict:
+                     year_start: int = CLIM_YEAR_START, year_end: int = CLIM_YEAR_END) -> dict:
     """The 2015-2024 SBGL climatology at the same sector count, re-binned
     from the raw ASOS CSV (data/asos/SBGL_2015_2024.csv) that built
     data/maré/wind_rose.json, with identical exclusions."""
-    df = pd.read_csv(Path(root) / "data" / "asos" / "SBGL_2015_2024.csv", na_values=["M"])
+    df = pd.read_csv(Path(root) / "data" / "asos" / f"SBGL_{CLIM_YEAR_START}_{CLIM_YEAR_END}.csv", na_values=["M"])
     t = pd.to_datetime(df["valid"], errors="coerce")
     df = df[(t.dt.year >= year_start) & (t.dt.year <= year_end)]
     spd = pd.to_numeric(df["sknt"], errors="coerce") * KNOT_MS

@@ -37,7 +37,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import pandas as pd  # noqa: E402
+
 import hubkit  # noqa: E402
+from src.om_package.figures import _DOSE_SLOT_QUANTILES  # noqa: E402
+from src.om_package.report import SEGMENT_M, count_word  # noqa: E402
+from src.om_package.wind_obs import CLIM_YEAR_END, CLIM_YEAR_START  # noqa: E402
 
 DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
 
@@ -215,6 +221,12 @@ def quality_summary(quality: dict) -> dict:
 
 # ---------------------------------------------------------------- render --
 
+def _shade_step_min(version_dir: Path) -> int:
+    """Time step of the P-05 shade table, read from its timestamps."""
+    t = pd.read_parquet(version_dir / "p05_building_shade.parquet", columns=["timestamp"])["timestamp"]
+    return int(pd.Series(sorted(t.unique())).diff().min() / pd.Timedelta(minutes=1))
+
+
 def _rel_to(from_dir: Path, target: Path) -> str:
     """POSIX relative href from from_dir to target, for a page served from
     the repo root (this project's hub convention — see build_project_hub.py)."""
@@ -258,8 +270,7 @@ def render_page(root: Path) -> str:
     readme_pdf_path = version_dir / "README.pdf"
     readme_pdf_rel = _rel_to(package_root, readme_pdf_path)
     p05 = manifest.get("p05_shade") or {}
-    p10 = manifest.get("p10") or {}
-    p11 = manifest.get("p11") or {}
+    p10, p11 = manifest["p10"], manifest["p11"]
     built = manifest.get("built_at_utc", "?")
     built_label = built[:16].replace("T", " ") + " UTC" if len(built) >= 16 else built
 
@@ -294,23 +305,19 @@ def render_page(root: Path) -> str:
 </section>"""
 
     # --- what's new: the headline numbers of this version, from the manifest --
-    new_items = []
-    if p10:
-        new_items.append(
-            f"<strong>Sun exposure for every time of day</strong> over {html.escape(' to '.join(p10.get('window', [])))}: "
-            f"{100 * p10['date_dependent_share']:.0f}% of daylight point-slots change with the date, so use the "
-            "per-date results for the campaign dates.")
-        new_items.append(
-            f"<strong>Device-clock check</strong>: only {100 * p10['clock_agreement_all']:.0f}% of daylight point-slots "
-            "keep the same sun or shade state whether the loggers recorded UTC or Rio local time. "
-            "Confirming the clock is the most useful thing the team can send.")
-    if p11:
-        new_items.append(
-            f"<strong>Ventilation proxies</strong> at the prevailing wind ({p11['prevailing_wind_bearing_deg']:.0f}°: "
-            f"shelter angle, canyon alignment, roughness), plus {p11['n_obs']:,} observed {html.escape(p11['station'])} "
-            f"airport wind reports over the season, {p11['n_used_if_device_clock_utc']} (clock read as UTC) or "
-            f"{p11['n_used_if_device_clock_local']} (clock read as local time) of them matched to the walk times. "
-            "Geometry-derived proxies, not measured airflow.")
+    new_items = [
+        f"<strong>Sun exposure for every time of day</strong> over {html.escape(' to '.join(p10['window']))}: "
+        f"{100 * p10['date_dependent_share']:.0f}% of daylight point-slots change with the date, so use the "
+        "per-date results for the campaign dates.",
+        f"<strong>Device-clock check</strong>: only {100 * p10['clock_agreement_all']:.0f}% of daylight point-slots "
+        "keep the same sun or shade state whether the loggers recorded UTC or Rio local time. "
+        "Confirming the clock is the most useful thing the team can send.",
+        f"<strong>Ventilation proxies</strong> at the prevailing wind ({p11['prevailing_wind_bearing_deg']:.0f}°: "
+        f"shelter angle, canyon alignment, roughness), plus {p11['n_obs']:,} observed {html.escape(p11['station'])} "
+        f"airport wind reports over the season, {p11['n_used_if_device_clock_utc']} (clock read as UTC) or "
+        f"{p11['n_used_if_device_clock_local']} (clock read as local time) of them matched to the walk times. "
+        "Geometry-derived proxies, not measured airflow.",
+    ]
     n_figs = len(sorted((version_dir / "OM2").glob("*.png")))
     new_items.append(f"<strong>A shorter report</strong> with all {n_figs} figures and a README reorganised for scanning.")
     changelog_view_new = f"/doc?src=/morphofavela-dash/{version_dir.relative_to(root).as_posix()}/CHANGELOG.md"
@@ -370,13 +377,13 @@ def render_page(root: Path) -> str:
 
     # --- figure gallery: every figure, caption says what to look at ---------
     n_dates = p05.get("n_campaign_dates") or 0
-    bearing = p11.get("prevailing_wind_bearing_deg")
-    bearing_txt = f"{bearing:.0f}°" if bearing is not None else "the prevailing wind"
+    bearing_txt = f"{p11['prevailing_wind_bearing_deg']:.0f}°"
     gallery_spec = [
         ("map_form.png", "Route and sky view",
          "The OM2 route over the Maré buildings, coloured by sky view (0 = no sky, 1 = open). Dark stretches are enclosed."),
         ("profiles.png", "Street form along the route",
-         "Building height, height-to-width, sky view, plan density, a ventilation proxy and shade; grey = every metre, blue = 10 m means."),
+         "Building height, height-to-width, sky view, plan density, a ventilation proxy and shade; "
+         f"grey = every metre, blue = {SEGMENT_M} m means."),
         ("map_shade.png", "Building shade on the campaign dates",
          f"Share of daylight each point spends in building shade over the {n_dates} campaign dates."),
         ("shade_calendar.png", "Shade by date and time",
@@ -384,19 +391,19 @@ def render_page(root: Path) -> str:
         ("sun_envelope.png", "Does the date matter?",
          "Always shaded, date-dependent or always sunny by time of day (Rio local time), and where the date matters most."),
         ("sun_dose.png", "Direct sun dose",
-         "Clear-sky direct sun over the past hour along the route at three times of day; band = season range, lines = campaign dates."),
+         f"Clear-sky direct sun over the past hour along the route at {count_word(len(_DOSE_SLOT_QUANTILES))} times of day; band = season range, lines = campaign dates."),
         ("map_vent_shelter.png", "Shelter from the wind",
          f"How high buildings rise toward the prevailing wind ({bearing_txt}). Dark = sheltered. Geometry proxy."),
         ("profiles_vent.png", "Ventilation proxies along the route",
          "Frontal density, canyon alignment (0 = wind along the street), shelter angle and roughness length z0 (outside its calibrated range here)."),
         ("wind_rose_compare.png", "Observed wind vs climatology",
-         "Galeão airport wind for the campaign season against 2015 to 2024. Not wind at the route."),
+         f"Galeão airport wind for the campaign season against {CLIM_YEAR_START} to {CLIM_YEAR_END}. Not wind at the route."),
     ]
     tiles = []
     for name, title, caption in gallery_spec:
         path = version_dir / "OM2" / name
         if not path.exists():
-            continue
+            raise FileNotFoundError(f"gallery figure missing from {version_dir.name}: {path}")
         rel = _rel_to(package_root, path)
         cap = f"{title}{'' if title.endswith(('?', '.')) else '.'} {caption}"
         tiles.append(
@@ -429,12 +436,12 @@ def render_page(root: Path) -> str:
         ("OM2/points.parquet", "route points, one row per metre (GeoParquet)"),
         ("OM2/points.gpkg", "route points (GeoPackage)"),
         ("OM2/points.csv", "route points (CSV)"),
-        ("p05_building_shade.parquet", "building shade per point and 5-min step, campaign dates"),
+        ("p05_building_shade.parquet", f"building shade per point and {_shade_step_min(version_dir)}-min step, campaign dates"),
         ("p05_building_shade.csv", "building shade (CSV)"),
         ("p05b_campaign_windows.csv", "campaign dates and walk windows"),
         ("p10_sun_envelope.parquet", "sun class per point and local time of day over the season"),
         ("p10_sun_envelope.csv", "sun envelope (CSV)"),
-        ("p10_sun_dose.parquet", "clear-sky direct-sun dose, 1/2/3 h"),
+        ("p10_sun_dose.parquet", f"clear-sky direct-sun dose, {'/'.join(map(str, p10['dose_hours']))} h"),
         ("p10_sun_dose.csv", "sun dose (CSV)"),
         ("p10_clock_agreement.csv", "UTC vs local clock agreement per date"),
         ("p10_horizon_profiles.parquet", "horizon angle per point and azimuth"),
@@ -475,14 +482,14 @@ def render_page(root: Path) -> str:
 
     owes = [
         ("Device clock: UTC or Rio local time?",
-         (f"Only {100 * p10['clock_agreement_all']:.0f}% of daylight point-slots keep the same sun state under the two "
-          "readings, so this is the most valuable answer. The per-date shade table reads the clock as UTC until then.")
-         if p10 else "Per-date shade reads the clock as UTC until the team confirms it."),
+         f"Only {100 * p10['clock_agreement_all']:.0f}% of daylight point-slots keep the same sun state under the two "
+         "readings, so this is the most valuable answer. The per-date shade table reads the clock as UTC until then."),
         ("Sensor time constant",
          "The air-temperature sensor's response time as mounted (63% or 90%), to set the analysis segment length "
          "(README: Using the data)."),
         ("More raw OM2 CSVs, with GPS",
-         "The 5-file pilot from Zenodo_release/fixed_data/ has no Latitude/Longitude column, so whether it is the OM2 "
+         f"The {p05['n_csv_pilot']}-file pilot from Zenodo_release/fixed_data/ has no Latitude/Longitude column, "
+         "so whether it is the OM2 "
          "device is unverified; a GPS-track CSV is needed for the spatial half of the join."),
         ("om_routes.gpkg",
          "The team's own walked route: makes point_id final and removes the route_geometry_flag defect."),

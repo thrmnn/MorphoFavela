@@ -22,18 +22,19 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from src.om_package.figures import dose_slots_for_figure
+from src.om_package.figures import SEGMENT_LENGTH_M, dose_slots_for_figure
 from src.om_package.report_pdf import report_css, render_markdown_pdf
 from src.om_package.routes import ROUTE_FLAG_MAX_STREET_DIST_M
 from src.om_package.shade import daylight_rows, daylight_shade_fraction_pct
 from src.om_package.vent_indices import DEFAULT_BUFFER_M
+from src.om_package.wind_obs import CLIM_YEAR_END, CLIM_YEAR_START
 
 PROJECT_FORM = "Brisa+ (MorphoFavela)"
 STUDY_TITLE = (
     "Street by street: explaining air temperature differences across streets "
     "and over time in Complexo da Maré"
 )
-SEGMENT_M = 10
+SEGMENT_M = int(SEGMENT_LENGTH_M)
 #: k time constants in the segment-length rule L = v k tau.
 SEGMENT_K = 3
 
@@ -88,6 +89,10 @@ def _join(items: list[str]) -> str:
     if len(items) <= 1:
         return "".join(items)
     return ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def count_word(n: int) -> str:
+    return ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][n] if n < 10 else str(n)
 
 
 def _is_are(n: int) -> str:
@@ -242,6 +247,7 @@ def _sun_facts(f: dict, d: dict, p10: dict) -> None:
     med = at[at["scope"] == "envelope_median"]["dose_1h_wh_m2"]
     f["dose_zero_share"] = float((med == 0).mean())
     f["dose_hours"] = p10["dose_hours"]
+    f["envelope_slot_min"] = p10["envelope_slot_min"]
 
 
 def _vent_facts(f: dict, pts: pd.DataFrame, d: dict, p11: dict) -> None:
@@ -414,8 +420,8 @@ def render_report_markdown(package_dir: Path) -> str:
 
     out += _section("sun_envelope.png", [
         f"**The date matters.** Over the season ({_day(f['window'][0])} to {_day(f['window'][1])}), "
-        f"{_pct(f['date_dependent'])} of daylight point-slots (one point at one 5-minute time of day) are "
-        "sunny on some days and shaded on others. "
+        f"{_pct(f['date_dependent'])} of daylight point-slots (one point at one {f['envelope_slot_min']}-minute "
+        "time of day) are sunny on some days and shaded on others. "
         f"Only {_pct(f['always_sunlit'])} are always sunny and {_pct(f['always_shaded'])} always shaded. "
         f"The {len(dates)} campaign dates are known from the device files, so use the per-date results.\n",
         f"**The clock matters more.** If the loggers recorded UTC rather than Rio local time ({utc}), "
@@ -432,8 +438,9 @@ def render_report_markdown(package_dir: Path) -> str:
         f"In the hour up to {f['dose_slot']}, a point in full sun gets up to {_n(f['dose_hi'])} Wh/m² on "
         f"{_day(hi)} and {_n(f['dose_lo'])} Wh/m² on {_day(lo)}. "
         f"On a typical day of the season, {_pct(f['dose_zero_share'])} of points get no direct sun in that "
-        "hour. The package also gives 2-hour and 3-hour doses.\n",
-    ], "Direct sun in the past hour along the route, at three times of day (Rio local time). "
+        f"hour. The package also gives {_join([f'{h}-hour' for h in f['dose_hours'] if h != 1])} doses.\n",
+    ], f"Direct sun in the past hour along the route, at {count_word(len(f['dose_slots']))} times of day "
+       "(Rio local time). "
        "Coloured lines: the campaign dates. Grey band: lowest to highest over the season. "
        "Drops to zero are building shade.")
 
@@ -475,16 +482,17 @@ def render_report_markdown(package_dir: Path) -> str:
         f"{clim_b:.0f}°. "
         + (f"During the walks themselves it came from the {_join(walk)}. " if walk else "")
         + "The airport is a regional reference: wind in the streets is weaker and follows the street.\n",
-    ], "Wind at Galeão airport (10 m): the campaign season (left) against 2015 to 2024 (right). "
+    ], f"Wind at Galeão airport (10 m): the campaign season (left) against {CLIM_YEAR_START} to {CLIM_YEAR_END} "
+       "(right). "
        "Bars point to where the wind comes from; longer bars are more frequent, colour is mean speed.")
 
     # --- using the data ----------------------------------------------
     out.append("::: keep")
     out.append("## Using the data\n")
     out.append(
-        "**Choose the segment length from the sensor.** The points are 1 m apart, but a sensor carried at "
-        "walking speed responds slowly: each reading blends the last stretch walked. Neighbouring 1 m points "
-        "are therefore not independent. A good segment length is L = v × k × τ, with v the walking speed, "
+        f"**Choose the segment length from the sensor.** The points are {f['spacing_m']:g} m apart, but a sensor "
+        "carried at walking speed responds slowly: each reading blends the last stretch walked. Neighbouring "
+        f"{f['spacing_m']:g} m points are therefore not independent. A good segment length is L = v × k × τ, with v the walking speed, "
         f"τ the sensor's time constant and k = {f['k_tau']} (about {_pct(f['k_tau_response'])} of a step "
         "change). Match each reading to the segment that ends at that point, not one centred on it. "
         "The segment script in the package re-aggregates the points to any L.\n"
