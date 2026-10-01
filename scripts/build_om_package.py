@@ -68,6 +68,7 @@ from src.om_package.io_utils import Paths, hash_tree, write_table
 from src.om_package.neighbourhoods import communities_crossed, join_communities
 from src.om_package.package_docs import USE_TERMS, render_changelog, render_readme
 from src.om_package.provenance import read_om_decisions
+from src.om_package.report import write_report
 from src.om_package.report_pdf import render_readme_pdf
 from src.om_package.quality import write_quality_report
 from src.om_package.routes import compute_route_geometry_flag, densify_route, route_length_m
@@ -159,12 +160,12 @@ DISCLOSURE_PATTERN = re.compile(
 
 
 def write_disclosure_hits(out_dir: Path) -> Path:
-    """Runs DISCLOSURE_PATTERN over every line of README.md, CHANGELOG.md
-    and p08_data_dictionary.csv in the built package, and writes
+    """Runs DISCLOSURE_PATTERN over every line of README.md, CHANGELOG.md,
+    p08_data_dictionary.csv and report.md in the built package, and writes
     (file, line, term, sentence) per hit to p00_disclosure_hits.txt at the
     package root. Hits are reported, never stripped — disclosure is the
     PI's call, not this script's."""
-    targets = ["README.md", "CHANGELOG.md", "p08_data_dictionary.csv"]
+    targets = ["README.md", "CHANGELOG.md", "p08_data_dictionary.csv", "report.md"]
     hits: list[str] = []
     for name in targets:
         p = out_dir / name
@@ -522,6 +523,13 @@ def main() -> int:
         "campaign_dates": [str(d) for d in campaign_windows_df["date"]] if campaign_windows_df is not None else [],
     }
     manifest["provenance"] = {"decisions": decisions}
+    # The human report reads manifest.json, so a provisional copy (every
+    # field but the file hashes) goes down first; the final write below
+    # replaces it. report.md/.pdf land before the hash pass so they ship
+    # in the manifest.
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
+    report_md, report_pdf = write_report(out_dir)
+    print(f"[build_om_package] wrote {report_md} and {report_pdf}")
     # Disclosure greplist (PI decides each hit — never auto-removed). Written
     # before hashing: written after, the manifest carried the previous
     # build's hash of this file.
