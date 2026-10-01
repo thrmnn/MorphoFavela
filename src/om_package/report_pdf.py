@@ -5,7 +5,7 @@
 Two documents use it: README.pdf (the technical README, whose wide spec
 table needs a small font and aggressive wrapping to fit A4) and
 report.pdf (the short human report, see report.py, with readable body
-text and full-width figures).
+text and full-width figures, styled by report_css).
 """
 from __future__ import annotations
 
@@ -43,30 +43,45 @@ a { color: #2A5FA5; text-decoration: none; }
 """
 
 
-REPORT_CSS = """
+def report_css(version: str) -> str:
+    """Stylesheet of the human report: A4, one figure per section at full
+    width, a small running header and footer. The version goes in the
+    header so a printed page says which package it describes."""
+    return """
 @page {
   size: A4;
-  margin: 15mm 18mm 15mm 18mm;
-  @top-left { content: "Octopus OM2 — street-form and shade along the route"; font-size: 8pt; color: #666; }
-  @top-right { content: counter(page) " / " counter(pages); font-size: 8pt; color: #666; }
+  margin: 17mm 18mm 16mm 18mm;
+  @top-left { content: "Octopus OM2 data package, VERSION"; font-size: 7.5pt; color: #6b6b6b; }
+  @top-right { content: "Internal review draft"; font-size: 7.5pt; color: #6b6b6b; }
+  @bottom-center { content: counter(page) " / " counter(pages); font-size: 7.5pt; color: #6b6b6b; }
 }
-body { font-family: "Liberation Sans", "Arial", sans-serif; font-size: 10.5pt; line-height: 1.45; color: #1a1a1a; }
-h1 { font-size: 18pt; margin: 0 0 4pt 0; }
-h2 { font-size: 13.5pt; margin-top: 10pt; border-bottom: 1px solid #bbb; page-break-after: avoid; }
-h3 { font-size: 11.5pt; margin-top: 12pt; page-break-after: avoid; }
-p { margin: 0.45em 0; }
-li { margin: 0.2em 0; }
-figure { margin: 6pt 0 10pt 0; page-break-inside: avoid; text-align: center; }
-.figsec { page-break-inside: avoid; }
-figure img { max-width: 100%; }
+@page :first { @top-left { content: none; } @top-right { content: none; } }
+html { font-family: "Source Sans 3", "Liberation Sans", "Arial", sans-serif; }
+body { font-size: 10.5pt; line-height: 1.45; color: #1d1d1f; }
+h1 { font-family: "Source Serif 4", "Liberation Serif", Georgia, serif; font-size: 21pt; line-height: 1.15;
+     margin: 0 0 3pt 0; color: #111; }
+h2 { font-family: "Source Serif 4", "Liberation Serif", Georgia, serif; font-size: 14pt; color: #111;
+     margin: 14pt 0 5pt 0; padding-bottom: 2pt; border-bottom: 0.6pt solid #b9b9b9; break-after: avoid; }
+h3 { font-size: 11.5pt; margin: 0 0 4pt 0; color: #0f5f57; break-after: avoid; }
+p { margin: 0 0 5pt 0; orphans: 3; widows: 3; }
+ol, ul { margin: 2pt 0 6pt 0; padding-left: 16pt; }
+li { margin: 0 0 2.5pt 0; }
+strong { color: #111; }
+.meta p { font-size: 9pt; color: #555; margin: 0 0 9pt 0; padding-bottom: 6pt; border-bottom: 1.2pt solid #111; }
+.figsec { break-inside: avoid; margin: 0 0 12pt 0; padding-top: 4pt; }
+figure { margin: 6pt 0 0 0; break-inside: avoid; text-align: center; }
+figure img { max-width: 100%; width: auto; height: auto; }
+img.hero { max-height: 112mm; }
 img.map { max-height: 150mm; }
-img.tall { max-height: 200mm; }
-img.wide { max-height: 150mm; }
-.care { page-break-inside: avoid; }
-figcaption { font-size: 9pt; color: #444; margin-top: 3pt; text-align: left; }
-table { font-size: 9pt; border-collapse: collapse; }
-a { color: #2A5FA5; text-decoration: none; }
-"""
+img.tall { max-height: 160mm; }
+img.wide { max-height: 112mm; }
+figcaption { font-size: 8.8pt; line-height: 1.35; color: #444; margin: 4pt 0 0 0; text-align: left; }
+section.keep, .keep { break-inside: avoid; }
+.care { break-inside: avoid; background: #f4f6f7; border-left: 3pt solid #0f5f57; padding: 2pt 10pt 4pt 10pt;
+        margin: 10pt 0; }
+.care h2 { border-bottom: none; margin-top: 6pt; }
+a { color: #0f5f57; text-decoration: none; }
+""".replace("VERSION", version)
 
 
 def render_markdown_pdf(md: Path, pdf: Path, *, css: str, title: str, md_format: str = "gfm") -> Path:

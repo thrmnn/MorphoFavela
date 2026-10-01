@@ -182,3 +182,21 @@ def test_results_deck_links_on_page():
 
 def test_deck_links_are_the_only_unresolved_exception():
     assert M.HUB_ORIGIN_LINKS == {"/decks/brisa_om_pk.pdf", "/decks/preview_om_pk.html"}
+
+
+@pytestmark_real
+def test_gallery_shows_every_figure_and_spec_table_is_behind_a_toggle():
+    version = M.latest_version(PACKAGE_ROOT)
+    page = M.render_page(DEFAULT_ROOT)
+    for png in (PACKAGE_ROOT / version / "OM2").glob("*.png"):
+        assert re.search(rf'<figure class="tile"><a href="{re.escape(version)}/OM2/{re.escape(png.name)}"[^>]*zoom\(', page), png.name
+    assert f"What's new in {version}" in page
+    spec = page.split('<section id="conformance">', 1)[1].split("</section>", 1)[0]
+    assert spec.index("<details") < spec.index("<table")
+    assert page.index("Download report (PDF)") < page.index("<h2>Figures</h2>") < page.index('<section id="files">')
+
+
+@pytestmark_real
+def test_page_names_project_in_parenthetical_form():
+    page = M.render_page(DEFAULT_ROOT)
+    assert not re.search(r"(?<!Brisa\+ \()MorphoFavela(?!-dash)", re.sub(r"<footer>.*?</footer>", "", page, flags=re.S))

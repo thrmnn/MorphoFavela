@@ -4,19 +4,20 @@
 Builds outputs/_packages/mare_om2/index.html — a stable URL across
 versions. Reads the newest version directory under mare_om2/ that is not
 internal (name not starting with '_') and renders, from files already on
-disk (never recomputed, never guessed):
+disk (never recomputed, never guessed), in reading order (PI, 2026-10-01:
+"clear hierarchy"):
 
-  - status: version, build time, use_terms banner, and a team-release
-    badge (draft/sent/superseded) that is visually and textually distinct
-    from BRISA release_class — this package is not part of that scheme
-  - what the PI decides (the open om_release_v0_1_1 decision, linked to
-    brisaverse's /ops — this page carries no tap of its own)
-  - what the team owes (raw OM2 CSVs, clock/timezone, om_routes.gpkg,
-    LiDAR)
-  - the documents: README, data dictionary (as a table), changelog
-    (version history), a quality summary read from p07_quality_report.json,
-    the contact sheet, and the panel ruling
-  - a link to brisaverse's /paper/x1
+  - header: version + build time; one action row (Download report (PDF)
+    primary; results slides, slide preview and technical README secondary);
+    use-terms callout with the team-release badge (independent of BRISA
+    release_class)
+  - what's new in this version, its numbers read from manifest.json
+  - spec: status counts, the full conformance table behind a toggle
+  - figure gallery: every OM2/*.png with a caption, click to enlarge
+  - files: data files and documents
+  - for the PI and the technical reader: the open release decision (linked
+    to brisaverse's /ops), what the team owes, quality, campaign windows,
+    data dictionary, version history, glossary, /paper/x1
 
 Hooked into scripts/build_om_package.py — every OM2 build regenerates
 this page from whatever that build just wrote.
@@ -67,12 +68,41 @@ NAMED_TEAM = ["Jingxue", "Vincent", "Simone"]  # PI ruling 2026-09-24, Q6a — m
 # package is actually sent to the team.
 TEAM_RELEASE_STATUS = "draft"  # draft | sent | superseded
 
-TEAM_OWES = [
-    ("More raw OM2 CSVs", "A 5-file, one-per-device pilot was pulled 2026-09-25 from Zenodo_release/fixed_data/ (which holds far more files than the pilot downloaded) — those 5 files have NO Latitude/Longitude column (I_1/I_3/I_4/O_3/O_4 schema), so whether they ARE the OM2 device is UNVERIFIED; a confirmed GPS-track CSV is still needed to exercise the spatial half of the join example."),
-    ("Clock / timezone confirmation", "GPS-fix rows are UTC per firmware; RTC-fallback rows are unconfirmed. v0.1.2's P-05 table is computed with tz=\"UTC\" as a stated labelling choice, not a resolution (Q1)."),
-    ("om_routes.gpkg", "The team's own walked route — repairs point_id from PROVISIONAL to final and removes the route_geometry_flag defect (Q2)."),
-    ("2024 airborne LiDAR + 2026 terrestrial OM2 scan", "The PI's Drive LiDAR_DSM_DTM/2024/ folders (Maré, Rio das Pedras, Rocinha_Vidigal) are scaffolded but EMPTY — asked of Carlo Moroz (Q3); see docs/research/octopus_lidar_sources.md."),
-]
+
+
+#: Page-local layout on top of hubkit.CSS; colours come from its tokens only,
+#: so light and dark both follow the hub theme.
+PAGE_CSS = """<style>
+.top{margin-top:18px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 16px}
+.actions .btn a{display:inline-block;padding:9px 15px;border-radius:8px;border:1px solid var(--line);
+background:var(--card);color:var(--ink);text-decoration:none;font-weight:600;font-size:14px}
+.actions .btn a:hover{border-color:var(--accent)}
+.actions .primary a{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-size:15px;padding:10px 18px}
+.lede{font-size:17px;color:var(--lede);max-width:760px}
+.terms p{margin:4px 0}
+ul.new{padding-left:20px;max-width:820px}ul.new li{margin:6px 0}
+.counts{display:flex;flex-wrap:wrap;gap:14px}.count strong{font-size:18px;margin-left:4px}
+details summary{cursor:pointer;color:var(--accent);font-weight:600;margin:6px 0}
+.scroll{overflow:auto;border:1px solid var(--line);border-radius:8px}.scroll.tall{max-height:480px}
+table{border-collapse:collapse;font-size:13px;width:100%}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--bg-soft)}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.tile{margin:0;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tile img{width:100%;height:220px;object-fit:contain;background:#fff;display:block;cursor:zoom-in;
+border-bottom:1px solid var(--line)}
+.tile figcaption{padding:10px 12px;font-size:13px;color:var(--mut);line-height:1.45}
+.tile figcaption strong{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:8px 28px}
+.cols h3{font-size:15px;margin:4px 0 6px}
+ul.files a{text-decoration:none}ul.files a:hover{text-decoration:underline}
+ul.files{list-style:none;padding:0;margin:0}ul.files li{padding:5px 0;border-bottom:1px solid var(--line);font-size:14px}
+.divider{margin:44px 0 0;border-top:2px solid var(--ink);padding-top:8px}
+.divider span{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:700}
+a.ops{display:inline-block;padding:8px 14px;background:var(--accent);color:var(--accent-ink);border-radius:8px;
+text-decoration:none;font-weight:600}a.ops code{background:none;color:inherit}
+</style>"""
 
 
 # ---------------------------------------------------------------- sources --
@@ -227,62 +257,85 @@ def render_page(root: Path) -> str:
     pdf_download = f"octopus_om2_{version}_report.pdf"
     readme_pdf_path = version_dir / "README.pdf"
     readme_pdf_rel = _rel_to(package_root, readme_pdf_path)
-    readme_pdf_link = (
-        f' · <a href="{readme_pdf_rel}" download="octopus_om2_{html.escape(version)}_README.pdf">'
-        'Technical README (PDF)</a>' if readme_pdf_path.exists() else ""
-    )
-    deck_links = (
-        f'<a href="{DECK_PDF}">Results slides (PDF)</a> · '
-        f'<a href="{DECK_PREVIEW}" target="_blank" rel="noopener">View slides</a>'
-    )
-    pdf_html = (
-        f'<p class="more"><a href="{pdf_rel}" download="{html.escape(pdf_download)}">'
-        f'Download report (PDF)</a> · {deck_links}</p>'
-        f'<p class="sub">The report shows the results and the context needed to read them, in a few pages.'
-        f'{readme_pdf_link}</p>'
-        if pdf_path.exists() else
-        '<p class="sub">Report PDF not built for this version — rebuild with scripts/build_om_package.py.</p>'
-        f'<p class="more">{deck_links}</p>'
-    )
+    p05 = manifest.get("p05_shade") or {}
+    p10 = manifest.get("p10") or {}
+    p11 = manifest.get("p11") or {}
+    built = manifest.get("built_at_utc", "?")
+    built_label = built[:16].replace("T", " ") + " UTC" if len(built) >= 16 else built
 
-    # --- status -------------------------------------------------------
+    # --- one action row: the report first, everything else secondary -----
+    actions = []
+    if pdf_path.exists():
+        actions.append(f'<span class="btn primary"><a href="{pdf_rel}" download="{html.escape(pdf_download)}">'
+                       'Download report (PDF)</a></span>')
+    actions.append(f'<span class="btn"><a href="{DECK_PDF}">Results slides (PDF)</a></span>')
+    actions.append(f'<span class="btn"><a href="{DECK_PREVIEW}" target="_blank" rel="noopener">View slides</a></span>')
+    if readme_pdf_path.exists():
+        actions.append(f'<span class="btn"><a href="{readme_pdf_rel}" '
+                       f'download="octopus_om2_{html.escape(version)}_README.pdf">Technical README (PDF)</a></span>')
     status_badges = (
         hubkit.badge("info", f"version {version}")
         + hubkit.badge("warn", "INTERNAL REVIEW DRAFT")
         + hubkit.badge("amber", f"team release: {TEAM_RELEASE_STATUS}")
     )
+    report_note = ("" if pdf_path.exists() else
+                   '<p class="sub">Report PDF not built for this version: rebuild with scripts/build_om_package.py.</p>')
     status_html = f"""
-<section id="status">
-  <h2>Status</h2>
-  <p>{status_badges}</p>
-  <div class="callout">{pdf_html}</div>
-  <p class="sub">Built {html.escape(manifest.get("built_at_utc", "?"))} ·
-  CRS {html.escape(manifest.get("crs", "?"))} ·
-  {om2_route.get("n_points", "?")} OM2 points ·
-  crosses {", ".join(html.escape(c) for c in communities) or "?"}.</p>
-  <div class="callout"><p class="lead">Use terms</p>
+<section id="status" class="top">
+  <div class="actions">{"".join(actions)}</div>
+  {report_note}
+  <p class="lede">Street form, sun and ventilation proxies for the {om2_route.get("n_points", 0):,} points of the
+  OM2 walking route in Maré ({", ".join(html.escape(c) for c in communities) or "?"}), for the Octopus LRP #2 team.
+  Start with the report: it gives the results and the context needed to read them in a few pages.</p>
+  <div class="callout terms"><p>{status_badges}</p>
   <p>{html.escape(manifest.get("use_terms", "?"))}</p>
-  <p class="gloss">The INTERNAL REVIEW DRAFT and team-release badges above describe
-  <em>this Octopus package</em> only. They are independent of BRISA's own
-  <code>release_class</code> lifecycle for P1 figures — this package is not
-  part of that scheme at all, so the two badge systems must never be read
-  as equivalent.</p></div>
+  <p class="gloss">These badges describe this Octopus package only. They are independent of BRISA's own
+  <code>release_class</code> lifecycle for P1 figures.</p></div>
 </section>"""
 
-    # --- P-00 spec conformance -------------------------------------------
+    # --- what's new: the headline numbers of this version, from the manifest --
+    new_items = []
+    if p10:
+        new_items.append(
+            f"<strong>Sun exposure for every time of day</strong> over {html.escape(' to '.join(p10.get('window', [])))}: "
+            f"{100 * p10['date_dependent_share']:.0f}% of daylight point-slots change with the date, so use the "
+            "per-date results for the campaign dates.")
+        new_items.append(
+            f"<strong>Device-clock check</strong>: only {100 * p10['clock_agreement_all']:.0f}% of daylight point-slots "
+            "keep the same sun or shade state whether the loggers recorded UTC or Rio local time. "
+            "Confirming the clock is the most useful thing the team can send.")
+    if p11:
+        new_items.append(
+            f"<strong>Ventilation proxies</strong> at the prevailing wind ({p11['prevailing_wind_bearing_deg']:.0f}°: "
+            f"shelter angle, canyon alignment, roughness), plus {p11['n_obs']:,} observed {html.escape(p11['station'])} "
+            f"airport wind reports over the season, {p11['n_used_if_device_clock_utc']} (clock read as UTC) or "
+            f"{p11['n_used_if_device_clock_local']} (clock read as local time) of them matched to the walk times. "
+            "Geometry-derived proxies, not measured airflow.")
+    n_figs = len(sorted((version_dir / "OM2").glob("*.png")))
+    new_items.append(f"<strong>A shorter report</strong> with all {n_figs} figures and a README reorganised for scanning.")
+    changelog_view_new = f"/doc?src=/morphofavela-dash/{version_dir.relative_to(root).as_posix()}/CHANGELOG.md"
+    new_html = f"""
+<section id="new">
+  <h2>What's new in {html.escape(version)}</h2>
+  <ul class="new">{"".join(f"<li>{i}</li>" for i in new_items)}</ul>
+  <p class="sub"><a href="{changelog_view_new}">Full changelog</a></p>
+</section>"""
+
+    # --- spec: counts up front, the table behind a toggle ------------------
     conformance_rel = _rel_to(package_root, version_dir / "p00_spec_conformance.json")
     conformance_csv_rel = _rel_to(package_root, version_dir / "p00_spec_conformance.csv")
     conformance = load_json(version_dir / "p00_spec_conformance.json")
     if conformance is None:
         conformance_html = """
 <section id="conformance">
-  <h2>Spec conformance</h2>
-  <p class="sub">No p00_spec_conformance.json found for this version — rebuild with
+  <h2>Spec</h2>
+  <p class="sub">No p00_spec_conformance.json found for this version: rebuild with
   scripts/build_om_package.py.</p>
 </section>"""
     else:
         _STATUS_BADGE = {"delivered": "ok", "delivered (scoped)": "ok", "descoped": "info",
                          "partial": "amber", "pending": "warn"}
+        items = conformance.get("items", [])
         conf_rows = [
             [
                 it["id"],
@@ -291,161 +344,75 @@ def render_page(root: Path) -> str:
                 it["evidence"],
                 ", ".join(
                     list(it.get("pending_on") or [])
-                    + [f"descoped \u2014 {d}" for d in it.get("decisions") or []]
+                    + [f"descoped — {d}" for d in it.get("decisions") or []]
                 ) or "—",
             ]
-            for it in conformance.get("items", [])
+            for it in items
         ]
-        n_delivered = sum(1 for it in conformance.get("items", []) if it["status"] == "delivered")
-        n_partial = sum(1 for it in conformance.get("items", []) if it["status"] == "partial")
-        n_pending = sum(1 for it in conformance.get("items", []) if it["status"] == "pending")
-        n_scoped = sum(1 for it in conformance.get("items", []) if it["status"] == "delivered (scoped)")
+        counts = []
+        for status in ("delivered", "delivered (scoped)", "partial", "pending", "descoped"):
+            n = sum(1 for it in items if it["status"] == status)
+            if n:
+                counts.append(f'<span class="count">{hubkit.badge(_STATUS_BADGE[status], status)} <strong>{n}</strong></span>')
         conformance_html = f"""
 <section id="conformance">
-  <h2>Spec conformance (P-01…P-09)</h2>
-  <p>{n_delivered} delivered · {n_scoped} delivered (scoped) · {n_partial} partial · {n_pending} pending
-  (of {len(conformance.get("items", []))}). A <em>descoped</em> part is a deliberate cut by PI decision, not a gap. — computed mechanically by
-  <code>src/om_package/spec.py</code> against this build
-  (<a href="{conformance_rel}">p00_spec_conformance.json</a>,
-  <a href="{conformance_csv_rel}">.csv</a>), never typed by hand.</p>
-  {_table(["id", "requirement", "status", "evidence", "pending on / descoped"], conf_rows, escape_cols={0, 1, 3, 4})}
+  <h2>Spec</h2>
+  <p>The team's package spec has {len(items)} items ({html.escape(items[0]["id"]) if items else ""} to
+  {html.escape(items[-1]["id"]) if items else ""}). Status computed from this build:</p>
+  <p class="counts">{"".join(counts)}</p>
+  <p class="sub">A <em>scoped</em> or <em>descoped</em> part is a deliberate cut by PI decision, not a gap.</p>
+  <details class="spec"><summary>Show the full spec table</summary>
+  <p class="sub">Computed by <code>src/om_package/spec.py</code>
+  (<a href="{conformance_rel}">p00_spec_conformance.json</a>, <a href="{conformance_csv_rel}">.csv</a>).</p>
+  <div class="scroll">{_table(["id", "requirement", "status", "evidence", "pending on / descoped"], conf_rows, escape_cols={0, 1, 3, 4})}</div>
+  </details>
 </section>"""
 
-    # --- PI decision ----------------------------------------------------
-    named_team_str = ", ".join(NAMED_TEAM)
-    decision_html = f"""
-<section id="decision">
-  <h2>What the PI decides</h2>
-  <p>Release <strong>{html.escape(version)}</strong> to the named Octopus team
-  — {html.escape(named_team_str)} — now? The panel's must-fix list (see the
-  panel ruling below) has been applied. This page states the decision; it
-  carries no tap of its own — the PI rules on it in the brisaverse cockpit.</p>
-  <p><a href="{OPS_LINK}" target="_blank" rel="noopener"
-  style="display:inline-block;padding:8px 14px;background:var(--accent);color:var(--accent-ink) !important;
-  border-radius:8px;text-decoration:none;font-weight:600">
-  → Rule on <code style="background:none;color:var(--accent-ink) !important">{OPS_DECISION_ID}</code> at /ops</a></p>
-</section>"""
-
-    # --- what the team owes ---------------------------------------------
-    owes_rows = [[item, note] for item, note in TEAM_OWES]
-    owes_html = f"""
-<section id="team-owes">
-  <h2>What the team owes</h2>
-  {_table(["Item", "Why it's blocking"], owes_rows)}
-</section>"""
-
-    # --- quality ----------------------------------------------------------
-    below_rows = [[r["column"], f'{r["pct"]}%', f'{r["n_valid"]}/{r["n_total"]}'] for r in q["below_100"]]
-    pending_html = "".join(f"<li><code>{html.escape(p)}</code></li>" for p in q["pending_items"])
-    descoped_html = "".join(f"<li><code>{html.escape(p)}</code></li>" for p in q["descoped_items"])
-    quality_html = f"""
-<section id="quality">
-  <h2>Quality (P-07)</h2>
-  <p>{q["n_points"]} OM2 points. <strong>{q["flagged"]}</strong> flagged by
-  <code>route_geometry_flag</code>
-  ({q["flagged_pct"]}% — inside a building footprint or &gt;10 m from the
-  nearest street centreline).</p>
-  <p>{len(below_rows)} column(s) below 100% coverage:</p>
-  {_table(["Column", "Coverage", "Valid / total"], below_rows) if below_rows else "<p class='sub'>None.</p>"}
-  <p>Pending items (quoted exactly from <code>p07_quality_report.json</code>):</p>
-  <ul>{pending_html or "<li class='sub'>None.</li>"}</ul>
-  <p>Descoped items (deliberate cut by decision <code>{html.escape(q["descoped_by"])}</code>, not gaps):</p>
-  <ul>{descoped_html or "<li class='sub'>None.</li>"}</ul>
-</section>"""
-
-    # --- P-05 shade / campaign windows -----------------------------------
-    p05 = manifest.get("p05_shade") or {}
-    windows_csv = version_dir / "p05b_campaign_windows.csv"
-    windows_rows = []
-    if windows_csv.exists():
-        with windows_csv.open(newline="", encoding="utf-8") as fh:
-            for r in csv.DictReader(fh):
-                windows_rows.append(
-                    [
-                        Path(r.get("csv_path", "")).name,
-                        r.get("date"),
-                        r.get("first_timestamp"),
-                        r.get("last_timestamp"),
-                        r.get("n_rows"),
-                        r.get("has_gps"),
-                        r.get("n_epoch_reset"),
-                    ]
-                )
-    if p05.get("n_rows"):
-        shade_html = f"""
-<section id="shade">
-  <h2>P-05 building shade — campaign windows</h2>
-  <p><strong>{p05.get("n_rows")}</strong> (point x 5-min-timestamp) rows across
-  <strong>{p05.get("n_campaign_dates")}</strong> campaign dates, from a
-  <strong>{p05.get("n_csv_pilot")}</strong>-file pilot pull (one CSV per device).
-  <strong>{p05.get("shade_fraction_daylight_pct")}%</strong> of daylight rows in building shade
-  (sun above the horizon; night rows stay in the table, marked by <code>sun_altitude_deg</code> &le; 0).
-  Computed <code>tz={html.escape(str(p05.get("tz")))}</code> —
-  a stated labelling choice, the campaign timezone stays UNRESOLVED.
-  Horizon march <code>max_dist_m={p05.get("max_dist_m")}</code> m (not
-  WP-04's 500 m citywide default — the extended-300m DTM/footprints layer
-  has real nodata gaps closer than that; see the package README's Known
-  limits).</p>
-  {_table(["CSV", "date", "first_timestamp", "last_timestamp", "n_rows", "has_gps", "n_epoch_reset"], windows_rows) if windows_rows else "<p class='sub'>No campaign-windows table found.</p>"}
-  <p class="sub">Walk windows above are as read off the raw CSVs by
-  <code>infer_campaign_windows()</code>; the shade table's own windows are
-  each padded to the enclosing hour before the 5-min sweep.</p>
-</section>"""
-    else:
-        shade_html = """
-<section id="shade">
-  <h2>P-05 building shade — campaign windows</h2>
-  <p class="sub">No campaign CSVs found at build time — this version ships the
-  empty-schema P-05 table (see the package README's P-05 section).</p>
-</section>"""
-
-    # --- figures (PI, 2026-09-27: spatial result first, then the sampling
-    # along the route) — F1/F2 stacked at a fixed 800 px width, then F3,
-    # then F4, replacing the old single contact-sheet section. ------------
-    n_campaign_dates_fig = p05.get("n_campaign_dates") or 0
-    tz_fig = p05.get("tz") or "n/a (no campaign rows)"
-    shade_pct_fig = p05.get("shade_fraction_daylight_pct")
-
-    def _fig_block(rel_path: str, alt: str, caption: str, width_800: bool) -> str:
-        img_style = "width:800px;max-width:100%;" if width_800 else "max-width:100%;"
-        return f"""
-  <figure style="margin:0 0 20px 0">
-    <a href="{rel_path}" target="_blank" rel="noopener">
-    <img src="{rel_path}" alt="{html.escape(alt)}" style="{img_style}border:1px solid var(--line);border-radius:8px"></a>
-    <figcaption class="sub" style="margin-top:6px">{caption}</figcaption>
-  </figure>"""
-
-    map_form_rel = _rel_to(package_root, version_dir / "OM2" / "map_form.png")
-    map_shade_rel = _rel_to(package_root, version_dir / "OM2" / "map_shade.png")
-    profiles_rel = _rel_to(package_root, version_dir / "OM2" / "profiles.png")
-    shade_calendar_rel = _rel_to(package_root, version_dir / "OM2" / "shade_calendar.png")
-
+    # --- figure gallery: every figure, caption says what to look at ---------
+    n_dates = p05.get("n_campaign_dates") or 0
+    bearing = p11.get("prevailing_wind_bearing_deg")
+    bearing_txt = f"{bearing:.0f}°" if bearing is not None else "the prevailing wind"
+    gallery_spec = [
+        ("map_form.png", "Route and sky view",
+         "The OM2 route over the Maré buildings, coloured by sky view (0 = no sky, 1 = open). Dark stretches are enclosed."),
+        ("profiles.png", "Street form along the route",
+         "Building height, height-to-width, sky view, plan density, a ventilation proxy and shade; grey = every metre, blue = 10 m means."),
+        ("map_shade.png", "Building shade on the campaign dates",
+         f"Share of daylight each point spends in building shade over the {n_dates} campaign dates."),
+        ("shade_calendar.png", "Shade by date and time",
+         "One panel per campaign date: distance along the route against time of day (device clock read as UTC)."),
+        ("sun_envelope.png", "Does the date matter?",
+         "Always shaded, date-dependent or always sunny by time of day (Rio local time), and where the date matters most."),
+        ("sun_dose.png", "Direct sun dose",
+         "Clear-sky direct sun over the past hour along the route at three times of day; band = season range, lines = campaign dates."),
+        ("map_vent_shelter.png", "Shelter from the wind",
+         f"How high buildings rise toward the prevailing wind ({bearing_txt}). Dark = sheltered. Geometry proxy."),
+        ("profiles_vent.png", "Ventilation proxies along the route",
+         "Frontal density, canyon alignment (0 = wind along the street), shelter angle and roughness length z0 (outside its calibrated range here)."),
+        ("wind_rose_compare.png", "Observed wind vs climatology",
+         "Galeão airport wind for the campaign season against 2015 to 2024. Not wind at the route."),
+    ]
+    tiles = []
+    for name, title, caption in gallery_spec:
+        path = version_dir / "OM2" / name
+        if not path.exists():
+            continue
+        rel = _rel_to(package_root, path)
+        cap = f"{title}{'' if title.endswith(('?', '.')) else '.'} {caption}"
+        tiles.append(
+            f'<figure class="tile"><a href="{rel}" target="_blank" rel="noopener" '
+            f'onclick="event.preventDefault();zoom(\'{rel}\',\'{hubkit._js_attr(cap)}\')">'
+            f'<img src="{rel}" alt="{html.escape(cap)}" loading="lazy"></a>'
+            f'<figcaption><strong>{html.escape(title)}</strong> {html.escape(caption)}</figcaption></figure>'
+        )
     contact_html = f"""
 <section id="figures">
   <h2>Figures</h2>
-  {_fig_block(map_form_rel, f"OM2 route over Maré buildings, coloured by sky_view_factor ({version})",
-              f"F1 — the spatial result: {om2_route.get('n_points', '?')} OM2 points over the Maré buildings, route coloured by sky_view_factor.",
-              width_800=True)}
-  {_fig_block(map_shade_rel, f"OM2 route coloured by share of daylight in building shade ({version})",
-              (f"F2 — same base map, route coloured by the share of daylight in building shade across {n_campaign_dates_fig} "
-               f"campaign date(s) ({shade_pct_fig}% of daylight rows, times labelled {html.escape(str(tz_fig))}); building shade only."
-               if n_campaign_dates_fig else
-               "F2 — same base map; no campaign-date shade rows in this build (empty-schema P-05 table)."),
-              width_800=True)}
-  {_fig_block(profiles_rel, f"OM2 sampling along the route ({version})",
-              "F3 — sampling along the route: 1 m raw values (faint) and 10 m segment means (bold) for "
-              "building height, H/W ratio, sky view factor, plan density (λp), the ventilation "
-              "frontal-area PROXY, and daylight shaded fraction, with community names at 100 m distance guides.",
-              width_800=False)}
-  {_fig_block(shade_calendar_rel, f"OM2 shade calendar ({version})",
-              (f"F4 — building shade across {n_campaign_dates_fig} campaign date(s): distance along the route "
-               "vs time of day (UTC), building shade (dark), sun (light), night (grey), walk window bracketed."
-               if n_campaign_dates_fig else
-               "F4 — no campaign-date shade rows in this build (empty-schema P-05 table)."),
-              width_800=False)}
+  <p class="sub">Click a figure to enlarge it.</p>
+  <div class="gallery">{"".join(tiles)}</div>
 </section>"""
 
-    # --- documents ------------------------------------------------------
+    # --- files ------------------------------------------------------------
     readme_rel = _rel_to(package_root, version_dir / "README.md")
     changelog_rel = _rel_to(package_root, version_dir / "CHANGELOG.md")
     # Served as text/markdown under the hub's MorphoFavela mount, a .md file
@@ -458,111 +425,186 @@ def render_page(root: Path) -> str:
     dict_rel = _rel_to(package_root, version_dir / "p08_data_dictionary.csv")
     panel_rel = _rel_to(package_root, package_root / PANEL_PAGE_NAME)
 
-    # Deliverable data files this release exists to ship — linked directly so
-    # a recipient never has to reverse-engineer paths out of manifest.json's
-    # files map to reach them.
     data_files = [
-        (version_dir / "OM2" / "points.parquet", "OM2/points.parquet", "route-point table (GeoParquet)"),
-        (version_dir / "OM2" / "points.gpkg", "OM2/points.gpkg", "route-point table (GeoPackage)"),
-        (version_dir / "OM2" / "points.csv", "OM2/points.csv", "route-point table (plain CSV)"),
-        (version_dir / "p05_building_shade.parquet", "p05_building_shade.parquet", "P-05 shade (point x 5-min timestamp)"),
-        (version_dir / "p05_building_shade.csv", "p05_building_shade.csv", "P-05 shade (CSV)"),
-        (version_dir / "p05b_campaign_windows.parquet", "p05b_campaign_windows.parquet", "P-05 campaign walk windows"),
-        (version_dir / "p05b_campaign_windows.csv", "p05b_campaign_windows.csv", "P-05 campaign walk windows (CSV)"),
+        ("OM2/points.parquet", "route points, one row per metre (GeoParquet)"),
+        ("OM2/points.gpkg", "route points (GeoPackage)"),
+        ("OM2/points.csv", "route points (CSV)"),
+        ("p05_building_shade.parquet", "building shade per point and 5-min step, campaign dates"),
+        ("p05_building_shade.csv", "building shade (CSV)"),
+        ("p05b_campaign_windows.csv", "campaign dates and walk windows"),
+        ("p10_sun_envelope.parquet", "sun class per point and local time of day over the season"),
+        ("p10_sun_envelope.csv", "sun envelope (CSV)"),
+        ("p10_sun_dose.parquet", "clear-sky direct-sun dose, 1/2/3 h"),
+        ("p10_sun_dose.csv", "sun dose (CSV)"),
+        ("p10_clock_agreement.csv", "UTC vs local clock agreement per date"),
+        ("p10_horizon_profiles.parquet", "horizon angle per point and azimuth"),
+        ("p11_wind_observed.csv", "SBGL airport wind, flagged by matched walk"),
+        ("p08_data_dictionary.csv", "data dictionary"),
+        ("OM2/aggregate_to_segments.py", "re-aggregate the points to any segment length"),
+        ("OM2/join_shade_example.py", "example join of device data to the shade table"),
     ]
     data_files_html = "".join(
-        f'<li><a href="{_rel_to(package_root, p)}"><code>{html.escape(label)}</code></a> — {html.escape(desc)}</li>'
-        for p, label, desc in data_files if p.exists()
+        f'<li><a href="{_rel_to(package_root, version_dir / label)}"><code>{html.escape(label)}</code></a>'
+        f' <span class="sub">{html.escape(desc)}</span></li>'
+        for label, desc in data_files if (version_dir / label).exists()
     )
-
-    dict_table_rows = [
-        [r.get("id", ""), r.get("definition", ""), r.get("unit", ""), r.get("status", "")]
-        for r in dict_rows
-    ]
-    dict_html = f"""
-<section id="dictionary">
-  <h2>Data dictionary (P-08)</h2>
-  <p>{len(dict_rows)} variables (<a href="{dict_rel}">full dictionary, incl. source/method/limits, as CSV</a>).</p>
-  <div style="max-height:480px;overflow:auto;border:1px solid var(--line);border-radius:8px">
-  {_table(["id", "definition", "unit", "status"], dict_table_rows)}
+    files_html = f"""
+<section id="files">
+  <h2>Files</h2>
+  <div class="cols">
+  <div><h3>Data</h3><ul class="files">{data_files_html or "<li class='sub'>None found on disk for this version.</li>"}</ul></div>
+  <div><h3>Documents</h3><ul class="files">
+    <li><a href="{pdf_rel}" download="{html.escape(pdf_download)}">report.pdf</a> <span class="sub">the short report</span></li>
+    <li><a href="{readme_view}">README</a> <span class="sub">technical document (<a href="{readme_rel}">raw .md</a>, <a href="{readme_pdf_rel}">PDF</a>)</span></li>
+    <li><a href="{changelog_view}">Changelog</a> <span class="sub">(<a href="{changelog_rel}">raw .md</a>)</span></li>
+    <li><a href="{manifest_rel}">manifest.json</a> <span class="sub">sha256 per file, version, CRS, use terms</span></li>
+    <li><a href="{panel_rel}">Panel ruling</a> <span class="sub">the expert-panel review behind v0.1's must-fix list</span></li>
+  </ul></div>
   </div>
 </section>"""
 
+    # --- for the PI: decision, what the team owes, quality ------------------
+    named_team_str = ", ".join(NAMED_TEAM)
+    decision_html = f"""
+<section id="decision">
+  <h2>What the PI decides</h2>
+  <p>Release <strong>{html.escape(version)}</strong> to the named Octopus team
+  ({html.escape(named_team_str)}) now? The PI rules on it in the brisaverse cockpit; this page has no tap of its own.</p>
+  <p><a class="ops" href="{OPS_LINK}" target="_blank" rel="noopener">Rule on <code>{OPS_DECISION_ID}</code> at /ops</a></p>
+</section>"""
+
+    owes = [
+        ("Device clock: UTC or Rio local time?",
+         (f"Only {100 * p10['clock_agreement_all']:.0f}% of daylight point-slots keep the same sun state under the two "
+          "readings, so this is the most valuable answer. The per-date shade table reads the clock as UTC until then.")
+         if p10 else "Per-date shade reads the clock as UTC until the team confirms it."),
+        ("Sensor time constant",
+         "The air-temperature sensor's response time as mounted (63% or 90%), to set the analysis segment length "
+         "(README: Using the data)."),
+        ("More raw OM2 CSVs, with GPS",
+         "The 5-file pilot from Zenodo_release/fixed_data/ has no Latitude/Longitude column, so whether it is the OM2 "
+         "device is unverified; a GPS-track CSV is needed for the spatial half of the join."),
+        ("om_routes.gpkg",
+         "The team's own walked route: makes point_id final and removes the route_geometry_flag defect."),
+        ("2024 airborne LiDAR + footprints",
+         "Replaces the 2019 geometry; every geometry input is already a build parameter."),
+    ]
+    owes_html = f"""
+<section id="team-owes">
+  <h2>What the team owes</h2>
+  {_table(["Item", "Why it matters"], [[a, b] for a, b in owes])}
+</section>"""
+
+    below_rows = [[r["column"], f'{r["pct"]}%', f'{r["n_valid"]}/{r["n_total"]}'] for r in q["below_100"]]
+    pending_html = "".join(f"<li><code>{html.escape(p)}</code></li>" for p in q["pending_items"])
+    descoped_html = "".join(f"<li><code>{html.escape(p)}</code></li>" for p in q["descoped_items"])
+    quality_html = f"""
+<section id="quality">
+  <h2>Quality</h2>
+  <p>{q["n_points"]} OM2 points. <strong>{q["flagged"]}</strong> flagged by
+  <code>route_geometry_flag</code>
+  ({q["flagged_pct"]}%: inside a building footprint or &gt;10 m from the
+  nearest street centreline).</p>
+  <details><summary>{len(below_rows)} column(s) below 100% coverage; pending and descoped items</summary>
+  {_table(["Column", "Coverage", "Valid / total"], below_rows) if below_rows else "<p class='sub'>None.</p>"}
+  <p>Pending items (from <code>p07_quality_report.json</code>):</p>
+  <ul>{pending_html or "<li class='sub'>None.</li>"}</ul>
+  <p>Descoped items (deliberate cut by decision <code>{html.escape(q["descoped_by"])}</code>, not gaps):</p>
+  <ul>{descoped_html or "<li class='sub'>None.</li>"}</ul>
+  </details>
+</section>"""
+
+    windows_csv = version_dir / "p05b_campaign_windows.csv"
+    windows_rows = []
+    if windows_csv.exists():
+        with windows_csv.open(newline="", encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                windows_rows.append([Path(r.get("csv_path", "")).name, r.get("date"), r.get("first_timestamp"),
+                                     r.get("last_timestamp"), r.get("n_rows"), r.get("has_gps"), r.get("n_epoch_reset")])
+    if p05.get("n_rows"):
+        shade_html = f"""
+<section id="shade">
+  <h2>Campaign windows</h2>
+  <p>{p05.get("n_campaign_dates")} campaign dates from a {p05.get("n_csv_pilot")}-file pilot pull (one CSV per device).
+  {p05.get("shade_fraction_daylight_pct")}% of daylight rows are in building shade.
+  Shade timestamps: <code>{html.escape(str(p05.get("tz")))}</code>.</p>
+  <details><summary>Walk windows as read off the device files</summary>
+  <div class="scroll">{_table(["CSV", "date", "first_timestamp", "last_timestamp", "n_rows", "has_gps", "n_epoch_reset"], windows_rows) if windows_rows else "<p class='sub'>No campaign-windows table found.</p>"}</div>
+  <p class="sub">The shade table pads each window to the enclosing hour before the 5-min sweep.</p>
+  </details>
+</section>"""
+    else:
+        shade_html = """
+<section id="shade">
+  <h2>Campaign windows</h2>
+  <p class="sub">No campaign CSVs found at build time: this version ships the empty-schema shade table.</p>
+</section>"""
+
+    dict_table_rows = [[r.get("id", ""), r.get("definition", ""), r.get("unit", ""), r.get("status", "")]
+                       for r in dict_rows]
+    dict_html = f"""
+<section id="dictionary">
+  <h2>Data dictionary</h2>
+  <p>{len(dict_rows)} variables (<a href="{dict_rel}">full dictionary as CSV</a>, with source, method and limits).</p>
+  <details><summary>Show the dictionary</summary>
+  <div class="scroll tall">{_table(["id", "definition", "unit", "status"], dict_table_rows)}</div>
+  </details>
+</section>"""
+
     history_rows = [
-        [
-            e["version"],
-            e["date"],
-            "yes" if e["on_disk"] else "superseded / not on disk",
-            e.get("built_at_utc") or "—",
-            str(e.get("n_points")) if e.get("n_points") is not None else "—",
-        ]
+        [e["version"], e["date"], "yes" if e["on_disk"] else "superseded / not on disk",
+         (e.get("built_at_utc") or "—")[:16].replace("T", " "), str(e.get("n_points")) if e.get("n_points") is not None else "—"]
         for e in history
     ]
     changelog_items = "".join(
-        f"<li><strong>{html.escape(e['version'])}</strong> — {html.escape(e['date'])}<ul>"
+        f"<li><strong>{html.escape(e['version'])}</strong> ({html.escape(e['date'])})<ul>"
         + "".join(f"<li>{html.escape(b)}</li>" for b in e["bullets"])
         + "</ul></li>"
         for e in history
     )
-    docs_html = f"""
-<section id="documents">
-  <h2>Documents</h2>
-  <ul>
-    <li><a href="{pdf_rel}" download="{html.escape(pdf_download)}"><strong>Download report (PDF)</strong></a> — the short report: results, key figures, what to read with care.</li>
-    <li><a href="{readme_pdf_rel}">Technical README (PDF)</a> — the README below as one file.</li>
-    <li>{deck_links} — the results deck, generated from this package.</li>
-    <li><a href="{readme_view}">README</a> — release scope, coverage vs Table 1, sources, methods, known limits
-        (<a href="{readme_rel}">raw .md</a>).</li>
-    <li><a href="{changelog_view}">Changelog</a> (<a href="{changelog_rel}">raw .md</a>)</li>
-    <li><a href="{manifest_rel}">manifest.json</a> — per-file sha256, package_version, crs, use_terms.</li>
-    <li><a href="{panel_rel}">Panel ruling</a> — the expert-panel review v0.1's must-fix list came from.</li>
-  </ul>
-  <h3>Data files</h3>
-  <p class="sub">The actual deliverable — linked directly, not just via manifest.json's files map.</p>
-  <ul>{data_files_html or "<li class='sub'>None found on disk for this version.</li>"}</ul>
-  <h3>Version history</h3>
+    history_html = f"""
+<section id="history">
+  <h2>Version history</h2>
   {_table(["Version", "Date", "On disk", "Built (UTC)", "OM2 points"], history_rows)}
   <details><summary>Changelog detail</summary><ul>{changelog_items}</ul></details>
 </section>"""
 
-    # --- glossary ---------------------------------------------------------
     # Same one-line <details class="glossary"> convention as the project hub
-    # (build_project_hub.py::_recent_results_section) — for a reader outside
-    # MorphoFavela (e.g. Jingxue) meeting this package's shorthand cold.
+    # (build_project_hub.py::_recent_results_section).
     glossary_html = (
         '<section id="glossary"><div class="callout">'
         '<details class="glossary"><summary>Glossary</summary>'
         '<span class="gloss">'
-        "P-02..P-08 this package's own pipeline steps (route points, buffer/segment "
-        "aggregation, airborne form variables, building shade, ventilation proxies, "
-        "quality report, data dictionary) · "
+        "P-02..P-11 this package's spec items (route points, aggregation, form variables, building shade, "
+        "ventilation proxies, quality report, data dictionary, changelog, sun exposure, ventilation indices) · "
         "WP-02 the Brisa+ (MorphoFavela) shared horizon/sky-obstruction engine, reused unmodified "
-        "for P-05 shade · "
-        "lambda_p (plan_density_lambda_p) building plan-area fraction of a 10&nbsp;m grid "
-        "cell, 0-1, 1.0 = fully built · "
-        "Tregenza sky the 145-patch sky-hemisphere subdivision the sky-view-factor / "
-        "shade computations sample directions from"
+        "for shade · "
+        "lambda_p (plan_density_lambda_p) building plan-area fraction, 0-1, 1.0 = fully built · "
+        "Tregenza sky the 145-patch sky-hemisphere subdivision the sky-view and shade computations sample · "
+        "proxy a value derived from building geometry, never a measured air temperature, sunlight or wind"
         '</span></details></div></section>'
     )
 
     paper_html = f"""
 <section id="paper">
   <h2>Paper link</h2>
-  <p><a href="{PAPER_LINK}" target="_blank" rel="noopener">→ /paper/x1</a> —
-  our role in Octopus LRP #2, the package spec, and what v0.2 is waiting on.</p>
+  <p><a href="{PAPER_LINK}" target="_blank" rel="noopener">/paper/x1</a>: our role in Octopus LRP #2, the
+  package spec, and what the next version waits on.</p>
 </section>"""
 
+    pi_html = '<div class="divider"><span>For the PI and the technical reader</span></div>'
     body = (
-        status_html + conformance_html + decision_html + glossary_html + owes_html + contact_html
-        + quality_html + shade_html + dict_html + docs_html + paper_html
+        PAGE_CSS + status_html + new_html + conformance_html + contact_html + files_html
+        + pi_html + decision_html + owes_html + quality_html + shade_html + dict_html + history_html
+        + glossary_html + paper_html
     )
     prov = hubkit.git_provenance(root, "scripts/build_om_package_page.py")
     return hubkit.page(
-        "Maré morphology, OM2 — package",
-        "Octopus LRP #2 contributor package · figure_organization_spec.md §4",
+        "Octopus OM2 data package",
+        f"Version <strong>{html.escape(version)}</strong> · built {html.escape(built_label)} · "
+        "Maré, Rio de Janeiro · Brisa+ (MorphoFavela) for Octopus LRP #2",
         body,
         provenance=prov,
-        doc=True,
     )
 
 

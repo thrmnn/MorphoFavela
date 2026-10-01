@@ -50,14 +50,40 @@ def test_project_named_only_in_parenthetical_form(report_md):
 
 
 def test_no_internal_ids(report_md):
-    for token in ("P-0", "om_", "OCTOPUS_", "src/", ".parquet", ".py"):
+    for token in ("P-0", "P-1", "om_", "OCTOPUS_", "src/", ".parquet", ".py", "_proxy", "_deg"):
         assert token not in report_md, token
 
 
-def test_four_figures_embedded(report_md):
-    for name, _heading, _cls in FIGURES:
-        assert re.search(rf"!\[[^\]]+\]\(OM2/{re.escape(name)}\)", report_md), name
-        assert (PACKAGE_DIR / "OM2" / name).exists()
+def test_every_package_figure_embedded_once_with_numbered_caption(report_md):
+    shipped = sorted(p.name for p in (PACKAGE_DIR / "OM2").glob("*.png"))
+    assert sorted(name for name, _h, _c in FIGURES) == shipped
+    for i, (name, _heading, _cls) in enumerate(FIGURES, start=1):
+        hits = re.findall(rf"!\[Figure (\d+)\. [^\]]+\]\(OM2/{re.escape(name)}\)", report_md)
+        assert hits == [str(i)], name
+
+
+def test_no_bare_project_name_or_em_dash(report_md):
+    assert not re.search(r"(?<!Brisa\+ \()MorphoFavela", report_md)
+    assert "\u2014" not in report_md and "\u2013" not in report_md
+
+
+def test_planted_manifest_share_mismatch_stops_the_build(tmp_path):
+    pkg = _linked_copy(tmp_path / "pkg")
+    manifest = json.loads((PACKAGE_DIR / "manifest.json").read_text(encoding="utf-8"))
+    manifest["p10"]["clock_agreement_all"] += 0.01
+    (pkg / "manifest.json").unlink()
+    (pkg / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="clock_agreement_all"):
+        render_report_markdown(pkg)
+
+
+def test_findings_quote_the_manifest_shares(report_md):
+    manifest = json.loads((PACKAGE_DIR / "manifest.json").read_text(encoding="utf-8"))
+    p10 = manifest["p10"]
+    assert f"{100 * p10['date_dependent_share']:.0f}% of daylight point-slots" in report_md
+    assert f"only {100 * p10['clock_agreement_all']:.0f}% of daylight point-slots" in report_md
+    assert f"({manifest['p11']['prevailing_wind_bearing_deg']:.0f}°)" in report_md
+    assert "outside the method's calibrated range" in report_md
 
 
 def test_study_title_matches_readme():
@@ -69,12 +95,12 @@ def test_planted_manifest_value_changes_the_text(tmp_path):
     pkg = _linked_copy(tmp_path / "pkg")
     manifest = json.loads((PACKAGE_DIR / "manifest.json").read_text(encoding="utf-8"))
     om2 = next(r for r in manifest["routes"] if r["route_id"] == "OM_2")
-    original = f"{om2['n_points']:,} points"
-    om2["n_points"] = 98765
+    original = f"over {om2['length_m']:,.0f} m"
+    om2["length_m"] = 98765
     (pkg / "manifest.json").unlink()
     (pkg / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     text = render_report_markdown(pkg)
-    assert "98,765 points" in text
+    assert "over 98,765 m" in text
     assert original not in text
 
 
@@ -113,3 +139,13 @@ def test_manifest_daylight_share_equals_parquet():
     day = shade[shade["sun_altitude_deg"] > 0]
     assert p05["shade_fraction_daylight_pct"] == round(100 * float(day["shaded"].mean()), 1)
     assert p05["shade_fraction_daylight_pct"] < round(100 * float(shade["shaded"].mean()), 1)
+
+
+def test_readme_file_table_lists_every_shipped_file():
+    manifest = json.loads((PACKAGE_DIR / "manifest.json").read_text(encoding="utf-8"))
+    readme = (PACKAGE_DIR / "README.md").read_text(encoding="utf-8")
+    table = readme.split("## Files in this package", 1)[1].split("\n## ", 1)[0]
+    cells = " ".join(ln.split("|")[1] for ln in table.splitlines() if ln.startswith("| `"))
+    for name in [*manifest["files"], "manifest.json"]:
+        stem, dot, ext = name.rpartition(".")
+        assert f"`{name}`" in cells or f"`.{ext}`" in cells and f"`{stem}." in cells, name
