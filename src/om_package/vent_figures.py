@@ -79,7 +79,7 @@ def _draw_wind_arrow(ax, wind_from_deg: float, text: str):
 
 
 def build_map_shelter(points_df, indices, buildings, subunits, out_path: Path, wind_dir_deg: float,
-                      route_id: str = "OM2", version: str = "") -> Path:
+                      route_id: str = "OM2", version: str = "", wind_source: str = "") -> Path:
     with _rc():
         import matplotlib.pyplot as plt
 
@@ -91,7 +91,7 @@ def build_map_shelter(points_df, indices, buildings, subunits, out_path: Path, w
         _draw_base_map(ax, merged, buildings, subunits)
         _draw_route_line(fig, ax, merged, "upwind_shelter_deg_proxy", SHELTER_CMAP,
                          "upwind shelter angle, proxy (deg)")
-        _draw_wind_arrow(ax, wind_dir_deg, f"prevailing wind from {wind_dir_deg:.0f}°\n(SBGL 2015–2024, circular mean)")
+        _draw_wind_arrow(ax, wind_dir_deg, f"prevailing wind from {wind_dir_deg:.0f}°\n({wind_source}, circular mean)")
         suffix = f" {version}" if version else ""
         ax.set_title(f"{route_id} route{suffix}\nupwind shelter angle (proxy) at the prevailing wind", fontsize=10)
         fig.text(0.02, 0.01, _CAPTION, fontsize=7, color="#555555")
@@ -170,7 +170,7 @@ def build_wind_rose_compare(campaign: dict, climatology: dict, out_path: Path) -
         fig.colorbar(sm, ax=axes, shrink=0.7, pad=0.04, label="mean speed (m/s)")
         fig.suptitle("Wind at Galeão (SBGL), where the wind blows FROM; bar length = % of directional reports",
                      fontsize=10)
-        fig.text(0.01, 0.01, "SBGL airport METAR at 10 m, about 3 km from Maré; not measured at the route. "
+        fig.text(0.01, 0.01, "SBGL airport METAR at 10 m; not measured at the route. "
                  "Brisa+ (MorphoFavela).", fontsize=7, color="#555555")
         out_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out_path, dpi=150, bbox_inches="tight")
@@ -193,6 +193,7 @@ def build_all(out_dir: Path, root=DEFAULT_ROOT, version: str = "v0.1.3") -> list
     points = gpd.read_parquet(paths.package_dir(version) / "OM2" / "points.parquet")
     horizon, az = load_or_compute_horizon(points, root, version)
     wind = prevailing_direction_deg(root)
+    clim = climatology_rose(root)
     idx = compute_indices(points, wind, horizon, az)
     df = pd.DataFrame(points.drop(columns="geometry"))
     buildings = gpd.read_file(paths.buildings_mare)
@@ -200,7 +201,8 @@ def build_all(out_dir: Path, root=DEFAULT_ROOT, version: str = "v0.1.3") -> list
     out_dir = Path(out_dir)
     obs = load_obs(root)
     return [
-        build_map_shelter(df, idx, buildings, subunits, out_dir / "map_vent_shelter.png", wind, version=version),
+        build_map_shelter(df, idx, buildings, subunits, out_dir / "map_vent_shelter.png", wind, version=version,
+                          wind_source=clim["label"].removesuffix(" climatology, 10 m")),
         build_profiles_vent(df, idx, out_dir / "profiles_vent.png", wind, version=version),
-        build_wind_rose_compare(campaign_window_rose(obs), climatology_rose(root), out_dir / "wind_rose_compare.png"),
+        build_wind_rose_compare(campaign_window_rose(obs), clim, out_dir / "wind_rose_compare.png"),
     ]

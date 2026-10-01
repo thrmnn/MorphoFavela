@@ -1,6 +1,6 @@
 """Observed wind at Galeão (SBGL) for the OM2 campaign window.
 
-SBGL is ~3 km from Maré; it is a regional reference, NOT wind measured at
+SBGL is a regional reference; it is a regional reference, NOT wind measured at
 the route. Everything here is airport METAR at 10 m, never an on-site
 measurement. Source: Iowa Environmental Mesonet ASOS archive (the same
 service and column schema as scripts/build_wind_rose.py
@@ -25,16 +25,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from scripts.build_wind_rose import CALM_MS, KNOT_MS
+
 from .io_utils import DEFAULT_ROOT
 
 STATION = "SBGL"
 WINDOW_START = "2025-12-01"
 WINDOW_END = "2026-04-30"
 CACHE_STEM = "sbgl_metar_20251201_20260430"
-#: knots -> m/s, same factor as scripts/build_wind_rose.py.
-KNOT_MS = 0.514444
-#: Calm below this speed, as in the climatology (build_wind_rose.py).
-CALM_MS = 0.5
 MAX_GAP_MIN = 60
 LOCAL_UTC_OFFSET_H = -3
 ASOS_URL = "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py"

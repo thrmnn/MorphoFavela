@@ -46,6 +46,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.cfd_integration.schema import WIND_DIRECTIONS_8
 
+KNOT_MS = 0.514444  # knots -> m/s
+CALM_MS = 0.5  # calm below this speed (m/s)
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -387,13 +390,13 @@ def from_iowa_asos_csv(
 
     df["sknt"] = pd.to_numeric(df["sknt"], errors="coerce")
     df["drct"] = pd.to_numeric(df["drct"], errors="coerce")
-    df["u_ms"] = df["sknt"] * 0.514444  # knots → m/s
+    df["u_ms"] = df["sknt"] * KNOT_MS
 
     df = df.dropna(subset=["u_ms"])
     n_total = len(df)
 
     # Calm: |U| < 0.5 m/s OR direction missing
-    calm_mask = (df["u_ms"] < 0.5) | df["drct"].isna()
+    calm_mask = (df["u_ms"] < CALM_MS) | df["drct"].isna()
     n_calm = int(calm_mask.sum())
     active = df[~calm_mask].copy()
 
