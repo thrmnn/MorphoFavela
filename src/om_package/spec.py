@@ -1,4 +1,5 @@
-"""P-00 — the PI's package spec (P-01..P-09, verbatim, 2026-09-23) encoded
+"""P-00 — the PI's package spec (P-01..P-09, verbatim, 2026-09-23; P-10/P-11
+added 2026-10-01 for v0.2.0, worded here, not verbatim) encoded
 as data, plus a mechanical conformance check against a BUILT package
 directory.
 
@@ -233,8 +234,9 @@ def _pending_part(name: str, package_dir: Path, dict_id: str, pending_on: list[s
 
 
 #: PI decision (resolved 2026-10-01) that dropped the terrestrial-LiDAR
-#: analysis and tree shade from v0.1.3. Both stay candidates for a later
-#: version (OMPKG2); this is a cut of this version, not a cancellation.
+#: analysis and tree shade from v0.1.3 (still out of scope in v0.2.0). Both
+#: stay candidates for a later version (OMPKG2); this is a cut of this
+#: version, not a cancellation.
 DESCOPE_DECISION = "om_v013_descope"
 _DESCOPE_REASON = (
     "Dropped from this version by PI decision; candidate for a later version (OMPKG2)."
@@ -442,6 +444,164 @@ def _known_gaps_part(name: str, package_dir: Path) -> PartResult:
     )
 
 
+# ------------------------------------------------- P-10 / P-11 helpers --
+
+P10_COLUMNS = {
+    "p10_sun_envelope": ["point_id", "local_slot", "class", "sunlit_day_share", "n_days_sun_up"],
+    "p10_sun_dose": ["point_id", "scope", "local_slot", "dose_1h_wh_m2", "dose_2h_wh_m2", "dose_3h_wh_m2"],
+    "p10_horizon_profiles": ["point_id", "azimuth_deg", "horizon_deg"],
+}
+P10_CLASSES = {"always_sunlit", "always_shaded", "date_dependent", "night"}
+P11_WIND_COLUMNS = [
+    "valid_utc", "valid_local", "drct", "speed_ms", "calm", "variable_direction",
+    "used_if_device_clock_utc", "used_if_device_clock_local",
+]
+P11_INDEX_COLUMNS = {
+    "windward_lambda_f": "windward_lambda_f_prevailing",
+    "canyon_alignment": "canyon_alignment_prevailing_deg",
+    "upwind_shelter": "upwind_shelter_deg_prevailing",
+    "open_space_fraction": "open_space_fraction",
+}
+P11_ROUGHNESS_COLUMNS = ["z0_macdonald_m", "zd_macdonald_m"]
+P11_PROXY_IDS = [*P11_INDEX_COLUMNS.values(), *P11_ROUGHNESS_COLUMNS]
+
+
+def _read_table(package_dir: Path, stem: str) -> pd.DataFrame | None:
+    pq = package_dir / f"{stem}.parquet"
+    if pq.exists():
+        return pd.read_parquet(pq)
+    csv = package_dir / f"{stem}.csv"
+    return pd.read_csv(csv) if csv.exists() else None
+
+
+def _table_with_columns(name: str, package_dir: Path, stem: str, cols: list[str]):
+    """(df, None) or (None, PartResult pending) for a shipped package-root table."""
+    df = _read_table(package_dir, stem)
+    if df is None:
+        return None, PartResult(name, "pending", evidence=f"{stem}.parquet/.csv not found")
+    missing = [c for c in cols if c not in df.columns]
+    if missing:
+        return None, PartResult(name, "pending", evidence=f"{stem} missing column(s): {missing}")
+    if len(df) == 0:
+        return None, PartResult(name, "pending", evidence=f"{stem} has the schema but 0 rows")
+    return df, None
+
+
+def _both_formats_part(name: str, package_dir: Path, stems: list[str]) -> PartResult | None:
+    missing = [f"{s}.{ext}" for s in stems for ext in ("parquet", "csv") if not (package_dir / f"{s}.{ext}").exists()]
+    return PartResult(name, "pending", evidence=f"missing file(s): {', '.join(missing)}") if missing else None
+
+
+def _sun_envelope_part(name: str, package_dir: Path) -> PartResult:
+    bad = _both_formats_part(name, package_dir, ["p10_sun_envelope"])
+    if bad:
+        return bad
+    if not (package_dir / "p10_horizon_profiles.parquet").exists():
+        return PartResult(name, "pending", evidence="missing file(s): p10_horizon_profiles.parquet")
+    env, bad = _table_with_columns(name, package_dir, "p10_sun_envelope", P10_COLUMNS["p10_sun_envelope"])
+    if bad:
+        return bad
+    hor, bad = _table_with_columns(name, package_dir, "p10_horizon_profiles", P10_COLUMNS["p10_horizon_profiles"])
+    if bad:
+        return bad
+    unknown = sorted(set(env["class"].unique()) - P10_CLASSES)
+    if unknown:
+        return PartResult(name, "pending", evidence=f"p10_sun_envelope has unknown class value(s): {unknown}")
+    pts = _points_df(package_dir)
+    if pts is None:
+        return PartResult(name, "pending", evidence="OM2/points table not found")
+    ids = set(pts["point_id"])
+    if set(env["point_id"]) != ids or set(hor["point_id"]) != ids:
+        return PartResult(name, "pending", evidence="p10_sun_envelope / p10_horizon_profiles do not cover exactly the OM2 point_ids")
+    day = env[env["class"] != "night"]
+    share = float((day["class"] == "date_dependent").mean()) if len(day) else float("nan")
+    return PartResult(
+        name, "delivered",
+        evidence=f"p10_sun_envelope: {len(env)} rows over {len(ids)} points, {env['local_slot'].nunique()} local slots; "
+                 f"date_dependent share of daylight point-slots {share:.3f}; p10_horizon_profiles: {len(hor)} rows",
+    )
+
+
+def _sun_dose_part(name: str, package_dir: Path) -> PartResult:
+    bad = _both_formats_part(name, package_dir, ["p10_sun_dose"])
+    if bad:
+        return bad
+    dose, bad = _table_with_columns(name, package_dir, "p10_sun_dose", P10_COLUMNS["p10_sun_dose"])
+    if bad:
+        return bad
+    scopes = set(dose["scope"].astype(str).unique())
+    env_scopes = {"envelope_min", "envelope_median", "envelope_max"}
+    dates = sorted(scopes - env_scopes)
+    if not env_scopes <= scopes or not dates:
+        return PartResult(name, "pending", evidence=f"p10_sun_dose scopes {sorted(scopes)} lack the envelope statistics or a campaign date")
+    dcols = [c for c in P10_COLUMNS["p10_sun_dose"] if c.startswith("dose_")]
+    if (dose[dcols] < 0).any().any():
+        return PartResult(name, "pending", evidence="p10_sun_dose has negative dose values")
+    return PartResult(
+        name, "delivered",
+        evidence=f"p10_sun_dose: {len(dose)} rows; scopes = {len(dates)} campaign date(s) + {sorted(env_scopes)}; columns {dcols}",
+    )
+
+
+def _clock_agreement_part(name: str, package_dir: Path) -> PartResult:
+    bad = _both_formats_part(name, package_dir, ["p10_clock_agreement"])
+    if bad:
+        return bad
+    df, bad = _table_with_columns(name, package_dir, "p10_clock_agreement", ["scope", "n_daylight_point_slots", "agreement_share"])
+    if bad:
+        return bad
+    if "all" not in set(df["scope"].astype(str)):
+        return PartResult(name, "pending", evidence="p10_clock_agreement has no pooled 'all' row")
+    share = df["agreement_share"].dropna()
+    if ((share < 0) | (share > 1)).any():
+        return PartResult(name, "pending", evidence="p10_clock_agreement has agreement_share outside [0,1]")
+    overall = float(df.loc[df["scope"].astype(str) == "all", "agreement_share"].iloc[0])
+    return PartResult(
+        name, "delivered",
+        evidence=f"p10_clock_agreement: {len(df) - 1} campaign date(s) + pooled row; pooled UTC-vs-local agreement {overall:.3f}",
+    )
+
+
+def _wind_observed_part(name: str, package_dir: Path) -> PartResult:
+    p = package_dir / "p11_wind_observed.csv"
+    if not p.exists():
+        return PartResult(name, "pending", evidence="missing file(s): p11_wind_observed.csv")
+    df = pd.read_csv(p)
+    missing = [c for c in P11_WIND_COLUMNS if c not in df.columns]
+    if missing:
+        return PartResult(name, "pending", evidence=f"p11_wind_observed.csv missing column(s): {missing}")
+    if len(df) == 0:
+        return PartResult(name, "pending", evidence="p11_wind_observed.csv has 0 rows")
+    mp = package_dir / "manifest.json"
+    src = (json.loads(mp.read_text(encoding="utf-8")).get("provenance", {}).get("wind_source") if mp.exists() else None) or {}
+    if not src.get("sha256") or not src.get("url"):
+        return PartResult(name, "pending", evidence="manifest.json provenance.wind_source lacks the source url/sha256")
+    n_used = int(((df["used_if_device_clock_utc"].fillna("") != "") | (df["used_if_device_clock_local"].fillna("") != "")).sum())
+    return PartResult(
+        name, "delivered",
+        evidence=f"p11_wind_observed.csv: {len(df)} SBGL observations ({src.get('station')}, 10 m), {n_used} matched to a campaign "
+                 f"window under at least one clock reading; source sha256 in manifest.json provenance.wind_source",
+    )
+
+
+def _p11_labelled_proxy_part(name: str, package_dir: Path) -> PartResult:
+    df = _dictionary_df(package_dir)
+    if df is None:
+        return PartResult(name, "pending", evidence="p08_data_dictionary.csv not found")
+    missing, unlabelled = [], []
+    for vid in P11_PROXY_IDS:
+        hit = df[df["id"] == vid]
+        if hit.empty:
+            missing.append(vid)
+        elif "PROXY" not in " ".join(str(hit.iloc[0].get(c, "")) for c in ("definition", "limits")).upper():
+            unlabelled.append(vid)
+    if missing:
+        return PartResult(name, "pending", evidence=f"p08_data_dictionary.csv missing row(s): {missing}")
+    if unlabelled:
+        return PartResult(name, "pending", evidence=f"dictionary row(s) not labelled PROXY: {unlabelled}")
+    return PartResult(name, "delivered", evidence=f"all {len(P11_PROXY_IDS)} P-11 index dictionary rows contain 'PROXY'")
+
+
 # ------------------------------------------------------------------ SPEC --
 
 SPEC: list[dict] = [
@@ -498,7 +658,7 @@ SPEC: list[dict] = [
             {"name": "airborne_sky_view_factor", "check": lambda pd_: _columns_part("airborne_sky_view_factor", pd_, ["sky_view_factor"])},
             {"name": "terrestrial_sky_view_factor", "check": lambda pd_: _descoped_part(
                 "terrestrial_sky_view_factor",
-                "terrestrial sky-view factor is not part of v0.1.3 (airborne SVF only); no terrestrial column shipped",
+                f"terrestrial sky-view factor is not part of {_current_version(pd_)} (airborne SVF only); no terrestrial column shipped",
             )},
         ],
     },
@@ -544,10 +704,10 @@ SPEC: list[dict] = [
             {"name": "coverage_mask", "check": lambda pd_: _coverage_mask_part("coverage_mask", pd_)},
             {"name": "known_gaps_listed", "check": lambda pd_: _known_gaps_part("known_gaps_listed", pd_)},
             {"name": "height_change_2024_2026", "check": lambda pd_: _descoped_part(
-                "height_change_2024_2026", "2024 to 2026 height change is not part of v0.1.3",
+                "height_change_2024_2026", f"2024 to 2026 height change is not part of {_current_version(pd_)}",
             )},
             {"name": "airborne_vs_terrestrial_comparison", "check": lambda pd_: _descoped_part(
-                "airborne_vs_terrestrial_comparison", "airborne vs terrestrial comparison is not part of v0.1.3",
+                "airborne_vs_terrestrial_comparison", f"airborne vs terrestrial comparison is not part of {_current_version(pd_)}",
             )},
         ],
     },
@@ -571,6 +731,38 @@ SPEC: list[dict] = [
             {"name": "changelog_has_dated_entry_for_version", "check": lambda pd_: _changelog_entry_part(
                 "changelog_has_dated_entry_for_version", pd_,
             )},
+        ],
+    },
+    {
+        "id": "P-10",
+        "title": "Sun exposure robust to campaign date and device clock",
+        "requirement": "Added 2026-10-01 (PI: stop chasing the exact campaign date; the device clock may log UTC or Rio local "
+                       "time). Per point and local time of day, whether the point is always sunlit, always shaded or "
+                       "date-dependent over the campaign season; direct-sun dose for 1, 2 and 3 h windows (campaign dates and the "
+                       "season envelope); annual sun hours; and how much the UTC-vs-local clock question changes the exact-date "
+                       "shade. Geometry-derived proxies, not measured sunlight.",
+        "parts": [
+            {"name": "sun_envelope", "check": lambda pd_: _sun_envelope_part("sun_envelope", pd_)},
+            {"name": "sun_dose", "check": lambda pd_: _sun_dose_part("sun_dose", pd_)},
+            {"name": "annual_sun_hours", "check": lambda pd_: _columns_part("annual_sun_hours", pd_, ["annual_sun_hours"])},
+            {"name": "clock_agreement", "check": lambda pd_: _clock_agreement_part("clock_agreement", pd_)},
+        ],
+    },
+    {
+        "id": "P-11",
+        "title": "Derived ventilation indices with time-matched wind",
+        "requirement": "Added 2026-10-01. Observed SBGL (airport, 10 m) wind for the campaign window, and ventilation indices "
+                       "derived from building geometry at the prevailing wind: windward frontal-area density, canyon-wind "
+                       "alignment, upwind shelter angle, Macdonald z0 and zd, open-space fraction. All are PROXIES (geometry), "
+                       "none is measured or simulated air temperature or air movement; SBGL is not wind at the route.",
+        "parts": [
+            {"name": "observed_wind", "check": lambda pd_: _wind_observed_part("observed_wind", pd_)},
+            {"name": "windward_lambda_f", "check": lambda pd_: _columns_part("windward_lambda_f", pd_, [P11_INDEX_COLUMNS["windward_lambda_f"]])},
+            {"name": "canyon_alignment", "check": lambda pd_: _columns_part("canyon_alignment", pd_, [P11_INDEX_COLUMNS["canyon_alignment"]])},
+            {"name": "upwind_shelter", "check": lambda pd_: _columns_part("upwind_shelter", pd_, [P11_INDEX_COLUMNS["upwind_shelter"]])},
+            {"name": "roughness_z0_zd", "check": lambda pd_: _columns_part("roughness_z0_zd", pd_, P11_ROUGHNESS_COLUMNS)},
+            {"name": "open_space_fraction", "check": lambda pd_: _columns_part("open_space_fraction", pd_, [P11_INDEX_COLUMNS["open_space_fraction"]])},
+            {"name": "labelled_proxy_in_dictionary", "check": lambda pd_: _p11_labelled_proxy_part("labelled_proxy_in_dictionary", pd_)},
         ],
     },
 ]
@@ -668,7 +860,7 @@ def render_conformance_markdown(conf: dict) -> str:
     id | requirement | status | evidence | pending on, rendered straight
     from conformance()'s own result (never re-derived by hand)."""
     lines = [
-        "## Conformance to the package spec (P-01…P-09)",
+        "## Conformance to the package spec (P-01…P-11)",
         "",
         f"Computed by `src/om_package/spec.py` against this build "
         f"({conf.get('version', '?')}); see `p00_spec_conformance.json`/`.csv` "

@@ -410,6 +410,12 @@ _README_STATS = dict(
     internal_routes_status="not built in this version — no `outputs/_packages/_internal/mare_routes/v0.1.3` directory exists yet.",
     decisions=_FAKE_DECISIONS,
     dtm_native_resolution_m=5.0,
+    p10_summary={"window": ["2025-12-01", "2026-04-30"], "dose_slot_min": 15, "date_dependent_share": 0.49,
+                 "clock_agreement_all": 0.37},
+    wind_source={"window_utc": ["2025-12-01", "2026-04-30"], "fetched_utc": "2026-10-01T17:31:31+00:00"},
+    geometry_label="test epoch",
+    route_length_m=1557.8,
+    prevailing_deg=91.5,
 )
 
 
@@ -449,14 +455,6 @@ def test_readme_no_pending_surface_cover_row():
 
 # --- 2026-09-27 numerical audit: docs/provenance defects --------------------
 
-_CHANGELOG_KWARGS = dict(
-    n_om2_points=1559,
-    nodata_floor_m=_FAKE_NODATA_FLOOR_M,
-    csv_catalogued_note="The pilot manifest's own note on the rest of the Drive folder: fake note.",
-    decisions=_FAKE_DECISIONS,
-)
-
-
 def test_render_readme_requires_nodata_floor_m_no_default():
     """A sabotaged call missing nodata_floor_m must fail loudly (TypeError:
     missing required argument), never silently render a default number —
@@ -464,12 +462,6 @@ def test_render_readme_requires_nodata_floor_m_no_default():
     stats = {k: v for k, v in _README_STATS.items() if k != "nodata_floor_m"}
     with pytest.raises(TypeError):
         render_readme(**stats)
-
-
-def test_render_changelog_requires_nodata_floor_m_no_default():
-    kwargs = {k: v for k, v in _CHANGELOG_KWARGS.items() if k != "nodata_floor_m"}
-    with pytest.raises(TypeError):
-        render_changelog(**kwargs)
 
 
 def test_require_nodata_floor_m_fails_loudly_on_a_sabotaged_manifest():
@@ -525,27 +517,45 @@ def test_readme_sources_no_invented_vintage():
     assert "5 m native resolution" in sources
 
 
-def test_render_changelog_v01_entry_byte_identical_to_v012_shipped():
-    """v0.1's frozen entry must match, byte-for-byte, the v0.1 section of
-    outputs/_packages/mare_om2/v0.1.2/CHANGELOG.md (the last shipped file
-    that carries it) — no defect was flagged in it by the 2026-09-27
-    audit, so freezing it must not silently change a single character."""
-    shipped_path = PATHS.root / "outputs" / "_packages" / "mare_om2" / "v0.1.2" / "CHANGELOG.md"
+def _shipped_entry(version: str, heading: str):
+    shipped_path = PATHS.root / "outputs" / "_packages" / "mare_om2" / version / "CHANGELOG.md"
     if not shipped_path.exists():
-        pytest.skip("v0.1.2/CHANGELOG.md not present at the default root")
+        pytest.skip(f"{version}/CHANGELOG.md not present at the default root")
     shipped = shipped_path.read_text(encoding="utf-8")
-    shipped_v01 = "## v0.1 — 2026-09-24\n" + shipped.split("## v0.1 — 2026-09-24\n", 1)[1]
-    rendered = render_changelog(**_CHANGELOG_KWARGS)
-    rendered_v01 = "## v0.1 — 2026-09-24\n" + rendered.split("## v0.1 — 2026-09-24\n", 1)[1]
-    assert rendered_v01 == shipped_v01
+    return shipped, heading + shipped.split(heading, 1)[1]
+
+
+def _entry(text: str, heading: str, next_heading: str | None) -> str:
+    body = heading + text.split(heading, 1)[1]
+    return body.split(next_heading, 1)[0] if next_heading else body
+
+
+def _normalised(text: str) -> str:
+    import re
+
+    return re.sub(r"(?<!Brisa\+ \()MorphoFavela", "Brisa+ (MorphoFavela)", text)
+
+
+def test_render_changelog_old_entries_are_frozen_not_rendered_from_state():
+    """v0.1.3 and older render identically whatever the current version is
+    (no live state reaches them)."""
+    a = render_changelog(version="v0.2.0")
+    b = render_changelog(version="v9.9.9", version_date="2099-01-01")
+    assert a.split("## v0.1.3", 1)[1] == b.split("## v0.1.3", 1)[1]
+
+
+def test_render_changelog_frozen_entries_match_shipped_v013_modulo_project_name():
+    shipped, _ = _shipped_entry("v0.1.3", "## v0.1.3 — 2026-10-01")
+    rendered = render_changelog()
+    for heading, nxt in (("## v0.1.3 — 2026-10-01", "## v0.1.2"), ("## v0.1.2 — 2026-09-25", "## v0.1.1"),
+                         ("## v0.1.1 — 2026-09-24", "## v0.1 — 2026-09-24"), ("## v0.1 — 2026-09-24", None)):
+        want = _normalised(_entry(shipped, heading, nxt))
+        got = _entry(rendered, heading, nxt)
+        assert got.rstrip() == want.rstrip(), heading
 
 
 def test_render_changelog_v011_entry_fixes_the_version_drift_bug():
-    """The shipped v0.1.1 entry says 'now build to .../v0.1.2/' — a
-    version-drift bug (the CURRENT version leaking into historical text).
-    The frozen, corrected entry must name v0.1.1, OM1 only, and must not
-    repeat that bug."""
-    rendered = render_changelog(**_CHANGELOG_KWARGS)
+    rendered = render_changelog()
     v011 = rendered.split("## v0.1.1 — 2026-09-24\n", 1)[1].split("## v0.1 — 2026-09-24", 1)[0]
     assert "mare_routes/v0.1.1/" in v011
     assert "OM1" in v011
@@ -553,21 +563,25 @@ def test_render_changelog_v011_entry_fixes_the_version_drift_bug():
 
 
 def test_render_changelog_v012_entry_no_qcodes_no_hardcoded_floor():
-    rendered = render_changelog(**_CHANGELOG_KWARGS)
+    rendered = render_changelog()
     v012 = rendered.split("## v0.1.2 — 2026-09-25\n", 1)[1].split("## v0.1.1 — 2026-09-24", 1)[0]
     assert "Q1/Q5" not in v012
     assert "~104-330" not in v012
     assert "om_shade_release" in v012 and "om_dates_tz" in v012
-    assert "docs/critic/octopus_package_panel_2026-09-24.md" in v012
 
 
-def test_render_changelog_v012_entry_reads_point_count_from_kwargs_not_hardcoded():
-    kwargs = dict(_CHANGELOG_KWARGS, n_om2_points=42)
-    rendered = render_changelog(**kwargs)
-    v012 = rendered.split("## v0.1.2 — 2026-09-25\n", 1)[1].split("## v0.1.1 — 2026-09-24", 1)[0]
-    assert "42 OM2" in v012 or "42\n" in v012 or "all 42" in v012
-    assert "1559" not in v012
-    assert "~9 s" not in v012
+def test_changelog_no_bare_project_name():
+    import re
+
+    assert not re.search(r"(?<!Brisa\+ \()MorphoFavela", render_changelog())
+
+
+def test_readme_has_using_the_data_and_segment_note_without_a_typed_time_constant():
+    readme = render_readme(**_README_STATS)
+    section = readme.split("## Using the data")[1].split("## Known limits")[0]
+    assert "--segment-m" in section and "time constant" in section
+    assert "does not state an L" in section
+    assert "95%" in section  # computed 1 - e^-3
 
 
 TASKS_JSON = Path("/home/theo/SCL/SCR/brisaverse/shared/facts/tasks.json")

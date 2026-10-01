@@ -18,8 +18,8 @@ clock (tasks OCTOPUS_CSV / OCTOPUS_TZ).
 SPATIAL-JOIN CAVEAT: this join is by ``point_id``, not by GPS coordinate.
 The device CSV must already carry the ``point_id`` its rows belong to
 (e.g. assigned during data collection, or by a prior nearest-OM2-point
-spatial join done with the full MorphoFavela repo's geopandas/KDTree
-tooling). This standalone script (pandas + pyarrow only, no MorphoFavela
+spatial join done with the full Brisa+ (MorphoFavela) repo's geopandas/KDTree
+tooling). This standalone script (pandas + pyarrow only, no Brisa+ (MorphoFavela)
 import) deliberately does not perform that spatial join itself — see
 ``src/om_package/shade.py``'s ``OCTOPUS_JOIN_EXAMPLE`` in the repo for
 the nearest-OM2-point version, once a real GPS-track CSV (Timestamp,

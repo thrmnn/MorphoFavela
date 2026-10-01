@@ -1,6 +1,6 @@
 """Tests for the Octopus OM2 human report (src/om_package/report.py).
 
-Needs the real built package (outputs/_packages/mare_om2/v0.1.3/,
+Needs the real built package (outputs/_packages/mare_om2/v0.2.0/,
 gitignored); skipped when it is absent, as in tests/test_om_package_spec.py.
 """
 from __future__ import annotations
@@ -14,10 +14,10 @@ import pytest
 from src.om_package.report import PROJECT_FORM, STUDY_TITLE, FIGURES, render_report_markdown
 
 DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
-PACKAGE_DIR = DEFAULT_ROOT / "outputs" / "_packages" / "mare_om2" / "v0.1.3"
+PACKAGE_DIR = DEFAULT_ROOT / "outputs" / "_packages" / "mare_om2" / "v0.2.0"
 
 pytestmark = pytest.mark.skipif(
-    not PACKAGE_DIR.is_dir(), reason="mare_om2 v0.1.3 package not built at the default root"
+    not PACKAGE_DIR.is_dir(), reason="mare_om2 v0.2.0 package not built at the default root"
 )
 
 

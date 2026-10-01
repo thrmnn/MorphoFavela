@@ -4,7 +4,7 @@ For every variable column in the package's point table, reports how many
 points have a valid (non-null) value and lists the point_ids that don't
 (join-distance gaps from formvars.py/ventilation.py, or a point off the
 edge of a source layer). Also records the PENDING items that are not
-computed at all in v0.1.
+computed at all in this version.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import pandas as pd
 #: Items still owed in this version. None: the former four were descoped.
 PENDING_ITEMS: list[str] = []
 
-#: Dropped from v0.1.3 by PI decision om_v013_descope (2026-10-01) — a
+#: Dropped from v0.1.3 by PI decision om_v013_descope (2026-10-01; still out of scope in v0.2.0) — a
 #: deliberate cut, not a gap; candidates for a later version. Listed so the
 #: quality report and the data dictionary agree.
 DESCOPE_DECISION = "om_v013_descope"
@@ -28,7 +28,7 @@ DESCOPED_ITEMS = [
 ]
 
 
-def coverage_report(df: pd.DataFrame, variable_cols: list[str]) -> dict:
+def coverage_report(df: pd.DataFrame, variable_cols: list[str], extra: dict | None = None) -> dict:
     n = len(df)
     per_column = {}
     for col in variable_cols:
@@ -54,11 +54,16 @@ def coverage_report(df: pd.DataFrame, variable_cols: list[str]) -> dict:
         # PI ruling 2026-09-24 (must-fix 1): count points where the
         # OSM-inferred route falls inside a building or off the street.
         report["route_geometry_flagged_points"] = int(df["route_geometry_flag"].sum())
+    if extra:
+        # P-10 / P-11 table-level entries (class shares, clock agreement,
+        # wind-observation counts): measured by the build, never typed.
+        report.update(extra)
     return report
 
 
-def write_quality_report(df: pd.DataFrame, variable_cols: list[str], out_dir: Path, stem: str = "p07_quality_report"):
-    report = coverage_report(df, variable_cols)
+def write_quality_report(df: pd.DataFrame, variable_cols: list[str], out_dir: Path, stem: str = "p07_quality_report",
+                         extra: dict | None = None):
+    report = coverage_report(df, variable_cols, extra)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"{stem}.json").write_text(json.dumps(report, indent=2))
 

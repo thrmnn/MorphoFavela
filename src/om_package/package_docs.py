@@ -12,9 +12,10 @@ back to a stale number.
 """
 from __future__ import annotations
 
+import math
 from datetime import date
 
-VERSION = "v0.1.3"
+VERSION = "v0.2.0"
 #: read from the clock at import time, never typed — this is the date this
 #: version is BUILT, not the date any source data was fetched (the
 #: "fetched" date in the README is computed at build time from the route
@@ -93,7 +94,8 @@ OM1/OM3/OM4 released, which is a PI decision for a later version.
 
 **This package covers surface structure only** — route-point geometry,
 building height/plan density/canyon form, ventilation-geometry proxies,
-and (once dates are known) building shade. Surface cover (vegetation
+sun exposure (P-05 exact-date shade, P-10 sun exposure that does not need
+the exact date) and observed-wind-based ventilation indices (P-11). Surface cover (vegetation
 fraction, impervious fraction) and façade materials belong to other
 Octopus LRP #2 team members' packages, not this one; there is no PENDING
 row here for them, because they are out of this package's scope, not a
@@ -117,13 +119,21 @@ densification.
 | outputs/maré/svf_v2/svf_streets.gpkg | ray-cast from the above, 1.5 m pedestrian height, 145-patch Tregenza sky (src/svf_v2) | P-04 sky_view_factor |
 | outputs/maré/morphometrics/canyon/hw_streets.gpkg | derived from the above (scripts/brisa_ventilation/02_hw_canyon_proxy.py: flanking-building cross-section at each street sample, search radius = that script's SEARCH_RADIUS) | P-04 street_width_m, building_height_m, height_width_ratio |
 | outputs/maré/features/features_grid.parquet | 10 m grid, derived from the above | P-04 plan_density_lambda_p, grid_cell_id, P-06 ventilation proxies incl. lambda_f_<dir> |
-| data/maré/wind_rose.json | ASOS Galeão (SBGL) METAR, 2015-2024 | P-06 wind-alignment proxy |
+| data/maré/wind_rose.json | ASOS Galeão (SBGL) METAR, 2015-2024 | P-06 wind-alignment proxy; prevailing bearing for the P-11 columns |
+| data/maré/octopus/wind/ (SBGL METAR, Iowa Environmental Mesonet ASOS archive) | window {wind_window}, fetched {wind_fetched}; fetch URL and sha256 in `manifest.json` `provenance.wind_source` | P-11 observed wind (`p11_wind_observed.csv`), `OM2/wind_rose_compare.png` |
+| Octopus campaign CSVs (data/maré/octopus/csv/) | {n_campaign_dates} campaign dates; no GPS columns | campaign dates for P-05 / P-10 |
 | data/maré/neighbourhoods.gpkg | community boundary crosswalk | neighbourhood attribution |
 
 The extended DTM (`dtm_extended_300m.tif`, used for P-05 shade's horizon
 march) is **{dtm_native_resolution_m:g} m native resolution** (read from
 the raster at build time), resampled to 1 m by
 `src/brisa_solar/wp02_surface.build_surface` to match WP-04's `CELL_M`.
+
+**Geometry epoch: {geometry_label}.** The buildings + terrain layers are the
+source for every {version} P-04/P-06/P-10/P-11 variable. The epoch is a build
+parameter (`--buildings`, `--dtm`, and the form-variable inputs under
+`--root`), so 2024 airborne LiDAR and footprints can replace it later without
+a code change.
 
 **The buildings + terrain cadastral layer is the source for every
 {version} P-04/P-06 variable.** No terrestrial (ground-instrument) source
@@ -150,7 +160,7 @@ decision `om_v013_descope` — see Known limits.
   can still re-aggregate. Usage (run from inside the package directory):
   ```
   python OM2/aggregate_to_segments.py --points OM2/points.parquet \\
-      --segment-length-m 20 --out OM2/segments_20m.parquet
+      --segment-m 20 --out OM2/segments_20m.parquet
   ```
   Point count is conserved (every point lands in exactly one segment);
   the four buffer radii (5/10/20/50 m) are already columns on
@@ -202,16 +212,113 @@ decision `om_v013_descope` — see Known limits.
       --device path/to/octopus_log_with_point_id.csv --out joined_example.csv
   ```
 
+- **P-10 sun exposure** (`src/om_package/sun_envelope.py`,
+  `src/om_package/p10_p11.py`): the horizon is marched once per point
+  (`p10_horizon_profiles.parquet`) and every date or time then costs only a
+  sun-position lookup. *Envelope*: for each point and local time of day
+  (Rio local time, 5-min slots) over every day of the season window
+  {p10_window}, classify as always sunlit, always shaded or date-dependent
+  (counting only days with the sun up), with the sunlit share of days.
+  *Dose*: clear-sky direct-beam energy on a horizontal plane over the
+  preceding 1, 2 and 3 h (slots of {dose_slot_min} min), for each campaign
+  date and as a min/median/max over the season window. *Annual sun hours*:
+  hours per year with the sun above the point's horizon. *Clock agreement*:
+  the exact-date shade recomputed with the device clock read as UTC and as
+  Rio local time. Every quantity is a geometry-derived proxy (no cloud, no
+  tree shade, not measured sunlight); the dose is clear-sky, hence an upper
+  bound. Rio local time is a fixed UTC-3 (no daylight saving since 2019);
+  whether the device clocks log UTC or local time is UNKNOWN, which is why
+  the envelope is indexed by local time of day, not by date.
+- **P-11 ventilation indices** (`src/om_package/vent_indices.py`,
+  `src/om_package/wind_obs.py`): `p11_wind_observed.csv` holds the SBGL
+  (Galeão airport, 10 m) observations of the window, each flagged with the
+  campaign date it would be matched to (nearest report with a usable
+  direction, within the match gap recorded in `manifest.json` `p11`) under
+  each device-clock reading. Per-point columns are evaluated at the
+  prevailing bearing ({prevailing_deg:.0f} deg, the circular mean of the
+  2015-2024 SBGL climatology): `windward_lambda_f_prevailing`,
+  `canyon_alignment_prevailing_deg`, `upwind_shelter_deg_prevailing`,
+  `z0_macdonald_m` / `zd_macdonald_m` (Macdonald et al. 1998) and
+  `open_space_fraction`. All are PROXIES from building geometry, never
+  measured or simulated air temperature or air movement; SBGL is a regional
+  reference, not wind at the route.
 - **Figures** (`src/om_package/figures.py`, PI ruling 2026-09-27 — spatial
   result first, then the sampling along the route): `OM2/map_form.png`
   (route over the Maré buildings, coloured by `sky_view_factor`),
   `OM2/map_shade.png` (same base map, coloured by the share of daylight in building shade),
   `OM2/profiles.png` (1 m raw + 10 m segment means for the form/shade
   variables along the route), `OM2/shade_calendar.png` (one strip per
-  campaign date, distance vs time of day, shaded/sunlit).
+  campaign date, distance vs time of day, shaded/sunlit). New in {version}:
+  `OM2/sun_envelope.png` (date-dependent share by local time of day, and a
+  map of each point's date-dependent share of daylight), `OM2/sun_dose.png`
+  (1 h dose along the route: season envelope band and the campaign dates)
+  and three ventilation-proxy figures from `src/om_package/vent_figures.py`
+  (`OM2/map_vent_shelter.png`, `OM2/profiles_vent.png`,
+  `OM2/wind_rose_compare.png`, campaign-window observed wind vs the
+  2015-2024 climatology).
+
+## Using the data
+
+- **Join device data to P-05 / P-10.** P-05 (`p05_building_shade`) is keyed
+  by 5-min timestamps *labelled UTC* (exact campaign dates). P-10 is keyed
+  by **local** time of day and so does not depend on the date. Because the
+  device clock is unresolved, map a device timestamp to a local slot under
+  both readings and compare:
+  ```
+  ts = pd.to_datetime(device["Timestamp"])
+  as_utc = ts.dt.tz_localize("UTC").dt.tz_convert("America/Sao_Paulo")  # clock logged UTC
+  as_local = ts                                                        # clock logged local time
+  device["slot_if_utc"] = as_utc.dt.floor("5min").dt.strftime("%H:%M")
+  device["slot_if_local"] = as_local.dt.floor("5min").dt.strftime("%H:%M")
+  ```
+  `p10_clock_agreement` says how often the two readings give the same sun
+  state at exact-date resolution; where it is low, use the P-10 classes
+  (`always_sunlit`, `always_shaded`) as the date- and clock-robust subset and
+  treat `date_dependent` slots as unresolved.
+- **Segment length (note for the Octopus team).** The points are 1 m apart.
+  A sensor carried at walking speed does not resolve that: its reading at any
+  instant is a weighted average over the stretch of route just walked, so
+  neighbouring 1 m points are strongly correlated and a 1 m point is not an
+  independent observation. Treat the 1 m points as the geometry grid and
+  choose the analysis segment from the sensor:
+  **L ≈ v × k × τ**, with v the walking speed (m/s), τ the sensor's response
+  time constant (s) and k the number of time constants; k = 3 gives about
+  {three_tau_pct:.0f}% of a step response (1 - e^-3). For one walk of T
+  seconds over the whole route (length {route_length_m:.0f} m) the mean speed
+  is v = {route_length_m:.0f} m / T. **This package holds no value for τ, so it
+  does not state an L.** *Question for the team: what is the time constant of
+  your air-temperature sensor as mounted (housing/shield included), and is it
+  quoted as a 63% or a 90% response time?* Two consequences: the reading at a
+  point reflects the route *behind* the walker, so match it to a segment that
+  ends at that point rather than one centred on it; and models that treat
+  segments shorter than L as independent will understate uncertainty, so
+  cluster by `grid_cell_id` or by blocks of at least L. Re-aggregate with
+  ```
+  python OM2/aggregate_to_segments.py --points OM2/points.parquet \\
+      --segment-m <L> --out OM2/segments.parquet
+  ```
+  (`--segment-m` defaults to 10 m, a placeholder for the build's profile
+  figures, not a sensor-derived value.)
 
 ## Known limits
 
+- **Device clock UNKNOWN (UTC or Rio local time).** P-10 is indexed by local
+  time of day and reports both readings. Across the {n_campaign_dates}
+  campaign dates the sun state of a point-slot is identical under the two
+  readings in {clock_agreement_pct:.1f}% of daylight point-slots (pooled,
+  `p10_clock_agreement`): exact-date shade (P-05) is not reliable until the
+  clock is confirmed. The season envelope is date-dependent for
+  {date_dependent_pct:.1f}% of daylight point-slots; the rest
+  (`always_sunlit` / `always_shaded`) holds on every day of the window.
+- **Sun and ventilation quantities are geometry-derived proxies.** No tree
+  shade, no cloud (the dose is clear-sky, an upper bound), diffuse and
+  reflected radiation excluded; none is measured sunlight, air temperature or
+  air movement. SBGL wind is an airport reference at 10 m, matched to a
+  campaign time only within the match gap in `manifest.json` `p11`; it is
+  not wind at the route.
+- **Geometry epoch is {geometry_label}.** The horizon march is limited to the
+  DTM's valid radius (see `max_dist_m` below); 2024 airborne data are not
+  used yet.
 - **No terrestrial ground-truth comparison exists yet.** Every P-04/P-06
   variable is derived from the cadastral buildings + DTM layers in
   Sources and dates above.
@@ -309,8 +416,10 @@ decision `om_v013_descope` — see Known limits.
 ## Manifest
 
 `manifest.json` records `package_version`, `crs`, `use_terms`,
-`provenance.decisions` (the seven Octopus panel decisions, id +
-resolution text — see above), per-route build stats (relative output
+`provenance.decisions` (the Octopus panel and release decisions, id +
+resolution text — see above), `provenance.wind_source` (the SBGL source
+manifest: station, fetch URL, fetch time, sha256, counts), `p10` / `p11`
+(window, slot grids, match gap, summary shares), per-route build stats (relative output
 paths), and a `sha256` per OTHER file in this package (recompute and
 compare before trusting a copy — `manifest.json` excludes its own hash,
 since a file cannot record its own checksum before it is written).
@@ -415,37 +524,30 @@ ruling (interview 2026-09-24) applied on top of v0.1's initial release.
 - Contact sheet: map panel aspect now uses `adjustable="datalim"` instead
   of the default `"box"`, so it no longer leaves a blank strip either
   side on a 10-inch-wide figure.
-- How to cite: filled with an acknowledgment line (MorphoFavela pipeline,
+- How to cite: filled with an acknowledgment line (Brisa+ (MorphoFavela) pipeline,
   Théo Hermann); authorship to be raised with the lead author when the
   contribution list is drafted. No PLACEHOLDER remains anywhere in the
   README.
 """
 
-#: v0.1.2's entry, corrected for four audit-flagged defects (2026-09-27
-#: audit, items 3/5/7/10) the first time it is frozen into history (it
-#: was still the dynamically-templated "current" entry through v0.1.2's
-#: own build). Fixed: the "PI ruling 2026-09-24 (Q1/Q5: ...)" interview
-#: shorthand -> plain decision-id citations; the hardcoded "~104-330 m"
-#: nodata range -> the measured {nodata_floor_*} figures; the hardcoded
-#: "1559"/"~9 s" -> the actual point count (no timing figure is recorded
-#: anywhere, so it is dropped rather than kept as an unsourced number);
-#: "see the manifest's catalogued_not_downloaded count" (that key holds a
-#: prose note, not a count) -> the note's own text; "navigation council
-#: panel review 2026-09-24" -> the review document's real name. Every
-#: other bullet is reproduced unchanged. From v0.1.4 onward this entry, as
-#: written here, is itself frozen literal text.
-V012_ENTRY_TEMPLATE = """\
+#: Frozen literal text — v0.1.2's entry as SHIPPED in v0.1.3's CHANGELOG
+#: (rendered values included: it used to be a template filled from live
+#: build state, which is how a rebuild could change history). From v0.2.0
+#: every entry here is literal text; only the newest is rendered. One
+#: wording correction, applied once: a bare project name now reads
+#: "Brisa+ (MorphoFavela)", as in all reader-facing text.
+V012_ENTRY = """\
 ## v0.1.2 — 2026-09-25
 
 P-05 shade goes live on a real pilot pull, per two decisions from the
-{decisions_date} panel ruling: `om_shade_release` ({om_shade_release_resolution})
-and `om_dates_tz` ({om_dates_tz_resolution}).
+2026-09-24 panel ruling: `om_shade_release` (Release building-only P-05 once dates are known; tree_shade an explicit empty column)
+and `om_dates_tz` (Ask the team for the raw OM2 CSVs; infer dates/walk times from the data; timezone stays an open question until confirmed).
 
 - **Pilot pull**: 5 CSVs (one per device — I_1/I_3/I_4/O_3/O_4) downloaded
   from the PI's Drive `04_Octopus_Maré/_data collection/Zenodo_release/
   fixed_data/` (created 2026-09-23) via the Drive connector, to
   `data/maré/octopus/csv/` with a manifest (file id, name, size,
-  modified). {csv_catalogued_note}
+  modified). The pilot manifest's own note on the rest of the Drive folder: search_files(parentId=...) was paginated across 3 pages (~150 file rows seen, with some repeats across pages -- Drive's search API does not guarantee stable pagination for a parentId filter). Every row seen was a CSV named <I|O>_<device#>_<YYYYMMDD>_<NN>durhrs.csv for devices I_1, I_3, I_4, O_3, O_4, spanning 2025-12 through 2026-04. Full-corpus mechanical download (remaining ~145+ files) is owed -- not done in this pass; the 5-file one-per-device pilot was judged sufficient to exercise infer_campaign_windows, the real P-05 shade run, and the join example.
 - **Schema finding**: all 5 pilot CSVs share
   `Timestamp,Temperature,Humidity,PM1.0,PM2.5,PM2.5_cal,PM4.0,PM10.0` — NO
   Latitude/Longitude column. This is a fixed-site indoor/outdoor logger
@@ -459,14 +561,14 @@ and `om_dates_tz` ({om_dates_tz_resolution}).
   v0.1/v0.1.1): builds the obstruction surface from
   `dtm_extended_300m.tif` + `buildings_extended_300m.gpkg` (WP-02's
   `build_surface`, cell_m=1.0) and marches WP-02's
-  `patch_visibility(..., return_horizon=True)` from all {n_om2_points} OM2
+  `patch_visibility(..., return_horizon=True)` from all 1559 OM2
   points at 1.5 m over the real 145-patch Tregenza direction set — same
   engine WP-04 uses for direct-sun-hours. Runs on the laptop GPU
   (RTX 4060); no timing figure is recorded for this run.
 - **max_dist_m dropped to 100 m** (from WP-04's 500 m citywide default)
   for this march: `dtm_extended_300m.tif` has real nodata starting
-  between {nodata_floor_min_m:.0f} m and {nodata_floor_max_m:.0f} m from
-  OM2 points (median {nodata_floor_median_m:.0f} m; measured via
+  between 105 m and 599 m from
+  OM2 points (median 338 m; measured via
   `shade.nodata_floor_m()`), and WP-02's running max is not NaN-safe
   (`torch.maximum` propagates NaN) — an unscoped pilot run returned
   all-NaN horizon values before this was caught. Not patched into the
@@ -484,7 +586,7 @@ and `om_dates_tz` ({om_dates_tz_resolution}).
 - Package version v0.1.1 -> v0.1.2 across `package_docs.py`,
   `build_om_package.py`'s default `--version`, and the brisaverse release
   card (`om_release_v0_1_1` -> `om_release_v0_1_2`).
-- **Package-page fixes** ({panel_review_doc}, blocking + top
+- **Package-page fixes** (docs/critic/octopus_package_panel_2026-09-24.md, blocking + top
   improvements): the "Panel ruling" link on the package page now points
   at a page rendered into `outputs/_packages/mare_om2/` itself
   (`panel_review.html`), not at `docs/critic/...md` outside `outputs/` —
@@ -495,17 +597,12 @@ and `om_dates_tz` ({om_dates_tz_resolution}).
   `p05_building_shade.*`, `p05b_campaign_windows.*`) directly instead of
   requiring a `manifest.json` reverse-engineer. A one-line glossary
   covers P-02..P-08, WP-02, `lambda_p` and the Tregenza sky for a reader
-  outside MorphoFavela.
+  outside Brisa+ (MorphoFavela).
 """
 
-#: The newest entry — the only part of CHANGELOG.md still rendered fresh
-#: on every build (audit fix, 2026-09-27: everything above this used to
-#: run through the same .format() call, which is exactly how a stray
-#: `{version}` leaked into v0.1.1's historical text).
-CURRENT_ENTRY_TEMPLATE = """\
-# Changelog — mare_om2
-
-## {version} — {version_date}
+#: Frozen literal text — v0.1.3's entry as shipped (same correction).
+V013_ENTRY = """\
+## v0.1.3 — 2026-10-01
 
 Structural fix (PI, 2026-09-27): the P-01..P-09 package spec was only
 mentioned in README prose — conformance to it was invisible, and P-03's
@@ -524,7 +621,7 @@ package. Both addressed directly, not just documented around.
   computed result. Nothing here is typed by hand: every count/coverage
   number is read from the file it describes.
 - **P-03 ships inside the package**: `OM2/aggregate_to_segments.py` is a
-  standalone (pandas + pyarrow only, no MorphoFavela import) mirror of
+  standalone (pandas + pyarrow only, no Brisa+ (MorphoFavela) import) mirror of
   `src/om_package/segments.py`'s `aggregate_to_segments` — a recipient
   with only this directory can re-aggregate to any segment length without
   the repo. `scripts/aggregate_om_points.py` (the repo-only CLI) is
@@ -533,7 +630,7 @@ package. Both addressed directly, not just documented around.
   joins `p05_building_shade` against a real Octopus device CSV by
   `point_id` and 5-min-floored `timestamp`, states the UTC-labelling
   caveat in its own docstring.
-- **Documentation corrections after audit** ({version_date}): fixed the
+- **Documentation corrections after audit** (2026-10-01): fixed the
   numerical-audit findings against v0.1.2's README/CHANGELOG — itemised
   here (release-scope internal-routes
   claim, route fetch dates, the nodata floor, the manifest self-hash, the
@@ -543,7 +640,7 @@ package. Both addressed directly, not just documented around.
 - **Descoped by decision** (`om_v013_descope`, PI, 2026-10-01): the
   terrestrial-LiDAR analysis (terrestrial sky-view factor, 2024 to 2026
   height change, airborne-vs-terrestrial comparison) and tree shade are
-  out of scope for {version}. The spec marks those parts `descoped`
+  out of scope for v0.1.3. The spec marks those parts `descoped`
   (a deliberate cut), not `pending`; items whose remaining parts are all
   delivered read `delivered (scoped)`. `tree_shade` stays in the shade
   schema as a reserved, all-null column. They remain candidates for a
@@ -567,6 +664,65 @@ package. Both addressed directly, not just documented around.
 
 """
 
+#: The newest entry — the only part of CHANGELOG.md rendered fresh on every
+#: build; v0.1.3 and older are frozen literal text above.
+CURRENT_ENTRY_TEMPLATE = """\
+# Changelog — mare_om2
+
+## {version} — {version_date}
+
+Sun exposure that does not depend on knowing the campaign date or the device
+clock, and ventilation indices tied to observed wind. Data stays on the 2019
+geometry for now; every geometry input is a build parameter, so moving to the
+2024 airborne LiDAR and footprints later is one argument (`--buildings`,
+`--dtm`), not a code change. {version} is a new directory; v0.1.3 is untouched.
+
+- **P-10 sun exposure (new spec item)**: `p10_sun_envelope.parquet/.csv`
+  (per point and local time of day over the campaign season: always sunlit,
+  always shaded, date-dependent, or night, plus the sunlit share of days),
+  `p10_sun_dose.parquet/.csv` (clear-sky direct-sun dose over the preceding
+  1, 2 and 3 h, for each campaign date and as a season min/median/max
+  envelope), `p10_horizon_profiles.parquet` (the marched horizon each point's
+  sun result is derived from) and `p10_clock_agreement.parquet/.csv` (how much
+  the exact-date shade changes if the device clock logged UTC rather than Rio
+  local time). All geometry-derived proxies, not measured sunlight; the dose is
+  clear-sky, so an upper bound.
+- **P-11 ventilation indices with time-matched wind (new spec item)**:
+  `p11_wind_observed.csv` (Galeão airport, SBGL, observations for the
+  campaign window, flagged with the campaign date each would be matched to
+  under each reading of the device clock) and, in `OM2/points.*`, seven new
+  columns: `annual_sun_hours`, `windward_lambda_f_prevailing`,
+  `canyon_alignment_prevailing_deg`, `upwind_shelter_deg_prevailing`,
+  `z0_macdonald_m`, `zd_macdonald_m`, `open_space_fraction`. The ventilation
+  columns are PROXIES from building geometry, never measured or simulated air
+  temperature or air movement, and SBGL is a regional reference, not wind at the
+  route. The source's fetch URL, time and sha256 are recorded in
+  `manifest.json` under `provenance.wind_source`.
+- **Spec**: P-10 and P-11 added to the conformance table; P-05 and P-06 are
+  unchanged (the exact-date P-05 table stays, reserved and compatible). Status
+  vocabulary as before: delivered / partial / pending / descoped.
+- **Data dictionary**: a row for every new column and every column of the new
+  files (all ventilation rows say PROXY). No id from v0.1.3 is removed or reused.
+- **Quality report**: coverage for the new point columns plus a `p10_p11`
+  block (class shares, clock agreement, wind-observation counts), all read off
+  the tables.
+- **Figures**: `OM2/sun_envelope.png`, `OM2/sun_dose.png`,
+  `OM2/map_vent_shelter.png`, `OM2/profiles_vent.png`,
+  `OM2/wind_rose_compare.png`.
+- **Using the data**: new README section, including a note on segment length
+  for the Octopus team (1 m points are finer than a walking sensor's response;
+  a question to the team about their sensor's time constant).
+  `OM2/aggregate_to_segments.py` gains `--segment-m` (default 10 m; the old
+  `--segment-length-m` still works).
+- **Changelog**: v0.1.3 and older entries are now frozen literal text rather
+  than rendered from live build state. One wording correction, applied once to
+  the frozen text: the bare project name now reads "Brisa+ (MorphoFavela)".
+- Descoped by decision `om_v013_descope` and still out of scope: terrestrial
+  sky-view factor, tree shade, the airborne-vs-terrestrial comparison and the
+  2024 to 2026 height change.
+
+"""
+
 
 def render_readme(
     n_om2_points: int,
@@ -587,6 +743,13 @@ def render_readme(
     shade_fraction_daylight_pct: float = 0.0,
     shade_max_dist_m: float = 100.0,
     conformance_section: str = "",
+    *,
+    p10_summary: dict,
+    wind_source: dict,
+    geometry_label: str,
+    route_length_m: float,
+    prevailing_deg: float,
+    version: str = VERSION,
 ) -> str:
     """Render README.md. The route_geometry_flag/lambda_p/shade numbers,
     the nodata floor, the internal-routes on-disk state, the route fetch
@@ -605,7 +768,7 @@ def render_readme(
     n_lambda_p_remainder_not_checked = n_lambda_p_remainder - n_lambda_p_remainder_plausible
     floor = nodata_floor_m
     return README_TEMPLATE.format(
-        version=VERSION,
+        version=version,
         version_date=VERSION_DATE,
         route_fetch_date_label=route_fetch_date_label,
         conformance_section=conformance_section,
@@ -630,36 +793,21 @@ def render_readme(
         nodata_floor_min_m=floor["min"],
         nodata_floor_median_m=floor["median"],
         nodata_floor_max_m=floor["max"],
+        p10_window=" to ".join(p10_summary["window"]),
+        dose_slot_min=p10_summary["dose_slot_min"],
+        date_dependent_pct=100 * p10_summary["date_dependent_share"],
+        clock_agreement_pct=100 * p10_summary["clock_agreement_all"],
+        wind_window=" to ".join(wind_source["window_utc"]),
+        wind_fetched=str(wind_source["fetched_utc"])[:10],
+        geometry_label=geometry_label,
+        route_length_m=route_length_m,
+        prevailing_deg=prevailing_deg,
+        three_tau_pct=100 * (1 - math.exp(-3)),
     )
 
 
-def render_changelog(
-    n_om2_points: int,
-    nodata_floor_m: dict,
-    csv_catalogued_note: str,
-    decisions: list[dict],
-    panel_review_doc: str = "docs/critic/octopus_package_panel_2026-09-24.md",
-) -> str:
-    """Render CHANGELOG.md: the newest entry ({version}) is templated
-    fresh every build; v0.1/v0.1.1/v0.1.2 are frozen literal text (see the
-    module-level comments above each), corrected only where the
-    2026-09-27 audit found a defect in the shipped text itself. Every
-    number in the v0.1.2 entry is a required parameter — no defaults —
-    so a caller that omits one (e.g. a sabotaged rebuild) fails loudly
-    instead of re-typing a stale figure."""
-    floor = nodata_floor_m
-    om_shade_release = _decision(decisions, "om_shade_release")
-    om_dates_tz = _decision(decisions, "om_dates_tz")
-    current = CURRENT_ENTRY_TEMPLATE.format(version=VERSION, version_date=VERSION_DATE)
-    v012 = V012_ENTRY_TEMPLATE.format(
-        n_om2_points=n_om2_points,
-        nodata_floor_min_m=floor["min"],
-        nodata_floor_median_m=floor["median"],
-        nodata_floor_max_m=floor["max"],
-        csv_catalogued_note=csv_catalogued_note,
-        panel_review_doc=panel_review_doc,
-        decisions_date=om_shade_release["resolved_utc"][:10],
-        om_shade_release_resolution=om_shade_release["resolution"],
-        om_dates_tz_resolution=om_dates_tz["resolution"],
-    )
-    return current + v012 + CHANGELOG_V011_ENTRY + CHANGELOG_V01_ENTRY
+def render_changelog(version: str = VERSION, version_date: str = VERSION_DATE) -> str:
+    """Render CHANGELOG.md: only the newest entry is rendered; v0.1.3 and
+    older are frozen literal text (see the constants above)."""
+    current = CURRENT_ENTRY_TEMPLATE.format(version=version, version_date=version_date)
+    return current + V013_ENTRY + V012_ENTRY + CHANGELOG_V011_ENTRY + CHANGELOG_V01_ENTRY

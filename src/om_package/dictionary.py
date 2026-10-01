@@ -1,11 +1,12 @@
 """P-08 — data dictionary: one row per variable ID, ever. IDs are never
 reused; a variable retired in a later version keeps its row (marked
-retired), it doesn't vanish. v0.1 has no retired variables yet.
+retired), it doesn't vanish. No variable has been retired yet.
 """
 from __future__ import annotations
 
 from .buffers import BUFFER_RADII_M
 from .routes import ROUTE_FLAG_MAX_STREET_DIST_M
+from .vent_indices import DEFAULT_BUFFER_M, MACDONALD_A, MACDONALD_BETA, MACDONALD_CD, VON_KARMAN
 
 # id -> {definition, unit, source, method, limits, status}
 # status: "computed" (present as a real column in v0.1's tables) or
@@ -159,6 +160,217 @@ _BASE: dict[str, dict] = {
     },
 }
 
+# --- v0.2.0: P-10 (sun exposure) and P-11 (ventilation indices with
+# time-matched wind). Every ventilation row is a PROXY from building
+# geometry; the wind rows are SBGL airport observations, not wind at the
+# route; no row is a measured air temperature or airflow. ---------------
+_GEOM = "2019 building geometry (the geometry epoch is a build parameter)"
+_SUN_PROXY = (
+    "Geometry-derived (building and terrain horizon vs. sun position), not measured sunlight: "
+    "no cloud, no tree shade."
+)
+_PREVAILING = (
+    "evaluated at the prevailing wind bearing (frequency-weighted circular mean of the 2015-2024 SBGL "
+    "climatology, data/maré/wind_rose.json; the same bearing P-06 uses)"
+)
+_VENT_LIMITS = (
+    "PROXY, not simulated or measured air movement. SBGL (Galeão airport) is a regional reference, not wind at the "
+    "route; a circular mean of a spread wind rose is a summary bearing, not a mode."
+)
+_BASE.update({
+    "annual_sun_hours": {
+        "definition": "Hours per year with the sun above both the geometric horizon and the marched building/terrain horizon at this point (static, like sky_view_factor). Geometry-derived PROXY for direct-sun exposure, not measured sunlight.",
+        "unit": "h per year",
+        "source": f"{_GEOM}; marched horizon (p10_horizon_profiles.parquet); pvlib solar position",
+        "method": "10-min steps over one calendar year in Rio local time (America/Sao_Paulo); step counted sunlit when sun altitude > 0 and > the horizon angle at the sun's azimuth (nearest marched azimuth); hours = sunlit steps x step length (src/om_package/sun_envelope.py annual_sun_hours)",
+        "limits": _SUN_PROXY + " Horizon march is limited to the DTM's valid radius (see README Known limits), so very distant obstructions are not seen.",
+        "status": "computed",
+    },
+    "windward_lambda_f_prevailing": {
+        "definition": "PROXY: frontal-area density facing the prevailing wind (Oke 1988 lambda_f of the nearest 10 m grid cell), " + _PREVAILING + ".",
+        "unit": "dimensionless",
+        "source": "lambda_f_<dir> columns of this table (outputs/maré/features/features_grid.parquet)",
+        "method": "circular linear interpolation between the two nearest of the 8 compass-direction columns at the prevailing bearing (src/om_package/vent_indices.py windward_lambda_f)",
+        "limits": _VENT_LIMITS + " 10 m-cell resolution; NaN where the lambda_f_<dir> columns are NaN.",
+        "status": "computed",
+    },
+    "canyon_alignment_prevailing_deg": {
+        "definition": "PROXY: angle between the street axis and the prevailing wind axis, folded to 0-90 deg (0 = along the street, channelling; 90 = across), " + _PREVAILING + ".",
+        "unit": "degrees [0,90]",
+        "source": "street_orientation_deg of this table + data/maré/wind_rose.json",
+        "method": "both the street axis and the wind axis are undirected, so the absolute difference is folded mod 180 and then to 0-90 (src/om_package/vent_indices.py canyon_alignment_deg)",
+        "limits": _VENT_LIMITS + " Axis alignment only; says nothing about building-scale blocking. Same information as ventilation_wind_alignment_proxy on a different scale.",
+        "status": "computed",
+    },
+    "upwind_shelter_deg_prevailing": {
+        "definition": "PROXY: horizon (obstruction) angle at the upwind azimuth, i.e. how high the surroundings rise toward the prevailing wind, " + _PREVAILING + ".",
+        "unit": "degrees",
+        "source": f"p10_horizon_profiles.parquet (marched horizon of {_GEOM})",
+        "method": "horizon angle at the marched azimuth nearest the wind bearing (src/om_package/vent_indices.py upwind_shelter_deg)",
+        "limits": _VENT_LIMITS + " Horizon march is limited to the DTM's valid radius, so it sees obstructions only within that distance.",
+        "status": "computed",
+    },
+    "z0_macdonald_m": {
+        "definition": "PROXY: aerodynamic roughness length z0 by Macdonald et al. (1998), from the 50 m buffer's plan density and mean building height and the windward frontal-area density, " + _PREVAILING + ".",
+        "unit": "m",
+        "source": f"lambda_p_buffer_{DEFAULT_BUFFER_M}m, building_height_mean_buffer_{DEFAULT_BUFFER_M}m, windward_lambda_f_prevailing of this table",
+        "method": f"Macdonald, Griffiths & Hall (1998), Atmos. Environ. 32(11):1857-1864: z0/H = (1 - zd/H) exp(-[0.5 beta (Cd/kappa^2) (1 - zd/H) lambda_f]^-0.5), A={MACDONALD_A:g}, beta={MACDONALD_BETA:g}, Cd={MACDONALD_CD:g}, kappa={VON_KARMAN:g} (src/om_package/vent_indices.py macdonald_zd_z0)",
+        "limits": _VENT_LIMITS + " Staggered-array constants applied to an irregular favela fabric; NaN where the 50 m buffer has no building (mean height undefined).",
+        "status": "computed",
+    },
+    "zd_macdonald_m": {
+        "definition": "PROXY: displacement height zd by Macdonald et al. (1998), from the 50 m buffer's plan density and mean building height.",
+        "unit": "m",
+        "source": f"lambda_p_buffer_{DEFAULT_BUFFER_M}m and building_height_mean_buffer_{DEFAULT_BUFFER_M}m of this table",
+        "method": f"zd/H = 1 + A^(-lambda_p) (lambda_p - 1), A={MACDONALD_A:g}; zd = (zd/H) x H (src/om_package/vent_indices.py macdonald_zd_z0)",
+        "limits": _VENT_LIMITS + " Does not depend on wind direction. NaN where the 50 m buffer has no building.",
+        "status": "computed",
+    },
+    "open_space_fraction": {
+        "definition": "PROXY: share of the 50 m circular buffer not covered by building footprints (1 - lambda_p).",
+        "unit": "fraction [0,1]",
+        "source": f"lambda_p_buffer_{DEFAULT_BUFFER_M}m of this table ({_GEOM})",
+        "method": f"1 - lambda_p_buffer_{DEFAULT_BUFFER_M}m (src/om_package/vent_indices.py compute_indices)",
+        "limits": "PROXY for ventilation openness, not measured or simulated air movement. Footprint area only: streets, courtyards and empty plots all count as open; no height information.",
+        "status": "computed",
+    },
+    # ---- p10 tables
+    "local_slot": {
+        "definition": "Local Rio clock time of day (HH:MM, slot start) of a P-10 row. Rio local time is a fixed UTC-3 offset (no daylight saving since 2019).",
+        "unit": "HH:MM, America/Sao_Paulo local time",
+        "source": "src/om_package/sun_envelope.py",
+        "method": "slot grid over the 24 h day; envelope table at 5 min, dose table on its own (coarser) grid stated in manifest.json p10.dose_slot_min",
+        "limits": "Local time, not the device clock: whether the Octopus device clocks log UTC or local time is UNKNOWN (decision om_dates_tz). Map a device timestamp to a slot under both readings (clock_readings in src/om_package/sun_envelope.py; OM2/join_shade_example.py states the UTC-labelled P-05 convention).",
+        "status": "computed",
+    },
+    "class": {
+        "definition": "Sun class of a point at a local time of day over every day of the analysis window, counting only days with the sun up: always_sunlit, always_shaded, date_dependent, or night (sun down on every day).",
+        "unit": "category",
+        "source": f"p10_horizon_profiles.parquet ({_GEOM}); pvlib solar position",
+        "method": "sun altitude vs. marched horizon at the sun's azimuth for every day in the window (manifest.json p10.window); always_* if the state is identical on every sun-up day, date_dependent otherwise (src/om_package/sun_envelope.py sun_envelope)",
+        "limits": _SUN_PROXY + " 'Shaded' means building/terrain horizon.",
+        "status": "computed",
+    },
+    "sunlit_day_share": {
+        "definition": "Share of the sun-up days in the window on which this point is sunlit at this local time of day (geometry-derived proxy).",
+        "unit": "fraction [0,1]; null for night slots",
+        "source": "p10_sun_envelope (this definition's table)",
+        "method": "sunlit sun-up days / sun-up days at this slot",
+        "limits": _SUN_PROXY,
+        "status": "computed",
+    },
+    "n_days_sun_up": {
+        "definition": "Number of days in the window on which the sun is above the horizon at this local time of day.",
+        "unit": "days",
+        "source": "pvlib solar position",
+        "method": "count over the window of apparent sun altitude > 0 at the slot",
+        "limits": "Depends only on the slot and the window, not on the point.",
+        "status": "computed",
+    },
+    "scope": {
+        "definition": "Which case a P-10 row describes: a campaign date (YYYY-MM-DD), envelope_min / envelope_median / envelope_max (statistic over every day of the window), or 'all' (clock-agreement row pooled over the campaign dates).",
+        "unit": "category",
+        "source": "src/om_package/p10_p11.py",
+        "method": "campaign dates are read off the campaign CSVs (p05b_campaign_windows)",
+        "limits": "A campaign date here is a calendar date in Rio local time; the device clock reading is unresolved (see local_slot).",
+        "status": "computed",
+    },
+    "dose_1h_wh_m2": {
+        "definition": "Clear-sky direct-beam dose on the horizontal plane over the 1 h up to and including this local slot (same day), zero while the point is shaded by the building horizon. Geometry-derived UPPER BOUND, not measured radiation.",
+        "unit": "Wh/m2 (rounded to 0.1)",
+        "source": f"pvlib Ineichen clear-sky DNI x sin(sun altitude); p10_horizon_profiles.parquet ({_GEOM})",
+        "method": "per-slot beam energy = DNI x sin(altitude) x slot length, zero when shaded or sun down; trailing sum over 1 h (src/om_package/sun_envelope.py direct_sun_dose). Rows with scope = a date use that date; envelope_* rows are min/median/max over the window. Slots where the sun is down on every day and all doses are zero are omitted.",
+        "limits": _SUN_PROXY + " Clear sky makes it an upper bound; diffuse and reflected radiation are not included; the trailing window is clipped at 00:00.",
+        "status": "computed",
+    },
+    "dose_2h_wh_m2": {
+        "definition": "As dose_1h_wh_m2, summed over the 2 h up to and including this local slot.",
+        "unit": "Wh/m2 (rounded to 0.1)", "source": "see dose_1h_wh_m2", "method": "see dose_1h_wh_m2 (trailing 2 h)",
+        "limits": _SUN_PROXY + " Clear-sky upper bound.", "status": "computed",
+    },
+    "dose_3h_wh_m2": {
+        "definition": "As dose_1h_wh_m2, summed over the 3 h up to and including this local slot.",
+        "unit": "Wh/m2 (rounded to 0.1)", "source": "see dose_1h_wh_m2", "method": "see dose_1h_wh_m2 (trailing 3 h)",
+        "limits": _SUN_PROXY + " Clear-sky upper bound.", "status": "computed",
+    },
+    "azimuth_deg": {
+        "definition": "Azimuth (clockwise from north) of a marched horizon direction.",
+        "unit": "degrees",
+        "source": "src/om_package/shade.py point_horizon_profiles (145-patch Tregenza sky; patches sharing an azimuth collapse to one row)",
+        "method": "distinct azimuths of the Tregenza patch directions",
+        "limits": "Azimuth grid is the sky discretisation's, not a free choice; the sun's azimuth is matched to the nearest.",
+        "status": "computed",
+    },
+    "horizon_deg": {
+        "definition": "Marched horizon angle above the horizontal at this point and azimuth: the highest building or terrain obstruction angle along that direction at 1.5 m observer height.",
+        "unit": "degrees",
+        "source": f"{_GEOM}; dtm_extended_300m.tif + buildings_extended_300m.gpkg via src/brisa_solar WP-02/WP-04 horizon engine",
+        "method": "max over the Tregenza patches sharing the azimuth of the marched obstruction angle, march radius max_dist_m (README Known limits)",
+        "limits": "Geometry only (no vegetation); limited to the march radius; cell resolution of the obstruction surface (1 m resampled from the DTM's native resolution).",
+        "status": "computed",
+    },
+    "agreement_share": {
+        "definition": "Share of daylight point-slots (sun up under either clock reading) whose sun state (sunlit / shaded / night) is identical whether the device clock logged UTC or Rio local time.",
+        "unit": "fraction [0,1]",
+        "source": "p10_clock_agreement (this definition's table)",
+        "method": "per campaign date, 5-min slots of the logged clock read as UTC (A) or as local time (B); state per point from the marched horizon; night counts as its own state (src/om_package/sun_envelope.py exact_date_agreement)",
+        "limits": "Low agreement means the unresolved clock matters for exact-date shade; use the envelope (class, sunlit_day_share) where it does. Geometry-derived, not measured.",
+        "status": "computed",
+    },
+    "n_daylight_point_slots": {
+        "definition": "Number of point x 5-min slot cells with the sun up under either clock reading, the denominator of agreement_share.",
+        "unit": "count", "source": "p10_clock_agreement", "method": "count of point-slots with sun altitude > 0 under reading A or B", "limits": "-",
+        "status": "computed",
+    },
+    # ---- p11 observed wind table
+    "valid_utc": {
+        "definition": "Observation time of an SBGL (Galeão airport) METAR report, UTC.",
+        "unit": "ISO 8601, UTC", "source": "Iowa Environmental Mesonet ASOS archive, station SBGL (provenance.wind_source in manifest.json)",
+        "method": "as reported", "limits": "SBGL is a regional reference at 10 m, not wind at the route.",
+        "status": "computed",
+    },
+    "valid_local": {
+        "definition": "valid_utc converted to Rio local time (fixed UTC-3).",
+        "unit": "ISO 8601, local time (no offset)", "source": "valid_utc", "method": "tz conversion to America/Sao_Paulo",
+        "limits": "Offset from the tz database, not typed.", "status": "computed",
+    },
+    "drct": {
+        "definition": "Wind direction the wind blows FROM at SBGL, degrees clockwise from north; empty for calm or variable reports.",
+        "unit": "degrees", "source": "SBGL METAR (Iowa ASOS archive)", "method": "as reported",
+        "limits": "Observed at the airport, not at the route. Reported on a coarse direction grid by the source.",
+        "status": "computed",
+    },
+    "speed_ms": {
+        "definition": "Wind speed at SBGL, 10 m.",
+        "unit": "m/s", "source": "SBGL METAR (Iowa ASOS archive), reported in knots",
+        "method": "knots x the knot-to-m/s factor used by scripts/build_wind_rose.py",
+        "limits": "Observed at the airport, not at the route.",
+        "status": "computed",
+    },
+    "calm": {
+        "definition": "True when the reported speed is below the calm threshold used by the climatology (scripts/build_wind_rose.py CALM_MS, recorded in manifest.json provenance.wind_source).",
+        "unit": "bool", "source": "speed_ms", "method": "speed_ms < calm threshold", "limits": "Calm reports carry no usable direction and are never matched to a campaign time.",
+        "status": "computed",
+    },
+    "variable_direction": {
+        "definition": "True when a non-calm report has no direction (variable wind).",
+        "unit": "bool", "source": "drct, speed_ms", "method": "not calm and direction missing", "limits": "Never matched to a campaign time.",
+        "status": "computed",
+    },
+    "used_if_device_clock_utc": {
+        "definition": "Campaign date (YYYY-MM-DD) this observation would be matched to if the device clock logged UTC; empty when not used.",
+        "unit": "date or empty", "source": "p05b_campaign_windows + this table",
+        "method": "for each 5-min step of a campaign walk window, the nearest SBGL report with a usable direction within the match gap (manifest.json p11.max_gap_min) (src/om_package/wind_obs.py wind_at)",
+        "limits": "The device clock reading is UNKNOWN; this column and used_if_device_clock_local are the two readings. Time-matched wind is SBGL, not at the route.",
+        "status": "computed",
+    },
+    "used_if_device_clock_local": {
+        "definition": "As used_if_device_clock_utc, if the device clock logged Rio local time (UTC-3).",
+        "unit": "date or empty", "source": "p05b_campaign_windows + this table", "method": "as used_if_device_clock_utc, device time shifted to UTC by the fixed local offset",
+        "limits": "See used_if_device_clock_utc.", "status": "computed",
+    },
+})
+
 _DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 for _d in _DIRECTIONS:
     _BASE[f"lambda_f_{_d}"] = {
@@ -216,22 +428,22 @@ _DESCOPED_STATUS = "DESCOPED (om_v013_descope)"
 _DESCOPED: dict[str, dict] = {
     "sky_view_factor_terrestrial": {
         "definition": "Terrestrial (ground-instrument) sky-view factor at each OM2 point.",
-        "unit": "fraction [0,1]", "source": "DESCOPED — terrestrial-LiDAR analysis is out of scope for v0.1.3 by PI decision om_v013_descope",
+        "unit": "fraction [0,1]", "source": "DESCOPED — terrestrial-LiDAR analysis is out of scope in this version (descoped from v0.1.3; PI decision om_v013_descope)",
         "method": "DESCOPED", "limits": "No column in this version (spec P-04: airborne only). May come in a later version.", "status": _DESCOPED_STATUS,
     },
     "tree_shade": {
         "definition": "Whether tree canopy shades each OM2 point. RESERVED column in the shade table schema (SHADE_TABLE_COLUMNS) — present but always null, so the table's shape will not change if it is added later.",
-        "unit": "bool", "source": "DESCOPED — tree shade is out of scope for v0.1.3 by PI decision om_v013_descope",
+        "unit": "bool", "source": "DESCOPED — tree shade is out of scope in this version (descoped from v0.1.3; PI decision om_v013_descope)",
         "method": "DESCOPED", "limits": "Always null in this version (reserved column). Building-only shade is the 'shaded' column. May come in a later version.", "status": _DESCOPED_STATUS,
     },
     "airborne_vs_terrestrial_comparison": {
         "definition": "Comparison of airborne vs. terrestrial form-variable estimates along OM2.",
-        "unit": "-", "source": "DESCOPED — terrestrial-LiDAR analysis is out of scope for v0.1.3 by PI decision om_v013_descope",
+        "unit": "-", "source": "DESCOPED — terrestrial-LiDAR analysis is out of scope in this version (descoped from v0.1.3; PI decision om_v013_descope)",
         "method": "DESCOPED", "limits": "Not computed in this version. May come in a later version.", "status": _DESCOPED_STATUS,
     },
     "height_change_2024_2026": {
         "definition": "Change in building/canopy height between the 2024 airborne LiDAR and the 2026 OM2 terrestrial field campaign.",
-        "unit": "m", "source": "DESCOPED — terrestrial-LiDAR analysis is out of scope for v0.1.3 by PI decision om_v013_descope",
+        "unit": "m", "source": "DESCOPED — terrestrial-LiDAR analysis is out of scope in this version (descoped from v0.1.3; PI decision om_v013_descope)",
         "method": "DESCOPED", "limits": "Not computed in this version; the name may be revisited if it comes in a later version.", "status": _DESCOPED_STATUS,
     },
 }

@@ -16,6 +16,14 @@ with:
   F4 shade_calendar.png — one strip per campaign date, distance x time of
                        day (UTC), shaded/sunlit, walk-window bracket.
 
+  F5 sun_envelope.png — (v0.2.0, P-10) share of points always sunlit /
+                       date-dependent / always shaded by local time of day,
+                       plus a map of each point's date-dependent share of
+                       daylight.
+  F6 sun_dose.png    — (v0.2.0, P-10) 1 h clear-sky direct-sun dose along the
+                       route at three local times: season envelope band and
+                       the campaign dates.
+
 Every renderer wraps its whole body in
 ``matplotlib.rc_context(matplotlib.rcParamsDefault)`` — a leaked rcParam
 from one figure function once broke the next one drawn in the same
@@ -429,6 +437,156 @@ def build_shade_calendar(points_df: pd.DataFrame, shade_df: pd.DataFrame,
         fig.suptitle(f"{route_id} building shade calendar — {len(dates)} campaign date(s){version_suffix}\n"
                      "dark = building shade · light = sun · grey = night (sun below the horizon)", fontsize=10)
         fig.tight_layout(rect=(0, 0, 1, 0.96))
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+    return out_path
+
+
+#: Colours for the three P-10 classes; date_dependent carries the message.
+_CLASS_COLOURS = {"always_shaded": "#2b2b2b", "date_dependent": "#d98c1f", "always_sunlit": "#f4efd6"}
+_CLASS_ORDER = ["always_shaded", "date_dependent", "always_sunlit"]
+DATE_DEPENDENT_CMAP = "YlOrBr"
+_DATE_COLOURS = ["#1b6ca8", "#c0392b", "#2e8b57", "#8e44ad", "#7f6000"]
+#: How many local times the dose figure shows: the early / middle / late
+#: sun-up slot of the window (quartiles of the slot list, read from the data).
+_DOSE_SLOT_QUANTILES = (0.25, 0.5, 0.75)
+
+
+def _slot_hours(slots) -> np.ndarray:
+    return np.array([int(x[:2]) + int(x[3:5]) / 60.0 for x in slots])
+
+
+def daylight_date_dependent_share_by_point(envelope_df: pd.DataFrame) -> pd.Series:
+    """Per point: share of its daylight slots (class != night) that are
+    date_dependent."""
+    day = envelope_df[envelope_df["class"] != "night"]
+    out = (day["class"] == "date_dependent").groupby(day["point_id"]).mean().astype(float)
+    out.name = "date_dependent_share"
+    return out
+
+
+def class_shares_by_slot(envelope_df: pd.DataFrame) -> pd.DataFrame:
+    """Rows = local slot (daylight only), columns = class, values = share of
+    points in that class at that slot."""
+    day = envelope_df[envelope_df["class"] != "night"]
+    counts = day.groupby(["local_slot", "class"]).size().unstack(fill_value=0)
+    for c in _CLASS_ORDER:
+        if c not in counts.columns:
+            counts[c] = 0
+    counts = counts[_CLASS_ORDER]
+    return counts.div(counts.sum(axis=1), axis=0)
+
+
+def build_sun_envelope(points_df: pd.DataFrame, envelope_df: pd.DataFrame,
+                       buildings: gpd.GeoDataFrame | None, subunits: gpd.GeoDataFrame | None,
+                       out_path: Path, route_id: str = "OM2", version: str = "", window: tuple | None = None,
+                       tz_label: str = "Rio local time", geometry_label: str = "") -> Path:
+    """F5 — how much the unknown campaign date costs: (left) share of the
+    route's points always sunlit / date-dependent / always shaded at each
+    local time of day; (right) map of each point's date-dependent share of
+    daylight. Geometry-derived proxy (building horizon vs sun position)."""
+    with _rc():
+        import matplotlib.pyplot as plt
+
+        from src.cartography import apply_publication_style
+        apply_publication_style()
+
+        shares = class_shares_by_slot(envelope_df)
+        hours = _slot_hours(shares.index)
+        per_point = daylight_date_dependent_share_by_point(envelope_df)
+        merged = points_df.merge(per_point, left_on="point_id", right_index=True, how="left")
+
+        fig = plt.figure(figsize=(14, 7.2))
+        gs = fig.add_gridspec(1, 2, width_ratios=[1.0, 1.0], wspace=0.12)
+        ax = fig.add_subplot(gs[0, 0])
+        ax.stackplot(hours, [shares[c].to_numpy() * 100 for c in _CLASS_ORDER],
+                     colors=[_CLASS_COLOURS[c] for c in _CLASS_ORDER], edgecolor="#777777", linewidth=0.4,
+                     labels=["always shaded", "date-dependent", "always sunlit"])
+        ax.set_xlim(hours.min(), hours.max())
+        ax.set_ylim(0, 100)
+        ax.set_xlabel(f"local time of day ({tz_label})")
+        ax.set_ylabel("share of route points (%)")
+        ax.legend(loc="upper center", ncol=3, fontsize=8, frameon=True, framealpha=0.95)
+        wtxt = f"{window[0]} to {window[1]}" if window else "the analysis window"
+        ax.set_title(f"Sun class by time of day over {wtxt}\n(days with the sun up only)", fontsize=10)
+
+        axm = fig.add_subplot(gs[0, 1])
+        _draw_base_map(axm, merged, buildings, subunits)
+        _draw_route_line(fig, axm, merged, "date_dependent_share", DATE_DEPENDENT_CMAP,
+                         "share of daylight that is date-dependent", vmin=0.0, vmax=1.0)
+        axm.set_title("Where the campaign date matters\n(per point, over its daylight slots)", fontsize=10)
+
+        suffix = f" {version}" if version else ""
+        fig.suptitle(f"{route_id} sun exposure envelope{suffix}", fontsize=11)
+        geo = f" Geometry: {geometry_label}." if geometry_label else ""
+        fig.text(0.01, -0.02, "Brisa+ (MorphoFavela). Geometry-derived proxy (building and terrain horizon vs sun position); "
+                 "no cloud, no tree shade; not measured sunlight.\n" + geo.strip(), fontsize=7, color="#555555")
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+    return out_path
+
+
+def dose_slots_for_figure(envelope_df: pd.DataFrame, dose_df: pd.DataFrame,
+                          quantiles: tuple = _DOSE_SLOT_QUANTILES) -> list[str]:
+    """Local slots shown in F6: the slots at the given quantiles of the
+    sun-up slot list that also exist on the dose table's slot grid."""
+    sun_up = sorted(envelope_df.loc[envelope_df["class"] != "night", "local_slot"].unique())
+    on_grid = sorted(set(dose_df["local_slot"].unique()))
+    pool = [x for x in sun_up if x in on_grid]
+    if not pool:
+        return []
+    return [pool[min(int(q * len(pool)), len(pool) - 1)] for q in quantiles]
+
+
+def build_sun_dose(points_df: pd.DataFrame, envelope_df: pd.DataFrame, dose_df: pd.DataFrame, out_path: Path,
+                   route_id: str = "OM2", version: str = "", tz_label: str = "Rio local time",
+                   geometry_label: str = "") -> Path:
+    """F6 — 1 h clear-sky direct-sun dose along the route at three local
+    times of day: band = min to max over every day of the season window,
+    grey line = median, coloured lines = the campaign dates. UPPER BOUND
+    (clear sky), geometry-derived proxy."""
+    with _rc():
+        import matplotlib.pyplot as plt
+
+        from src.cartography import apply_publication_style
+        apply_publication_style()
+
+        col = "dose_1h_wh_m2"
+        slots = dose_slots_for_figure(envelope_df, dose_df)
+        dist = points_df.set_index("point_id")["distance_along_m"]
+        dates = sorted(s for s in dose_df["scope"].astype(str).unique() if not s.startswith("envelope_"))
+        n = max(len(slots), 1)
+        fig, axes = plt.subplots(n, 1, figsize=(10, 2.6 * n + 1.2), sharex=True, squeeze=False)
+        axes = axes[:, 0]
+        for ax, slot in zip(axes, slots):
+            sl = dose_df[dose_df["local_slot"] == slot].copy()
+            sl["d"] = sl["point_id"].map(dist)
+            sl = sl.dropna(subset=["d"]).sort_values("d")
+            wide = sl.pivot_table(index="d", columns="scope", values=col, aggfunc="first")
+            lo, hi, med = (wide[f"envelope_{k}"] for k in ("min", "max", "median"))
+            ax.fill_between(wide.index, lo, hi, color="#cfd8e3", label="season envelope (min to max)", zorder=1)
+            ax.plot(wide.index, med, color="#555555", lw=0.8, label="season median", zorder=2)
+            for d, c in zip(dates, _DATE_COLOURS * (len(dates) // len(_DATE_COLOURS) + 1)):
+                if d in wide.columns:
+                    ax.plot(wide.index, wide[d], color=c, lw=0.9, label=d, zorder=3)
+            ax.set_ylabel(f"1 h dose up to {slot}\n(Wh/m2)", fontsize=8)
+            ax.set_ylim(bottom=0)
+        if not slots:
+            axes[0].text(0.5, 0.5, "No dose rows in this build.", ha="center", va="center", transform=axes[0].transAxes)
+            axes[0].set_axis_off()
+        else:
+            axes[0].legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=7, frameon=False)
+        axes[-1].set_xlabel("distance along route (m)")
+        suffix = f" {version}" if version else ""
+        fig.suptitle(f"{route_id} direct-sun dose, 1 h window, along the route{suffix}\n"
+                     f"campaign dates vs the season envelope ({tz_label})", fontsize=10)
+        geo = f" Geometry: {geometry_label}." if geometry_label else ""
+        fig.text(0.01, 0.005, "Brisa+ (MorphoFavela). Clear-sky direct beam on a horizontal plane, zero where building/terrain horizon\n"
+                 "blocks the sun: an UPPER BOUND and a geometry-derived proxy, not measured sunlight." + geo,
+                 fontsize=7, color="#555555")
+        fig.tight_layout(rect=(0, 0.05, 1, 0.94))
         out_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out_path, dpi=150, bbox_inches="tight")
         plt.close(fig)

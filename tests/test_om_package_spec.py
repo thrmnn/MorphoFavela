@@ -5,7 +5,7 @@ only in README prose — conformance was invisible. These tests prove the
 mechanical check actually reacts to a broken package (RED), not just that
 it runs.
 
-Needs the real built package (outputs/_packages/mare_om2/v0.1.3/,
+Needs the real built package (outputs/_packages/mare_om2/v0.2.0/,
 gitignored) for the RED/subprocess tests — same convention as
 tests/test_om_package.py; those are skipped when it's absent. The pure
 structural tests (SPEC shape, pending_on ids) run unconditionally.
@@ -25,18 +25,18 @@ from src.om_package.spec import SPEC, conformance, conformance_rows, render_conf
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
-PACKAGE_DIR = DEFAULT_ROOT / "outputs" / "_packages" / "mare_om2" / "v0.1.3"
+PACKAGE_DIR = DEFAULT_ROOT / "outputs" / "_packages" / "mare_om2" / "v0.2.0"
 TASKS_JSON = Path("/home/theo/SCL/SCR/brisaverse/shared/facts/tasks.json")
 
 pytestmark_real = pytest.mark.skipif(
-    not PACKAGE_DIR.is_dir(), reason="mare_om2 v0.1.3 package not built at the default root"
+    not PACKAGE_DIR.is_dir(), reason="mare_om2 v0.2.0 package not built at the default root"
 )
 
 
 # --- structural: SPEC itself ------------------------------------------------
 
-def test_spec_ids_are_p01_through_p09_in_order():
-    assert [item["id"] for item in SPEC] == [f"P-{i:02d}" for i in range(1, 10)]
+def test_spec_ids_are_p01_through_p11_in_order():
+    assert [item["id"] for item in SPEC] == [f"P-{i:02d}" for i in range(1, 12)]
 
 
 def test_every_spec_item_has_a_verbatim_requirement_and_parts():
@@ -190,7 +190,7 @@ def test_every_pending_part_names_an_existing_tasks_json_id():
     for item in conf["items"]:
         for part in item["parts"]:
             named.update(part["pending_on"])
-    assert named, "expected at least one pending part with a pending_on id in the real v0.1.3 build"
+    assert named, "expected at least one pending part with a pending_on id in the real v0.2.0 build"
     missing = named - known_ids
     assert not missing, f"pending_on names id(s) not in tasks.json: {missing}"
 
@@ -207,7 +207,7 @@ def test_conformance_rows_and_markdown_render_without_error():
 # --- RED: conformance reacts to a sabotaged copy -----------------------------
 
 def _copy_package(tmp_path: Path) -> Path:
-    dest = tmp_path / "mare_om2_copy" / "v0.1.3"
+    dest = tmp_path / "mare_om2_copy" / "v0.2.0"
     shutil.copytree(PACKAGE_DIR, dest)
     return dest
 
@@ -266,10 +266,10 @@ def test_sabotage_missing_changelog_entry_flips_p09_delivered_to_pending(tmp_pat
 
     changelog = copy_dir / "CHANGELOG.md"
     text = changelog.read_text(encoding="utf-8")
-    assert "## v0.1.3" in text
+    assert "## v0.2.0" in text
     lines = text.splitlines()
-    start = next(i for i, ln in enumerate(lines) if ln.startswith("## v0.1.3"))
-    end = next(i for i in range(start + 1, len(lines)) if lines[i].startswith("## v0.1.2"))
+    start = next(i for i, ln in enumerate(lines) if ln.startswith("## v0.2.0"))
+    end = next(i for i in range(start + 1, len(lines)) if lines[i].startswith("## v0.1.3"))
     stripped = "\n".join(lines[:start] + lines[end:])
     changelog.write_text(stripped, encoding="utf-8")
 
@@ -287,7 +287,7 @@ def test_shipped_aggregate_to_segments_runs_from_inside_package(tmp_path):
     out = tmp_path / "segments_20m.parquet"
     result = subprocess.run(
         [sys.executable, str(script), "--points", str(PACKAGE_DIR / "OM2" / "points.parquet"),
-         "--segment-length-m", "20", "--out", str(out)],
+         "--segment-m", "20", "--out", str(out)],
         capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr
@@ -428,11 +428,11 @@ def test_no_descoped_id_appears_as_pending_in_built_package():
         assert "PENDING" not in " ".join(str(row[c]) for c in d.columns).upper()
 
     needle = re.compile("|".join(re.escape(i) for i in DESCOPED_ITEMS) + r"|terrestrial|tree[ _]shade", re.I)
-    # frozen history entries (v0.1..v0.1.2) rightly say PENDING as it was then; only the
-    # README and the current v0.1.3 changelog entry must not.
+    # frozen history entries (v0.1..v0.1.3) rightly say PENDING as it was then; only the
+    # README and the current v0.2.0 changelog entry must not.
     changelog = (PACKAGE_DIR / "CHANGELOG.md").read_text(encoding="utf-8")
-    current = changelog.split("## v0.1.2", 1)[0]
-    texts = {"README.md": (PACKAGE_DIR / "README.md").read_text(encoding="utf-8"), "CHANGELOG.md (v0.1.3)": current}
+    current = changelog.split("## v0.1.3", 1)[0]
+    texts = {"README.md": (PACKAGE_DIR / "README.md").read_text(encoding="utf-8"), "CHANGELOG.md (v0.2.0)": current}
     for name, text in texts.items():
         for n, line in enumerate(text.splitlines(), 1):
             assert not (needle.search(line) and re.search(r"\bpending\b", line, re.I)

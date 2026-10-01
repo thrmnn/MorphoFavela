@@ -65,3 +65,15 @@ def decision_date(decisions: list[dict], decision_id: str) -> str:
         if d["id"] == decision_id and d.get("resolved_utc"):
             return str(d["resolved_utc"])[:10]
     raise ValueError(f"decision '{decision_id}' not found or has no resolved_utc in {decisions!r}")
+
+
+def read_wind_source_manifest(root) -> dict:
+    """The SBGL source manifest written by wind_obs.fetch_sbgl (station,
+    window, fetch URL, fetch time, sha256, counts), read verbatim so
+    manifest.json carries the wind source's own provenance. Raises
+    FileNotFoundError if the cache was never fetched — wind is never
+    synthesised."""
+    from .wind_obs import cache_paths
+
+    _, manifest_p = cache_paths(root)
+    return json.loads(manifest_p.read_text(encoding="utf-8"))
