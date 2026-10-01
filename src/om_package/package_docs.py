@@ -63,7 +63,7 @@ README_TEMPLATE = """\
 Built for Octopus LRP #2 ("Street by street: explaining air temperature
 differences across streets and over time in Complexo da Maré", lead
 Jingxue, PI Simone). Théo Hermann contributes street-form variables from
-the MorphoFavela pipeline in a support role. This package contains no
+the Brisa+ (MorphoFavela) pipeline in a support role. This package contains no
 temperature analysis and no conclusions — those are the Octopus team's work.
 
 **Named team (release card `om_release_v0_1_3`; use terms per PI decision `om_use_terms`, {om_use_terms_date}):** Jingxue,
@@ -74,7 +74,8 @@ terms). The decision's full resolution text travels in this package's
 an interview shorthand a reader outside this repo cannot resolve.
 
 Generated {version_date} by `scripts/build_om_package.py`
-(source: `src/om_package/` in the MorphoFavela repo).
+(source: `src/om_package/`; every code path named in this README lives in
+the Brisa+ (MorphoFavela) repository).
 
 ## Release scope
 
@@ -145,7 +146,7 @@ decision `om_v013_descope` — see Known limits.
   aggregation ships two ways: `scripts/aggregate_om_points.py` (repo-only
   CLI, same logic) and, new in v0.1.3, **`OM2/aggregate_to_segments.py`
   travels inside this package itself** — standalone (pandas + pyarrow
-  only, no MorphoFavela import), so a recipient with only this directory
+  only, no Brisa+ (MorphoFavela) import), so a recipient with only this directory
   can still re-aggregate. Usage (run from inside the package directory):
   ```
   python OM2/aggregate_to_segments.py --points OM2/points.parquet \\
@@ -321,7 +322,7 @@ GeoParquet-aware and plain-pandas readers work without extra steps.
 
 ## How to cite
 
-This package was produced with the MorphoFavela pipeline (Théo Hermann).
+This package was produced with the Brisa+ (MorphoFavela) pipeline (Théo Hermann).
 Authorship is to be discussed with the lead author when the Octopus LRP #2
 contribution list is drafted (decision `om_credit`).
 """
