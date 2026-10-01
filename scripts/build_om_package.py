@@ -68,6 +68,7 @@ from src.om_package.io_utils import Paths, hash_tree, write_table
 from src.om_package.neighbourhoods import communities_crossed, join_communities
 from src.om_package.package_docs import USE_TERMS, render_changelog, render_readme
 from src.om_package.provenance import read_om_decisions
+from src.om_package.report_pdf import render_readme_pdf
 from src.om_package.quality import write_quality_report
 from src.om_package.routes import compute_route_geometry_flag, densify_route, route_length_m
 from src.om_package.spec import render_conformance_markdown, write_conformance
@@ -484,15 +485,23 @@ def main() -> int:
     # computed from the files just written — never typed by hand (see
     # src/om_package/spec.py).
     conf = write_conformance(out_dir)
-    delivered = sum(1 for it in conf["items"] if it["status"] == "delivered")
-    partial = sum(1 for it in conf["items"] if it["status"] == "partial")
-    pending = sum(1 for it in conf["items"] if it["status"] == "pending")
-    print(f"[build_om_package] P-00 spec conformance: {delivered} delivered, {partial} partial, {pending} pending (of {len(conf['items'])})")
+    counts = {s: sum(1 for it in conf["items"] if it["status"] == s)
+              for s in ("delivered", "delivered (scoped)", "partial", "pending", "descoped")}
+    print(
+        "[build_om_package] P-00 spec conformance: "
+        + ", ".join(f"{n} {s}" for s, n in counts.items())
+        + f" (of {len(conf['items'])})"
+    )
 
     # Second pass: README with the conformance section filled in.
     (out_dir / "README.md").write_text(
         render_readme(conformance_section=render_conformance_markdown(conf) + "\n", **readme_kwargs)
     )
+
+    # README.pdf is rendered from the FINAL README.md, before the hash pass
+    # so it ships in the manifest like any other file.
+    render_readme_pdf(out_dir)
+    print(f"[build_om_package] wrote {out_dir / 'README.pdf'}")
 
     # manifest: sha256 per file, computed last (over everything just
     # written). manifest.json is EXCLUDED from its own file list — audit

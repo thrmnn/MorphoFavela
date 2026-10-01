@@ -126,7 +126,8 @@ the raster at build time), resampled to 1 m by
 
 **The buildings + terrain cadastral layer is the source for every
 {version} P-04/P-06 variable.** No terrestrial (ground-instrument) source
-is used or available yet — see Known limits.
+is used: terrestrial-LiDAR analysis is out of scope for {version} by
+decision `om_v013_descope` — see Known limits.
 
 ## Methods
 
@@ -281,17 +282,19 @@ is used or available yet — see Known limits.
   sample); (2) *no feature in the buffer* (`building_height_mean_buffer_*m`
   — zero buildings intersect that point's buffer, a real "no building
   here" result, not a join gap).
-- **Terrestrial SVF: PENDING** (decision `om_lidar`) — needs the team's
-  2026 OM2 terrestrial scan; PI knows where the 2024 airborne and 2026
-  terrestrial data are, location pending from the PI.
+- **Terrestrial SVF: OUT OF SCOPE for this version, by decision**
+  (`om_v013_descope`) — the terrestrial-LiDAR analysis is not part of
+  {version}; it may come in a later version.
 - **Building shade: computed for {n_campaign_dates} pilot campaign dates**
   (see P-05 above, decision `om_shade_release`) — more dates arrive as
   more of the team's Drive CSVs are pulled; an empty table still ships
-  when no CSVs are found at build time. **Tree shade: PENDING** — no tree
-  canopy/DSM layer for Maré on disk. `tree_shade` is reserved as an
-  always-null column in the shade schema.
-- **Height change 2024->2026: PENDING** — data location being confirmed
-  by T. Hermann (decision `om_lidar`).
+  when no CSVs are found at build time. **Tree shade: OUT OF SCOPE for
+  this version, by decision** (`om_v013_descope`); it may come in a later
+  version. `tree_shade` stays in the shade schema as a reserved,
+  always-null column.
+- **Height change 2024->2026 and the airborne-vs-terrestrial comparison:
+  OUT OF SCOPE for this version, by decision** (`om_v013_descope`); they
+  may come in a later version.
 - Nearest-neighbour joins carry a `*_join_dist_m` column; check it before
   trusting a value near a data-layer edge.
 - Ventilation columns are geometry-derived PROXIES, not simulated or
@@ -534,6 +537,17 @@ package. Both addressed directly, not just documented around.
   frozen historical entries, the join-example pointer, "PI ruling Qxx"
   citations replaced by `provenance.decisions` ids, source vintages, and
   the lambda_p==1.0 check).
+- **Descoped by decision** (`om_v013_descope`, PI, 2026-10-01): the
+  terrestrial-LiDAR analysis (terrestrial sky-view factor, 2024 to 2026
+  height change, airborne-vs-terrestrial comparison) and tree shade are
+  out of scope for {version}. The spec marks those parts `descoped`
+  (a deliberate cut), not `pending`; items whose remaining parts are all
+  delivered read `delivered (scoped)`. `tree_shade` stays in the shade
+  schema as a reserved, all-null column. They remain candidates for a
+  later version. The decision's text travels in `manifest.json`
+  `provenance.decisions`.
+- **README.pdf** ships in the package (the README rendered through pandoc
+  and weasyprint) and the package page links it as "Download report (PDF)".
 - Package version v0.1.2 -> v0.1.3 across `package_docs.py` and
   `build_om_package.py`'s default `--version`.
 - **Figures rebuilt** (PI, 2026-09-27: "I would like to see the spatial

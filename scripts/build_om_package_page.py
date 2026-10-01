@@ -212,6 +212,15 @@ def render_page(root: Path) -> str:
     om2_route = next((r for r in routes if r.get("route_id") == "OM_2"), {})
     communities = om2_route.get("communities_crossed") or []
 
+    pdf_path = version_dir / "README.pdf"
+    pdf_rel = _rel_to(package_root, pdf_path)
+    pdf_html = (
+        f'<p class="more"><a href="{pdf_rel}" download="mare_om2_{html.escape(version)}_report.pdf">'
+        f'Download report (PDF)</a> — the package README ({version}) as a single PDF.</p>'
+        if pdf_path.exists() else
+        '<p class="sub">Report PDF not built for this version — rebuild with scripts/build_om_package.py.</p>'
+    )
+
     # --- status -------------------------------------------------------
     status_badges = (
         hubkit.badge("info", f"version {version}")
@@ -222,6 +231,7 @@ def render_page(root: Path) -> str:
 <section id="status">
   <h2>Status</h2>
   <p>{status_badges}</p>
+  <div class="callout">{pdf_html}</div>
   <p class="sub">Built {html.escape(manifest.get("built_at_utc", "?"))} ·
   CRS {html.escape(manifest.get("crs", "?"))} ·
   {om2_route.get("n_points", "?")} OM2 points ·
@@ -247,29 +257,34 @@ def render_page(root: Path) -> str:
   scripts/build_om_package.py.</p>
 </section>"""
     else:
-        _STATUS_BADGE = {"delivered": "ok", "partial": "amber", "pending": "warn"}
+        _STATUS_BADGE = {"delivered": "ok", "delivered (scoped)": "ok", "descoped": "info",
+                         "partial": "amber", "pending": "warn"}
         conf_rows = [
             [
                 it["id"],
                 it["requirement"],
                 hubkit.badge(_STATUS_BADGE.get(it["status"], "info"), it["status"]),
                 it["evidence"],
-                ", ".join(it.get("pending_on") or []) or "—",
+                ", ".join(
+                    list(it.get("pending_on") or [])
+                    + [f"descoped \u2014 {d}" for d in it.get("decisions") or []]
+                ) or "—",
             ]
             for it in conformance.get("items", [])
         ]
         n_delivered = sum(1 for it in conformance.get("items", []) if it["status"] == "delivered")
         n_partial = sum(1 for it in conformance.get("items", []) if it["status"] == "partial")
         n_pending = sum(1 for it in conformance.get("items", []) if it["status"] == "pending")
+        n_scoped = sum(1 for it in conformance.get("items", []) if it["status"] == "delivered (scoped)")
         conformance_html = f"""
 <section id="conformance">
   <h2>Spec conformance (P-01…P-09)</h2>
-  <p>{n_delivered} delivered · {n_partial} partial · {n_pending} pending
-  (of {len(conformance.get("items", []))}) — computed mechanically by
+  <p>{n_delivered} delivered · {n_scoped} delivered (scoped) · {n_partial} partial · {n_pending} pending
+  (of {len(conformance.get("items", []))}). A <em>descoped</em> part is a deliberate cut by PI decision, not a gap. — computed mechanically by
   <code>src/om_package/spec.py</code> against this build
   (<a href="{conformance_rel}">p00_spec_conformance.json</a>,
   <a href="{conformance_csv_rel}">.csv</a>), never typed by hand.</p>
-  {_table(["id", "requirement", "status", "evidence", "pending on"], conf_rows, escape_cols={0, 1, 3, 4})}
+  {_table(["id", "requirement", "status", "evidence", "pending on / descoped"], conf_rows, escape_cols={0, 1, 3, 4})}
 </section>"""
 
     # --- PI decision ----------------------------------------------------
@@ -465,6 +480,7 @@ def render_page(root: Path) -> str:
 <section id="documents">
   <h2>Documents</h2>
   <ul>
+    <li><a href="{pdf_rel}" download="mare_om2_{html.escape(version)}_report.pdf"><strong>Download report (PDF)</strong></a> — README.pdf, the report as one file.</li>
     <li><a href="{readme_view}">README</a> — release scope, coverage vs Table 1, sources, methods, known limits
         (<a href="{readme_rel}">raw .md</a>).</li>
     <li><a href="{changelog_view}">Changelog</a> (<a href="{changelog_rel}">raw .md</a>)</li>

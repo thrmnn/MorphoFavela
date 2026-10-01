@@ -110,6 +110,73 @@ def test_item_status_mixed_parts_is_partial():
     assert conf["items"][0]["status"] == "partial"
 
 
+def _item_status_of(*parts):
+    from src.om_package.spec import PartResult  # noqa: F401
+    import src.om_package.spec as spec_mod
+
+    fake_item = {"id": "X", "title": "t", "requirement": "r",
+                 "parts": [{"name": p.name, "check": (lambda pd_, p=p: p)} for p in parts]}
+    old = spec_mod.SPEC
+    spec_mod.SPEC = [fake_item]
+    try:
+        return conformance(Path("/nonexistent"))["items"][0]
+    finally:
+        spec_mod.SPEC = old
+
+
+def _descoped(name):
+    from src.om_package.spec import PartResult
+
+    return PartResult(name, "descoped", evidence="e", reason="r", decision="om_v013_descope")
+
+
+def test_item_status_delivered_plus_descoped_is_delivered_scoped():
+    from src.om_package.spec import PartResult
+
+    item = _item_status_of(PartResult("a", "delivered"), _descoped("b"))
+    assert item["status"] == "delivered (scoped)"
+    assert item["decisions"] == ["om_v013_descope"]
+    assert item["pending_on"] == []
+
+
+def test_item_status_descoped_plus_pending_stays_partial():
+    from src.om_package.spec import PartResult
+
+    item = _item_status_of(PartResult("a", "delivered"), _descoped("b"), PartResult("c", "pending", pending_on=["T1"]))
+    assert item["status"] == "partial"
+    assert item["pending_on"] == ["T1"]
+
+
+def test_item_status_only_descoped_is_descoped():
+    assert _item_status_of(_descoped("a"), _descoped("b"))["status"] == "descoped"
+
+
+def test_descoped_part_without_decision_id_fails():
+    from src.om_package.spec import PartResult
+
+    with pytest.raises(ValueError, match="without a decision id"):
+        PartResult("a", "descoped", reason="r")
+    with pytest.raises(ValueError, match="without a reason"):
+        PartResult("a", "descoped", decision="om_v013_descope")
+    with pytest.raises(ValueError, match="pending_on"):
+        PartResult("a", "descoped", reason="r", decision="om_v013_descope", pending_on=["T"])
+
+
+def test_spec_descopes_exactly_the_decided_parts():
+    from src.om_package.spec import PartResult
+
+    expected = {"terrestrial_sky_view_factor", "tree_shade_column_reserved",
+                "height_change_2024_2026", "airborne_vs_terrestrial_comparison"}
+    got = set()
+    for item in SPEC:
+        for part in item["parts"]:
+            res = part["check"](Path("/nonexistent"))
+            if res.status == "descoped":
+                got.add(part["name"])
+                assert res.decision == "om_v013_descope"
+    assert got == expected
+
+
 # --- every pending part names a real tasks.json id --------------------------
 
 @pytest.mark.skipif(not TASKS_JSON.exists(), reason="brisaverse shared/facts/tasks.json not found at the default root")
@@ -147,11 +214,9 @@ def _copy_package(tmp_path: Path) -> Path:
 
 @pytestmark_real
 def test_sabotage_drop_ventilation_column_flips_p06_delivered_to_partial(tmp_path):
-    # P-06 is chosen (rather than P-04, which the spec itself makes only
-    # PARTIAL from day one — its terrestrial sky-view-factor part is
-    # genuinely pending on OCTOPUS_LIDAR, so it can never start "delivered"):
-    # P-06 has no PI-pending part, so it is fully "delivered" pre-sabotage,
-    # which lets this test show a real delivered -> partial transition.
+    # P-06 has no pending or descoped part, so it is plain "delivered"
+    # pre-sabotage, which lets this test show a real delivered -> partial
+    # transition.
     copy_dir = _copy_package(tmp_path)
     before = conformance(copy_dir)
     p06_before = next(it for it in before["items"] if it["id"] == "P-06")
@@ -171,15 +236,15 @@ def test_sabotage_drop_ventilation_column_flips_p06_delivered_to_partial(tmp_pat
 
 @pytestmark_real
 def test_sabotage_drop_building_height_flips_p04_part_but_stays_partial(tmp_path):
-    # P-04 itself is already "partial" (terrestrial SVF pending) — the
-    # mechanical part that DOES flip is airborne_building_and_canyon,
-    # from delivered to pending.
+    # P-04 starts "delivered (scoped)" (terrestrial SVF is descoped) — the
+    # mechanical part that flips is airborne_building_and_canyon, from
+    # delivered to pending, and a descoped cut must not mask it: partial.
     copy_dir = _copy_package(tmp_path)
     before = conformance(copy_dir)
     p04_before = next(it for it in before["items"] if it["id"] == "P-04")
     before_part = next(p for p in p04_before["parts"] if p["name"] == "airborne_building_and_canyon")
     assert before_part["status"] == "delivered"
-    assert p04_before["status"] == "partial"
+    assert p04_before["status"] == "delivered (scoped)"
 
     points_path = copy_dir / "OM2" / "points.parquet"
     df = pd.read_parquet(points_path).drop(columns=["building_height_m"])
@@ -189,7 +254,7 @@ def test_sabotage_drop_building_height_flips_p04_part_but_stays_partial(tmp_path
     p04_after = next(it for it in after["items"] if it["id"] == "P-04")
     after_part = next(p for p in p04_after["parts"] if p["name"] == "airborne_building_and_canyon")
     assert after_part["status"] == "pending"
-    assert p04_after["status"] == "partial"  # still partial: other parts unaffected
+    assert p04_after["status"] == "partial"
 
 
 @pytestmark_real
@@ -328,3 +393,15 @@ def test_shipped_manifest_hashes_match_files():
         if hashlib.sha256((PACKAGE_DIR / rel).read_bytes()).hexdigest() != digest
     ]
     assert bad == []
+
+
+@pytestmark_real
+def test_real_package_descoped_parts_render_distinctly():
+    conf = conformance(PACKAGE_DIR)
+    by_id = {it["id"]: it for it in conf["items"]}
+    assert by_id["P-04"]["status"] == "delivered (scoped)"
+    assert by_id["P-07"]["status"] == "delivered (scoped)"
+    assert by_id["P-05"]["status"] == "partial"
+    assert by_id["P-05"]["pending_on"] == ["OCTOPUS_CSV", "OCTOPUS_TZ"]
+    md = render_conformance_markdown(conf)
+    assert "descoped \u2014 om_v013_descope" in md

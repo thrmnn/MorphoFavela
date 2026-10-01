@@ -151,3 +151,19 @@ def test_check_fails_on_hand_edited_page():
         assert M.check(DEFAULT_ROOT) == 1
     finally:
         out.write_text(original, encoding="utf-8")
+
+
+# --- README.pdf ships and the page links it --------------------------------
+
+@pytestmark_real
+def test_readme_pdf_built_in_manifest_and_linked_from_page():
+    version_dir = PACKAGE_ROOT / M.latest_version(PACKAGE_ROOT)
+    pdf = version_dir / "README.pdf"
+    assert pdf.exists(), "README.pdf missing; rebuild with scripts/build_om_package.py"
+    data = pdf.read_bytes()
+    assert len(data) > 0 and data.startswith(b"%PDF")
+    manifest = json.loads((version_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert "README.pdf" in manifest["files"]
+    page = M.render_page(DEFAULT_ROOT)
+    assert 'README.pdf" download' in page
+    assert "Download report (PDF)" in page

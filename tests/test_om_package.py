@@ -390,6 +390,7 @@ _FAKE_DECISIONS = [
     {"id": "om_dates_tz", "question": "q", "resolution": "Timezone stays an open question until confirmed.", "resolved_utc": "2026-09-24T18:39:11Z"},
     {"id": "om_lidar", "question": "q", "resolution": "Location pending from the PI.", "resolved_utc": "2026-09-24T18:39:11Z"},
     {"id": "om_route_geometry", "question": "q", "resolution": "Flag now; v0.2 rebuilds with a crosswalk.", "resolved_utc": "2026-09-24T18:39:11Z"},
+    {"id": "om_v013_descope", "question": "q", "resolution": "Dropped from this version, deliberately.", "resolved_utc": "2026-10-01T13:46:07Z"},
 ]
 
 _FAKE_NODATA_FLOOR_M = {"min": 105.1, "median": 338.4, "max": 598.9}
@@ -571,7 +572,7 @@ TASKS_JSON = Path("/home/theo/SCL/SCR/brisaverse/shared/facts/tasks.json")
 
 
 @pytest.mark.skipif(not TASKS_JSON.exists(), reason="brisaverse shared/facts/tasks.json not found at the default root")
-def test_provenance_decisions_present_with_the_seven_ids():
+def test_provenance_decisions_present_with_all_ids():
     from src.om_package.provenance import OM_DECISION_IDS, read_om_decisions
 
     decisions = read_om_decisions()

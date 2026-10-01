@@ -22,7 +22,7 @@ from pathlib import Path
 BRISAVERSE_TASKS_JSON = Path("/home/theo/SCL/SCR/brisaverse/shared/facts/tasks.json")
 
 #: The seven Octopus package panel-blocker decisions (panel review
-#: 2026-09-24), in the order the README/CHANGELOG reference them.
+#: 2026-09-24) plus om_v013_descope (2026-10-01), in the order the README/CHANGELOG reference them.
 OM_DECISION_IDS = [
     "om_use_terms",
     "om_scope",
@@ -31,6 +31,7 @@ OM_DECISION_IDS = [
     "om_dates_tz",
     "om_lidar",
     "om_route_geometry",
+    "om_v013_descope",
 ]
 
 
