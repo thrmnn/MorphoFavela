@@ -1337,6 +1337,139 @@ def stage_zoom(repo_root: Path, out_dir: Path | None = None,
 
 
 # ---------------------------------------------------------------------------
+# P1 supplementary — Maré under two definitions (explain run, descriptive)
+# ---------------------------------------------------------------------------
+
+MARE_DEF_EXPLAIN_RUN = "mare_definitions_explain_20260924T212711Z"
+MARE_DEF_FIG_ID = "p1_supp_mare_definitions"
+# config/sites.yaml also says "outside the data extent"; that holds for the
+# site-level data only — the citywide wp05 grid this figure pools does cover it.
+MARE_DEF_EXCLUSION_REASON = (
+    "Marcílio Dias (one of the 16 communities) lies outside the IPP outline and is not "
+    "among the six 2019 favela polygons, so neither definition contains it — excluded "
+    "by geometry, never by name. [config/sites.yaml, Maré entry; guardian read 2026-10-01]"
+)
+
+
+def _pooled_decile_share(parts: list[dict]) -> list[float]:
+    """Cell-count-weighted pool of buckets' own decile shares (percent); exact
+    because each bucket's share is count/n against the same citywide cuts."""
+    n = sum(p["n"] for p in parts)
+    return [sum(p["n"] * p["decile_share"][d] for p in parts) / n for d in range(10)]
+
+
+def render_mare_definitions(explain_dir: Path, out_dir: Path) -> dict:
+    fig_id = MARE_DEF_FIG_ID
+    path = explain_dir / "decomposition.json"
+    if not path.exists():
+        return _skip(fig_id, f"explain-run decomposition absent: {path}")
+    d = json.loads(path.read_text())
+    b = d["buckets"]
+    a_full, e_full = d["definition_A_full"], d["definition_E"]
+    a_parts = [b["A"], b["A_outside_E"]]
+    e_parts = [b["A"], b["favelas_2022"], b["conjuntos"], b["between"]]
+    assert sum(p["n"] for p in a_parts) == a_full["n"]
+    assert sum(p["n"] for p in e_parts) == e_full["n"]
+    share_a = _pooled_decile_share(a_parts)
+    share_e = _pooled_decile_share(e_parts)
+
+    col_a, col_e = COLORS["mare"], "#88CCEE"
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9.4, 3.6),
+                                   gridspec_kw={"width_ratios": [1.15, 1]})
+    x = np.arange(1, 11)
+    w = 0.4
+    ax1.bar(x - w / 2, share_a, w, color=col_a,
+            label=f"A: IPP favela polygons (n={a_full['n']:,})")
+    ax1.bar(x + w / 2, share_e, w, color=col_e,
+            label=f"B: IPP complex outline (n={e_full['n']:,})")
+    ax1.axhline(10, color="black", linewidth=0.8, linestyle=":")
+    ax1.set_xticks(x)
+    ax1.set_xlabel("citywide kWh m$^{-2}$ decile (1 = lowest)")
+    ax1.set_ylabel("share of definition's own ground cells (%)")
+    ax1.set_title("Decile share (dotted: 10% per decile)", fontsize=8, loc="left")
+    ax1.legend(frameon=False, fontsize=6.5, loc="upper right")
+
+    steps = d["waterfall"]
+    labels = ["A polygons\n(inside outline)", "+ other favela-\nlayer communities",
+              "+ conjuntos\nhabitacionais", "+ ground between\ncommunities (= B)"]
+    cum = [s["cumulative_percentile"] for s in steps]
+    ax2.bar(range(4), cum, color=[col_a, "#999999", "#999999", col_e], width=0.6)
+    for i, s in enumerate(steps):
+        txt = f"p{cum[i]:.1f}"
+        if s["delta_percentile"] is not None:
+            txt += f"\n({s['delta_percentile']:+.1f}; n={s['n_added']:,})"
+        else:
+            txt += f"\n(n={s['n_added']:,})"
+        ax2.text(i, cum[i] + 0.4, txt, ha="center", va="bottom", fontsize=6)
+    ax2.set_xticks(range(4))
+    ax2.set_xticklabels(labels, fontsize=6)
+    ax2.set_ylabel("cumulative citywide percentile of median irradiation")
+    ax2.set_ylim(0, max(cum) * 1.3)
+    ax2.set_title(
+        f"A full: p{a_full['citywide_percentile']:.1f} → B: "
+        f"p{e_full['citywide_percentile']:.1f}", fontsize=8, loc="left")
+    fig.suptitle(
+        "Maré under two definitions. Marcílio Dias is excluded from both (outside the outline).",
+        fontsize=7.5, y=1.02)
+    fig.tight_layout()
+
+    svg_name, png_name, checklist = _save_and_checklist(fig, fig_id, out_dir)
+    return {
+        "id": fig_id,
+        "status": "produced",
+        "svg_path": svg_name,
+        "png_path": png_name,
+        "derived_from": [explain_dir.name, d["derived_from"]],
+        "release_class_proposed": "staged",
+        "p1_status": "supplementary candidate",
+        "values": {
+            "A_full": a_full, "B_outline": e_full,
+            "decile_share_A_pct": share_a, "decile_share_B_pct": share_e,
+            "waterfall": steps,
+        },
+        "marcilio_dias_exclusion": {
+            "reason": MARE_DEF_EXCLUSION_REASON,
+            "explain_run_states_reason": False,
+            "note": "the explain run's own files name no reason; quoted from config/sites.yaml",
+        },
+        "caption": (
+            "Maré under two definitions. (A) The six IPP favela polygons under complexo "
+            f"\"Maré\" (run of record; n={a_full['n']:,} ground cells, median "
+            f"{a_full['median_kwh_m2']:.0f} kWh m-2 yr-1, citywide percentile "
+            f"{a_full['citywide_percentile']:.1f}). (B) The IPP Territórios Sociais outline of the "
+            f"complex (n={e_full['n']:,}, median {e_full['median_kwh_m2']:.0f} kWh m-2 yr-1, "
+            f"percentile {e_full['citywide_percentile']:.1f}). Left: share of each definition's own "
+            "ground cells in each citywide irradiation decile; dotted line = 10% per decile. "
+            "Right: cumulative citywide percentile as the outline's added ground is included, in "
+            "three groups (other favela-layer communities, conjuntos habitacionais, ground between "
+            f"communities); its first bar holds the {steps[0]['n_added']:,} A cells inside the "
+            f"outline, so the {a_full['n'] - steps[0]['n_added']:,} A cells outside it appear "
+            "in the left panel only. Descriptive only. Marcílio Dias is excluded from both "
+            "definitions: it lies outside the IPP outline and is not among the six 2019 "
+            "polygons, excluded by geometry, never by name."),
+        "checklist": checklist,
+    }
+
+
+def stage_mare_definitions(repo_root: Path, out_dir: Path | None = None,
+                           explain_run: str = MARE_DEF_EXPLAIN_RUN) -> dict:
+    repo_root = Path(repo_root)
+    if out_dir is None:
+        out_dir = repo_root / "runs" / ("wp07_figures_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig = render_mare_definitions(repo_root / "runs" / explain_run, out_dir)
+    manifest = {
+        "_utc": _utc_now(),
+        "git_sha": _git_sha(repo_root),
+        "derived_from": [explain_run],
+        "figures": {MARE_DEF_FIG_ID: fig},
+    }
+    (out_dir / "figure_manifest.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
+    return manifest
+
+
+# ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
 
@@ -1377,7 +1510,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-root", default=str(REPO_ROOT))
     ap.add_argument("--out-dir", default=None)
-    ap.add_argument("--target", choices=("figures", "map", "zoom"), default="figures",
+    ap.add_argument("--target", choices=("figures", "map", "zoom", "mare_defs"), default="figures",
                      help="'figures' (default, unchanged): f1-f4 into runs/wp07_figures_<UTC>/. "
                           "'map': WP-07M f5/f5b into runs/wp07_map_<UTC>/ (docs/wp07_map_spec.md). "
                           "'zoom': WP-07Z citywide pair + per-window renders into "
@@ -1393,7 +1526,10 @@ def main() -> int:
     args = ap.parse_args()
     repo_root = Path(args.repo_root)
     out_dir = Path(args.out_dir) if args.out_dir else None
-    if args.target == "map":
+    if args.target == "mare_defs":
+        manifest = stage_mare_definitions(repo_root, out_dir)
+        label = "mare-definitions figure"
+    elif args.target == "map":
         manifest = stage_map(repo_root, out_dir, pixel_m=args.pixel_m)
         label = "map figures"
     elif args.target == "zoom":

@@ -764,3 +764,36 @@ def test_zoom_windows_render_at_the_frame_pitch_and_are_not_blank(tmp_path, ledg
         ny, nx = agg["grid_shape_rows_cols"]
         fill = agg["n_cells_aggregated"] / float(ny * nx)
         assert fill > 0.05, f"{row['id']}: raster only {fill:.2%} filled — the blank-render class"
+
+
+def test_mare_definitions_pools_and_renders(tmp_path):
+    def bucket(n, first):
+        share = [0.0] * 10
+        share[0], share[1] = first, 100.0 - first
+        return {"n": n, "decile_share": share}
+
+    d = {
+        "derived_from": "src_run",
+        "definition_A_full": {"n": 30, "median_kwh_m2": 600.0, "citywide_percentile": 7.7},
+        "definition_E": {"n": 90, "median_kwh_m2": 950.0, "citywide_percentile": 20.7},
+        "buckets": {
+            "A": bucket(20, 50.0), "A_outside_E": bucket(10, 80.0),
+            "favelas_2022": bucket(10, 90.0), "conjuntos": bucket(30, 20.0),
+            "between": bucket(30, 10.0),
+        },
+        "waterfall": [
+            {"cumulative_percentile": p, "delta_percentile": dp, "n_added": n}
+            for p, dp, n in [(8.0, None, 20), (7.0, -1.0, 10), (14.0, 7.0, 30), (20.7, 6.7, 30)]
+        ],
+    }
+    run = tmp_path / "explain"
+    run.mkdir()
+    (run / "decomposition.json").write_text(json.dumps(d))
+    out = tmp_path / "out"
+    out.mkdir()
+    fig = figs.render_mare_definitions(run, out)
+    assert fig["status"] == "produced"
+    assert (out / "p1_supp_mare_definitions.png").exists()
+    assert fig["values"]["decile_share_A_pct"][0] == pytest.approx((20 * 50 + 10 * 80) / 30)
+    assert fig["checklist"]["banned_tokens_absent"]
+    assert "Marcílio Dias is excluded" in fig["caption"]
