@@ -22,7 +22,7 @@ from src.om_package.dictionary import dictionary_dataframe, full_dictionary
 from src.om_package.formvars import compute_form_variables
 from src.om_package.io_utils import Paths, hash_tree, write_table
 from src.om_package.package_docs import USE_TERMS, render_changelog, render_readme
-from src.om_package.quality import PENDING_ITEMS, coverage_report
+from src.om_package.quality import DESCOPED_ITEMS, PENDING_ITEMS, coverage_report
 from src.om_package.routes import (
     POINT_SPACING_M,
     ROUTE_FLAG_MAX_STREET_DIST_M,
@@ -177,17 +177,19 @@ def test_pending_items_listed():
     # is wired for real and compute_shade() produced a real (non-empty) table from the
     # pilot CSV pull — see the 'shaded' dictionary row instead (_SHADE_TABLE_ONLY).
     assert "building_shade_per_5min" not in PENDING_ITEMS
-    assert "sky_view_factor_terrestrial" in PENDING_ITEMS
-    assert "tree_shade" in PENDING_ITEMS
+    assert PENDING_ITEMS == []
+    assert "sky_view_factor_terrestrial" in DESCOPED_ITEMS
+    assert "tree_shade" in DESCOPED_ITEMS
+    assert not set(PENDING_ITEMS) & set(DESCOPED_ITEMS)
 
 
 # --- P-08: dictionary covers every column, both directions ----------------
 
-def test_dictionary_has_pending_rows():
+def test_dictionary_marks_descoped_rows_not_pending():
     d = full_dictionary()
-    pending = [k for k, v in d.items() if v["status"] == "PENDING"]
-    assert set(PENDING_ITEMS).issubset(set(pending))
-    assert len(pending) > 0
+    for k in DESCOPED_ITEMS:
+        assert d[k]["status"] == "DESCOPED (om_v013_descope)"
+    assert not [k for k, v in d.items() if v["status"] == "PENDING"]
 
 
 def test_dictionary_covers_every_output_column(om2_points_small):
@@ -206,11 +208,11 @@ def test_dictionary_covers_every_output_column(om2_points_small):
 
 def test_no_dictionary_row_is_orphaned_from_a_real_table():
     # every dictionary id belongs to either the points table, the buffer
-    # template, the shade table, or the PENDING registry — this is a
+    # template, the shade table, or the DESCOPED registry — this is a
     # structural check (dictionary.py's own composition), not a live-data one.
-    from src.om_package.dictionary import _BASE, _BUFFER_TEMPLATES, _PENDING, _SHADE_TABLE_ONLY
+    from src.om_package.dictionary import _BASE, _BUFFER_TEMPLATES, _DESCOPED, _SHADE_TABLE_ONLY
 
-    known_sources = set(_BASE) | {t.format(r=r) for t in _BUFFER_TEMPLATES for r in BUFFER_RADII_M} | set(_PENDING) | set(_SHADE_TABLE_ONLY)
+    known_sources = set(_BASE) | {t.format(r=r) for t in _BUFFER_TEMPLATES for r in BUFFER_RADII_M} | set(_DESCOPED) | set(_SHADE_TABLE_ONLY)
     assert set(full_dictionary()) == known_sources
 
 
@@ -440,9 +442,9 @@ def test_readme_no_pending_surface_cover_row():
     assert "surface structure only" in coverage_section
     assert "façade materials" in coverage_section
     # the panel's suggested PENDING surface-cover row was overruled (PI, 2026-09-24)
-    from src.om_package.dictionary import _PENDING
+    from src.om_package.dictionary import _DESCOPED
 
-    assert not any("surface_cover" in k or "surface cover" in v.get("definition", "").lower() for k, v in _PENDING.items())
+    assert not any("surface_cover" in k or "surface cover" in v.get("definition", "").lower() for k, v in _DESCOPED.items())
 
 
 # --- 2026-09-27 numerical audit: docs/provenance defects --------------------

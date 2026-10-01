@@ -170,6 +170,8 @@ def quality_summary(quality: dict) -> dict:
         "flagged_pct": pct,
         "below_100": below_100,
         "pending_items": list(quality.get("pending_items", [])),
+        "descoped_items": list(quality.get("descoped_items", [])),
+        "descoped_by": quality.get("descoped_by", ""),
     }
 
 
@@ -313,6 +315,7 @@ def render_page(root: Path) -> str:
     # --- quality ----------------------------------------------------------
     below_rows = [[r["column"], f'{r["pct"]}%', f'{r["n_valid"]}/{r["n_total"]}'] for r in q["below_100"]]
     pending_html = "".join(f"<li><code>{html.escape(p)}</code></li>" for p in q["pending_items"])
+    descoped_html = "".join(f"<li><code>{html.escape(p)}</code></li>" for p in q["descoped_items"])
     quality_html = f"""
 <section id="quality">
   <h2>Quality (P-07)</h2>
@@ -324,6 +327,8 @@ def render_page(root: Path) -> str:
   {_table(["Column", "Coverage", "Valid / total"], below_rows) if below_rows else "<p class='sub'>None.</p>"}
   <p>Pending items (quoted exactly from <code>p07_quality_report.json</code>):</p>
   <ul>{pending_html or "<li class='sub'>None.</li>"}</ul>
+  <p>Descoped items (deliberate cut by decision <code>{html.escape(q["descoped_by"])}</code>, not gaps):</p>
+  <ul>{descoped_html or "<li class='sub'>None.</li>"}</ul>
 </section>"""
 
     # --- P-05 shade / campaign windows -----------------------------------

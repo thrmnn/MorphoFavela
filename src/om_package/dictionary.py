@@ -211,26 +211,28 @@ _BUFFER_TEMPLATES = {
     },
 }
 
-_PENDING: dict[str, dict] = {
+_DESCOPED_STATUS = "DESCOPED (om_v013_descope)"
+
+_DESCOPED: dict[str, dict] = {
     "sky_view_factor_terrestrial": {
         "definition": "Terrestrial (ground-instrument) sky-view factor at each OM2 point.",
-        "unit": "fraction [0,1]", "source": "PENDING — needs the team's 2026 OM2 terrestrial scan/photography campaign",
-        "method": "PENDING", "limits": "Not computed in v0.1 (spec P-04: airborne only).", "status": "PENDING",
+        "unit": "fraction [0,1]", "source": "DESCOPED — terrestrial-LiDAR analysis is out of scope for v0.1.3 by PI decision om_v013_descope",
+        "method": "DESCOPED", "limits": "No column in this version (spec P-04: airborne only). May come in a later version.", "status": _DESCOPED_STATUS,
     },
     "tree_shade": {
-        "definition": "Whether tree canopy shades each OM2 point. RESERVED column in the shade table schema (SHADE_TABLE_COLUMNS) — present but always null, so the table's shape will not change again once this is computed.",
-        "unit": "bool", "source": "PENDING — no DSM/canopy layer for Maré on disk",
-        "method": "PENDING", "limits": "Building-only shade (the 'shaded' column) releases once campaign dates are known; tree_shade stays null until a canopy/DSM layer exists.", "status": "PENDING",
+        "definition": "Whether tree canopy shades each OM2 point. RESERVED column in the shade table schema (SHADE_TABLE_COLUMNS) — present but always null, so the table's shape will not change if it is added later.",
+        "unit": "bool", "source": "DESCOPED — tree shade is out of scope for v0.1.3 by PI decision om_v013_descope",
+        "method": "DESCOPED", "limits": "Always null in this version (reserved column). Building-only shade is the 'shaded' column. May come in a later version.", "status": _DESCOPED_STATUS,
     },
     "airborne_vs_terrestrial_comparison": {
         "definition": "Comparison of airborne vs. terrestrial form-variable estimates along OM2.",
-        "unit": "-", "source": "PENDING — needs sky_view_factor_terrestrial first",
-        "method": "PENDING", "limits": "-", "status": "PENDING",
+        "unit": "-", "source": "DESCOPED — terrestrial-LiDAR analysis is out of scope for v0.1.3 by PI decision om_v013_descope",
+        "method": "DESCOPED", "limits": "Not computed in this version. May come in a later version.", "status": _DESCOPED_STATUS,
     },
     "height_change_2024_2026": {
         "definition": "Change in building/canopy height between the 2024 airborne LiDAR and the 2026 OM2 terrestrial field campaign.",
-        "unit": "m", "source": "PENDING — data location being confirmed by T. Hermann",
-        "method": "PENDING", "limits": "Name kept as height_change_2024_2026 for now; will be revisited (e.g. renamed to height_change_2019_2026) once the 2024 airborne dataset's existence and location are confirmed.", "status": "PENDING",
+        "unit": "m", "source": "DESCOPED — terrestrial-LiDAR analysis is out of scope for v0.1.3 by PI decision om_v013_descope",
+        "method": "DESCOPED", "limits": "Not computed in this version; the name may be revisited if it comes in a later version.", "status": _DESCOPED_STATUS,
     },
 }
 
@@ -251,7 +253,7 @@ def full_dictionary(radii=BUFFER_RADII_M) -> dict[str, dict]:
             row = {k: (v.format(r=r) if isinstance(v, str) else v) for k, v in template.items()}
             row["status"] = "computed"
             d[col_id] = row
-    for k, v in _PENDING.items():
+    for k, v in _DESCOPED.items():
         d[k] = v
     for k, v in _SHADE_TABLE_ONLY.items():
         d.setdefault(k, v)

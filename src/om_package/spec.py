@@ -431,9 +431,15 @@ def _coverage_mask_part(name: str, package_dir: Path) -> PartResult:
 def _known_gaps_part(name: str, package_dir: Path) -> PartResult:
     q = _quality_report(package_dir)
     pending_items = q.get("pending_items")
-    if not pending_items:
-        return PartResult(name, "pending", evidence="p07_quality_report.json has no pending_items")
-    return PartResult(name, "delivered", evidence=f"pending_items: {pending_items}")
+    descoped_items = q.get("descoped_items")
+    if pending_items is None or descoped_items is None:
+        return PartResult(name, "pending", evidence="p07_quality_report.json lacks pending_items/descoped_items")
+    if not pending_items and not descoped_items:
+        return PartResult(name, "pending", evidence="p07_quality_report.json lists no known gaps")
+    return PartResult(
+        name, "delivered",
+        evidence=f"pending_items: {pending_items}; descoped_items ({q.get('descoped_by')}): {descoped_items}",
+    )
 
 
 # ------------------------------------------------------------------ SPEC --

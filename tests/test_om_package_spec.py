@@ -405,3 +405,35 @@ def test_real_package_descoped_parts_render_distinctly():
     assert by_id["P-05"]["pending_on"] == ["OCTOPUS_CSV", "OCTOPUS_TZ"]
     md = render_conformance_markdown(conf)
     assert "descoped \u2014 om_v013_descope" in md
+
+
+@pytestmark_real
+def test_no_descoped_id_appears_as_pending_in_built_package():
+    import re
+
+    from src.om_package.quality import DESCOPED_ITEMS
+
+    conf = conformance(PACKAGE_DIR)
+    for item in conf["items"]:
+        for part in item["parts"]:
+            if part["status"] == "pending":
+                assert part["name"] not in DESCOPED_ITEMS
+    q = json.loads((PACKAGE_DIR / "OM2" / "p07_quality_report.json").read_text(encoding="utf-8"))
+    assert not set(q["pending_items"]) & set(DESCOPED_ITEMS)
+    assert set(q["descoped_items"]) == set(DESCOPED_ITEMS)
+
+    d = pd.read_csv(PACKAGE_DIR / "p08_data_dictionary.csv")
+    for _id in DESCOPED_ITEMS:
+        row = d[d["id"] == _id].iloc[0]
+        assert "PENDING" not in " ".join(str(row[c]) for c in d.columns).upper()
+
+    needle = re.compile("|".join(re.escape(i) for i in DESCOPED_ITEMS) + r"|terrestrial|tree[ _]shade", re.I)
+    # frozen history entries (v0.1..v0.1.2) rightly say PENDING as it was then; only the
+    # README and the current v0.1.3 changelog entry must not.
+    changelog = (PACKAGE_DIR / "CHANGELOG.md").read_text(encoding="utf-8")
+    current = changelog.split("## v0.1.2", 1)[0]
+    texts = {"README.md": (PACKAGE_DIR / "README.md").read_text(encoding="utf-8"), "CHANGELOG.md (v0.1.3)": current}
+    for name, text in texts.items():
+        for n, line in enumerate(text.splitlines(), 1):
+            assert not (needle.search(line) and re.search(r"\bpending\b", line, re.I)
+                        and "descoped" not in line.lower()), f"{name}:{n}: {line}"

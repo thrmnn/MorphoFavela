@@ -13,9 +13,14 @@ from pathlib import Path
 
 import pandas as pd
 
-#: Not computed anywhere in v0.1 — no column exists for these; listed here
-#: so the quality report and the data dictionary agree.
-PENDING_ITEMS = [
+#: Items still owed in this version. None: the former four were descoped.
+PENDING_ITEMS: list[str] = []
+
+#: Dropped from v0.1.3 by PI decision om_v013_descope (2026-10-01) — a
+#: deliberate cut, not a gap; candidates for a later version. Listed so the
+#: quality report and the data dictionary agree.
+DESCOPE_DECISION = "om_v013_descope"
+DESCOPED_ITEMS = [
     "sky_view_factor_terrestrial",
     "tree_shade",
     "airborne_vs_terrestrial_comparison",
@@ -42,6 +47,8 @@ def coverage_report(df: pd.DataFrame, variable_cols: list[str]) -> dict:
         "n_points": n,
         "columns": per_column,
         "pending_items": PENDING_ITEMS,
+        "descoped_items": DESCOPED_ITEMS,
+        "descoped_by": DESCOPE_DECISION,
     }
     if "route_geometry_flag" in df.columns:
         # PI ruling 2026-09-24 (must-fix 1): count points where the
