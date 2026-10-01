@@ -75,7 +75,7 @@ those are the Octopus team's work.
 what to read with care). This README is the technical document: files,
 sources, methods, limits.
 
-**Named team (release card `om_release_v0_1_3`; use terms per PI decision `om_use_terms`, {om_use_terms_date}):** Jingxue,
+**Named team (release card `om_release_v0_2_0`; use terms per PI decision `om_use_terms`, {om_use_terms_date}):** Jingxue,
 Vincent, Simone. This release goes to the three of them only, as an
 internal review draft; not for wider redistribution or citation (see Use
 terms). The decision's full resolution text travels in this package's
