@@ -590,6 +590,14 @@ def _build_run_backed_family(nodes, fam_node_id, wp_node_id, wp_key, family, fam
     head = (ok_runs or family_runs)[-1] if family_runs else None
     head_run_id = head.run_id if head else None
     n_artifacts = 0
+    # A figure is current in the newest run that produced IT, not only in the
+    # family's newest run: a run that adds one figure must not mark the
+    # family's other figures superseded (2026-10-01).
+    slug_head = {}
+    for ri in family_runs:
+        for slug, fig in ri.figures.items():
+            if fig.get("status") == "produced":
+                slug_head[slug] = ri.run_id
 
     for ri in family_runs:
         run_node_id = f"run:{ri.run_id}"
@@ -615,7 +623,10 @@ def _build_run_backed_family(nodes, fam_node_id, wp_node_id, wp_key, family, fam
                 if p and (DATA_ROOT / p).exists():
                     content_hash = _sha256(DATA_ROOT / p)
                     break
-            fig_lifecycle = "draft" if fig.get("status") == "skipped" else lifecycle
+            fig_current = slug_head.get(slug) == ri.run_id
+            fig_lifecycle = ("draft" if fig.get("status") == "skipped"
+                             else "current" if fig_current
+                             else "superseded" if slug in slug_head else lifecycle)
             site = (fig.get("window") or {}).get("id") or _match_site(slug, sites)
             art_id = f"art:{family}::{ri.run_id}::{slug}"
             nodes[art_id] = {
@@ -637,7 +648,7 @@ def _build_run_backed_family(nodes, fam_node_id, wp_node_id, wp_key, family, fam
                 "status": fig.get("status"), "reason": fig.get("reason"),
             }
             n_artifacts += 1
-            if is_head and fig.get("status") != "skipped":
+            if fig_current:
                 alias_id = f"art:{family}::current::{slug}"
                 nodes[alias_id] = {"kind": "alias", "target": art_id}
 

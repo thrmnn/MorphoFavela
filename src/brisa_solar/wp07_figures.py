@@ -1419,7 +1419,9 @@ def render_mare_definitions(explain_dir: Path, out_dir: Path) -> dict:
         "status": "produced",
         "svg_path": svg_name,
         "png_path": png_name,
-        "derived_from": [explain_dir.name, d["derived_from"]],
+        # Run lineage, not `derived_from`: the registry reads that key as the
+        # slugs of sibling figures (scripts/build_results_registry.py).
+        "source_runs": [explain_dir.name, d["derived_from"]],
         "release_class_proposed": "staged",
         "p1_status": "supplementary candidate",
         "values": {

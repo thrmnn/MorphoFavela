@@ -334,3 +334,24 @@ def test_main_prints_skipped_runs_warning_and_still_exits_0(env, capsys):
     out = capsys.readouterr().out
     assert "1 run director" in out
     assert "some_family_20260925T150000Z" in out
+
+
+def test_newer_run_adding_one_figure_keeps_the_others_current(env):
+    """A run that stages one new figure must not supersede the family's
+    other figures, which only an older run produced (2026-10-01)."""
+    runs = env["runs"]
+    _write(env["config"] / "work_packages.yaml", yaml.dump(_wp_yaml({"wp07_figures": {"script": "src/x.py"}})))
+    for run_id, slug in [("wp07_figures_20260924T212023Z", "f1_v2_decile_share"),
+                         ("wp07_figures_20261001T131529Z", "p1_supp_mare_definitions")]:
+        _write(runs / run_id / f"{slug}.png")
+        _write_json(runs / run_id / "figure_manifest.json", {
+            "_utc": brr._run_utc_from_name(run_id),
+            "figures": {slug: {"id": slug, "status": "produced", "png_path": f"{slug}.png"}},
+        })
+
+    nodes = brr.build()["nodes"]
+
+    assert nodes["art:wp07_figures::wp07_figures_20260924T212023Z::f1_v2_decile_share"]["lifecycle"] == "current"
+    assert nodes["art:wp07_figures::current::f1_v2_decile_share"]["target"].endswith("::f1_v2_decile_share")
+    assert nodes["art:wp07_figures::current::p1_supp_mare_definitions"]["target"].startswith(
+        "art:wp07_figures::wp07_figures_20261001T131529Z")
