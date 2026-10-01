@@ -1,0 +1,212 @@
+{
+  "_utc": "2026-10-01T12:56:58Z",
+  "floor_h": 2.0,
+  "wp06_run_id": "wp06_geometry_20260915T052604Z",
+  "inputs_sha256": {
+    "outputs/vidigal/geometry_indicators/per_patch_geometry.csv": "6cd391d50f1d4cc3a3810310d7dc12cb6a7ea72c9f5b3226fc5f165264da7bd9",
+    "outputs/rocinha/geometry_indicators/per_patch_geometry.csv": "0af0e5d812589081bf309a0a671f7488c9731fb0efd6f090dc4c457bb9a9bc3a",
+    "outputs/complexo_do_alemao/geometry_indicators/per_patch_geometry.csv": "0f7958fbfc687acbe7256b77aab07c986ebcd900758369f795d8de19dd93be19",
+    "outputs/riodaspedras/geometry_indicators/per_patch_geometry.csv": "4556afc44c04f4426d648d7075b339876e4f9d487e2b3332c82a235cf294320e",
+    "outputs/maré/geometry_indicators/per_patch_geometry.csv": "6ca1d81d97548f1c5a03b3309b5e9bd0e1e3baf66765ec714c5edbfe4bbedb2e"
+  },
+  "per_site": {
+    "vidigal": {
+      "cells_total": 2756,
+      "rows": [
+        {
+          "n_constraints": 0,
+          "cells": 554,
+          "share_of_cells": 0.20473022912047303,
+          "point_deficit": 0.47942749644855487,
+          "cell_deficit": 0.45306859205776173
+        },
+        {
+          "n_constraints": 1,
+          "cells": 1074,
+          "share_of_cells": 0.3968957871396896,
+          "point_deficit": 0.6228513944285479,
+          "cell_deficit": 0.6210428305400373
+        },
+        {
+          "n_constraints": 2,
+          "cells": 889,
+          "share_of_cells": 0.32852919438285294,
+          "point_deficit": 0.7054257845752959,
+          "cell_deficit": 0.7131608548931384
+        },
+        {
+          "n_constraints": 3,
+          "cells": 189,
+          "share_of_cells": 0.06984478935698447,
+          "point_deficit": 0.6497331869375901,
+          "cell_deficit": 0.656084656084656
+        }
+      ]
+    },
+    "rocinha": {
+      "cells_total": 8031,
+      "rows": [
+        {
+          "n_constraints": 0,
+          "cells": 800,
+          "share_of_cells": 0.10639712727756351,
+          "point_deficit": 0.28136984508326146,
+          "cell_deficit": 0.25625
+        },
+        {
+          "n_constraints": 1,
+          "cells": 2222,
+          "share_of_cells": 0.29551802101343266,
+          "point_deficit": 0.5296524866991776,
+          "cell_deficit": 0.5198019801980198
+        },
+        {
+          "n_constraints": 2,
+          "cells": 3945,
+          "share_of_cells": 0.524670833887485,
+          "point_deficit": 0.819159730851732,
+          "cell_deficit": 0.8238276299112801
+        },
+        {
+          "n_constraints": 3,
+          "cells": 552,
+          "share_of_cells": 0.07341401782151882,
+          "point_deficit": 0.7556592113359331,
+          "cell_deficit": 0.7481884057971014
+        }
+      ]
+    },
+    "complexo_do_alemao": {
+      "cells_total": 17768,
+      "rows": [
+        {
+          "n_constraints": 0,
+          "cells": 2989,
+          "share_of_cells": 0.17355707815584717,
+          "point_deficit": 0.16509631900777094,
+          "cell_deficit": 0.11843425894948144
+        },
+        {
+          "n_constraints": 1,
+          "cells": 6476,
+          "share_of_cells": 0.37603065846010914,
+          "point_deficit": 0.35773325394769195,
+          "cell_deficit": 0.3247374922791847
+        },
+        {
+          "n_constraints": 2,
+          "cells": 5922,
+          "share_of_cells": 0.3438625014516316,
+          "point_deficit": 0.5765496142115583,
+          "cell_deficit": 0.5623100303951368
+        },
+        {
+          "n_constraints": 3,
+          "cells": 1835,
+          "share_of_cells": 0.10654976193241203,
+          "point_deficit": 0.662860305183452,
+          "cell_deficit": 0.667574931880109
+        }
+      ]
+    },
+    "riodaspedras": {
+      "cells_total": 6605,
+      "rows": [
+        {
+          "n_constraints": 0,
+          "cells": 199,
+          "share_of_cells": 0.03751885369532428,
+          "point_deficit": 0.1603510173107016,
+          "cell_deficit": 0.09045226130653267
+        },
+        {
+          "n_constraints": 1,
+          "cells": 755,
+          "share_of_cells": 0.14234539969834087,
+          "point_deficit": 0.28885097407044436,
+          "cell_deficit": 0.2503311258278146
+        },
+        {
+          "n_constraints": 2,
+          "cells": 1574,
+          "share_of_cells": 0.29675716440422323,
+          "point_deficit": 0.6416559264623748,
+          "cell_deficit": 0.6423125794155019
+        },
+        {
+          "n_constraints": 3,
+          "cells": 2776,
+          "share_of_cells": 0.5233785822021116,
+          "point_deficit": 0.8397154851126808,
+          "cell_deficit": 0.8440201729106628
+        }
+      ]
+    },
+    "maré": {
+      "cells_total": 29229,
+      "rows": [
+        {
+          "n_constraints": 0,
+          "cells": 279,
+          "share_of_cells": 0.036394469084268195,
+          "point_deficit": 0.3125738878712912,
+          "cell_deficit": 0.3118279569892473
+        },
+        {
+          "n_constraints": 1,
+          "cells": 884,
+          "share_of_cells": 0.11531437516305766,
+          "point_deficit": 0.5029484320900883,
+          "cell_deficit": 0.49095022624434387
+        },
+        {
+          "n_constraints": 2,
+          "cells": 2501,
+          "share_of_cells": 0.32624576050091314,
+          "point_deficit": 0.7669123300417089,
+          "cell_deficit": 0.7776889244302279
+        },
+        {
+          "n_constraints": 3,
+          "cells": 4002,
+          "share_of_cells": 0.522045395251761,
+          "point_deficit": 0.8394121337674071,
+          "cell_deficit": 0.8513243378310844
+        }
+      ]
+    },
+    "pooled": {
+      "cells_total": 64389,
+      "rows": [
+        {
+          "n_constraints": 0,
+          "cells": 4821,
+          "share_of_cells": 0.11928149046193433,
+          "point_deficit": 0.22885077240702256,
+          "cell_deficit": 0.1897946484131923
+        },
+        {
+          "n_constraints": 1,
+          "cells": 11411,
+          "share_of_cells": 0.2823316921097558,
+          "point_deficit": 0.42285511129768727,
+          "cell_deficit": 0.39856279029007097
+        },
+        {
+          "n_constraints": 2,
+          "cells": 14831,
+          "share_of_cells": 0.3669495509315387,
+          "point_deficit": 0.687819408114386,
+          "cell_deficit": 0.6857258445148675
+        },
+        {
+          "n_constraints": 3,
+          "cells": 9354,
+          "share_of_cells": 0.23143726649677115,
+          "point_deficit": 0.7960925446878596,
+          "cell_deficit": 0.8030788967286723
+        }
+      ]
+    }
+  }
+}
