@@ -401,7 +401,25 @@ def _octopus_extra(section_out: Path) -> str | None:
 # renders (G1) — never the slug, never dict/list position.
 # --------------------------------------------------------------------------
 
+BRISAVERSE = Path.home() / "SCL/SCR/brisaverse"
+
+
+def _review_today() -> list[Path]:
+    pkg = _newest_om2_package()
+    return ([pkg / "README.pdf"] if pkg else []) + [
+        BRISAVERSE / "slides/brisa_om_pk.pdf", BRISAVERSE / "slides/contact_om_pk.png",
+        BRISAVERSE / "slides/brisa_v3.pdf", BRISAVERSE / "slides/contact_master.png",
+        BRISAVERSE / "papers/p1-nature-cities/latex/main_cprime.pdf",
+    ]
+
+
 RECORDS: list[dict] = [
+    dict(
+        order=0, slug="review_today", title="For your review today",
+        blurb="Octopus OM2 package report (README.pdf) and its results deck; the main paper deck rebuilt "
+              "for C′ (brisa_v3); the P1 C′ manuscript draft (main_cprime.pdf). Each deck has its contact sheet.",
+        paths=_review_today,
+    ),
     dict(
         order=1, slug="mare_territory", title="Maré — territory and site deliverables",
         blurb=(
