@@ -391,10 +391,12 @@ def render_report_markdown(package_dir: Path) -> str:
     out += _section("profiles.png", [
         f"The street is narrow and enclosed. The median building is {f['bh_median']:.1f} m tall and the median "
         f"street is {f['sw_median']:.1f} m wide, so buildings are {f['hw_median']:.1f} times as tall as the "
-        f"street is wide. The deepest {SEGMENT_M} m stretch starts at {_n(f['hw_max_seg'])} m, where the ratio "
+        f"street is wide. Among points on the walked street (excluding the {_n(f['n_flagged'])} flagged points), "
+        f"the deepest {SEGMENT_M} m stretch starts at {_n(f['hw_max_seg'])} m, where the ratio "
         f"reaches {f['hw_max_val']:.1f}.\n",
         f"Sky view has a median of {f['svf_median']:.2f}; half of the points lie between {f['svf_q25']:.2f} "
-        f"and {f['svf_q75']:.2f}. The most enclosed {SEGMENT_M} m stretch starts at {_n(f['svf_min_seg'])} m "
+        f"and {f['svf_q75']:.2f}. Among points on the walked street (excluding the {_n(f['n_flagged'])} flagged "
+        f"points), the most enclosed {SEGMENT_M} m stretch starts at {_n(f['svf_min_seg'])} m "
         f"(mean {f['svf_min_val']:.2f}) and the most open one at {_n(f['svf_max_seg'])} m "
         f"(mean {f['svf_max_val']:.2f}).\n",
     ], f"Street form along the route. Grey: every metre. Blue: {SEGMENT_M} m means. Look for the stretches "
