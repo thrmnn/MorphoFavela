@@ -105,6 +105,21 @@ def is_shaded(sun_altitude_deg: np.ndarray, sun_azimuth_deg: np.ndarray, horizon
     return (sun_altitude_deg <= 0) | (sun_altitude_deg <= horizon_at_sun_az)
 
 
+def daylight_rows(shade_df: pd.DataFrame) -> pd.DataFrame:
+    """Rows with the sun above the horizon. ``shaded`` is also True at
+    night (no direct sun), so every shade SHARE the package reports is
+    taken over these rows only; a share over all rows would count night
+    as building shade."""
+    return shade_df[shade_df["sun_altitude_deg"] > 0]
+
+
+def daylight_shade_fraction_pct(shade_df: pd.DataFrame) -> float:
+    """Percent of daylight (point x timestamp) rows in building shade,
+    rounded to 0.1; 0.0 for a table with no daylight rows."""
+    day = daylight_rows(shade_df)
+    return round(100 * float(day["shaded"].mean()), 1) if len(day) else 0.0
+
+
 #: WP-04's own citywide default (MAX_DIST_M = 500 m) is unsafe on
 #: dtm_extended_300m.tif/buildings_extended_300m.gpkg: that 300m-buffer
 #: layer has real nodata starting some distance from OM2 route points —

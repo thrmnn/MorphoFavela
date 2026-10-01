@@ -44,6 +44,14 @@ BRISA_HUB = "https://brisa.theoalessandro.com"
 OPS_DECISION_ID = "om_release_v0_1_3"
 OPS_LINK = f"{BRISA_HUB}/ops#dec-{OPS_DECISION_ID}"
 PAPER_LINK = f"{BRISA_HUB}/paper/x1"
+# The results deck lives on the hub origin that serves this page (under
+# /morphofavela-dash/), regenerated from this package by brisaverse
+# (slides/gen_om_pk_spec.py). Root-absolute on purpose so it always reaches
+# the current deck; check() cannot resolve these in this checkout, so they
+# are its one declared exception, exact paths only.
+DECK_PDF = "/decks/brisa_om_pk.pdf"
+DECK_PREVIEW = "/decks/preview_om_pk.html"
+HUB_ORIGIN_LINKS = frozenset({DECK_PDF, DECK_PREVIEW})
 PANEL_DOC_REL = "docs/critic/octopus_package_panel_2026-09-24.md"  # repo-root relative
 # Rendered inside outputs/_packages/mare_om2/ (stable across versions, like
 # index.html) so the "Panel ruling" link never points outside outputs/ — the
@@ -214,13 +222,27 @@ def render_page(root: Path) -> str:
     om2_route = next((r for r in routes if r.get("route_id") == "OM_2"), {})
     communities = om2_route.get("communities_crossed") or []
 
-    pdf_path = version_dir / "README.pdf"
+    pdf_path = version_dir / "report.pdf"
     pdf_rel = _rel_to(package_root, pdf_path)
+    pdf_download = f"octopus_om2_{version}_report.pdf"
+    readme_pdf_path = version_dir / "README.pdf"
+    readme_pdf_rel = _rel_to(package_root, readme_pdf_path)
+    readme_pdf_link = (
+        f' · <a href="{readme_pdf_rel}" download="octopus_om2_{html.escape(version)}_README.pdf">'
+        'Technical README (PDF)</a>' if readme_pdf_path.exists() else ""
+    )
+    deck_links = (
+        f'<a href="{DECK_PDF}">Results slides (PDF)</a> · '
+        f'<a href="{DECK_PREVIEW}" target="_blank" rel="noopener">View slides</a>'
+    )
     pdf_html = (
-        f'<p class="more"><a href="{pdf_rel}" download="mare_om2_{html.escape(version)}_report.pdf">'
-        f'Download report (PDF)</a> — the package README ({version}) as a single PDF.</p>'
+        f'<p class="more"><a href="{pdf_rel}" download="{html.escape(pdf_download)}">'
+        f'Download report (PDF)</a> · {deck_links}</p>'
+        f'<p class="sub">The report shows the results and the context needed to read them, in a few pages.'
+        f'{readme_pdf_link}</p>'
         if pdf_path.exists() else
         '<p class="sub">Report PDF not built for this version — rebuild with scripts/build_om_package.py.</p>'
+        f'<p class="more">{deck_links}</p>'
     )
 
     # --- status -------------------------------------------------------
@@ -356,7 +378,8 @@ def render_page(root: Path) -> str:
   <p><strong>{p05.get("n_rows")}</strong> (point x 5-min-timestamp) rows across
   <strong>{p05.get("n_campaign_dates")}</strong> campaign dates, from a
   <strong>{p05.get("n_csv_pilot")}</strong>-file pilot pull (one CSV per device).
-  <strong>{p05.get("shade_fraction_pct")}%</strong> of rows shaded.
+  <strong>{p05.get("shade_fraction_daylight_pct")}%</strong> of daylight rows in building shade
+  (sun above the horizon; night rows stay in the table, marked by <code>sun_altitude_deg</code> &le; 0).
   Computed <code>tz={html.escape(str(p05.get("tz")))}</code> —
   a stated labelling choice, the campaign timezone stays UNRESOLVED.
   Horizon march <code>max_dist_m={p05.get("max_dist_m")}</code> m (not
@@ -381,7 +404,7 @@ def render_page(root: Path) -> str:
     # then F4, replacing the old single contact-sheet section. ------------
     n_campaign_dates_fig = p05.get("n_campaign_dates") or 0
     tz_fig = p05.get("tz") or "n/a (no campaign rows)"
-    shade_pct_fig = p05.get("shade_fraction_pct")
+    shade_pct_fig = p05.get("shade_fraction_daylight_pct")
 
     def _fig_block(rel_path: str, alt: str, caption: str, width_800: bool) -> str:
         img_style = "width:800px;max-width:100%;" if width_800 else "max-width:100%;"
@@ -403,20 +426,20 @@ def render_page(root: Path) -> str:
   {_fig_block(map_form_rel, f"OM2 route over Maré buildings, coloured by sky_view_factor ({version})",
               f"F1 — the spatial result: {om2_route.get('n_points', '?')} OM2 points over the Maré buildings, route coloured by sky_view_factor.",
               width_800=True)}
-  {_fig_block(map_shade_rel, f"OM2 route coloured by mean shaded fraction ({version})",
-              (f"F2 — same base map, route coloured by mean shaded fraction across {n_campaign_dates_fig} "
-               f"campaign date(s) ({shade_pct_fig}% shaded, computed {html.escape(str(tz_fig))}); building-only, tree_shade PENDING."
+  {_fig_block(map_shade_rel, f"OM2 route coloured by share of daylight in building shade ({version})",
+              (f"F2 — same base map, route coloured by the share of daylight in building shade across {n_campaign_dates_fig} "
+               f"campaign date(s) ({shade_pct_fig}% of daylight rows, times labelled {html.escape(str(tz_fig))}); building shade only."
                if n_campaign_dates_fig else
                "F2 — same base map; no campaign-date shade rows in this build (empty-schema P-05 table)."),
               width_800=True)}
   {_fig_block(profiles_rel, f"OM2 sampling along the route ({version})",
               "F3 — sampling along the route: 1 m raw values (faint) and 10 m segment means (bold) for "
               "building height, H/W ratio, sky view factor, plan density (λp), the ventilation "
-              "frontal-area PROXY, and mean shaded fraction, with community names at 100 m distance guides.",
+              "frontal-area PROXY, and daylight shaded fraction, with community names at 100 m distance guides.",
               width_800=False)}
   {_fig_block(shade_calendar_rel, f"OM2 shade calendar ({version})",
               (f"F4 — building shade across {n_campaign_dates_fig} campaign date(s): distance along the route "
-               "vs time of day (UTC), shaded (dark) vs sunlit (light), walk window bracketed."
+               "vs time of day (UTC), building shade (dark), sun (light), night (grey), walk window bracketed."
                if n_campaign_dates_fig else
                "F4 — no campaign-date shade rows in this build (empty-schema P-05 table)."),
               width_800=False)}
@@ -485,7 +508,9 @@ def render_page(root: Path) -> str:
 <section id="documents">
   <h2>Documents</h2>
   <ul>
-    <li><a href="{pdf_rel}" download="mare_om2_{html.escape(version)}_report.pdf"><strong>Download report (PDF)</strong></a> — README.pdf, the report as one file.</li>
+    <li><a href="{pdf_rel}" download="{html.escape(pdf_download)}"><strong>Download report (PDF)</strong></a> — the short report: results, key figures, what to read with care.</li>
+    <li><a href="{readme_pdf_rel}">Technical README (PDF)</a> — the README below as one file.</li>
+    <li>{deck_links} — the results deck, generated from this package.</li>
     <li><a href="{readme_view}">README</a> — release scope, coverage vs Table 1, sources, methods, known limits
         (<a href="{readme_rel}">raw .md</a>).</li>
     <li><a href="{changelog_view}">Changelog</a> (<a href="{changelog_rel}">raw .md</a>)</li>
@@ -511,7 +536,7 @@ def render_page(root: Path) -> str:
         "P-02..P-08 this package's own pipeline steps (route points, buffer/segment "
         "aggregation, airborne form variables, building shade, ventilation proxies, "
         "quality report, data dictionary) · "
-        "WP-02 MorphoFavela's shared horizon/sky-obstruction engine, reused unmodified "
+        "WP-02 the Brisa+ (MorphoFavela) shared horizon/sky-obstruction engine, reused unmodified "
         "for P-05 shade · "
         "lambda_p (plan_density_lambda_p) building plan-area fraction of a 10&nbsp;m grid "
         "cell, 0-1, 1.0 = fully built · "
@@ -602,7 +627,7 @@ def check(root: Path = DEFAULT_ROOT) -> int:
         if target.startswith(("http://", "https://", "#", "mailto:")):
             continue
         target_path = target.split("#", 1)[0]
-        if not target_path:
+        if not target_path or target_path in HUB_ORIGIN_LINKS:
             continue
         if target_path.startswith("/doc?src=/morphofavela-dash/"):
             # hub markdown viewer over a file under the MorphoFavela mount:
@@ -616,6 +641,9 @@ def check(root: Path = DEFAULT_ROOT) -> int:
 
     if OPS_LINK not in fresh:
         fails.append(f"missing expected PI-decision link {OPS_LINK}")
+    for deck_link in sorted(HUB_ORIGIN_LINKS):
+        if f'href="{deck_link}"' not in fresh:
+            fails.append(f"missing expected results-deck link {deck_link}")
     if PAPER_LINK not in fresh:
         fails.append(f"missing expected /paper/x1 link {PAPER_LINK}")
 

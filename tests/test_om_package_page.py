@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -153,17 +154,31 @@ def test_check_fails_on_hand_edited_page():
         out.write_text(original, encoding="utf-8")
 
 
-# --- README.pdf ships and the page links it --------------------------------
+# --- report.pdf is the main download; README.pdf and the deck sit beside it --
 
 @pytestmark_real
-def test_readme_pdf_built_in_manifest_and_linked_from_page():
-    version_dir = PACKAGE_ROOT / M.latest_version(PACKAGE_ROOT)
-    pdf = version_dir / "README.pdf"
-    assert pdf.exists(), "README.pdf missing; rebuild with scripts/build_om_package.py"
-    data = pdf.read_bytes()
-    assert len(data) > 0 and data.startswith(b"%PDF")
+def test_report_pdf_is_main_download_and_readme_pdf_secondary():
+    version = M.latest_version(PACKAGE_ROOT)
+    version_dir = PACKAGE_ROOT / version
+    for name in ("report.pdf", "README.pdf"):
+        data = (version_dir / name).read_bytes()
+        assert data.startswith(b"%PDF"), name
     manifest = json.loads((version_dir / "manifest.json").read_text(encoding="utf-8"))
-    assert "README.pdf" in manifest["files"]
+    assert "report.pdf" in manifest["files"] and "README.pdf" in manifest["files"]
     page = M.render_page(DEFAULT_ROOT)
-    assert 'README.pdf" download' in page
-    assert "Download report (PDF)" in page
+    main = re.search(r'<a href="([^"]+)" download="([^"]+)">Download report \(PDF\)</a>', page)
+    assert main, "no Download report (PDF) link"
+    assert main.group(1).endswith(f"{version}/report.pdf")
+    assert main.group(2) == f"octopus_om2_{version}_report.pdf"
+    assert re.search(r'<a href="[^"]+README\.pdf"[^>]*>Technical README \(PDF\)</a>', page)
+
+
+@pytestmark_real
+def test_results_deck_links_on_page():
+    page = M.render_page(DEFAULT_ROOT)
+    assert '<a href="/decks/brisa_om_pk.pdf">Results slides (PDF)</a>' in page
+    assert re.search(r'<a href="/decks/preview_om_pk\.html"[^>]*>View slides</a>', page)
+
+
+def test_deck_links_are_the_only_unresolved_exception():
+    assert M.HUB_ORIGIN_LINKS == {"/decks/brisa_om_pk.pdf", "/decks/preview_om_pk.html"}
