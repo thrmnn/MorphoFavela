@@ -809,3 +809,14 @@ def test_load_fresh_registry_returns_real_registry_on_success(monkeypatch):
     monkeypatch.setitem(sys.modules, "build_results_registry", _FakeBRR())
     result = bprf._load_fresh_registry()
     assert result == {"nodes": {}, "counts": {"figure": 0}}
+
+
+def test_runs_newest_first_keeps_older_runs_figures(tmp_path, monkeypatch):
+    monkeypatch.setattr(bprf, "ROOT", tmp_path)
+    for run, fig in [("wp07_figures_20260924T212023Z", "f1.png"), ("wp07_figures_20261001T131529Z", "supp.png")]:
+        d = tmp_path / "runs" / run
+        d.mkdir(parents=True)
+        (d / fig).write_bytes(b"x")
+        (d / "figure_manifest.json").write_text("{}")
+    runs = bprf._runs_newest_first("wp07_figures_*")
+    assert [r.name for r in runs] == ["wp07_figures_20261001T131529Z", "wp07_figures_20260924T212023Z"]

@@ -108,6 +108,16 @@ def _latest(glob: str) -> Path | None:
     return hits[-1] if hits else None
 
 
+def _runs_newest_first(glob: str) -> list[Path]:
+    """Every run holding images, newest first. A section resolving to this list
+    takes each figure from the newest run that produced it, so a run adding one
+    figure (the Maré two-definition candidate, 2026-10-01) does not hide the
+    family's other figures."""
+    return sorted((d for d in (ROOT / "runs").glob(glob)
+                   if d.is_dir() and (d / "figure_manifest.json").is_file()
+                   and list(_image_dir(d).glob("*.png"))), reverse=True)
+
+
 def _wp_by_figure(run_dir: Path) -> dict[str, str]:
     """Which work package each figure's numbers come from — derived, never typed:
     a figure cites ledger ids, each ledger entry names its source run, and the
@@ -458,7 +468,7 @@ RECORDS: list[dict] = [
             "<a href=\"/morphofavela-dash/outputs/_hub/wp07_staged/review/_results_wp06.html\">WP06</a> and "
             "<a href=\"/morphofavela-dash/outputs/_hub/wp07_staged/review/_results_g3.html\">G3</a>."
         ),
-        resolve=lambda: _latest("wp07_figures_*"),
+        resolve=lambda: _runs_newest_first("wp07_figures_*"),
     ),
     dict(
         order=5, slug="citywide_maps", title="Citywide maps (f5, f5b, f6)",
@@ -825,18 +835,25 @@ def build(out_root: Path) -> dict:
         section_out = out_root / slug
 
         if "resolve" in record:
-            run_dir = record["resolve"]()
-            if run_dir is None:
+            resolved = record["resolve"]()
+            run_dirs = resolved if isinstance(resolved, list) else [resolved] if resolved else []
+            if not run_dirs:
                 continue
-            classes = _manifest_classes(run_dir)
-            wps = _wp_by_figure(run_dir)
-            img_dir = _image_dir(run_dir)
-            for name in sorted(classes):
-                meta = dict(classes[name])
-                if name in wps:
-                    meta["work_package"] = wps[name]
-                _copy(img_dir / name, section_out, meta, entries, slug)
-            provenance = str(run_dir.relative_to(ROOT))
+            seen, used = set(), []
+            for run_dir in run_dirs:
+                classes = _manifest_classes(run_dir)
+                wps = _wp_by_figure(run_dir)
+                img_dir = _image_dir(run_dir)
+                fresh = [n for n in sorted(classes) if n not in seen]
+                for name in fresh:
+                    meta = dict(classes[name])
+                    if name in wps:
+                        meta["work_package"] = wps[name]
+                    _copy(img_dir / name, section_out, meta, entries, slug)
+                if fresh:
+                    used.append(str(run_dir.relative_to(ROOT)))
+                seen.update(fresh)
+            provenance = ", ".join(used)
         else:
             paths = record["paths"]() if callable(record["paths"]) else record["paths"]
             for src in paths:
