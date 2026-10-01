@@ -67,7 +67,12 @@ def shade_df(points_df) -> pd.DataFrame:
             for t in times:
                 # deterministic shaded pattern: shaded where (x + minute) is even
                 shaded = bool((int(x) + t.minute) % 4 == 0)
-                rows.append({"point_id": pid, "timestamp": t, "date": d, "shaded": shaded, "tree_shade": None})
+                # the first step of each date is night: shaded=True as the
+                # shade engine writes it, never counted as building shade
+                night = t.minute == 0 and t.hour == 9
+                rows.append({"point_id": pid, "timestamp": t, "date": d,
+                             "sun_altitude_deg": -5.0 if night else 30.0,
+                             "shaded": True if night else shaded, "tree_shade": None})
     return pd.DataFrame(rows)
 
 
@@ -126,8 +131,10 @@ def test_build_map_shade_handles_empty_shade_table(tmp_path, points_df, building
 
 def test_mean_shaded_fraction_by_point_is_correct(shade_df):
     frac = figures.mean_shaded_fraction_by_point(shade_df)
-    manual = shade_df.groupby("point_id")["shaded"].mean()
+    manual = shade_df[shade_df["sun_altitude_deg"] > 0].groupby("point_id")["shaded"].mean()
     pd.testing.assert_series_equal(frac.sort_index(), manual.sort_index(), check_names=False)
+    with_night = shade_df.groupby("point_id")["shaded"].mean()
+    assert (with_night.sort_index() > frac.sort_index()).all()
 
 
 def test_mean_shaded_fraction_by_point_empty_input_is_empty_series():

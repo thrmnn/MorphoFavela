@@ -378,7 +378,8 @@ def render_page(root: Path) -> str:
   <p><strong>{p05.get("n_rows")}</strong> (point x 5-min-timestamp) rows across
   <strong>{p05.get("n_campaign_dates")}</strong> campaign dates, from a
   <strong>{p05.get("n_csv_pilot")}</strong>-file pilot pull (one CSV per device).
-  <strong>{p05.get("shade_fraction_pct")}%</strong> of rows shaded.
+  <strong>{p05.get("shade_fraction_daylight_pct")}%</strong> of daylight rows in building shade
+  (sun above the horizon; night rows stay in the table, marked by <code>sun_altitude_deg</code> &le; 0).
   Computed <code>tz={html.escape(str(p05.get("tz")))}</code> —
   a stated labelling choice, the campaign timezone stays UNRESOLVED.
   Horizon march <code>max_dist_m={p05.get("max_dist_m")}</code> m (not
@@ -403,7 +404,7 @@ def render_page(root: Path) -> str:
     # then F4, replacing the old single contact-sheet section. ------------
     n_campaign_dates_fig = p05.get("n_campaign_dates") or 0
     tz_fig = p05.get("tz") or "n/a (no campaign rows)"
-    shade_pct_fig = p05.get("shade_fraction_pct")
+    shade_pct_fig = p05.get("shade_fraction_daylight_pct")
 
     def _fig_block(rel_path: str, alt: str, caption: str, width_800: bool) -> str:
         img_style = "width:800px;max-width:100%;" if width_800 else "max-width:100%;"
@@ -425,20 +426,20 @@ def render_page(root: Path) -> str:
   {_fig_block(map_form_rel, f"OM2 route over Maré buildings, coloured by sky_view_factor ({version})",
               f"F1 — the spatial result: {om2_route.get('n_points', '?')} OM2 points over the Maré buildings, route coloured by sky_view_factor.",
               width_800=True)}
-  {_fig_block(map_shade_rel, f"OM2 route coloured by mean shaded fraction ({version})",
-              (f"F2 — same base map, route coloured by mean shaded fraction across {n_campaign_dates_fig} "
-               f"campaign date(s) ({shade_pct_fig}% shaded, computed {html.escape(str(tz_fig))}); building-only, tree_shade PENDING."
+  {_fig_block(map_shade_rel, f"OM2 route coloured by share of daylight in building shade ({version})",
+              (f"F2 — same base map, route coloured by the share of daylight in building shade across {n_campaign_dates_fig} "
+               f"campaign date(s) ({shade_pct_fig}% of daylight rows, times labelled {html.escape(str(tz_fig))}); building shade only."
                if n_campaign_dates_fig else
                "F2 — same base map; no campaign-date shade rows in this build (empty-schema P-05 table)."),
               width_800=True)}
   {_fig_block(profiles_rel, f"OM2 sampling along the route ({version})",
               "F3 — sampling along the route: 1 m raw values (faint) and 10 m segment means (bold) for "
               "building height, H/W ratio, sky view factor, plan density (λp), the ventilation "
-              "frontal-area PROXY, and mean shaded fraction, with community names at 100 m distance guides.",
+              "frontal-area PROXY, and daylight shaded fraction, with community names at 100 m distance guides.",
               width_800=False)}
   {_fig_block(shade_calendar_rel, f"OM2 shade calendar ({version})",
               (f"F4 — building shade across {n_campaign_dates_fig} campaign date(s): distance along the route "
-               "vs time of day (UTC), shaded (dark) vs sunlit (light), walk window bracketed."
+               "vs time of day (UTC), building shade (dark), sun (light), night (grey), walk window bracketed."
                if n_campaign_dates_fig else
                "F4 — no campaign-date shade rows in this build (empty-schema P-05 table)."),
               width_800=False)}

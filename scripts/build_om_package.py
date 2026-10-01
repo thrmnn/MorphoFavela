@@ -78,6 +78,7 @@ from src.om_package.shade import (
     OM2_SHADE_MAX_DIST_M,
     build_empty_shade_table,
     compute_shade,
+    daylight_shade_fraction_pct,
     infer_campaign_windows,
     nodata_floor_m as compute_nodata_floor_m,
     point_horizon_profiles,
@@ -313,7 +314,7 @@ def main() -> int:
     n_csv_pilot = len(csv_paths)
     n_campaign_dates = 0
     n_shade_rows = 0
-    shade_fraction_pct = 0.0
+    shade_fraction_daylight_pct = 0.0
     campaign_windows_df = None
 
     # om2_gdf is needed regardless of whether real shade runs this build:
@@ -364,8 +365,9 @@ def main() -> int:
         shade_table = pd.concat(frames, ignore_index=True)
         n_campaign_dates = len(campaign_windows_df)
         n_shade_rows = len(shade_table)
-        shade_fraction_pct = round(100 * shade_table["shaded"].mean(), 1) if n_shade_rows else 0.0
-        print(f"[build_om_package] P-05: {n_shade_rows} rows across {n_campaign_dates} campaign dates ({shade_fraction_pct}% shaded, tz=UTC)")
+        shade_fraction_daylight_pct = daylight_shade_fraction_pct(shade_table)
+        print(f"[build_om_package] P-05: {n_shade_rows} rows across {n_campaign_dates} campaign dates "
+              f"({shade_fraction_daylight_pct}% of daylight rows in building shade, tz=UTC)")
     else:
         shade_table = build_empty_shade_table()
     write_table(shade_table, out_dir, "p05_building_shade")
@@ -466,7 +468,7 @@ def main() -> int:
         n_csv_pilot=n_csv_pilot,
         n_campaign_dates=n_campaign_dates,
         n_shade_rows=n_shade_rows,
-        shade_fraction_pct=shade_fraction_pct,
+        shade_fraction_daylight_pct=shade_fraction_daylight_pct,
         shade_max_dist_m=OM2_SHADE_MAX_DIST_M,
     )
     changelog_kwargs = dict(
@@ -516,7 +518,7 @@ def main() -> int:
         "n_csv_pilot": n_csv_pilot,
         "n_campaign_dates": n_campaign_dates,
         "n_rows": n_shade_rows,
-        "shade_fraction_pct": shade_fraction_pct,
+        "shade_fraction_daylight_pct": shade_fraction_daylight_pct,
         "tz": "UTC (labelling choice, campaign timezone UNRESOLVED)" if n_shade_rows else None,
         "max_dist_m": OM2_SHADE_MAX_DIST_M,
         "nodata_floor_m": nodata_floor,

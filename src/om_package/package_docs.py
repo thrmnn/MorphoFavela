@@ -187,7 +187,9 @@ decision `om_v013_descope` — see Known limits.
   laptop GPU. `compute_shade()` then produced {n_shade_rows} real
   (point x 5-min-timestamp) rows across the {n_campaign_dates} campaign
   dates (walk windows padded to the hour), **computed in UTC**
-  ({shade_fraction_pct}% of rows shaded) — see Known limits for why UTC
+  ({shade_fraction_daylight_pct}% of daylight rows in building shade; `shaded`
+  is also true at night, sun below the horizon, so shares are taken over
+  rows with `sun_altitude_deg > 0` only) — see Known limits for why UTC
   and why `max_dist_m={shade_max_dist_m:g} m`, not WP-04's 500 m citywide
   default. The schema reserves a `tree_shade` column (always null). New in
   v0.1.3, **`OM2/join_shade_example.py` travels inside this package** —
@@ -203,7 +205,7 @@ decision `om_v013_descope` — see Known limits.
 - **Figures** (`src/om_package/figures.py`, PI ruling 2026-09-27 — spatial
   result first, then the sampling along the route): `OM2/map_form.png`
   (route over the Maré buildings, coloured by `sky_view_factor`),
-  `OM2/map_shade.png` (same base map, coloured by mean shaded fraction),
+  `OM2/map_shade.png` (same base map, coloured by the share of daylight in building shade),
   `OM2/profiles.png` (1 m raw + 10 m segment means for the form/shade
   variables along the route), `OM2/shade_calendar.png` (one strip per
   campaign date, distance vs time of day, shaded/sunlit).
@@ -582,7 +584,7 @@ def render_readme(
     n_csv_pilot: int = 0,
     n_campaign_dates: int = 0,
     n_shade_rows: int = 0,
-    shade_fraction_pct: float = 0.0,
+    shade_fraction_daylight_pct: float = 0.0,
     shade_max_dist_m: float = 100.0,
     conformance_section: str = "",
 ) -> str:
@@ -623,7 +625,7 @@ def render_readme(
         n_csv_pilot=n_csv_pilot,
         n_campaign_dates=n_campaign_dates,
         n_shade_rows=n_shade_rows,
-        shade_fraction_pct=shade_fraction_pct,
+        shade_fraction_daylight_pct=shade_fraction_daylight_pct,
         shade_max_dist_m=shade_max_dist_m,
         nodata_floor_min_m=floor["min"],
         nodata_floor_median_m=floor["median"],

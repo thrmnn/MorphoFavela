@@ -21,6 +21,7 @@ import pandas as pd
 
 from src.om_package.report_pdf import REPORT_CSS, render_markdown_pdf
 from src.om_package.routes import ROUTE_FLAG_MAX_STREET_DIST_M
+from src.om_package.shade import daylight_rows, daylight_shade_fraction_pct
 
 PROJECT_FORM = "Brisa+ (MorphoFavela)"
 STUDY_TITLE = (
@@ -159,8 +160,10 @@ def compute_facts(package_dir: Path) -> dict:
     if len(sh):
         step = sh.sort_values(["point_id", "timestamp"]).groupby("point_id")["timestamp"].diff().dropna()
         f["step_min"] = int(step.median() / pd.Timedelta(minutes=1))
-        day = sh[sh["sun_altitude_deg"] > 0].assign(hour=lambda x: x["timestamp"].dt.hour)
+        day = daylight_rows(sh).assign(hour=lambda x: x["timestamp"].dt.hour)
         f["day_share"] = float(day["shaded"].mean())
+        if daylight_shade_fraction_pct(sh) != p05["shade_fraction_daylight_pct"]:
+            raise ValueError("manifest daylight shade share disagrees with p05_building_shade")
         per_point = day.groupby("point_id")["shaded"].mean()
         f["pt_q25"], f["pt_q75"] = (float(v) for v in per_point.quantile([0.25, 0.75]))
         hour_sets = [set(g["hour"]) for _, g in day.groupby("date")]
@@ -262,14 +265,13 @@ def render_report_markdown(package_dir: Path) -> str:
     out.append(f"### {h2}\n")
     if f["shade_rows"]:
         out.append(
-            f"The colour gives the share of {f['step_min']}-minute steps in shade at each point. "
-            "The steps run to midnight UTC on each date, so on this map the hours after sunset count as shade. "
-            f"In daylight only, the route is in building shade {_pct(f['day_share'])} of the time. "
+            f"The colour gives the share of daylight {f['step_min']}-minute steps in building shade at each point. "
+            f"Over all dates, the route is in building shade {_pct(f['day_share'])} of daylight time. "
             f"Half of the points are in shade for {_pct(f['pt_q25'])} to {_pct(f['pt_q75'])} of daylight.\n"
         )
     else:
         out.append("No campaign dates are in this version, so the map has no shade values.\n")
-    out.append(f"![Mean share of time in building shade per point, over all campaign dates.](OM2/{fig2}){{.{c2}}}\n")
+    out.append(f"![Share of daylight in building shade per point, over all campaign dates.](OM2/{fig2}){{.{c2}}}\n")
     out.append(":::\n")
 
     out.append("::: figsec")
@@ -289,7 +291,7 @@ def render_report_markdown(package_dir: Path) -> str:
     if f["shade_rows"]:
         h0, h_end = f["common_hours"][0], f["common_hours"][-1]
         out.append(
-            "Each panel is one campaign date. Dark is shade and light is sun. "
+            "Each panel is one campaign date. Dark is building shade, light is sun and grey is night. "
             f"To compare dates on equal terms we keep the daylight hours all {len(dates)} dates share, "
             f"{h0:02d}:00 to {h_end:02d}:59 UTC. In those hours the shaded share goes from "
             f"{_pct(f['date_min_val'])} on {_day(f['date_min'])} to {_pct(f['date_max_val'])} on "

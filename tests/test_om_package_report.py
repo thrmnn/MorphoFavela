@@ -102,3 +102,14 @@ def test_report_pdf_ships_in_manifest():
 def test_disclosure_sweep_covers_report():
     hits = (PACKAGE_DIR / "p00_disclosure_hits.txt").read_text(encoding="utf-8")
     assert "report.md" in hits.splitlines()[4]
+
+
+def test_manifest_daylight_share_equals_parquet():
+    import pandas as pd
+    manifest = json.loads((PACKAGE_DIR / "manifest.json").read_text(encoding="utf-8"))
+    p05 = manifest["p05_shade"]
+    assert "shade_fraction_pct" not in p05
+    shade = pd.read_parquet(PACKAGE_DIR / "p05_building_shade.parquet", columns=["sun_altitude_deg", "shaded"])
+    day = shade[shade["sun_altitude_deg"] > 0]
+    assert p05["shade_fraction_daylight_pct"] == round(100 * float(day["shaded"].mean()), 1)
+    assert p05["shade_fraction_daylight_pct"] < round(100 * float(shade["shaded"].mean()), 1)

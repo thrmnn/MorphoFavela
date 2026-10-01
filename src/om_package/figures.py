@@ -34,6 +34,7 @@ import numpy as np
 import pandas as pd
 
 from .segments import aggregate_to_segments
+from .shade import daylight_rows
 
 #: Tick spacing along the route for both maps (F1/F2) and the profile
 #: panels' vertical guides (F3) — one constant so the three figures can
@@ -71,7 +72,7 @@ _PROFILE_LABELS = {
     "sky_view_factor": "sky view factor",
     "plan_density_lambda_p": "plan density (λp)",
     "ventilation_frontal_area_proxy": "ventilation frontal-area PROXY",
-    "mean_shaded_fraction": "mean shaded fraction",
+    "mean_shaded_fraction": "daylight shaded fraction",
 }
 #: Order matches the PI's spec list; mean_shaded_fraction is derived (not a
 #: p08 dictionary row) so its unit is stated here rather than looked up.
@@ -226,12 +227,14 @@ def build_map_form(points_df: pd.DataFrame, buildings: gpd.GeoDataFrame | None,
 
 
 def mean_shaded_fraction_by_point(shade_df: pd.DataFrame) -> pd.Series:
-    """Mean of `shaded` across every campaign date and 5-min step, per
-    point_id — the P-05 result F2/F3 colour/plot by. Empty input yields an
-    empty (float) Series, never a guessed value."""
+    """Mean of `shaded` over the DAYLIGHT 5-min steps (sun above the
+    horizon) of every campaign date, per point_id — the P-05 result F2/F3
+    colour/plot by. Night steps are excluded: `shaded` is True there (no
+    direct sun), which is not building shade. Empty input yields an empty
+    (float) Series, never a guessed value."""
     if shade_df is None or len(shade_df) == 0 or "shaded" not in shade_df.columns:
         return pd.Series(dtype=float, name="mean_shaded_fraction")
-    out = shade_df.groupby("point_id")["shaded"].mean().astype(float)
+    out = daylight_rows(shade_df).groupby("point_id")["shaded"].mean().astype(float)
     out.name = "mean_shaded_fraction"
     return out
 
@@ -252,19 +255,19 @@ def build_map_shade(points_df: pd.DataFrame, shade_df: pd.DataFrame,
 
         fig, ax = plt.subplots(figsize=(9, 9))
         _draw_base_map(ax, merged, buildings, subunits)
-        _draw_route_line(fig, ax, merged, "mean_shaded_fraction", SHADE_CMAP, "mean shaded fraction",
+        _draw_route_line(fig, ax, merged, "mean_shaded_fraction", SHADE_CMAP, "share of daylight in building shade",
                           vmin=0.0, vmax=1.0)
 
         version_suffix = f" {version}" if version else ""
         n_dates = shade_df["date"].nunique() if shade_df is not None and len(shade_df) and "date" in shade_df.columns else 0
         ax.set_title(
             f"{route_id} route — n={len(points_df)} points{version_suffix}\n"
-            f"mean shaded fraction across {n_dates} campaign date(s)",
+            f"share of daylight in building shade, {n_dates} campaign date(s)",
             fontsize=10,
         )
         caption = (
-            f"Building-only shade, computed in {tz}. tree_shade PENDING (no canopy/DSM layer for Maré)."
-            if n_dates else "No campaign-date shade rows in this build — empty-schema P-05 table. tree_shade PENDING."
+            f"Building shade only, daylight steps only (sun above the horizon); times labelled {tz}."
+            if n_dates else "No campaign-date shade rows in this build — empty-schema P-05 table."
         )
         fig.text(0.02, 0.01, caption, fontsize=7, color="#555555")
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -366,7 +369,8 @@ def build_shade_calendar(points_df: pd.DataFrame, shade_df: pd.DataFrame,
                           campaign_windows_df: pd.DataFrame | None, out_path: Path,
                           route_id: str = "OM2", version: str = "") -> Path:
     """F4 — one strip per campaign date: x = distance along route, y = time
-    of day (UTC, 5-min resolution), cell = shaded (dark) / sunlit (light),
+    of day (UTC, 5-min resolution), cell = building shade (dark) / sunlit
+    (light) / night, sun below the horizon (grey, never drawn as shade),
     walk window drawn as a bracket."""
     with _rc():
         import matplotlib.pyplot as plt
@@ -381,7 +385,7 @@ def build_shade_calendar(points_df: pd.DataFrame, shade_df: pd.DataFrame,
         n_rows = max(len(dates), 1)
         fig, axes = plt.subplots(n_rows, 1, figsize=(10, 1.6 * n_rows + 1.0), sharex=True, squeeze=False)
         axes = axes[:, 0]
-        cmap = ListedColormap(["#f4f1e8", "#2b2b2b"])  # False=sunlit(light), True=shaded(dark)
+        cmap = ListedColormap(["#f4f1e8", "#2b2b2b", "#9aa3ad"])  # 0 sunlit, 1 building shade, 2 night
 
         if not dates:
             axes[0].text(0.5, 0.5, "No campaign-date shade rows in this build (empty-schema P-05 table).",
@@ -391,14 +395,15 @@ def build_shade_calendar(points_df: pd.DataFrame, shade_df: pd.DataFrame,
             day = shade_df[shade_df["date"] == d].copy()
             day["distance_along_m"] = day["point_id"].map(dist_by_point)
             day = day.dropna(subset=["distance_along_m"])
-            pivot = day.pivot_table(index="timestamp", columns="distance_along_m", values="shaded", aggfunc="first")
+            day["state"] = day["shaded"].astype(float).where(day["sun_altitude_deg"] > 0, 2.0)
+            pivot = day.pivot_table(index="timestamp", columns="distance_along_m", values="state", aggfunc="first")
             pivot = pivot.sort_index()
             if pivot.shape[0] and pivot.shape[1]:
                 times = pd.to_datetime(pivot.index)
                 y_frac = [t.hour + t.minute / 60.0 for t in times]
                 ax.imshow(
                     pivot.to_numpy(dtype=float),
-                    aspect="auto", cmap=cmap, vmin=0, vmax=1,
+                    aspect="auto", cmap=cmap, vmin=0, vmax=2, interpolation="nearest",
                     extent=[pivot.columns.min(), pivot.columns.max(), max(y_frac), min(y_frac)],
                 )
             ax.set_ylabel(f"{d}\ntime (UTC)", fontsize=7.5)
@@ -421,7 +426,8 @@ def build_shade_calendar(points_df: pd.DataFrame, shade_df: pd.DataFrame,
 
         axes[-1].set_xlabel("distance along route (m)")
         version_suffix = f" {version}" if version else ""
-        fig.suptitle(f"{route_id} building shade calendar — {len(dates)} campaign date(s){version_suffix}", fontsize=10)
+        fig.suptitle(f"{route_id} building shade calendar — {len(dates)} campaign date(s){version_suffix}\n"
+                     "dark = building shade · light = sun · grey = night (sun below the horizon)", fontsize=10)
         fig.tight_layout(rect=(0, 0, 1, 0.96))
         out_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out_path, dpi=150, bbox_inches="tight")
