@@ -1342,10 +1342,12 @@ def stage_zoom(repo_root: Path, out_dir: Path | None = None,
 
 MARE_DEF_EXPLAIN_RUN = "mare_definitions_explain_20260924T212711Z"
 MARE_DEF_FIG_ID = "p1_supp_mare_definitions"
+# config/sites.yaml also says "outside the data extent"; that holds for the
+# site-level data only — the citywide wp05 grid this figure pools does cover it.
 MARE_DEF_EXCLUSION_REASON = (
-    "Marcílio Dias (one of the 16 communities) lies outside the outline and outside "
-    "the data extent — excluded from the study area by geometry (its own area's share "
-    "inside the study area is 0.0), never by name. [config/sites.yaml, Maré entry]"
+    "Marcílio Dias (one of the 16 communities) lies outside the IPP outline and is not "
+    "among the six 2019 favela polygons, so neither definition contains it — excluded "
+    "by geometry, never by name. [config/sites.yaml, Maré entry; guardian read 2026-10-01]"
 )
 
 
@@ -1440,9 +1442,11 @@ def render_mare_definitions(explain_dir: Path, out_dir: Path) -> dict:
             "ground cells in each citywide irradiation decile; dotted line = 10% per decile. "
             "Right: cumulative citywide percentile as the outline's added ground is included, in "
             "three groups (other favela-layer communities, conjuntos habitacionais, ground between "
-            "communities). Descriptive only. Marcílio Dias is excluded from both definitions: "
-            "it lies outside the outline and outside the data extent, excluded by geometry, "
-            "never by name (config/sites.yaml). Values PROVISIONAL (wp05 run design untapped)."),
+            f"communities); its first bar holds the {steps[0]['n_added']:,} A cells inside the "
+            f"outline, so the {a_full['n'] - steps[0]['n_added']:,} A cells outside it appear "
+            "in the left panel only. Descriptive only. Marcílio Dias is excluded from both "
+            "definitions: it lies outside the IPP outline and is not among the six 2019 "
+            "polygons, excluded by geometry, never by name."),
         "checklist": checklist,
     }
 
