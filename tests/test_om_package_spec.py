@@ -315,3 +315,16 @@ def test_shipped_aggregate_to_segments_matches_library_function_on_built_package
     lib_out = library_fn(df, 20.0)
     shipped_out = shipped.aggregate_to_segments(df, 20.0)
     pd.testing.assert_frame_equal(lib_out, shipped_out)
+
+
+# --- the shipped manifest verifies against the files beside it ---------------
+
+@pytestmark_real
+def test_shipped_manifest_hashes_match_files():
+    import hashlib
+    manifest = json.loads((PACKAGE_DIR / "manifest.json").read_text(encoding="utf-8"))
+    bad = [
+        rel for rel, digest in manifest["files"].items()
+        if hashlib.sha256((PACKAGE_DIR / rel).read_bytes()).hexdigest() != digest
+    ]
+    assert bad == []

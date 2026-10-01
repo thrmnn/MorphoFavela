@@ -513,6 +513,11 @@ def main() -> int:
         "campaign_dates": [str(d) for d in campaign_windows_df["date"]] if campaign_windows_df is not None else [],
     }
     manifest["provenance"] = {"decisions": decisions}
+    # Disclosure greplist (PI decides each hit — never auto-removed). Written
+    # before hashing: written after, the manifest carried the previous
+    # build's hash of this file.
+    write_disclosure_hits(out_dir)
+    print(f"[build_om_package] wrote disclosure hits to {out_dir / 'p00_disclosure_hits.txt'}")
     manifest["files"] = hash_tree(out_dir, exclude={"manifest.json"})
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(f"[build_om_package] wrote manifest to {out_dir / 'manifest.json'}")
@@ -520,10 +525,6 @@ def main() -> int:
         f"[build_om_package] route_geometry_flag: {n_route_geometry_flagged}/{n_om2_points} OM2 points flagged; "
         f"lambda_p=1.0 explained by flag: {n_lambda_p_ones_flagged}/{n_lambda_p_ones} ({lambda_p_share_explained_pct}%)"
     )
-
-    # Disclosure greplist (PI decides each hit — never auto-removed).
-    write_disclosure_hits(out_dir)
-    print(f"[build_om_package] wrote disclosure hits to {out_dir / 'p00_disclosure_hits.txt'}")
 
     page_path = build_om_package_page(paths.root)
     print(f"[build_om_package] rebuilt package page: {page_path}")
