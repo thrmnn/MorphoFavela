@@ -88,13 +88,14 @@ from src.om_package.spec import render_conformance_markdown, write_conformance
 from src.sites.territory import load_territory
 from src.om_package.shade import (
     OM2_SHADE_MAX_DIST_M,
+    SHADE_STEP_MIN,
     build_empty_shade_table,
     compute_shade,
     daylight_shade_fraction_pct,
     infer_campaign_windows,
     nodata_floor_m as compute_nodata_floor_m,
 )
-from src.om_package.sun_envelope import route_centroid_latlon
+from src.om_package.sun_envelope import ENVELOPE_SLOT_MIN, route_centroid_latlon
 from src.om_package.vent_figures import build_map_shelter, build_profiles_vent, build_wind_rose_compare
 from src.om_package.vent_indices import compute_indices
 from src.om_package.ventilation import compute_ventilation_proxies
@@ -383,7 +384,7 @@ def main() -> int:
         obs = load_obs(paths.root)
         wind_tbl = p10_p11.wind_observed_table(obs, campaign_windows_df)
         agree_all = float(sun["clock_agreement"].loc[sun["clock_agreement"]["scope"] == "all", "agreement_share"].iloc[0])
-        p10_summary = {**sun["summary"], "clock_agreement_all": agree_all}
+        p10_summary = {**sun["summary"], "clock_agreement_all": agree_all, "envelope_slot_min": ENVELOPE_SLOT_MIN}
         ctx.update(
             horizon_deg=horizon_deg, azimuths_deg=horizon_az, horizon_tab=horizon_tab, sun=sun, wind_tbl=wind_tbl,
             obs=obs, prevailing_deg=prevailing, p10_summary=p10_summary, lat=lat, lon=lon,
@@ -462,7 +463,7 @@ def main() -> int:
             end_h = min(row["last_timestamp"], row["last_timestamp"].normalize() + pd.Timedelta("23h59min")).strftime("%H:59")
             frames.append(
                 compute_shade(
-                    om2_gdf, [d], (start_h, end_h), step_min=5,
+                    om2_gdf, [d], (start_h, end_h), step_min=SHADE_STEP_MIN,
                     lat=mare_lat, lon=mare_lon, tz="UTC",
                     horizon_deg=horizon_deg, horizon_azimuths_deg=horizon_az,
                 )
@@ -635,8 +636,7 @@ def main() -> int:
     manifest["geometry_epoch"] = args.geometry_epoch
     manifest["p10"] = {
         **{k: ctx["p10_summary"][k] for k in ("window", "tz", "n_days", "n_daylight_point_slots", "date_dependent_share",
-                                              "class_share_of_daylight", "clock_agreement_all", "dose_slot_min", "dose_hours")},
-        "envelope_slot_min": 5,
+                                              "class_share_of_daylight", "clock_agreement_all", "dose_slot_min", "dose_hours", "envelope_slot_min")},
         "campaign_dates": [str(d) for d in campaign_windows_df["date"]],
     }
     manifest["p11"] = {**ctx["wind_summary"], "prevailing_wind_bearing_deg": prevailing,

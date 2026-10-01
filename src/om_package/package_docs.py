@@ -15,6 +15,8 @@ from __future__ import annotations
 import math
 from datetime import date
 
+from .routes import ROUTE_FLAG_MAX_STREET_DIST_M
+from .shade import SHADE_STEP_MIN
 from .vent_indices import DEFAULT_BUFFER_M
 
 VERSION = "v0.2.0"
@@ -95,19 +97,19 @@ the Brisa+ (MorphoFavela) repository).
 | `p00_disclosure_hits.txt` | Names and internal ids found in the text files, for the PI's release review | — |
 | `OM2/points.parquet`, `.gpkg`, `.csv` | One row per route point (1 m): form, buffer, ventilation-proxy and sun columns | P-02, P-03, P-04, P-06, P-10, P-11 |
 | `OM2/aggregate_to_segments.py` | Standalone re-aggregation of the points to any segment length | P-03 |
-| `p05_building_shade.parquet`, `.csv` | Building shade per point and 5-min step on each campaign date (UTC-labelled) | P-05 |
+| `p05_building_shade.parquet`, `.csv` | Building shade per point and {shade_step_min}-min step on each campaign date (UTC-labelled) | P-05 |
 | `p05b_campaign_windows.parquet`, `.csv` | Campaign dates and walk windows read off the device files | P-05 |
 | `OM2/join_shade_example.py` | Example join of device data to the shade table | P-05 |
 | `OM2/p07_quality_report.json`, `.csv` | Coverage per column, flagged points, P-10/P-11 summary block | P-07 |
 | `p08_data_dictionary.parquet`, `.csv` | One row per variable: definition, unit, source, method, limits | P-08 |
-| `p10_sun_envelope.parquet`, `.csv` | Per point and local 5-min slot over the season: always sunlit / always shaded / date-dependent / night | P-10 |
-| `p10_sun_dose.parquet`, `.csv` | Clear-sky direct-sun dose over the past 1, 2, 3 h, per campaign date and as a season min/median/max | P-10 |
+| `p10_sun_envelope.parquet`, `.csv` | Per point and local {envelope_slot_min}-min slot over the season: always sunlit / always shaded / date-dependent / night | P-10 |
+| `p10_sun_dose.parquet`, `.csv` | Clear-sky direct-sun dose over the past {dose_hours_list} h, per campaign date and as a season min/median/max | P-10 |
 | `p10_clock_agreement.parquet`, `.csv` | Share of daylight point-slots with the same sun state under the two device-clock readings | P-10 |
 | `p10_horizon_profiles.parquet` | Marched horizon angle per point and azimuth (input to every sun result) | P-10 |
 | `p11_wind_observed.csv` | SBGL airport wind for the season, flagged by the walk each report matches under each clock reading | P-11 |
 | `OM2/map_form.png`, `OM2/profiles.png` | Route map coloured by sky view; form variables along the route | P-04 |
 | `OM2/map_shade.png`, `OM2/shade_calendar.png` | Daylight shade share per point; shade by date and time | P-05 |
-| `OM2/sun_envelope.png`, `OM2/sun_dose.png` | Date-dependent share by time of day and along the route; 1 h dose along the route | P-10 |
+| `OM2/sun_envelope.png`, `OM2/sun_dose.png` | Date-dependent share by time of day and along the route; {dose_hours_first} h dose along the route | P-10 |
 | `OM2/map_vent_shelter.png`, `OM2/profiles_vent.png`, `OM2/wind_rose_compare.png` | Shelter angle map; ventilation proxies along the route; observed vs climatology wind | P-11 |
 
 {conformance_section}
@@ -227,7 +229,7 @@ guessing the wind direction that matters. See the data dictionary
 ### Route geometry flag (`route_geometry_flag`)
 
 True where a point falls inside a
-`buildings_mare` footprint OR more than 10 m from the nearest
+`buildings_mare` footprint OR more than {route_flag_max_dist_m:g} m from the nearest
 `street_mare` centreline (`src/om_package/routes.py`,
 `ROUTE_FLAG_MAX_STREET_DIST_M`) — both are signs the OSM-inferred route
 drifted off the street the team actually walked. See Known limits for
@@ -253,9 +255,9 @@ rows with `sun_altitude_deg > 0` only) — see Known limits for why UTC
 and why `max_dist_m={shade_max_dist_m:g} m`, not WP-04's 500 m citywide
 default. The schema reserves a `tree_shade` column (always null). New in
 v0.1.3, **`OM2/join_shade_example.py` travels inside this package** —
-joins `p05_building_shade` (`point_id`, `timestamp` at 5-min steps,
+joins `p05_building_shade` (`point_id`, `timestamp` at {shade_step_min}-min steps,
 **UTC-labelled, not a resolved local time** — see Known limits) against
-a real Octopus device CSV, matching `point_id` and floor-to-5-minutes
+a real Octopus device CSV, matching `point_id` and floor-to-{shade_step_min}-minutes
 `timestamp`. Usage (run from inside the package directory):
 ```
 python OM2/join_shade_example.py --shade p05_building_shade.parquet \\
@@ -268,11 +270,11 @@ python OM2/join_shade_example.py --shade p05_building_shade.parquet \\
 `src/om_package/p10_p11.py`): the horizon is marched once per point
 (`p10_horizon_profiles.parquet`) and every date or time then costs only a
 sun-position lookup. *Envelope*: for each point and local time of day
-(Rio local time, 5-min slots) over every day of the season window
+(Rio local time, {envelope_slot_min}-min slots) over every day of the season window
 {p10_window}, classify as always sunlit, always shaded or date-dependent
 (counting only days with the sun up), with the sunlit share of days.
 *Dose*: clear-sky direct-beam energy on a horizontal plane over the
-preceding 1, 2 and 3 h (slots of {dose_slot_min} min), for each campaign
+preceding {dose_hours_and} h (slots of {dose_slot_min} min), for each campaign
 date and as a min/median/max over the season window. *Annual sun hours*:
 hours per year with the sun above the point's horizon. *Clock agreement*:
 the exact-date shade recomputed with the device clock read as UTC and as
@@ -309,7 +311,7 @@ variables along the route), `OM2/shade_calendar.png` (one strip per
 campaign date, distance vs time of day, shaded/sunlit). New in {version}:
 `OM2/sun_envelope.png` (date-dependent share by local time of day, and a
 map of each point's date-dependent share of daylight), `OM2/sun_dose.png`
-(1 h dose along the route: season envelope band and the campaign dates)
+({dose_hours_first} h dose along the route: season envelope band and the campaign dates)
 and three ventilation-proxy figures from `src/om_package/vent_figures.py`
 (`OM2/map_vent_shelter.png`, `OM2/profiles_vent.png`,
 `OM2/wind_rose_compare.png`, campaign-window observed wind vs the
@@ -399,8 +401,9 @@ figures, not a sensor-derived value.)
   a tree-covered point's real sky view is <= the reported
   `sky_view_factor`, never more.
 - Ventilation columns are geometry-derived PROXIES, not simulated or
-  measured airflow; they are isotropic, so they say nothing about upwind
-  fetch beyond axis alignment.
+  measured airflow. The P-06 proxies are isotropic, so they say nothing
+  about upwind fetch beyond axis alignment; the P-11 columns are computed
+  at a wind direction and are direction-specific.
 - **`z0_macdonald_m` is outside its calibrated range along most of the
   route.** Macdonald et al. (1998) was calibrated on regular arrays of
   obstacles; Maré's plan density in the {vent_buffer_m} m buffer is beyond that range,
@@ -428,7 +431,7 @@ figures, not a sensor-derived value.)
   Sources and dates above.
 - **route_geometry_flag**: {n_route_geometry_flagged}/{n_om2_points}
   OM2 points ({route_flag_pct}%) are flagged — inside a building footprint
-  or more than 10 m from the nearest street centreline. Of the
+  or more than {route_flag_max_dist_m:g} m from the nearest street centreline. Of the
   {n_lambda_p_ones} points with `plan_density_lambda_p == 1.0`,
   {n_lambda_p_ones_flagged} ({lambda_p_share_explained_pct}%) are
   explained by this flag. Of the remaining {n_lambda_p_remainder} points,
@@ -885,6 +888,12 @@ def render_readme(
         nodata_floor_max_m=floor["max"],
         p10_window=" to ".join(p10_summary["window"]),
         dose_slot_min=p10_summary["dose_slot_min"],
+        envelope_slot_min=p10_summary["envelope_slot_min"],
+        shade_step_min=SHADE_STEP_MIN,
+        dose_hours_list=", ".join(map(str, p10_summary["dose_hours"])),
+        dose_hours_and=" and ".join([", ".join(map(str, p10_summary["dose_hours"][:-1])), str(p10_summary["dose_hours"][-1])]) if len(p10_summary["dose_hours"]) > 1 else str(p10_summary["dose_hours"][0]),
+        dose_hours_first=p10_summary["dose_hours"][0],
+        route_flag_max_dist_m=ROUTE_FLAG_MAX_STREET_DIST_M,
         date_dependent_pct=100 * p10_summary["date_dependent_share"],
         clock_agreement_pct=100 * p10_summary["clock_agreement_all"],
         wind_window=" to ".join(wind_source["window_utc"]),

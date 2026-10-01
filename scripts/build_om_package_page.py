@@ -42,7 +42,8 @@ import pandas as pd  # noqa: E402
 
 import hubkit  # noqa: E402
 from src.om_package.figures import _DOSE_SLOT_QUANTILES  # noqa: E402
-from src.om_package.report import SEGMENT_M, count_word  # noqa: E402
+from src.om_package.report import SEGMENT_M, count_word
+from src.om_package.routes import ROUTE_FLAG_MAX_STREET_DIST_M  # noqa: E402
 from src.om_package.wind_obs import CLIM_YEAR_END, CLIM_YEAR_START  # noqa: E402
 
 DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
@@ -510,7 +511,7 @@ def render_page(root: Path) -> str:
   <h2>Quality</h2>
   <p>{q["n_points"]} OM2 points. <strong>{q["flagged"]}</strong> flagged by
   <code>route_geometry_flag</code>
-  ({q["flagged_pct"]}%: inside a building footprint or &gt;10 m from the
+  ({q["flagged_pct"]}%: inside a building footprint or &gt;{ROUTE_FLAG_MAX_STREET_DIST_M:g} m from the
   nearest street centreline).</p>
   <details><summary>{len(below_rows)} column(s) below 100% coverage; pending and descoped items</summary>
   {_table(["Column", "Coverage", "Valid / total"], below_rows) if below_rows else "<p class='sub'>None.</p>"}
@@ -537,7 +538,7 @@ def render_page(root: Path) -> str:
   Shade timestamps: <code>{html.escape(str(p05.get("tz")))}</code>.</p>
   <details><summary>Walk windows as read off the device files</summary>
   <div class="scroll">{_table(["CSV", "date", "first_timestamp", "last_timestamp", "n_rows", "has_gps", "n_epoch_reset"], windows_rows) if windows_rows else "<p class='sub'>No campaign-windows table found.</p>"}</div>
-  <p class="sub">The shade table pads each window to the enclosing hour before the 5-min sweep.</p>
+  <p class="sub">The shade table pads each window to the enclosing hour before the {_shade_step_min(version_dir)}-min sweep.</p>
   </details>
 </section>"""
     else:

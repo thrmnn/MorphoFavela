@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from .buffers import BUFFER_RADII_M
 from .routes import ROUTE_FLAG_MAX_STREET_DIST_M
+from .shade import SHADE_STEP_MIN
+from .sun_envelope import ENVELOPE_SLOT_MIN
 from .vent_indices import DEFAULT_BUFFER_M, MACDONALD_A, MACDONALD_BETA, MACDONALD_CD, VON_KARMAN
 
 # id -> {definition, unit, source, method, limits, status}
@@ -239,7 +241,7 @@ _BASE.update({
         "definition": "Local Rio clock time of day (HH:MM, slot start) of a P-10 row. Rio local time is a fixed UTC-3 offset (no daylight saving since 2019).",
         "unit": "HH:MM, America/Sao_Paulo local time",
         "source": "src/om_package/sun_envelope.py",
-        "method": "slot grid over the 24 h day; envelope table at 5 min, dose table on its own (coarser) grid stated in manifest.json p10.dose_slot_min",
+        "method": f"slot grid over the 24 h day; envelope table at {ENVELOPE_SLOT_MIN} min, dose table on its own (coarser) grid stated in manifest.json p10.dose_slot_min",
         "limits": "Local time, not the device clock: whether the Octopus device clocks log UTC or local time is UNKNOWN (decision om_dates_tz). Map a device timestamp to a slot under both readings (clock_readings in src/om_package/sun_envelope.py; OM2/join_shade_example.py states the UTC-labelled P-05 convention).",
         "status": "computed",
     },
@@ -449,7 +451,7 @@ _DESCOPED: dict[str, dict] = {
 }
 
 _SHADE_TABLE_ONLY = {
-    "timestamp": {"definition": "Clock timestamp of a shade evaluation (5-min step).", "unit": "datetime, LABELLED UTC in v0.1.2 (a stated operating-rule choice, NOT a resolution of the still-UNRESOLVED campaign timezone — see src/om_package/shade.py module docstring; tz is a required, no-default parameter of every shade/join function)", "source": "src/om_package/shade.py", "method": "pd.date_range over the requested time window", "limits": "-", "status": "computed"},
+    "timestamp": {"definition": f"Clock timestamp of a shade evaluation ({SHADE_STEP_MIN}-min step).", "unit": "datetime, labelled UTC (a stated operating-rule choice, NOT a resolution of the still-UNRESOLVED campaign timezone — see src/om_package/shade.py module docstring; tz is a required, no-default parameter of every shade/join function)", "source": "src/om_package/shade.py", "method": "pd.date_range over the requested time window", "limits": "-", "status": "computed"},
     "date": {"definition": "Calendar date of a shade evaluation.", "unit": "date", "source": "src/om_package/shade.py", "method": "-", "limits": "-", "status": "computed"},
     "sun_altitude_deg": {"definition": "Apparent solar elevation at the evaluation timestamp.", "unit": "degrees", "source": "pvlib.solarposition.get_solarposition", "method": "-", "limits": "-", "status": "computed"},
     "sun_azimuth_deg": {"definition": "Solar azimuth (clockwise from north) at the evaluation timestamp.", "unit": "degrees", "source": "pvlib.solarposition.get_solarposition", "method": "-", "limits": "-", "status": "computed"},

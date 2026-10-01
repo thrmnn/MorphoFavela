@@ -139,6 +139,7 @@ def daylight_shade_fraction_pct(shade_df: pd.DataFrame) -> float:
 #: (see build_om_package.py) rather than trusting a number typed here.
 #: Revisit if a wider gap-free extended layer lands.
 OM2_SHADE_MAX_DIST_M = 100.0
+SHADE_STEP_MIN = 5
 
 
 def nodata_floor_m(points_gdf, paths) -> dict:

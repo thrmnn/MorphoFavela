@@ -21,6 +21,8 @@ import pandas as pd
 
 from .shade import OM2_SHADE_MAX_DIST_M, point_horizon_profiles
 
+ENVELOPE_SLOT_MIN = 5
+
 DEFAULT_TZ = "America/Sao_Paulo"
 HORIZON_COLUMNS = ["point_id", "azimuth_deg", "horizon_deg"]
 ENVELOPE_COLUMNS = ["point_id", "local_slot", "class", "sunlit_day_share", "n_days_sun_up"]
@@ -120,7 +122,7 @@ def sun_envelope(
     lon: float,
     window_start: str = "2025-12-01",
     window_end: str = "2026-04-30",
-    slot_min: int = 5,
+    slot_min: int = ENVELOPE_SLOT_MIN,
     tz: str = DEFAULT_TZ,
 ) -> tuple[pd.DataFrame, dict]:
     """Per point and local slot of day, classify over every day in the
@@ -220,7 +222,7 @@ def direct_sun_dose(
     hours: tuple[int, ...] = (1, 2, 3),
     window_start: str = "2025-12-01",
     window_end: str = "2026-04-30",
-    slot_min: int = 5,
+    slot_min: int = ENVELOPE_SLOT_MIN,
     tz: str = DEFAULT_TZ,
     site_altitude_m: float = 0.0,
 ) -> dict[str, pd.DataFrame]:

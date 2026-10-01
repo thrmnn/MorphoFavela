@@ -410,7 +410,7 @@ _README_STATS = dict(
     internal_routes_status="not built in this version — no `outputs/_packages/_internal/mare_routes/v0.1.3` directory exists yet.",
     decisions=_FAKE_DECISIONS,
     dtm_native_resolution_m=5.0,
-    p10_summary={"window": ["2025-12-01", "2026-04-30"], "dose_slot_min": 15, "date_dependent_share": 0.49,
+    p10_summary={"window": ["2025-12-01", "2026-04-30"], "dose_slot_min": 15, "envelope_slot_min": 5, "dose_hours": [1, 2, 3], "date_dependent_share": 0.49,
                  "clock_agreement_all": 0.37},
     wind_source={"window_utc": ["2025-12-01", "2026-04-30"], "fetched_utc": "2026-10-01T17:31:31+00:00"},
     geometry_label="test epoch",
