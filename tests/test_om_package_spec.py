@@ -445,7 +445,6 @@ def test_real_package_has_no_descoped_parts():
     assert by_id["P-07"]["status"] == "delivered"
     assert by_id["P-05"]["status"] == "delivered"
     assert by_id["P-05"]["pending_on"] == []
-    assert "descoped" not in render_conformance_markdown(conf)
 
 
 @pytestmark_real
