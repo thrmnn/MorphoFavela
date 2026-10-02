@@ -370,6 +370,50 @@ def test_shipped_aggregate_to_segments_matches_library_function():
     pd.testing.assert_frame_equal(lib_out, shipped_out)
 
 
+# --- --tau selection of sensor-matched columns ------------------------------
+
+def _tau_points():
+    import numpy as np
+
+    n = 20
+    return pd.DataFrame({
+        "point_id": [f"p{i}" for i in range(n)],
+        "distance_along_m": np.arange(n, dtype=float),
+        "svf": np.linspace(0, 1, n),
+        "T_tau5s": np.arange(n, dtype=float),
+        "T_tau30s": np.arange(n, dtype=float) * 2,
+        "T_tau2.5s": np.arange(n, dtype=float) * 3,
+    })
+
+
+def test_shipped_select_taus_filters_and_passes_through():
+    shipped = _load_shipped_module("aggregate_to_segments")
+    df = _tau_points()
+    assert list(shipped.select_taus(df, [30]).columns) == ["point_id", "distance_along_m", "svf", "T_tau30s"]
+    assert "T_tau2.5s" in shipped.select_taus(df, [2.5, 5]).columns
+    plain = df[["point_id", "distance_along_m", "svf"]]
+    assert shipped.select_taus(plain, [30]) is plain
+    with pytest.raises(ValueError):
+        shipped.select_taus(df, [60])
+
+
+def test_shipped_aggregate_cli_tau_flag(tmp_path):
+    script = REPO_ROOT / "src" / "om_package" / "shipped" / "aggregate_to_segments.py"
+    pts = tmp_path / "points.csv"
+    _tau_points().to_csv(pts, index=False)
+    base = [sys.executable, str(script), "--points", str(pts), "--segment-m", "10"]
+    out_all, out_tau, out_two = tmp_path / "all.csv", tmp_path / "tau.csv", tmp_path / "two.csv"
+    assert subprocess.run(base + ["--out", str(out_all)], capture_output=True, text=True).returncode == 0
+    assert {"T_tau5s", "T_tau30s", "T_tau2.5s"} <= set(pd.read_csv(out_all).columns)
+    r = subprocess.run(base + ["--tau", "30", "--out", str(out_tau)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    cols = set(pd.read_csv(out_tau).columns)
+    assert "T_tau30s" in cols and "T_tau5s" not in cols and "T_tau2.5s" not in cols
+    r = subprocess.run(base + ["--tau", "30", "--tau", "5,2.5", "--out", str(out_two)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert {"T_tau5s", "T_tau30s", "T_tau2.5s"} <= set(pd.read_csv(out_two).columns)
+
+
 @pytestmark_real
 def test_shipped_aggregate_to_segments_matches_library_function_on_built_package():
     from src.om_package.segments import aggregate_to_segments as library_fn
