@@ -151,14 +151,12 @@ def test_ventilation_proxies_present(om2_points_small):
     form = compute_form_variables(om2_points_small, PATHS)
     vent = compute_ventilation_proxies(om2_points_small, form["street_orientation_deg"].to_numpy(), PATHS)
     for col in [
-        "ventilation_wind_alignment_proxy",
         "ventilation_frontal_area_proxy",
         "ventilation_openness_proxy",
         "ventilation_dist_open_space_proxy_m",
     ]:
         assert col in vent.columns
-    align = vent["ventilation_wind_alignment_proxy"]
-    assert (align.dropna() >= -1e-9).all() and (align.dropna() <= 1 + 1e-9).all()
+    assert "ventilation_wind_alignment_proxy" not in vent.columns
 
 
 # --- P-05: shade table ships with the right schema, empty (dates unknown) --

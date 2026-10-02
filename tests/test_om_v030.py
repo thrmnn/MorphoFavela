@@ -25,7 +25,7 @@ real = pytest.mark.skipif(not PKG.is_dir(), reason=f"mare_om2 {VERSION} package 
 
 NEW_FILES = [
     "p02b_walks.parquet", "p02b_walks.csv", "p05_building_shade.parquet",
-    "p10_sun_envelope.parquet", "p10_sun_envelope.csv", "p10_sun_dose.parquet", "p10_sun_dose.csv",
+    "p10_sun_envelope.parquet", "p10_sun_envelope.csv", "p10_sun_dose.parquet",
     "p10_horizon_profiles.parquet", "p11_wind_regimes.csv", "p11_regime_by_hour.csv",
     "p12_walk_points.parquet", "p12_walk_points.csv",
 ]

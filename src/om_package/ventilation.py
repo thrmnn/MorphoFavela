@@ -2,15 +2,8 @@
 
 Every column here is a PROXY for airflow, not a simulated or measured wind
 field (this repo runs no flow simulation for P1 — see docs/p1_column_allowlist.json).
-Four proxies, all airborne/geometry-derived:
+Three proxies, all airborne/geometry-derived:
 
-  - ventilation_wind_alignment_proxy: how well the street's own axis lines
-    up with the frequency-weighted prevailing wind bearing (data/maré/
-    wind_rose.json, ASOS Galeão 2015-2024). 1.0 = street axis parallel to
-    the prevailing wind (a channelling geometry), 0.0 = perpendicular (a
-    blocking geometry). Undirected: a canyon channels wind from either end,
-    so both the street axis and the wind bearing are folded to a 0-180 deg
-    axis before comparing.
   - ventilation_frontal_area_proxy: nearest features_grid cell's
     lambda_f_mean, an OMNIDIRECTIONAL obstruction-density proxy (Oke 1988
     frontal-area density, averaged over 8 compass directions —
@@ -63,14 +56,6 @@ def prevailing_wind_bearing_deg(wind_rose_path) -> float:
     return bearing
 
 
-def wind_alignment_proxy(street_orientation_deg: np.ndarray, wind_bearing_deg: float) -> np.ndarray:
-    axis = street_orientation_deg % 180.0
-    wind_axis = wind_bearing_deg % 180.0
-    diff = np.abs(axis - wind_axis)
-    diff = np.minimum(diff, 180.0 - diff)  # fold to [0, 90]
-    return np.cos(np.radians(diff))
-
-
 def compute_ventilation_proxies(points_gdf, street_orientation_deg: np.ndarray, paths: Paths) -> pd.DataFrame:
     xy = np.column_stack([points_gdf.geometry.x.to_numpy(), points_gdf.geometry.y.to_numpy()])
     out = pd.DataFrame({"point_id": points_gdf["point_id"].to_numpy()})
@@ -89,9 +74,6 @@ def compute_ventilation_proxies(points_gdf, street_orientation_deg: np.ndarray, 
 
     op_join = nearest_join(xy, grid_xy, grid[["porosity"]].reset_index(drop=True), MAX_JOIN_DIST_GRID_M)
     out["ventilation_openness_proxy"] = op_join["porosity"]
-
-    wind_bearing = prevailing_wind_bearing_deg(paths.wind_rose_json)
-    out["ventilation_wind_alignment_proxy"] = wind_alignment_proxy(street_orientation_deg, wind_bearing)
 
     open_cells = grid[grid["lambda_p"].notna() & (grid["lambda_p"] < OPEN_SPACE_LAMBDA_P_MAX)]
     if len(open_cells) > 0:

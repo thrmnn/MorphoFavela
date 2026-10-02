@@ -131,7 +131,11 @@ def walk_points_table(points: pd.DataFrame, fixes: pd.DataFrame, walks: pd.DataF
         "dose_1h_before_wh_m2": full["dose_1h_before_wh_m2"].round(1),
         "dose_3h_before_wh_m2": full["dose_3h_before_wh_m2"].round(1),
     })
-    return pd.concat([out, full[matched_column_names(measures, taus)]], axis=1)
+    matched = full[matched_column_names(measures, taus)].round(6)
+    for c in matched.columns:
+        if c.startswith("shaded_at_arrival_tau"):
+            matched[c] = matched[c].clip(0.0, 1.0)
+    return pd.concat([out, matched], axis=1)
 
 
 def matched_column_names(measures: list[str], taus=DEFAULT_TAUS_S) -> list[str]:

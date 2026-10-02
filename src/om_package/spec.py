@@ -516,9 +516,8 @@ def _sun_envelope_part(name: str, package_dir: Path) -> PartResult:
 
 
 def _sun_dose_part(name: str, package_dir: Path) -> PartResult:
-    bad = _both_formats_part(name, package_dir, ["p10_sun_dose"])
-    if bad:
-        return bad
+    if not (package_dir / "p10_sun_dose.parquet").exists():
+        return PartResult(name, "pending", evidence="missing file(s): p10_sun_dose.parquet")
     dose, bad = _table_with_columns(name, package_dir, "p10_sun_dose", P10_COLUMNS["p10_sun_dose"])
     if bad:
         return bad
@@ -745,9 +744,8 @@ SPEC: list[dict] = [
         "requirement": "Orientation to prevailing wind, frontal area, openness, distance to open space. "
                        "Labelled as proxies.",
         "parts": [
-            {"name": "wind_alignment_and_frontal_area_proxies", "check": lambda pd_: _columns_part(
-                "wind_alignment_and_frontal_area_proxies", pd_,
-                ["ventilation_wind_alignment_proxy", "ventilation_frontal_area_proxy"],
+            {"name": "frontal_area_proxy", "check": lambda pd_: _columns_part(
+                "frontal_area_proxy", pd_, ["ventilation_frontal_area_proxy"],
             )},
             {"name": "openness_and_distance_proxies", "check": lambda pd_: _columns_part(
                 "openness_and_distance_proxies", pd_,

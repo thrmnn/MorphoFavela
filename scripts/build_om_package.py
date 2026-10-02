@@ -451,7 +451,8 @@ def main() -> int:
     # P-10 / P-11 package-root tables (computed in om2_extras above).
     sun = ctx["sun"]
     write_table(sun["envelope"], out_dir, "p10_sun_envelope")
-    write_table(sun["dose"], out_dir, "p10_sun_dose")
+    sun["dose"].to_parquet(out_dir / "p10_sun_dose.parquet", index=False)  # parquet only: the CSV was 234 MB
+    (out_dir / "p10_sun_dose.csv").unlink(missing_ok=True)
     ctx["horizon_tab"].to_parquet(out_dir / "p10_horizon_profiles.parquet", index=False)
     regimes_tbl = p10_p11.wind_regimes_table(season)
     regimes_tbl.to_csv(out_dir / "p11_wind_regimes.csv", index=False)
