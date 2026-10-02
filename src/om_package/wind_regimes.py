@@ -98,23 +98,25 @@ def _vm_logpdf(x, mu, kappa):
     return kappa * (np.cos(x - mu) - 1.0) - np.log(2 * np.pi * i0e(kappa))
 
 
-def vonmises_mixture(drct: np.ndarray, init_deg: tuple[float, float], n_iter: int = 500,
-                     tol: float = 1e-9) -> dict:
-    """Two-component von Mises mixture by EM (kappa via the Banerjee approximation)."""
+def vonmises_mixture(drct: np.ndarray, init_deg: tuple[float, float], n_iter: int = 1000,
+                     tol: float = 1e-10) -> dict:
+    """Two von Mises components (free mean, kappa, weight) plus a uniform
+    background (free weight), fitted by EM (kappa via the Banerjee approximation)."""
     x = np.deg2rad(np.asarray(drct, float))
     mu = np.deg2rad(np.array(init_deg, float))
-    kappa = np.array([2.0, 2.0])
-    w = np.array([0.5, 0.5])
+    kappa = np.array([5.0, 5.0])
+    w = np.array([0.4, 0.4, 0.2])
     prev = -np.inf
     for _ in range(n_iter):
-        lp = np.stack([np.log(w[k]) + _vm_logpdf(x, mu[k], kappa[k]) for k in range(2)])
+        lp = np.stack([np.log(w[k]) + _vm_logpdf(x, mu[k], kappa[k]) for k in range(2)]
+                      + [np.full_like(x, np.log(w[2]) - np.log(2 * np.pi))])
         m = lp.max(axis=0)
         ll = float((m + np.log(np.exp(lp - m).sum(axis=0))).sum())
         r = np.exp(lp - m)
         r /= r.sum(axis=0)
+        w = r.sum(axis=1) / len(x)
         for k in range(2):
             nk = r[k].sum()
-            w[k] = nk / len(x)
             c, s = (r[k] * np.cos(x)).sum(), (r[k] * np.sin(x)).sum()
             mu[k] = np.arctan2(s, c)
             R = min(np.hypot(c, s) / nk, 0.999)
@@ -122,12 +124,12 @@ def vonmises_mixture(drct: np.ndarray, init_deg: tuple[float, float], n_iter: in
         if abs(ll - prev) < tol * max(1.0, abs(ll)):
             break
         prev = ll
-    return {"mean_direction_deg": (np.rad2deg(mu) % 360.0).tolist(), "weights": w.tolist(),
-            "kappa": kappa.tolist(), "log_likelihood": ll}
+    return {"mean_direction_deg": (np.rad2deg(mu) % 360.0).tolist(), "weights": w[:2].tolist(),
+            "kappa": kappa.tolist(), "background_weight": float(w[2]), "log_likelihood": ll}
 
 
 def find_regimes(obs: pd.DataFrame) -> dict:
-    """Two regimes from the rose peaks, with the von Mises mixture as a check.
+    """Two regimes from the rose peaks, with a 2 von Mises + uniform-background mixture as a check.
     Regimes are ordered by share; keys are reg1/reg2 in that order (use
     assign_keys to impose the campaign-season keys on another period)."""
     act, counts = clean(obs)
@@ -148,14 +150,15 @@ def find_regimes(obs: pd.DataFrame) -> dict:
     regimes.sort(key=lambda g: -g["share_of_reports"])
     for key, g in zip(REGIME_KEYS, regimes):
         g["key"] = key
-    raw = vonmises_mixture(d, tuple(peaks))
-    order = sorted(range(2), key=lambda k: -raw["weights"][k])
-    mix = {k: [raw[k][i] for i in order] for k in ("mean_direction_deg", "weights", "kappa")}
-    mix["log_likelihood"] = raw["log_likelihood"]
+    # 10-degree reporting steps: undo the binning with seeded uniform +/-5 deg jitter
+    jit = (d + np.random.default_rng(0).uniform(-5.0, 5.0, d.size)) % 360.0
+    mix = vonmises_mixture(jit, tuple(peaks))
+    # per rose regime (in regime order): nearest mixture component
     mix["difference_deg"] = [
-        float(min(circ_dist(md, g["mean_direction_deg"]) for g in regimes))
-        for md in mix["mean_direction_deg"]]
+        float(min(circ_dist(md, g["mean_direction_deg"]) for md in mix["mean_direction_deg"]))
+        for g in regimes]
     mix["max_difference_deg"] = max(mix["difference_deg"])
+    mix["jitter_deg"] = 5.0
     n_all = counts["n_calm"] + counts["n_used"] + counts["n_variable_or_missing_direction"]
     return {"regimes": regimes, "mixture": mix, "counts": counts,
             "calm_share": counts["n_calm"] / max(n_all, 1)}

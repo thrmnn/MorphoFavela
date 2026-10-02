@@ -91,3 +91,18 @@ def test_tag_walks_nearest_and_cutoff():
 def test_colours_distinct():
     assert set(W.REGIME_COLOURS) == {"reg1", "reg2"}
     assert len(set(W.REGIME_COLOURS.values())) == 2
+
+
+def test_mixture_with_uniform_background():
+    rng = np.random.default_rng(1)
+    o = synth([(60, 0.35), (250, 0.35)], n=3000, kappa=40.0)
+    bg = rng.uniform(0, 360, 900)
+    d = np.concatenate([o["drct"].to_numpy(), bg])
+    o = pd.DataFrame({"valid_utc": pd.date_range("2025-12-01", periods=len(d), freq="h", tz="UTC"),
+                      "drct": (np.round(d, -1)) % 360, "speed_ms": 3.0, "calm": False, "variable": False})
+    res = W.find_regimes(o)
+    mix = res["mixture"]
+    for mu in (60, 250):
+        assert min(float(W.circ_dist(m, mu)) for m in mix["mean_direction_deg"]) < 10
+    assert max(mix["difference_deg"]) < 10
+    assert 0.15 < mix["background_weight"] < 0.45
