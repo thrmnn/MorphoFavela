@@ -644,10 +644,13 @@ _LOCAL_LINK = re.compile(r'(?:href|src)="([^"]+)"')
 # git_provenance() bakes in datetime.now(); strip it before diffing two
 # renders so --check compares content, not the wall-clock second it ran.
 _PROVENANCE_TS = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC")
+# The footer's commit sha changes with every commit, so a page built one commit
+# earlier failed --check and froze the tick (2026-10-02); provenance, not content.
+_PROVENANCE_SHA = re.compile(r"(branch \S+ · )[0-9a-f]{7,40}( · )")
 
 
 def _normalize(html_str: str) -> str:
-    return _PROVENANCE_TS.sub("<TS>", html_str)
+    return _PROVENANCE_SHA.sub(r"\1<SHA>\2", _PROVENANCE_TS.sub("<TS>", html_str))
 
 
 def check(root: Path = DEFAULT_ROOT) -> int:
