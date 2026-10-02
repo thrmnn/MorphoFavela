@@ -134,7 +134,7 @@ def walk_points_table(points: pd.DataFrame, fixes: pd.DataFrame, walks: pd.DataF
     matched = full[matched_column_names(measures, taus)].round(6)
     for c in matched.columns:
         if c.startswith("shaded_at_arrival_tau"):
-            matched[c] = matched[c].clip(0.0, 1.0)
+            matched[c] = matched[c].clip(0.0, 1.0) + 0.0
     return pd.concat([out, matched], axis=1)
 
 
