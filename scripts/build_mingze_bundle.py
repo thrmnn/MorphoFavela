@@ -275,7 +275,7 @@ See `manifest.json` next to this README for per-file sha256 and source paths.
 
 The shapefiles are open-data from the Rio municipality (`logradouros` + `edificações` registry). DTM derived from project-specific airborne LiDAR (per-site provenance, contact us for the upstream source). Observer points are MorphoFavela-derived under the same license as the repo.
 
-Contact: Theo Hermann (thermann.ai@gmail.com).
+Contact: Theo Alessandro Hermann (thermann.ai@gmail.com).
 """
 
 

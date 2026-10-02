@@ -66,7 +66,7 @@ README_TEMPLATE = """\
 
 Built for Octopus LRP #2 ("Street by street: explaining air temperature
 differences across streets and over time in Complexo da Maré", lead
-Jingxue, PI Simone). Théo Hermann contributes street-form, sun and
+Jingxue, PI Simone). Théo Alessandro Hermann contributes street-form, sun and
 ventilation variables from the Brisa+ (MorphoFavela) pipeline in a support
 role. This package contains no temperature analysis and no conclusions;
 those are the Octopus team's work.
@@ -519,7 +519,7 @@ GeoParquet-aware and plain-pandas readers work without extra steps.
 
 ## How to cite
 
-This package was produced with the Brisa+ (MorphoFavela) pipeline (Théo Hermann).
+This package was produced with the Brisa+ (MorphoFavela) pipeline (Théo Alessandro Hermann).
 Authorship is to be discussed with the lead author when the Octopus LRP #2
 contribution list is drafted (decision `om_credit`).
 """

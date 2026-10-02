@@ -438,7 +438,7 @@ def test_readme_states_om2_only_release_scope():
 
 def test_readme_has_how_to_cite_acknowledgment():
     readme = render_readme(**_README_STATS)
-    assert "Théo Hermann" in readme
+    assert "Théo Alessandro Hermann" in readme
     assert "How to cite" in readme
 
 

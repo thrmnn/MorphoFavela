@@ -362,7 +362,7 @@ def render_report_markdown(package_dir: Path) -> str:
         "For each point it gives the street's shape, when it is in the sun or in building shade, "
         "and how open it is to the wind. "
         f"It supports the Octopus team's study \"{STUDY_TITLE}\" (lead Jingxue, PI Simone). "
-        f"Théo Hermann built it for the {PROJECT_FORM} research project. "
+        f"Théo Alessandro Hermann built it for the {PROJECT_FORM} research project. "
         "It holds no temperature analysis: that is the Octopus team's work.\n"
     )
     out.append("::: hero")
@@ -531,7 +531,7 @@ def render_report_markdown(package_dir: Path) -> str:
     out.append("## Files and contact\n")
     out.append(
         "The data files sit in the package folder. The technical README gives the full method, the sources, "
-        "every column and the spec table. Contact: Théo Hermann.\n"
+        "every column and the spec table. Contact: Théo Alessandro Hermann.\n"
     )
     return "\n".join(out)
 
