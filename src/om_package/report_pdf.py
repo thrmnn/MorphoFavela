@@ -41,6 +41,7 @@ def _page_css(version: str, footer: str) -> str:
                    vertical-align: top; padding-top: 4mm; }}
 }}
 html {{ font-family: "{FONT_FAMILY}", sans-serif; }}
+body {{ max-width: none !important; margin: 0 !important; padding: 0 !important; hyphens: manual; }}
 a {{ color: #0f5f57; text-decoration: none; }}
 code {{ font-family: "DejaVu Sans Mono", monospace; font-size: 0.86em; background: #f3f3f3; padding: 0 1.5pt; }}
 """

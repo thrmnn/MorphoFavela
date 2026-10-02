@@ -36,7 +36,7 @@ ROUTE_MAX_HEIGHT_IN = 5.85
 SHADE_MAP_MAX_HEIGHT_IN = 4.85
 SHADE_BAR_COLUMN_IN = 1.0
 FORM_HEIGHT_IN = 6.2
-SUN_DOSE_HEIGHT_IN = 7.8
+SUN_DOSE_HEIGHT_IN = 7.4
 
 
 def load_shade_frame(parquet_path: Path) -> pd.DataFrame:
@@ -223,7 +223,7 @@ def build_fig_shade_calendar(shade_df: pd.DataFrame, out_path: Path, bin_min: in
         mins = mat.columns.to_numpy(float)
         edges_x = np.append(mins, mins[-1] + bin_min) / 60.0
         n = len(dates)
-        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 6.2))
+        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 5.4))
         ax = fig.add_axes([0.085, 0.085, 0.765, 0.905])
         cax = fig.add_axes([0.87, 0.085, 0.022, 0.905])
         cmap = matplotlib.colormaps[fs.VAR_CMAP["shade"]].copy()
@@ -295,7 +295,8 @@ def build_fig_sun_dose(walks: pd.DataFrame, p12: pd.DataFrame, total_m: float, o
 
         fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, SUN_DOSE_HEIGHT_IN))
         left, width, gapx = 0.215, 0.375, 0.02
-        bottom, height = 0.125, 0.84
+        H = SUN_DOSE_HEIGHT_IN
+        bottom, height = 0.95 / H, (H - 0.95 - 0.25) / H
         axes = [fig.add_axes([left + i * (width + gapx), bottom, width, height]) for i in range(2)]
         for ax, h, name in zip(axes, (1, 3), ("1 hour before", "3 hours before")):
             m = np.ma.masked_invalid(mats[h])
@@ -317,20 +318,20 @@ def build_fig_sun_dose(walks: pd.DataFrame, p12: pd.DataFrame, total_m: float, o
             axes[0].annotate(lab, xy=(-0.40, 0), xycoords=("axes fraction", "data"), xytext=(-0.40, (y0 + y1) / 2),
                              textcoords=("axes fraction", "data"), rotation=90, ha="center", va="center",
                              fontsize=fs.FONT_PT)
-        cax = fig.add_axes([left + 0.09, 0.05, 2 * width + gapx - 0.11, 0.012])
+        cax = fig.add_axes([left + 0.09, 0.39 / H, 2 * width + gapx - 0.11, 0.09 / H])
         sm = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
         cb = fig.colorbar(sm, cax=cax, orientation="horizontal")
         ticks = [DOSE_ZERO_BELOW, *range(500, int(vmax) + 1, 500)]
         cb.set_ticks(ticks)
         cb.set_ticklabels(["0", *[f"{t:,}" for t in ticks[1:]]])
         cb.set_label("clear-sky direct sun dose (Wh/m²)", labelpad=2)
-        sw = fig.add_axes([left + 0.02, 0.05, 0.03, 0.012])
+        sw = fig.add_axes([left + 0.02, 0.39 / H, 0.03, 0.09 / H])
         sw.set_facecolor(fs.ZERO_GREY)
         sw.set_xticks([])
         sw.set_yticks([])
         for sp in sw.spines.values():
             sp.set_visible(True)
-        fig.text(left + 0.035, 0.038, "zero", ha="center", va="top", fontsize=fs.FONT_PT)
+        fig.text(left + 0.035, 0.30 / H, "zero", ha="center", va="top", fontsize=fs.FONT_PT)
         out = fs.save(fig, out_path)
     return out, {"colour_limits_wh_m2": [DOSE_ZERO_BELOW, vmax], "zero_drawn_below_wh_m2": DOSE_ZERO_BELOW,
                  "colour_scale_note": "one scale for both panels, upper limit set from the 99.5th percentile of the 3 hour doses; larger values take the top colour",
@@ -353,20 +354,20 @@ def build_fig_svf_sensor(points: pd.DataFrame, walks: pd.DataFrame, p12: pd.Data
 
         w = p12[p12["walk_id"] == walk["walk_id"]].sort_values("distance_along_m")
         pts = points.sort_values("distance_along_m")
-        fig, ax = plt.subplots(figsize=(fs.TEXT_WIDTH_IN, 2.7))
+        fig, ax = plt.subplots(figsize=(fs.TEXT_WIDTH_IN, 2.9))
         ax.plot(pts["distance_along_m"], pts["sky_view_factor"], color="#a0a0a0", lw=0.6, label="1 m values", zorder=1)
         for tau in (10, 30):
             ax.plot(w["distance_along_m"], w[f"sky_view_factor_tau{tau}s"], color=fs.TAU_COLOURS[tau], lw=1.4,
-                    label=f"sensor-matched, time constant {tau} s", zorder=3)
+                    label=f"sensor-matched, {tau} s", zorder=3)
         fs.distance_axis(ax, float(pts["distance_along_m"].max()))
         ax.set_xlabel("distance along the route (m)")
         ax.set_ylabel("sky view factor")
         ax.set_ylim(0, 1)
         fs.shade_flagged([ax], fs.flagged_spans(pts))
         h, l = ax.get_legend_handles_labels()
-        ax.legend(h + [fs.flag_handle()], l + [fs.FLAG_LABEL], loc="upper right", ncol=1, frameon=False,
-                  handlelength=1.8, fontsize=fs.FONT_PT)
-        fig.subplots_adjust(left=0.1, right=0.985, top=0.97, bottom=0.2)
+        fig.legend(h + [fs.flag_handle()], l + [fs.FLAG_LABEL], loc="lower left", ncol=1, frameon=False,
+                   handlelength=1.8, fontsize=fs.FONT_PT, bbox_to_anchor=(0.08, 0.0))
+        fig.subplots_adjust(left=0.1, right=0.985, top=0.97, bottom=0.47)
         out = fs.save(fig, out_path)
     start = pd.Timestamp(str(walk["start_local"])[:19])
     return out, {"walk_id": str(walk["walk_id"]), "date": str(walk["date"]), "start_local": start.strftime("%H:%M"),

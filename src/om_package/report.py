@@ -627,14 +627,14 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"Shade changes more with the time of day than with the date ({_fig('fig_shade_calendar.png')}). Read "
         "the calendar row by row: each row is one walk date, time of day runs left to right in Rio local time, "
         "and the colour gives the share of route points in building shade.\n",
-        _figure(package_dir, "fig_shade_calendar.png", "Share of route points in building shade by walk date (rows) and time "
-                "of day (Rio local time). White: sun below the horizon."),
         f"In the {_hour(f['shade_hour_min'])} hour only {pct('shade_hour_min', f['shade_hour_min_val'])} of route "
         f"points are shaded, against {pct('shade_last', f['shade_last_val'])} in the "
         f"{_hour(f['shade_last_hour'])} hour. Over the hours of daylight that all walk dates share ({_hour(h0)} "
         f"to {h1:02d}:59), the shaded share of route points goes from "
         f"{pct('shade_date_min', f['shade_date_min_val'])} on {_day(f['shade_date_min'])} to "
         f"{pct('shade_date_max', f['shade_date_max_val'])} on {_day(f['shade_date_max'])}.\n",
+        _figure(package_dir, "fig_shade_calendar.png", "Share of route points in building shade by walk date (rows) and time "
+                "of day (Rio local time). White: sun below the horizon."),
     ]
 
     # 6 ------------------------------------------------------------------
@@ -643,11 +643,9 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "## Direct sun before each walk\n",
         "Morning walkers reach streets that have had direct sun in the past hour; evening walkers reach many "
         f"that have had none ({_fig('fig_sun_dose.png')}). "
-        "Each row is one walk, labelled by date and start time; morning walks are above the gap, evening walks "
-        f"below. Distance runs left to right in {SEGMENT_M} m means. One colour scale serves both panels; grey "
-        "is zero and white marks points the walk did not reach.\n",
+        "Each row is one walk, labelled by date and start time, mornings above evenings; one colour scale serves both panels, grey is zero and white marks points the walk did not reach.\n",
         _figure(package_dir, "fig_sun_dose.png", "Clear-sky direct sun dose in the hour (left) and the three hours (right) "
-                "before each walk reached each point.", source=True),
+                f"before each walk reached each point, in {SEGMENT_M} m means along the route.", source=True),
         "The **direct sun dose** is the direct sunlight energy that reached a horizontal surface at the point "
         "in the hour, or the three hours, before the walker arrived, in Wh/m². The arrival time comes from the "
         "walk's own GPS timestamps. The dose comes from 2019 building and terrain geometry and assumes a clear "
@@ -676,9 +674,6 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"wind most of the morning ({_fig('fig_wind.png')}). "
         "The roses show how often the wind comes from each direction, coloured by regime, with a line at each "
         "regime's mean direction; the lower panel gives each regime's share of the reports by hour of day.\n",
-        _figure(package_dir, "fig_wind.png", f"Wind at Galeão airport. Top: wind roses for the campaign season (left) and "
-                f"{y0} to {y1} (right), coloured by regime. Bottom: share of each regime by hour of day in Rio "
-                f"local time (solid: campaign season; dashed: {y0} to {y1}).", source=True),
         f"The regimes come from the Galeão airport hourly weather reports of the campaign season "
         f"({_day(f['wind_window'][0])} to {_day(f['wind_window'][1])}) and of {y0} to {y1}. Each report goes to "
         f"the nearer of the two peaks of the {f['n_sectors']}-sector wind rose. In the campaign season, the "
@@ -690,6 +685,9 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "that fits two circular distributions and a uniform background confirms the "
         f"{r1['name']} direction (within {r1['mix_diff']:.0f}°) but not the {r2['name']} one. Over {y0} to {y1} "
         f"the two regimes point the same way ({clim[k1]['dir']:.0f}° and {clim[k2]['dir']:.0f}°).\n",
+        _figure(package_dir, "fig_wind.png", f"Wind at Galeão airport. Top: wind roses for the campaign season (left) and "
+                f"{y0} to {y1} (right), coloured by regime. Bottom: share of each regime by hour of day in Rio "
+                f"local time (solid: campaign season; dashed: {y0} to {y1}).", source=True),
         f"The {r2['name']} wind is most frequent at {_hour(peak2[0])}, with "
         f"{pct('regime2_peak', peak2[1])} of that hour's airport reports; the {r1['name']} wind peaks at "
         f"{_hour(peak1[0])}, with {pct('regime1_peak', peak1[1])}. Each walk carries the regime of the airport "
@@ -770,8 +768,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
     ]
 
     # 10 -----------------------------------------------------------------
-    out.append("## Contact\n")
-    out.append(f"{AUTHOR}, {PROJECT_FORM}.\n")
+    out.append(f"**Contact.** {AUTHOR}, {PROJECT_FORM}.\n")
     pct.check()
     return "\n".join(out)
 

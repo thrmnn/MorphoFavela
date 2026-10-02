@@ -58,7 +58,7 @@ def build_fig_wind(season: dict, campaign_obs: pd.DataFrame, climatology_obs: pd
         shares = [sector_shares(o) for *_, o in periods]
         rmax = float(np.ceil(max(s.max() for s in shares) * 1.05 * 2.0) / 2.0)
 
-        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 5.6))
+        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 5.3))
         gs = fig.add_gridspec(2, 2, height_ratios=[1.55, 1.0], hspace=0.32, wspace=0.16, left=0.085, right=0.955,
                               top=0.9, bottom=0.115)
         centres = np.radians(np.arange(N_SECTORS) * SECTOR_W)
@@ -126,7 +126,7 @@ def build_fig_vent_profiles(points: pd.DataFrame, regimes: list[dict], out_path:
         total = float(np.ceil(p["distance_along_m"].max() / 50) * 50)
         cols = [f"{stem}_{g['slug']}" for stem, _ in VENT_PANELS for g in regimes]
         means = fs.ten_m_means(p, cols)
-        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 5.6))
+        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 4.7))
         gs = fig.add_gridspec(4, 1, height_ratios=[0.55, 1, 1, 1], hspace=0.28, left=0.13, right=0.985, top=0.99,
                               bottom=0.17)
         axb = fig.add_subplot(gs[0])
@@ -170,7 +170,7 @@ def build_fig_shelter_maps(points: pd.DataFrame, regimes: list[dict], buildings:
         cmap = fs.VAR_CMAP["shelter_angle"]
         o = points.sort_values("distance_along_m")
         extent = fs.route_extent(o, margin_m=30.0)
-        map_w = 0.455
+        map_w = 0.43
         h = fs.map_height_in(extent, fs.TEXT_WIDTH_IN * map_w)
         bar_h_in = 0.7
         fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, h + bar_h_in))
