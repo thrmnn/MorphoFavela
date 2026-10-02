@@ -354,7 +354,7 @@ def build_fig_svf_sensor(points: pd.DataFrame, walks: pd.DataFrame, p12: pd.Data
 
         w = p12[p12["walk_id"] == walk["walk_id"]].sort_values("distance_along_m")
         pts = points.sort_values("distance_along_m")
-        fig, ax = plt.subplots(figsize=(fs.TEXT_WIDTH_IN, 2.9))
+        fig, ax = plt.subplots(figsize=(fs.TEXT_WIDTH_IN, 2.6))
         ax.plot(pts["distance_along_m"], pts["sky_view_factor"], color="#a0a0a0", lw=0.6, label="1 m values", zorder=1)
         for tau in (10, 30):
             ax.plot(w["distance_along_m"], w[f"sky_view_factor_tau{tau}s"], color=fs.TAU_COLOURS[tau], lw=1.4,
@@ -365,9 +365,9 @@ def build_fig_svf_sensor(points: pd.DataFrame, walks: pd.DataFrame, p12: pd.Data
         ax.set_ylim(0, 1)
         fs.shade_flagged([ax], fs.flagged_spans(pts))
         h, l = ax.get_legend_handles_labels()
-        fig.legend(h + [fs.flag_handle()], l + [fs.FLAG_LABEL], loc="lower left", ncol=1, frameon=False,
-                   handlelength=1.8, fontsize=fs.FONT_PT, bbox_to_anchor=(0.08, 0.0))
-        fig.subplots_adjust(left=0.1, right=0.985, top=0.97, bottom=0.47)
+        fig.legend(h + [fs.flag_handle()], l + [fs.FLAG_LABEL], loc="lower left", ncol=2, frameon=False,
+                   handlelength=1.8, fontsize=fs.FONT_PT, bbox_to_anchor=(0.0, 0.0))
+        fig.subplots_adjust(left=0.1, right=0.985, top=0.97, bottom=0.36)
         out = fs.save(fig, out_path)
     start = pd.Timestamp(str(walk["start_local"])[:19])
     return out, {"walk_id": str(walk["walk_id"]), "date": str(walk["date"]), "start_local": start.strftime("%H:%M"),
