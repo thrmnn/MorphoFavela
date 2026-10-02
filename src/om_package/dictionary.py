@@ -1,4 +1,4 @@
-"""P-08 — data dictionary: one row per variable ID, ever. IDs are never
+"""P-08, data dictionary: one row per variable ID, ever. IDs are never
 reused; a variable retired in a later version keeps its row (marked
 retired), it doesn't vanish. No variable has been retired yet.
 """
@@ -12,24 +12,21 @@ from .sun_envelope import ENVELOPE_SLOT_MIN
 from .vent_indices import DEFAULT_BUFFER_M, MACDONALD_A, MACDONALD_BETA, MACDONALD_CD, VON_KARMAN
 
 # id -> {definition, unit, source, method, limits, status}
-# status: "computed" (present as a real column in v0.1's tables) or
-# "PENDING" (no column in v0.1; listed here so the dictionary is the single
-# place that enumerates every variable this package will ever carry).
 _BASE: dict[str, dict] = {
     "point_id": {
-        "definition": "PROVISIONAL point identifier, e.g. OM2-000042 — minted on the OSM-inferred route, not the team's own walked route.",
+        "definition": "Point identifier, for example OM2-000042: the route name and the distance in metres from the start of the route.",
         "unit": "-",
-        "source": "Octopus route file (Google Drive, PI-owned) + this package's code",
-        "method": "route_id + zero-padded integer metres from route start (deterministic; stable across rebuilds of the same OSM-inferred route file)",
-        "limits": "PROVISIONAL: the ID string is stable, but the place it names may move once v0.2 rebuilds on the team's om_routes.gpkg — a published old->new point_id crosswalk will accompany that release. Not comparable across different route files for the same OM route if the source route JSON changes.",
+        "source": "route file of the Octopus walk dataset; this package's code",
+        "method": "route_id + zero-padded integer metres from route start (deterministic: the same route file always gives the same identifiers)",
+        "limits": "Identifiers are only comparable between packages built on the same route file.",
         "status": "computed",
     },
     "route_geometry_flag": {
-        "definition": "True where the OSM-inferred route is defective at this point: it falls inside a building footprint, or lands off the real street network.",
+        "definition": "True where the route is defective at this point: it falls inside a building footprint or lies far from the street network.",
         "unit": "bool",
         "source": "data/maré/raw/buildings_mare.shp, data/maré/raw/street_mare.shp",
         "method": f"within(buildings_mare) OR distance-to-nearest(street_mare centreline) > {ROUTE_FLAG_MAX_STREET_DIST_M:.0f} m (src/om_package/routes.py compute_route_geometry_flag)",
-        "limits": "Only catches route-inference defects visible against these two layers; a route that is on-street but still not the team's actual walked path is not caught. See the README's route_geometry_flag caveat for the measured share of plan_density_lambda_p == 1.0 points this explains.",
+        "limits": "Only catches defects visible against these two layers. A point that is on a street but not on the path the team walked is not caught.",
         "status": "computed",
     },
     "route_id": {
@@ -51,7 +48,7 @@ _BASE: dict[str, dict] = {
     "height_m": {
         "definition": "Observer height used for every point-level airborne variable (pedestrian height).",
         "unit": "m", "source": "src/svf_v2/sampling.py 'pedestrian_height' default",
-        "method": "constant 1.5 m — matches the height this repo's own airborne SVF/street outputs were sampled at, so OM2 joins against them without a height mismatch",
+        "method": "constant 1.5 m, the height at which the airborne sky view and street layers were sampled, so the joins use one height",
         "limits": "Not a measured field height; a modelling convention.",
         "status": "computed",
     },
@@ -91,7 +88,7 @@ _BASE: dict[str, dict] = {
         "status": "computed",
     },
     "height_width_ratio": {
-        "definition": "Canyon aspect ratio H/W at this point.",
+        "definition": "Height-to-width ratio of the street canyon at this point: building height divided by street width.",
         "unit": "-", "source": "outputs/maré/morphometrics/canyon/hw_streets.gpkg column HW",
         "method": "nearest-neighbour join (<=20 m)", "limits": "NaN beyond 20 m of any canyon sample.",
         "status": "computed",
@@ -100,7 +97,7 @@ _BASE: dict[str, dict] = {
         "definition": "Fraction of the sky hemisphere visible at this point (airborne).",
         "unit": "fraction [0,1]", "source": "outputs/maré/svf_v2/svf_streets.gpkg column svf",
         "method": "nearest-neighbour join (<=15 m); ray-cast at 1.5 m pedestrian height against a buildings+DTM mesh (src/svf_v2, 145-patch Tregenza sky)",
-        "limits": "UPPER BOUND under canopy: the ray-cast mesh is buildings + bare-earth terrain only, no vegetation, so a tree-covered point's real sky view is <= this value, never more. Airborne (2019 buildings) only; NaN beyond 15 m of any SVF sample.",
+        "limits": "Computed from 2019 buildings and terrain only. NaN beyond 15 m of any sky view sample.",
         "status": "computed",
     },
     "sky_view_factor_join_dist_m": {
@@ -112,7 +109,7 @@ _BASE: dict[str, dict] = {
         "definition": "Building footprint area fraction of the 10 m grid cell nearest this point.",
         "unit": "fraction [0,1]", "source": "outputs/maré/features/features_grid.parquet column lambda_p",
         "method": "nearest-neighbour join (<=12 m) to grid cell centroid; lambda_p from src/urban_morphology.py",
-        "limits": "10 m-cell resolution, not a point-native measurement; NaN beyond 12 m of any grid cell centroid. Some lambda_p == 1.0 points are a route_geometry_flag defect (route cuts through a building) rather than a real fully-built cell — see the README's route_geometry_flag caveat for the measured split.",
+        "limits": "10 m-cell resolution, not a point-native measurement; NaN beyond 12 m of any grid cell centroid. Some points with plan_density_lambda_p equal to 1.0 are route_geometry_flag defects (the route cuts through a building) rather than fully built cells.",
         "status": "computed",
     },
     "plan_density_join_dist_m": {
@@ -123,7 +120,7 @@ _BASE: dict[str, dict] = {
     "grid_cell_id": {
         "definition": "features_grid.zone_id of the same 10 m grid cell used for plan_density_lambda_p, so downstream models can cluster/group by grid cell (adjacent OM2 points are not independent).",
         "unit": "-", "source": "outputs/maré/features/features_grid.parquet column zone_id",
-        "method": "same nearest-neighbour join (<=12 m) as plan_density_lambda_p — same source row, so the two columns are always consistent", "limits": "NaN (nullable Int64) beyond 12 m of any grid cell centroid, same gap as plan_density_lambda_p.",
+        "method": "same nearest-neighbour join (<=12 m) as plan_density_lambda_p, same source row, so the two columns are always consistent", "limits": "NaN (nullable Int64) beyond 12 m of any grid cell centroid, same gap as plan_density_lambda_p.",
         "status": "computed",
     },
     "street_orientation_deg": {
@@ -137,25 +134,25 @@ _BASE: dict[str, dict] = {
         "definition": "PROXY for how well the street channels the prevailing wind (not a flow simulation).",
         "unit": "proxy score [0,1], 1=axis parallel to prevailing wind", "source": "street_orientation_deg + data/maré/wind_rose.json",
         "method": "cos(acute angle between the undirected street axis and the frequency-weighted circular-mean wind bearing)",
-        "limits": "PROXY. Ignores building-scale channelling/blocking geometry beyond axis alignment; wind rose is a single station (ASOS Galeão) 8 km+ from Maré.",
+        "limits": "PROXY. Ignores building-scale channelling/blocking geometry beyond axis alignment; wind rose is a single station (Galeão airport) 8 km+ from Maré.",
         "status": "computed",
     },
     "ventilation_frontal_area_proxy": {
-        "definition": "PROXY for OMNIDIRECTIONAL obstruction density — Oke (1988) frontal-area density of the nearest 10 m grid cell, averaged over 8 compass directions. Not windward-specific by itself; see the lambda_f_<dir> columns for that.",
-        "unit": "proxy, lambda_f (dimensionless)", "source": "outputs/maré/features/features_grid.parquet column lambda_f_mean",
+        "definition": "PROXY for obstruction density from all directions: the frontal area density (Oke, 1988) of the nearest 10 m grid cell, averaged over 8 compass directions. For one direction see the lambda_f_<dir> columns.",
+        "unit": "proxy, dimensionless", "source": "outputs/maré/features/features_grid.parquet column lambda_f_mean",
         "method": "nearest-neighbour join (<=12 m); lambda_f_mean = mean over 8 compass directions, src/urban_morphology.py",
         "limits": "PROXY, not a simulated flow field; isotropic buffer, so it says nothing about upwind fetch on its own. 10 m-cell resolution.",
         "status": "computed",
     },
     "ventilation_openness_proxy": {
-        "definition": "PROXY for canopy openness — volumetric porosity of the nearest 10 m grid cell.",
+        "definition": "PROXY for openness, the volumetric porosity of the nearest 10 m grid cell.",
         "unit": "proxy, fraction [0,1]", "source": "outputs/maré/features/features_grid.parquet column porosity",
-        "method": "nearest-neighbour join (<=12 m); porosity = 1 - built volume / canopy volume, src/morphometry/indicators.py",
+        "method": "nearest-neighbour join (<=12 m); porosity = 1 - built volume / total volume up to the canopy height, src/morphometry/indicators.py",
         "limits": "PROXY, not a simulated flow field. 10 m-cell resolution.",
         "status": "computed",
     },
     "ventilation_dist_open_space_proxy_m": {
-        "definition": "PROXY for proximity to open space — planar distance to the nearest low-density (lambda_p<0.05) 10 m grid cell.",
+        "definition": "PROXY for proximity to open space: planar distance to the nearest 10 m grid cell with a plan area density below 0.05.",
         "unit": "proxy, m", "source": "outputs/maré/features/features_grid.parquet (lambda_p threshold)",
         "method": "KDTree nearest distance to any grid cell centroid with lambda_p < 0.05",
         "limits": "PROXY. Threshold (0.05) is a modelling choice, not a measured open-space boundary; grid-cell resolution 10 m.",
@@ -163,21 +160,21 @@ _BASE: dict[str, dict] = {
     },
 }
 
-# --- v0.2.0: P-10 (sun exposure) and P-11 (ventilation indices with
+# --- P-10 (sun exposure) and P-11 (ventilation indices with
 # time-matched wind). Every ventilation row is a PROXY from building
-# geometry; the wind rows are SBGL airport observations, not wind at the
+# geometry; the wind rows are Galeão airport observations, not wind at the
 # route; no row is a measured air temperature or airflow. ---------------
 _GEOM = "2019 building geometry (the geometry epoch is a build parameter)"
 _SUN_PROXY = (
     "Geometry-derived (building and terrain horizon vs. sun position), not measured sunlight: "
-    "no cloud, no tree shade."
+    "it ignores cloud."
 )
 _PREVAILING = (
-    "evaluated at the prevailing wind bearing (frequency-weighted circular mean of the 2015-2024 SBGL "
+    "evaluated at the prevailing wind bearing (frequency-weighted circular mean of the 2015-2024 Galeão airport "
     "climatology, data/maré/wind_rose.json; the same bearing P-06 uses)"
 )
 _VENT_LIMITS = (
-    "PROXY, not simulated or measured air movement. SBGL (Galeão airport) is a regional reference, not wind at the "
+    "PROXY, not simulated or measured air movement. Galeão airport is a regional reference, not wind at the "
     "route; a circular mean of a spread wind rose is a summary bearing, not a mode."
 )
 _BASE.update({
@@ -186,11 +183,11 @@ _BASE.update({
         "unit": "h per year",
         "source": f"{_GEOM}; marched horizon (p10_horizon_profiles.parquet); pvlib solar position",
         "method": "10-min steps over one calendar year in Rio local time (America/Sao_Paulo); step counted sunlit when sun altitude > 0 and > the horizon angle at the sun's azimuth (nearest marched azimuth); hours = sunlit steps x step length (src/om_package/sun_envelope.py annual_sun_hours)",
-        "limits": _SUN_PROXY + " Horizon march is limited to the DTM's valid radius (see README Known limits), so very distant obstructions are not seen.",
+        "limits": _SUN_PROXY + " Horizon march is limited to the DTM's valid radius so very distant obstructions are not seen.",
         "status": "computed",
     },
     "windward_lambda_f_prevailing": {
-        "definition": "PROXY: frontal-area density facing the prevailing wind (Oke 1988 lambda_f of the nearest 10 m grid cell), " + _PREVAILING + ".",
+        "definition": "PROXY: frontal area density facing the prevailing wind (Oke, 1988; nearest 10 m grid cell), " + _PREVAILING + ".",
         "unit": "dimensionless",
         "source": "lambda_f_<dir> columns of this table (outputs/maré/features/features_grid.parquet)",
         "method": "circular linear interpolation between the two nearest of the 8 compass-direction columns at the prevailing bearing (src/om_package/vent_indices.py windward_lambda_f)",
@@ -214,23 +211,23 @@ _BASE.update({
         "status": "computed",
     },
     "z0_macdonald_m": {
-        "definition": "PROXY: aerodynamic roughness length z0 by Macdonald et al. (1998), from the 50 m buffer's plan density and mean building height and the windward frontal-area density, " + _PREVAILING + ".",
+        "definition": "PROXY: roughness length by Macdonald et al. (1998), from the 50 m buffer's plan area density, mean building height and windward frontal area density, " + _PREVAILING + ".",
         "unit": "m",
         "source": f"lambda_p_buffer_{DEFAULT_BUFFER_M}m, building_height_mean_buffer_{DEFAULT_BUFFER_M}m, windward_lambda_f_prevailing of this table",
-        "method": f"Macdonald, Griffiths & Hall (1998), Atmos. Environ. 32(11):1857-1864: z0/H = (1 - zd/H) exp(-[0.5 beta (Cd/kappa^2) (1 - zd/H) lambda_f]^-0.5), A={MACDONALD_A:g}, beta={MACDONALD_BETA:g}, Cd={MACDONALD_CD:g}, kappa={VON_KARMAN:g} (src/om_package/vent_indices.py macdonald_zd_z0)",
+        "method": f"Macdonald, Griffiths & Hall (1998), Atmos. Environ. 32(11):1857-1864: roughness length / mean height = (1 - displacement height / mean height) x exp(-[0.5 beta (Cd/kappa^2) (1 - displacement height / mean height) x frontal area density]^-0.5), A={MACDONALD_A:g}, beta={MACDONALD_BETA:g}, Cd={MACDONALD_CD:g}, kappa={VON_KARMAN:g} (src/om_package/vent_indices.py, Macdonald function)",
         "limits": _VENT_LIMITS + " Staggered-array constants applied to an irregular favela fabric; NaN where the 50 m buffer has no building (mean height undefined).",
         "status": "computed",
     },
     "zd_macdonald_m": {
-        "definition": "PROXY: displacement height zd by Macdonald et al. (1998), from the 50 m buffer's plan density and mean building height.",
+        "definition": "PROXY: displacement height by Macdonald et al. (1998), from the 50 m buffer's plan density and mean building height.",
         "unit": "m",
         "source": f"lambda_p_buffer_{DEFAULT_BUFFER_M}m and building_height_mean_buffer_{DEFAULT_BUFFER_M}m of this table",
-        "method": f"zd/H = 1 + A^(-lambda_p) (lambda_p - 1), A={MACDONALD_A:g}; zd = (zd/H) x H (src/om_package/vent_indices.py macdonald_zd_z0)",
+        "method": f"displacement height / mean height = 1 + A^(-plan area density) x (plan area density - 1), A={MACDONALD_A:g} (src/om_package/vent_indices.py, Macdonald function)",
         "limits": _VENT_LIMITS + " Does not depend on wind direction. NaN where the 50 m buffer has no building.",
         "status": "computed",
     },
     "open_space_fraction": {
-        "definition": "PROXY: share of the 50 m circular buffer not covered by building footprints (1 - lambda_p).",
+        "definition": "PROXY: share of the 50 m circular buffer not covered by building footprints (1 minus the plan area density).",
         "unit": "fraction [0,1]",
         "source": f"lambda_p_buffer_{DEFAULT_BUFFER_M}m of this table ({_GEOM})",
         "method": f"1 - lambda_p_buffer_{DEFAULT_BUFFER_M}m (src/om_package/vent_indices.py compute_indices)",
@@ -308,8 +305,8 @@ _BASE.update({
         "definition": "Marched horizon angle above the horizontal at this point and azimuth: the highest building or terrain obstruction angle along that direction at 1.5 m observer height.",
         "unit": "degrees",
         "source": f"{_GEOM}; dtm_extended_300m.tif + buildings_extended_300m.gpkg via src/brisa_solar WP-02/WP-04 horizon engine",
-        "method": "max over the Tregenza patches sharing the azimuth of the marched obstruction angle, march radius max_dist_m (README Known limits)",
-        "limits": "Geometry only (no vegetation); limited to the march radius; cell resolution of the obstruction surface (1 m resampled from the DTM's native resolution).",
+        "method": "max over the Tregenza patches sharing the azimuth of the marched obstruction angle, march radius max_dist_m",
+        "limits": "Geometry only; limited to the march radius; cell resolution of the obstruction surface (1 m resampled from the DTM's native resolution).",
         "status": "computed",
     },
     "agreement_share": {
@@ -327,9 +324,9 @@ _BASE.update({
     },
     # ---- p11 observed wind table
     "valid_utc": {
-        "definition": "Observation time of an SBGL (Galeão airport) METAR report, UTC.",
-        "unit": "ISO 8601, UTC", "source": "Iowa Environmental Mesonet ASOS archive, station SBGL (provenance.wind_source in manifest.json)",
-        "method": "as reported", "limits": "SBGL is a regional reference at 10 m, not wind at the route.",
+        "definition": "Observation time of an Galeão airport weather report, UTC.",
+        "unit": "ISO 8601, UTC", "source": "Iowa Environmental Mesonet ASOS archive, Galeão airport station (provenance.wind_source in manifest.json)",
+        "method": "as reported", "limits": "Galeão airport is a regional reference at 10 m, not wind at the route.",
         "status": "computed",
     },
     "valid_local": {
@@ -338,14 +335,14 @@ _BASE.update({
         "limits": "Offset from the tz database, not typed.", "status": "computed",
     },
     "drct": {
-        "definition": "Wind direction the wind blows FROM at SBGL, degrees clockwise from north; empty for calm or variable reports.",
-        "unit": "degrees", "source": "SBGL METAR (Iowa ASOS archive)", "method": "as reported",
+        "definition": "Wind direction the wind blows FROM at Galeão airport, degrees clockwise from north; empty for calm or variable reports.",
+        "unit": "degrees", "source": "Galeão airport reports (Iowa ASOS archive)", "method": "as reported",
         "limits": "Observed at the airport, not at the route. Reported on a coarse direction grid by the source.",
         "status": "computed",
     },
     "speed_ms": {
-        "definition": "Wind speed at SBGL, 10 m.",
-        "unit": "m/s", "source": "SBGL METAR (Iowa ASOS archive), reported in knots",
+        "definition": "Wind speed at Galeão airport, 10 m.",
+        "unit": "m/s", "source": "Galeão airport reports (Iowa ASOS archive), given in knots",
         "method": "knots x the knot-to-m/s factor used by scripts/build_wind_rose.py",
         "limits": "Observed at the airport, not at the route.",
         "status": "computed",
@@ -363,8 +360,8 @@ _BASE.update({
     "used_if_device_clock_utc": {
         "definition": "Campaign date (YYYY-MM-DD) this observation would be matched to if the device clock logged UTC; empty when not used.",
         "unit": "date or empty", "source": "p05b_campaign_windows + this table",
-        "method": "for each 5-min step of a campaign walk window, the nearest SBGL report with a usable direction within the match gap (manifest.json p11.max_gap_min) (src/om_package/wind_obs.py wind_at)",
-        "limits": "The device clock reading is UNKNOWN; this column and used_if_device_clock_local are the two readings. Time-matched wind is SBGL, not at the route.",
+        "method": "for each 5-min step of a campaign walk window, the nearest Galeão airport report with a usable direction within the match gap (manifest.json p11.max_gap_min) (src/om_package/wind_obs.py wind_at)",
+        "limits": "The device clock reading is UNKNOWN; this column and used_if_device_clock_local are the two readings. Time-matched wind is Galeão airport, not at the route.",
         "status": "computed",
     },
     "used_if_device_clock_local": {
@@ -377,7 +374,7 @@ _BASE.update({
 _DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 for _d in _DIRECTIONS:
     _BASE[f"lambda_f_{_d}"] = {
-        "definition": f"Frontal-area density (Oke 1988) of the nearest 10 m grid cell, facing {_d}.",
+        "definition": f"Frontal area density (Oke, 1988) of the nearest 10 m grid cell, facing {_d}.",
         "unit": "dimensionless", "source": f"outputs/maré/features/features_grid.parquet column lambda_f_{_d}",
         "method": "nearest-neighbour join (<=12 m), same join as ventilation_frontal_area_proxy; src/urban_morphology.py",
         "limits": "Geometry-derived, not a simulated flow field. 10 m-cell resolution; NaN beyond 12 m of any grid cell centroid.",
@@ -385,11 +382,11 @@ for _d in _DIRECTIONS:
     }
 del _d
 
-# P-03 segment columns (scripts/aggregate_om_points.py output — must-fix 4).
+# P-03 segment columns (scripts/aggregate_om_points.py output, must-fix 4).
 _BASE["segment_id"] = {
     "definition": "0-based segment index along the route, at the chosen segment length.",
     "unit": "-", "source": "src/om_package/segments.py aggregate_to_segments",
-    "method": "distance_along_m // segment_length_m", "limits": "Segment length is a caller choice (scripts/aggregate_om_points.py), not fixed at build time — not comparable across two outputs built with different segment lengths.",
+    "method": "distance_along_m // segment_length_m", "limits": "Segment length is a caller choice (scripts/aggregate_om_points.py), not fixed at build time, not comparable across two outputs built with different segment lengths.",
     "status": "computed",
 }
 _BASE["segment_start_m"] = {
@@ -412,7 +409,7 @@ _BUFFER_TEMPLATES = {
     "lambda_p_buffer_{r}m": {
         "definition": "Building footprint area fraction within a {r} m circular buffer around the point.",
         "unit": "fraction [0,1]", "source": "data/maré/buildings_extended_300m.gpkg",
-        "method": "sum(building-buffer intersection area) / (pi * {r}^2)", "limits": "Airborne (2019 buildings) only.",
+        "method": "sum(building-buffer intersection area) / (pi * {r}^2)", "limits": "2019 buildings only.",
     },
     "building_count_buffer_{r}m": {
         "definition": "Count of buildings intersecting a {r} m circular buffer around the point.",
@@ -426,31 +423,6 @@ _BUFFER_TEMPLATES = {
     },
 }
 
-_DESCOPED_STATUS = "DESCOPED (om_v013_descope)"
-
-_DESCOPED: dict[str, dict] = {
-    "sky_view_factor_terrestrial": {
-        "definition": "Terrestrial (ground-instrument) sky-view factor at each OM2 point.",
-        "unit": "fraction [0,1]", "source": "DESCOPED — terrestrial-LiDAR analysis is out of scope in this version (descoped from v0.1.3; PI decision om_v013_descope)",
-        "method": "DESCOPED", "limits": "No column in this version (spec P-04: airborne only). May come in a later version.", "status": _DESCOPED_STATUS,
-    },
-    "tree_shade": {
-        "definition": "Whether tree canopy shades each OM2 point. RESERVED column in the shade table schema (SHADE_TABLE_COLUMNS) — present but always null, so the table's shape will not change if it is added later.",
-        "unit": "bool", "source": "DESCOPED — tree shade is out of scope in this version (descoped from v0.1.3; PI decision om_v013_descope)",
-        "method": "DESCOPED", "limits": "Always null in this version (reserved column). Building-only shade is the 'shaded' column. May come in a later version.", "status": _DESCOPED_STATUS,
-    },
-    "airborne_vs_terrestrial_comparison": {
-        "definition": "Comparison of airborne vs. terrestrial form-variable estimates along OM2.",
-        "unit": "-", "source": "DESCOPED — terrestrial-LiDAR analysis is out of scope in this version (descoped from v0.1.3; PI decision om_v013_descope)",
-        "method": "DESCOPED", "limits": "Not computed in this version. May come in a later version.", "status": _DESCOPED_STATUS,
-    },
-    "height_change_2024_2026": {
-        "definition": "Change in building/canopy height between the 2024 airborne LiDAR and the 2026 OM2 terrestrial field campaign.",
-        "unit": "m", "source": "DESCOPED — terrestrial-LiDAR analysis is out of scope in this version (descoped from v0.1.3; PI decision om_v013_descope)",
-        "method": "DESCOPED", "limits": "Not computed in this version; the name may be revisited if it comes in a later version.", "status": _DESCOPED_STATUS,
-    },
-}
-
 _SHADE_TABLE_ONLY = {
     "timestamp_local": {"definition": f"Rio local time of a shade evaluation ({SHADE_STEP_MIN}-min step), with the -03:00 offset.", "unit": "datetime, America/Sao_Paulo (UTC-3)", "source": "src/om_package/shade.py", "method": "local 5-min grid of each walk date, sun above the horizon only", "limits": "-", "status": "computed"},
     "timestamp_utc": {"definition": "The same instant as timestamp_local, in UTC (the loggers record UTC).", "unit": "datetime, UTC", "source": "src/om_package/shade.py", "method": "timestamp_local converted to UTC", "limits": "-", "status": "computed"},
@@ -458,7 +430,7 @@ _SHADE_TABLE_ONLY = {
     "date": {"definition": "Rio local calendar date: of a shade evaluation (p05_building_shade) or of a walk (p02b_walks).", "unit": "date, YYYY-MM-DD", "source": "src/om_package/shade.py; src/om_package/walks.py", "method": "local date of the timestamp", "limits": "-", "status": "computed"},
     "sun_altitude_deg": {"definition": "Apparent solar elevation at the evaluation timestamp.", "unit": "degrees", "source": "pvlib.solarposition.get_solarposition", "method": "-", "limits": "-", "status": "computed"},
     "sun_azimuth_deg": {"definition": "Solar azimuth (clockwise from north) at the evaluation timestamp.", "unit": "degrees", "source": "pvlib.solarposition.get_solarposition", "method": "-", "limits": "-", "status": "computed"},
-    "shaded": {"definition": "True when the point gets no direct sun at this timestamp: a building (not tree) blocks the sun, or the sun is below the horizon (night, sun_altitude_deg <= 0). Night rows are no direct sun, not building shade: take building-shade shares over rows with sun_altitude_deg > 0 only.", "unit": "bool", "source": "src/om_package/shade.py is_shaded()", "method": "sun altitude vs. marched horizon angle at the sun's azimuth (point_horizon_profiles(), wired v0.1.2, max_dist_m=100m — see README Known limits)", "limits": "Computed on the walk dates only, daylight steps only, Rio local time slots.", "status": "computed"},
+    "shaded": {"definition": "True when the point gets no direct sun at this timestamp: a building or the terrain blocks the sun, or the sun is below the horizon (night, sun_altitude_deg <= 0). Night rows are no direct sun, not building shade: take building-shade shares over rows with sun_altitude_deg > 0 only.", "unit": "bool", "source": "src/om_package/shade.py is_shaded()", "method": "sun altitude vs. marched horizon angle at the sun's azimuth (point_horizon_profiles(), march distance 100 m)", "limits": "Computed on the walk dates only, daylight steps only, Rio local time slots.", "status": "computed"},
 }
 
 
@@ -483,7 +455,7 @@ _RETIRED = {
     "variable_direction": "p11_wind_observed.csv is no longer shipped",
 }
 
-_WIND = ("SBGL (Galeao airport) METAR, 10 m, a regional reference and not wind at the route; regimes come from the peaks "
+_WIND = ("Galeão airport reports at 10 m, a regional reference and not wind at the route; regimes come from the peaks "
          "of the smoothed 16-sector rose (src/om_package/wind_regimes.py).")
 _REGIME_LIMITS = (
     "PROXY, not simulated or measured air movement. " + _WIND + " The regime direction is the mean of the reports "
@@ -512,16 +484,16 @@ _V030 = {
     "share_interpolated": _row("Share of the on-route rows whose position the map matcher interpolated.", "fraction [0,1]", "walk file", "match_status == interpolated", "-"),
     "max_gap_s": _row("Longest time between two consecutive on-route fixes.", "s", "walk file", "max diff of on-route timestamps", "-"),
     "partial": _row("True when the walk covers less than 0.9 of the route.", "bool", "p02b_walks", "coverage_share < 0.9", "-"),
-    "wind_regime": _row("Wind regime of the walk: the regime name of the nearest SBGL report to the walk's mid time, 'calm' if that report is calm, 'none' if it is more than 60 min away or has no direction.", "category (regime name, calm, none)", _WIND, "nearest report to the walk's mid time, classified to the nearer campaign regime peak (src/om_package/wind_regimes.py tag_walks)", "Airport wind, not wind at the route."),
-    "wind_report_time_local": _row("Rio local time of the SBGL report used to tag the walk.", "ISO 8601, America/Sao_Paulo", "SBGL METAR", "as reported, converted from UTC", "-"),
-    "wind_report_time_utc": _row("The same instant as wind_report_time_local, in UTC.", "ISO 8601, UTC", "SBGL METAR", "as reported", "-"),
-    "wind_direction_deg": _row("Direction the wind blows FROM in the SBGL report used to tag the walk; empty for calm or none.", "degrees clockwise from north", "SBGL METAR", "as reported", "Reported on a coarse direction grid by the source."),
-    "wind_speed_ms": _row("Wind speed in the SBGL report used to tag the walk.", "m/s", "SBGL METAR", "knots x the knot-to-m/s factor of scripts/build_wind_rose.py", "-"),
-    "wind_report_minutes_from_mid": _row("Minutes from the walk's mid time to that report (negative = report before).", "min", "SBGL METAR; walk file", "report time - walk mid time", "-"),
+    "wind_regime": _row("Wind regime of the walk: the regime name of the nearest Galeão airport report to the walk's mid time, 'calm' if that report is calm, 'none' if it is more than 60 min away or has no direction.", "category (regime name, calm, none)", _WIND, "nearest report to the walk's mid time, classified to the nearer campaign regime peak (src/om_package/wind_regimes.py tag_walks)", "Airport wind, not wind at the route."),
+    "wind_report_time_local": _row("Rio local time of the Galeão airport report used to tag the walk.", "ISO 8601, America/Sao_Paulo", "Galeão airport reports", "as reported, converted from UTC", "-"),
+    "wind_report_time_utc": _row("The same instant as wind_report_time_local, in UTC.", "ISO 8601, UTC", "Galeão airport reports", "as reported", "-"),
+    "wind_direction_deg": _row("Direction the wind blows FROM in the Galeão airport report used to tag the walk; empty for calm or none.", "degrees clockwise from north", "Galeão airport reports", "as reported", "Reported on a coarse direction grid by the source."),
+    "wind_speed_ms": _row("Wind speed in the Galeão airport report used to tag the walk.", "m/s", "Galeão airport reports", "knots x the knot-to-m/s factor of scripts/build_wind_rose.py", "-"),
+    "wind_report_minutes_from_mid": _row("Minutes from the walk's mid time to that report (negative = report before).", "min", "Galeão airport reports; walk file", "report time - walk mid time", "-"),
     "t_arrival_local": _row("Rio local time at which the walk reached this point, with the -03:00 offset.", "ISO 8601, America/Sao_Paulo", "walk file; OM2 route", "time interpolated linearly against distance along the route between on-route fixes (src/om_package/walks.py arrival_times)", "Distance is a running maximum, so arrival times never go backwards; interpolated across gaps (see arrival_source)."),
     "t_arrival_utc": _row("The same instant as t_arrival_local, in UTC.", "ISO 8601, UTC", "walk file", "as t_arrival_local", "-"),
     "arrival_source": _row("How the arrival time was obtained: gps (between fixes less than 60 s apart) or gap_interpolated (bracketed by a longer gap).", "category", "walk file", "src/om_package/walks.py arrival_times", "Rows outside the walk (outside_walk) are not shipped."),
-    "shaded_at_arrival": _row("True when the point is in building shade, or the sun is below the horizon, at the moment the walk reaches it. Matched columns <...>_tau<s>s carry it as 0/1.", "bool", "p10_horizon_profiles; pvlib solar position", "sun altitude at t_arrival vs the marched horizon at the sun's azimuth (src/om_package/shade.py is_shaded)", "Geometry-derived (buildings and terrain), no tree shade, no cloud."),
+    "shaded_at_arrival": _row("True when the point is in building shade, or the sun is below the horizon, at the moment the walk reaches it. Matched columns <...>_tau<s>s carry it as 0/1.", "bool", "p10_horizon_profiles; pvlib solar position", "sun altitude at t_arrival vs the marched horizon at the sun's azimuth (src/om_package/shade.py is_shaded)", "Geometry-derived (buildings and terrain); ignores cloud."),
     "dose_1h_before_wh_m2": _row("Clear-sky direct-beam energy on a horizontal plane in the 1 h before the walk reached this point; zero while the point is shaded by the building horizon.", "Wh/m2 (rounded to 0.1)", "pvlib Ineichen clear-sky DNI; p10_horizon_profiles", "integral over [t_arrival - 1 h, t_arrival] on a 1-min grid (src/om_package/walk_dose.py)", "Clear-sky upper bound, geometry-derived, not measured radiation."),
     "dose_3h_before_wh_m2": _row("As dose_1h_before_wh_m2, over the 3 h before arrival.", "Wh/m2 (rounded to 0.1)", "see dose_1h_before_wh_m2", "see dose_1h_before_wh_m2", "Clear-sky upper bound."),
     "regime_key": _row("Key of a wind regime: reg1 is the larger regime of the campaign season; climatology regimes take the key of the nearest campaign regime. 'calm' in p11_regime_by_hour.", "category", "src/om_package/wind_regimes.py", "see wind_regimes.find_regimes, assign_keys", "-"),
@@ -529,15 +501,15 @@ _V030 = {
     "column_slug": _row("The regime name lowercased with hyphens and spaces as underscores; the suffix of the regime's point columns.", "category", "name", "src/om_package/p10_p11.py regime_slug", "-"),
     "mean_direction_deg": _row("Circular mean direction the wind blows FROM, of the reports assigned to the regime.", "degrees clockwise from north", _WIND, "circular mean of the member reports", "Airport wind, not wind at the route."),
     "share": _row("In p11_wind_regimes: share of the directional (non-calm) reports in the regime. In p11_regime_by_hour: share of the reports in that local hour in the regime or calm.", "fraction [0,1]", _WIND, "count / count", "Variable and missing-direction reports are excluded."),
-    "mean_speed_ms": _row("Mean wind speed of the reports in the regime.", "m/s", "SBGL METAR (Iowa ASOS archive), reported in knots", "mean of the member reports", "Airport wind, 10 m."),
-    "n_reports": _row("Number of reports in the regime.", "count", "SBGL METAR", "count", "-"),
-    "period_calm_share": _row("Share of all reports in the period that are calm, a bookkeeping column repeated on both regime rows.", "fraction [0,1]", "SBGL METAR", "calm reports / all reports", "-"),
-    "mixture_component_direction_deg": _row("Mean direction of the von Mises mixture component nearest the regime (the check on the regime split).", "degrees", "SBGL METAR", "two von Mises components plus a uniform background fitted by EM to the reports with a seeded +/-5 degree jitter that undoes the 10 degree reporting steps (wind_regimes.vonmises_mixture)", "A check only: the regimes themselves come from the rose peaks."),
-    "mixture_difference_deg": _row("Circular difference between the regime's mean direction and that mixture component.", "degrees", "SBGL METAR", "see mixture_component_direction_deg", "-"),
-    "mixture_component_weight": _row("Mixture weight of that component.", "fraction [0,1]", "SBGL METAR", "see mixture_component_direction_deg", "-"),
-    "mixture_component_kappa": _row("Concentration of that component (larger = narrower).", "-", "SBGL METAR", "see mixture_component_direction_deg", "-"),
-    "mixture_background_weight": _row("Weight of the uniform background in the mixture.", "fraction [0,1]", "SBGL METAR", "see mixture_component_direction_deg", "-"),
-    "local_hour": _row("Rio local hour of day (0-23) of the SBGL reports.", "hour", "SBGL METAR", "valid time converted to America/Sao_Paulo", "-"),
+    "mean_speed_ms": _row("Mean wind speed of the reports in the regime.", "m/s", "Galeão airport reports (Iowa ASOS archive), given in knots", "mean of the member reports", "Airport wind, 10 m."),
+    "n_reports": _row("Number of reports in the regime.", "count", "Galeão airport reports", "count", "-"),
+    "period_calm_share": _row("Share of all reports in the period that are calm, a bookkeeping column repeated on both regime rows.", "fraction [0,1]", "Galeão airport reports", "calm reports / all reports", "-"),
+    "mixture_component_direction_deg": _row("Mean direction of the von Mises mixture component nearest the regime (the check on the regime split).", "degrees", "Galeão airport reports", "two von Mises components plus a uniform background fitted by EM to the reports with a seeded +/-5 degree jitter that undoes the 10 degree reporting steps (wind_regimes.vonmises_mixture)", "A check only: the regimes themselves come from the rose peaks."),
+    "mixture_difference_deg": _row("Circular difference between the regime's mean direction and that mixture component.", "degrees", "Galeão airport reports", "see mixture_component_direction_deg", "-"),
+    "mixture_component_weight": _row("Mixture weight of that component.", "fraction [0,1]", "Galeão airport reports", "see mixture_component_direction_deg", "-"),
+    "mixture_component_kappa": _row("Concentration of that component (larger = narrower).", "-", "Galeão airport reports", "see mixture_component_direction_deg", "-"),
+    "mixture_background_weight": _row("Weight of the uniform background in the mixture.", "fraction [0,1]", "Galeão airport reports", "see mixture_component_direction_deg", "-"),
+    "local_hour": _row("Rio local hour of day (0-23) of the Galeão airport reports.", "hour", "Galeão airport reports", "valid time converted to America/Sao_Paulo", "-"),
     "regime": _row("In p11_regime_by_hour: the regime name or 'calm'.", "category", "src/om_package/wind_regimes.py hourly_frequency", "each report goes to the nearer regime peak; calm = speed below the calm threshold", "-"),
     "zd_macdonald_m": None,  # placeholder replaced below
 }
@@ -556,7 +528,7 @@ def _regime_rows(regimes: list[dict]) -> dict[str, dict]:
         sl, nm = g["slug"], g["name"]
         where = f"at the mean direction of the campaign-season '{nm}' wind regime (p11_wind_regimes)"
         out[f"frontal_area_density_windward_{sl}"] = _row(
-            f"PROXY: frontal-area density (Oke 1988 lambda_f of the nearest 10 m grid cell) facing the wind, {where}.", "dimensionless",
+            f"PROXY: frontal area density (Oke, 1988; nearest 10 m grid cell) facing the wind, {where}.", "dimensionless",
             "lambda_f_<dir> columns of this table", "circular linear interpolation between the two nearest of the 8 compass-direction columns (src/om_package/vent_indices.py windward_lambda_f)",
             _REGIME_LIMITS + " 10 m-cell resolution; NaN where the lambda_f_<dir> columns are NaN.")
         out[f"canyon_alignment_deg_{sl}"] = _row(
@@ -568,9 +540,9 @@ def _regime_rows(regimes: list[dict]) -> dict[str, dict]:
             f"p10_horizon_profiles.parquet (marched horizon of {_GEOM})", "horizon angle at the marched azimuth nearest the regime direction (src/om_package/vent_indices.py upwind_shelter_deg)",
             _REGIME_LIMITS + " Horizon march limited to the DTM's valid radius.")
         out[f"z0_macdonald_m_{sl}"] = _row(
-            f"PROXY: aerodynamic roughness length z0 by Macdonald et al. (1998) from the 50 m buffer's plan density and mean building height and the windward frontal-area density, {where}.", "m",
+            f"PROXY: roughness length by Macdonald et al. (1998) from the 50 m buffer's plan area density, mean building height and windward frontal area density, {where}.", "m",
             f"lambda_p_buffer_{DEFAULT_BUFFER_M}m, building_height_mean_buffer_{DEFAULT_BUFFER_M}m, frontal_area_density_windward_{sl} of this table",
-            f"Macdonald, Griffiths & Hall (1998), Atmos. Environ. 32(11):1857-1864; A={MACDONALD_A:g}, beta={MACDONALD_BETA:g}, Cd={MACDONALD_CD:g}, kappa={VON_KARMAN:g} (src/om_package/vent_indices.py macdonald_zd_z0)",
+            f"Macdonald, Griffiths & Hall (1998), Atmos. Environ. 32(11):1857-1864; A={MACDONALD_A:g}, beta={MACDONALD_BETA:g}, Cd={MACDONALD_CD:g}, kappa={VON_KARMAN:g} (src/om_package/vent_indices.py, Macdonald function)",
             _REGIME_LIMITS + " Staggered-array constants applied to an irregular favela fabric; NaN where the 50 m buffer has no building.")
     return out
 
@@ -604,8 +576,6 @@ def full_dictionary(radii=BUFFER_RADII_M, regimes: list[dict] | None = None) -> 
             row = {k: (v.format(r=r) if isinstance(v, str) else v) for k, v in template.items()}
             row["status"] = "computed"
             d[col_id] = row
-    for k, v in _DESCOPED.items():
-        d[k] = v
     for k, v in _SHADE_TABLE_ONLY.items():
         d.setdefault(k, v)
     for k, note in _RETIRED.items():
