@@ -44,7 +44,7 @@ import hubkit  # noqa: E402
 from src.om_package.figures import _DOSE_SLOT_QUANTILES  # noqa: E402
 from src.om_package.report import SEGMENT_M, count_word
 from src.om_package.routes import ROUTE_FLAG_MAX_STREET_DIST_M  # noqa: E402
-from src.om_package.wind_obs import CLIM_YEAR_END, CLIM_YEAR_START  # noqa: E402
+from src.om_package.spec import internal_dir_for  # noqa: E402
 
 DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
 
@@ -182,7 +182,7 @@ def version_history(package_root: Path, latest_dir: Path) -> list[dict]:
     """Version history from each version's CHANGELOG (read off the newest
     version's cumulative CHANGELOG.md) cross-checked against each version's
     own manifest.json for build time and point count."""
-    entries = parse_changelog(latest_dir / "CHANGELOG.md")
+    entries = parse_changelog(internal_dir_for(latest_dir) / "CHANGELOG.md")
     for e in entries:
         vdir = package_root / e["version"]
         e["on_disk"] = vdir.is_dir()
@@ -224,7 +224,9 @@ def quality_summary(quality: dict) -> dict:
 
 def _shade_step_min(version_dir: Path) -> int:
     """Time step of the P-05 shade table, read from its timestamps."""
-    t = pd.read_parquet(version_dir / "p05_building_shade.parquet", columns=["timestamp"])["timestamp"]
+    import pyarrow.parquet as pq
+
+    t = pq.ParquetFile(version_dir / "p05_building_shade.parquet").read_row_group(0, columns=["timestamp_utc"]).to_pandas()["timestamp_utc"]
     return int(pd.Series(sorted(t.unique())).diff().min() / pd.Timedelta(minutes=1))
 
 
@@ -310,34 +312,28 @@ def render_page(root: Path) -> str:
         f"<strong>Sun exposure for every time of day</strong> over {html.escape(' to '.join(p10['window']))}: "
         f"{100 * p10['date_dependent_share']:.0f}% of daylight point-slots change with the date, so use the "
         "per-date results for the campaign dates.",
-        f"<strong>Device-clock check</strong>: only {100 * p10['clock_agreement_all']:.0f}% of daylight point-slots "
-        "keep the same sun or shade state whether the loggers recorded UTC or Rio local time. "
-        "Confirming the clock is the most useful thing the team can send.",
-        f"<strong>Ventilation proxies</strong> at the prevailing wind ({p11['prevailing_wind_bearing_deg']:.0f}°: "
-        f"shelter angle, canyon alignment, roughness), plus {p11['n_obs']:,} observed {html.escape(p11['station'])} "
-        f"airport wind reports over the season, {p11['n_used_if_device_clock_utc']} (clock read as UTC) or "
-        f"{p11['n_used_if_device_clock_local']} (clock read as local time) of them matched to the walk times. "
+        "<strong>Two wind regimes</strong> from the Galeão airport reports: "
+        + " and ".join(f"{html.escape(g['name'])} ({g['mean_direction_deg']:.0f}°)" for g in p11["campaign_regimes"])
+        + ". Ventilation proxies (shelter angle, canyon alignment, frontal density, roughness) are given for each regime. "
         "Geometry-derived proxies, not measured airflow.",
+        f"<strong>Walks</strong>: {manifest['walks']['n_walks']} logger walks on {manifest['walks']['n_dates']} dates, with an arrival "
+        "time at every route point and sensor-matched values.",
     ]
     n_figs = len(sorted((version_dir / "OM2").glob("*.png")))
     new_items.append(f"<strong>A shorter report</strong> with all {n_figs} figures and a README reorganised for scanning.")
-    changelog_view_new = f"/doc?src=/morphofavela-dash/{version_dir.relative_to(root).as_posix()}/CHANGELOG.md"
     new_html = f"""
 <section id="new">
   <h2>What's new in {html.escape(version)}</h2>
   <ul class="new">{"".join(f"<li>{i}</li>" for i in new_items)}</ul>
-  <p class="sub"><a href="{changelog_view_new}">Full changelog</a></p>
 </section>"""
 
     # --- spec: counts up front, the table behind a toggle ------------------
-    conformance_rel = _rel_to(package_root, version_dir / "p00_spec_conformance.json")
-    conformance_csv_rel = _rel_to(package_root, version_dir / "p00_spec_conformance.csv")
-    conformance = load_json(version_dir / "p00_spec_conformance.json")
+    conformance = load_json(internal_dir_for(version_dir) / "p00_spec_conformance.json")
     if conformance is None:
         conformance_html = """
 <section id="conformance">
   <h2>Spec</h2>
-  <p class="sub">No p00_spec_conformance.json found for this version: rebuild with
+  <p class="sub">No internal p00_spec_conformance.json found for this version: rebuild with
   scripts/build_om_package.py.</p>
 </section>"""
     else:
@@ -370,15 +366,13 @@ def render_page(root: Path) -> str:
   <p class="counts">{"".join(counts)}</p>
   <p class="sub">A <em>scoped</em> or <em>descoped</em> part is a deliberate cut by PI decision, not a gap.</p>
   <details class="spec"><summary>Show the full spec table</summary>
-  <p class="sub">Computed by <code>src/om_package/spec.py</code>
-  (<a href="{conformance_rel}">p00_spec_conformance.json</a>, <a href="{conformance_csv_rel}">.csv</a>).</p>
+  <p class="sub">Computed by <code>src/om_package/spec.py</code>.</p>
   <div class="scroll">{_table(["id", "requirement", "status", "evidence", "pending on / descoped"], conf_rows, escape_cols={0, 1, 3, 4})}</div>
   </details>
 </section>"""
 
     # --- figure gallery: every figure, caption says what to look at ---------
     n_dates = p05.get("n_campaign_dates") or 0
-    bearing_txt = f"{p11['prevailing_wind_bearing_deg']:.0f}°"
     gallery_spec = [
         ("map_form.png", "Route and sky view",
          "The OM2 route over the Maré buildings, coloured by sky view (0 = no sky, 1 = open). Dark stretches are enclosed."),
@@ -388,17 +382,11 @@ def render_page(root: Path) -> str:
         ("map_shade.png", "Building shade on the campaign dates",
          f"Share of daylight each point spends in building shade over the {n_dates} campaign dates."),
         ("shade_calendar.png", "Shade by date and time",
-         "One panel per campaign date: distance along the route against time of day (device clock read as UTC)."),
+         "One panel per campaign date: distance along the route against time of day (Rio local time)."),
         ("sun_envelope.png", "Does the date matter?",
          "Always shaded, date-dependent or always sunny by time of day (Rio local time), and where the date matters most."),
         ("sun_dose.png", "Direct sun dose",
          f"Clear-sky direct sun over the past hour along the route at {count_word(len(_DOSE_SLOT_QUANTILES))} times of day; band = season range, lines = campaign dates."),
-        ("map_vent_shelter.png", "Shelter from the wind",
-         f"How high buildings rise toward the prevailing wind ({bearing_txt}). Dark = sheltered. Geometry proxy."),
-        ("profiles_vent.png", "Ventilation proxies along the route",
-         "Frontal density, canyon alignment (0 = wind along the street), shelter angle and roughness length z0 (outside its calibrated range here)."),
-        ("wind_rose_compare.png", "Observed wind vs climatology",
-         f"Galeão airport wind for the campaign season against {CLIM_YEAR_START} to {CLIM_YEAR_END}. Not wind at the route."),
     ]
     tiles = []
     for name, title, caption in gallery_spec:
@@ -422,13 +410,11 @@ def render_page(root: Path) -> str:
 
     # --- files ------------------------------------------------------------
     readme_rel = _rel_to(package_root, version_dir / "README.md")
-    changelog_rel = _rel_to(package_root, version_dir / "CHANGELOG.md")
     # Served as text/markdown under the hub's MorphoFavela mount, a .md file
     # reaches the tablet as raw markdown (PI, 2026-09-27: "impossible to
     # read"); the hub's /doc viewer renders any same-origin src through md.js.
     dash_version = "/morphofavela-dash/" + version_dir.relative_to(root).as_posix()
     readme_view = f"/doc?src={dash_version}/README.md"
-    changelog_view = f"/doc?src={dash_version}/CHANGELOG.md"
     manifest_rel = _rel_to(package_root, version_dir / "manifest.json")
     dict_rel = _rel_to(package_root, version_dir / "p08_data_dictionary.csv")
     panel_rel = _rel_to(package_root, package_root / PANEL_PAGE_NAME)
@@ -438,15 +424,15 @@ def render_page(root: Path) -> str:
         ("OM2/points.gpkg", "route points (GeoPackage)"),
         ("OM2/points.csv", "route points (CSV)"),
         ("p05_building_shade.parquet", f"building shade per point and {_shade_step_min(version_dir)}-min step, campaign dates"),
-        ("p05_building_shade.csv", "building shade (CSV)"),
-        ("p05b_campaign_windows.csv", "campaign dates and walk windows"),
+        ("p02b_walks.csv", "one row per logger walk: timing, coverage, wind regime"),
+        ("p12_walk_points.parquet", "arrival time, shade, dose and sensor-matched values per walk and point"),
         ("p10_sun_envelope.parquet", "sun class per point and local time of day over the season"),
         ("p10_sun_envelope.csv", "sun envelope (CSV)"),
         ("p10_sun_dose.parquet", f"clear-sky direct-sun dose, {'/'.join(map(str, p10['dose_hours']))} h"),
         ("p10_sun_dose.csv", "sun dose (CSV)"),
-        ("p10_clock_agreement.csv", "UTC vs local clock agreement per date"),
         ("p10_horizon_profiles.parquet", "horizon angle per point and azimuth"),
-        ("p11_wind_observed.csv", "SBGL airport wind, flagged by matched walk"),
+        ("p11_wind_regimes.csv", "the two wind regimes, campaign season and climatology"),
+        ("p11_regime_by_hour.csv", "regime share by local hour"),
         ("p08_data_dictionary.csv", "data dictionary"),
         ("OM2/aggregate_to_segments.py", "re-aggregate the points to any segment length"),
         ("OM2/join_shade_example.py", "example join of device data to the shade table"),
@@ -464,7 +450,6 @@ def render_page(root: Path) -> str:
   <div><h3>Documents</h3><ul class="files">
     <li><a href="{pdf_rel}" download="{html.escape(pdf_download)}">report.pdf</a> <span class="sub">the short report</span></li>
     <li><a href="{readme_view}">README</a> <span class="sub">technical document (<a href="{readme_rel}">raw .md</a>, <a href="{readme_pdf_rel}">PDF</a>)</span></li>
-    <li><a href="{changelog_view}">Changelog</a> <span class="sub">(<a href="{changelog_rel}">raw .md</a>)</span></li>
     <li><a href="{manifest_rel}">manifest.json</a> <span class="sub">sha256 per file, version, CRS, use terms</span></li>
     <li><a href="{panel_rel}">Panel ruling</a> <span class="sub">the expert-panel review behind v0.1's must-fix list</span></li>
   </ul></div>
@@ -482,16 +467,9 @@ def render_page(root: Path) -> str:
 </section>"""
 
     owes = [
-        ("Device clock: UTC or Rio local time?",
-         f"Only {100 * p10['clock_agreement_all']:.0f}% of daylight point-slots keep the same sun state under the two "
-         "readings, so this is the most valuable answer. The per-date shade table reads the clock as UTC until then."),
         ("Sensor time constant",
          "The air-temperature sensor's response time as mounted (63% or 90%), to set the analysis segment length "
          "(README: Using the data)."),
-        ("More raw OM2 CSVs, with GPS",
-         f"The {p05['n_csv_pilot']}-file pilot from Zenodo_release/fixed_data/ has no Latitude/Longitude column, "
-         "so whether it is the OM2 "
-         "device is unverified; a GPS-track CSV is needed for the spatial half of the join."),
         ("om_routes.gpkg",
          "The team's own walked route: makes point_id final and removes the route_geometry_flag defect."),
         ("2024 airborne LiDAR + footprints",
@@ -522,30 +500,29 @@ def render_page(root: Path) -> str:
   </details>
 </section>"""
 
-    windows_csv = version_dir / "p05b_campaign_windows.csv"
+    walks_csv = version_dir / "p02b_walks.csv"
     windows_rows = []
-    if windows_csv.exists():
-        with windows_csv.open(newline="", encoding="utf-8") as fh:
+    if walks_csv.exists():
+        with walks_csv.open(newline="", encoding="utf-8") as fh:
             for r in csv.DictReader(fh):
-                windows_rows.append([Path(r.get("csv_path", "")).name, r.get("date"), r.get("first_timestamp"),
-                                     r.get("last_timestamp"), r.get("n_rows"), r.get("has_gps"), r.get("n_epoch_reset")])
+                windows_rows.append([r.get("walk_id"), r.get("date"), r.get("start_local"), r.get("end_local"),
+                                     r.get("coverage_share"), r.get("partial"), r.get("wind_regime")])
     if p05.get("n_rows"):
         shade_html = f"""
 <section id="shade">
-  <h2>Campaign windows</h2>
-  <p>{p05.get("n_campaign_dates")} campaign dates from a {p05.get("n_csv_pilot")}-file pilot pull (one CSV per device).
+  <h2>Walks</h2>
+  <p>{p05.get("n_walks")} walks on {p05.get("n_campaign_dates")} dates.
   {p05.get("shade_fraction_daylight_pct")}% of daylight rows are in building shade.
-  Shade timestamps: <code>{html.escape(str(p05.get("tz")))}</code>.</p>
-  <details><summary>Walk windows as read off the device files</summary>
-  <div class="scroll">{_table(["CSV", "date", "first_timestamp", "last_timestamp", "n_rows", "has_gps", "n_epoch_reset"], windows_rows) if windows_rows else "<p class='sub'>No campaign-windows table found.</p>"}</div>
-  <p class="sub">The shade table pads each window to the enclosing hour before the {_shade_step_min(version_dir)}-min sweep.</p>
+  Shade timestamps: <code>{html.escape(str(p05.get("tz")))}</code> local time, with a UTC column.</p>
+  <details><summary>Walks (Rio local time)</summary>
+  <div class="scroll">{_table(["walk", "date", "start_local", "end_local", "coverage_share", "partial", "wind regime"], windows_rows) if windows_rows else "<p class='sub'>No walks table found.</p>"}</div>
   </details>
 </section>"""
     else:
         shade_html = """
 <section id="shade">
-  <h2>Campaign windows</h2>
-  <p class="sub">No campaign CSVs found at build time: this version ships the empty-schema shade table.</p>
+  <h2>Walks</h2>
+  <p class="sub">No shade rows in this build.</p>
 </section>"""
 
     dict_table_rows = [[r.get("id", ""), r.get("definition", ""), r.get("unit", ""), r.get("status", "")]

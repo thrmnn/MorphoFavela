@@ -21,13 +21,14 @@ Builds, per requested route:
        length is the team's choice, not fixed at build time
   P-04 airborne form variables (incl. grid_cell_id)
   P-06 ventilation proxies (incl. the 8 lambda_f_<dir> columns)
-  P-05 shade — exact-date table from the campaign CSVs (see
+  P-05 shade — walk dates, daylight only, Rio local time (see
        src/om_package/shade.py) — OM2/shared package only
-  P-10 sun exposure robust to campaign date and device clock (v0.2.0):
-       envelope, dose, horizon profiles, clock agreement, annual_sun_hours
-  P-11 derived ventilation indices with time-matched SBGL wind (v0.2.0):
-       p11_wind_observed.csv + the *_prevailing / z0 / zd / open-space
-       point columns (all PROXIES from building geometry)
+  P-10 sun exposure over the season: envelope, dose, horizon profiles,
+       annual_sun_hours
+  P-11 two SBGL wind regimes (p11_wind_regimes, p11_regime_by_hour) and the
+       ventilation point columns at each regime (all PROXIES from building
+       geometry)
+  P-12 walks (p02b_walks) and per-walk point values (p12_walk_points)
   P-07 quality report (counts route_geometry_flag)
   P-08 data dictionary — OM2/shared package only
   contact sheet PNG (OM2 only)
@@ -53,6 +54,7 @@ import json
 import re
 import shutil
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -78,36 +80,24 @@ from src.om_package.formvars import compute_form_variables
 from src.om_package.io_utils import Paths, hash_tree, write_table
 from src.om_package.neighbourhoods import communities_crossed, join_communities
 from src.om_package.package_docs import USE_TERMS, VERSION, render_changelog, render_readme
-from src.om_package import p10_p11
+from src.om_package import p10_p11, walk_tables
+from src.om_package.walks import load_walks
+from src.om_package.wind_regimes import season_regimes, tag_walks, load_campaign
 from src.om_package.provenance import read_om_decisions, read_wind_source_manifest
-from src.om_package.report import write_report
-from src.om_package.report_pdf import render_readme_pdf
+from src.om_package.report_pdf import render_markdown_pdf, render_readme_pdf, report_css
 from src.om_package.quality import write_quality_report
 from src.om_package.routes import compute_route_geometry_flag, densify_route, route_length_m
-from src.om_package.spec import render_conformance_markdown, write_conformance
+from src.om_package.spec import internal_dir_for, render_conformance_markdown, write_conformance
 from src.sites.territory import load_territory
 from src.om_package.shade import (
     OM2_SHADE_MAX_DIST_M,
     SHADE_STEP_MIN,
-    build_empty_shade_table,
-    compute_shade,
-    daylight_shade_fraction_pct,
-    infer_campaign_windows,
+    compute_shade_local,
     nodata_floor_m as compute_nodata_floor_m,
 )
 from src.om_package.sun_envelope import ENVELOPE_SLOT_MIN, route_centroid_latlon
-from src.om_package.vent_figures import build_map_shelter, build_profiles_vent, build_wind_rose_compare
-from src.om_package.vent_indices import compute_indices
 from src.om_package.ventilation import compute_ventilation_proxies
-from src.om_package.wind_obs import (
-    WINDOW_END,
-    WINDOW_START,
-    cache_paths as wind_cache_paths,
-    campaign_window_rose,
-    climatology_rose,
-    fetch_sbgl,
-    load_obs,
-)
+from src.om_package.wind_obs import WINDOW_END, WINDOW_START, cache_paths as wind_cache_paths, fetch_sbgl
 
 from build_om_package_page import build_page as build_om_package_page
 
@@ -207,53 +197,36 @@ DISCLOSURE_PATTERN = re.compile(
 )
 
 
-def write_disclosure_hits(out_dir: Path) -> Path:
+def write_disclosure_hits(out_dir: Path, internal_dir: Path) -> Path:
     """Runs DISCLOSURE_PATTERN over every line of every reader-facing document
-    in the built package (README, CHANGELOG, data dictionary, report,
-    conformance table, shipped scripts), and writes
-    (file, line, term, sentence) per hit to p00_disclosure_hits.txt at the
-    package root. Hits are reported, never stripped — disclosure is the
+    of the built package (shipped README, data dictionary, report, shipped
+    scripts) and of the internal CHANGELOG and conformance table, and writes
+    (file, line, term, sentence) per hit to p00_disclosure_hits.txt in the
+    INTERNAL directory. Hits are reported, never stripped; disclosure is the
     PI's call, not this script's."""
     targets = [
-        "README.md", "CHANGELOG.md", "p08_data_dictionary.csv", "report.md", "p00_spec_conformance.csv",
-        "OM2/aggregate_to_segments.py", "OM2/join_shade_example.py",
+        (out_dir, "README.md"), (internal_dir, "CHANGELOG.md"), (out_dir, "p08_data_dictionary.csv"),
+        (out_dir, "report.md"), (internal_dir, "p00_spec_conformance.csv"),
+        (out_dir, "OM2/aggregate_to_segments.py"), (out_dir, "OM2/join_shade_example.py"),
     ]
     hits: list[str] = []
-    for name in targets:
-        p = out_dir / name
+    for base, name in targets:
+        p = base / name
         if not p.exists():
             continue
         for lineno, line in enumerate(p.read_text(encoding="utf-8").splitlines(), start=1):
             for m in DISCLOSURE_PATTERN.finditer(line):
                 hits.append(f"{name}:{lineno}: [{m.group(0)}] {line.strip()}")
-    out_path = out_dir / "p00_disclosure_hits.txt"
+    out_path = internal_dir / "p00_disclosure_hits.txt"
     header = (
         "# Disclosure greplist hits — PI decides each one before this package leaves.\n"
         "# Pattern: party-wall|dissolve|lancet|nature cities|morphofavela|airflow|\n"
         "#          brisaverse|drive-sync|solstice|grimmond|oke|sondotecnica|IPP|\n"
         "#          mingze|gobatti|fabio (case-insensitive; oke and IPP matched as whole words)\n"
-        f"# {len(hits)} hit(s) across {', '.join(targets)}.\n\n"
+        f"# {len(hits)} hit(s) across {', '.join(n for _, n in targets)}.\n\n"
     )
     out_path.write_text(header + ("\n".join(hits) + "\n" if hits else "(no hits)\n"))
     return out_path
-
-
-def csv_catalogued_note(csv_dir: Path) -> str:
-    """The pilot CSV manifest's own note on files seen-but-not-downloaded
-    — reworded from a prose reference to a nonexistent 'count' field
-    (audit fix, 2026-09-27) to the manifest's actual content: a text note
-    under catalogued_not_downloaded, not a count."""
-    manifest_p = csv_dir / "manifest.json"
-    if not manifest_p.exists():
-        return "No CSV manifest was found at build time to report catalogued-but-not-downloaded files."
-    try:
-        data = json.loads(manifest_p.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return "The CSV manifest exists but could not be parsed at build time."
-    note = (data.get("catalogued_not_downloaded") or {}).get("note")
-    if not note:
-        return "The CSV manifest records no catalogued_not_downloaded note."
-    return f"The pilot manifest's own note on the rest of the Drive folder: {note}"
 
 
 def build_one_route(om: str, paths: Paths, out_dir: Path, radii=BUFFER_RADII_M, extras_fn=None) -> dict:
@@ -304,7 +277,26 @@ def build_one_route(om: str, paths: Paths, out_dir: Path, radii=BUFFER_RADII_M, 
     }
 
 
+LOCAL_TZ = "America/Sao_Paulo"
+MATCHED_DIR = Path("data") / "maré" / "octopus" / "prerelease_v020" / "matched"
+
+
+def write_report_stub(out_dir: Path, version: str) -> tuple[Path, Path]:
+    """Placeholder report.md/.pdf: src/om_package/report.py still reads the
+    v0.2.0 tables (clock agreement, observed wind) and is rewritten by the
+    report lane; until then the package ships this stub, not a stale report."""
+    md = out_dir / "report.md"
+    md.write_text(
+        f"# Octopus OM2 report {version}\n\nPLACEHOLDER: the report for this version is being rewritten. "
+        "See README.md for the data description.\n",
+        encoding="utf-8",
+    )
+    pdf = render_markdown_pdf(md, out_dir / "report.pdf", css=report_css(version), title="Octopus OM2 report", md_format="markdown")
+    return md, pdf
+
+
 def main() -> int:
+    t_start = time.time()
     ap = argparse.ArgumentParser()
     ap.add_argument("--route", default="OM2", help="OM1|OM2|OM3|OM4|ALL — non-OM2 routes always go to the internal build dir")
     ap.add_argument("--out", default=None, help="shared package dir for OM2 (default: <root>/outputs/_packages/mare_om2/<version>)")
@@ -316,10 +308,9 @@ def main() -> int:
     ap.add_argument("--root", default=str(Paths().root), help="MorphoFavela repo root (absolute)")
     ap.add_argument("--version", default=VERSION)
     ap.add_argument(
-        "--csv-dir",
+        "--matched-dir",
         default=None,
-        help="dir of raw Octopus campaign CSVs for real P-05 shade (default: <root>/data/maré/octopus/csv); "
-        "empty-schema table ships if none found there",
+        help="dir of the OM_2_*.csv matched walk files (default: <root>/data/maré/octopus/prerelease_v020/matched)",
     )
     ap.add_argument("--buildings", default=None, help="buildings layer for the horizon march (default: <root>/data/maré/buildings_extended_300m.gpkg)")
     ap.add_argument("--dtm", default=None, help="DTM for the horizon march (default: <root>/data/maré/dtm_extended_300m.tif)")
@@ -338,12 +329,14 @@ def main() -> int:
         if args.internal_out
         else paths.root / "outputs" / "_packages" / "_internal" / "mare_routes" / args.version
     )
+    pkg_internal_dir = internal_dir_for(out_dir)
 
     route_sel = args.route.upper().replace("OM_", "OM")
     routes = ALL_ROUTES if route_sel == "ALL" else [f"OM_{route_sel[2:]}"]
 
     if "OM_2" in routes:
         out_dir.mkdir(parents=True, exist_ok=True)
+        pkg_internal_dir.mkdir(parents=True, exist_ok=True)
     if any(r != "OM_2" for r in routes):
         internal_dir.mkdir(parents=True, exist_ok=True)
 
@@ -356,47 +349,48 @@ def main() -> int:
         "routes": [],
     }
 
-    csv_dir = Path(args.csv_dir) if args.csv_dir else paths.root / "data" / "maré" / "octopus" / "csv"
-    csv_paths = sorted(csv_dir.glob("*.csv")) if csv_dir.exists() else []
-    campaign_windows_df = infer_campaign_windows(csv_paths) if csv_paths else None
-
     ctx: dict = {}
+    if "OM_2" in routes:
+        matched_dir = Path(args.matched_dir) if args.matched_dir else paths.root / MATCHED_DIR
+        print(f"[build_om_package] walks: reading {matched_dir} ...")
+        walks_df, fixes = load_walks(matched_dir, paths.route_json("OM_2"))
+        walk_dates = sorted(str(d) for d in walks_df["date"].unique())
+        if not wind_cache_paths(paths.root)[0].exists():
+            print("[build_om_package] SBGL cache missing — fetching from the Iowa ASOS archive ...")
+            fetch_sbgl(paths.root, args.window_start, args.window_end)
+        season = season_regimes(paths.root)
+        regimes = p10_p11.campaign_regime_list(season)
+        print(f"[build_om_package] {len(walks_df)} walks on {len(walk_dates)} dates; campaign regimes: "
+              + ", ".join(f"{g['name']} {g['mean_direction_deg']:.1f} deg" for g in regimes))
+        ctx.update(walks=walks_df, fixes=fixes, walk_dates=walk_dates, season=season, regimes=regimes)
 
     def om2_extras(points_gdf):
-        """P-10/P-11 inputs and the seven new point columns, from ONE horizon
-        march that P-05 shade reuses below."""
-        if campaign_windows_df is None:
-            raise SystemExit(f"P-10 needs the campaign CSVs under {csv_dir} (campaign dates for the dose and clock agreement)")
-        print(f"[build_om_package] P-10/P-11: horizon march on {args.device} ...")
+        """P-10/P-11 inputs and the new point columns, from ONE horizon
+        march that P-05 shade and p12 reuse below."""
+        print(f"[build_om_package] P-10/P-11: horizon march on {args.device} ({len(points_gdf)} points) ...")
         horizon_deg, horizon_az, horizon_tab = p10_p11.horizon_arrays_and_table(points_gdf, paths, device=args.device)
         lat, lon = route_centroid_latlon(points_gdf)
-        dates = [str(d) for d in campaign_windows_df["date"]]
-        new_cols, prevailing = p10_p11.new_point_columns(
-            points_gdf, horizon_deg, horizon_az, horizon_tab, lat=lat, lon=lon, root=paths.root
+        new_cols = p10_p11.new_point_columns(
+            points_gdf, horizon_deg, horizon_az, horizon_tab, regimes=ctx["regimes"], lat=lat, lon=lon
         )
         sun = p10_p11.sun_tables(
-            horizon_tab, dates, lat=lat, lon=lon, window_start=args.window_start, window_end=args.window_end,
+            horizon_tab, ctx["walk_dates"], lat=lat, lon=lon, window_start=args.window_start, window_end=args.window_end,
             dose_slot_min=args.dose_slot_min,
         )
-        if not wind_cache_paths(paths.root)[0].exists():
-            print("[build_om_package] P-11: SBGL cache missing — fetching from the Iowa ASOS archive ...")
-            fetch_sbgl(paths.root, args.window_start, args.window_end)
-        obs = load_obs(paths.root)
-        wind_tbl = p10_p11.wind_observed_table(obs, campaign_windows_df)
-        agree_all = float(sun["clock_agreement"].loc[sun["clock_agreement"]["scope"] == "all", "agreement_share"].iloc[0])
-        p10_summary = {**sun["summary"], "clock_agreement_all": agree_all, "envelope_slot_min": ENVELOPE_SLOT_MIN}
+        p10_summary = {**sun["summary"], "envelope_slot_min": ENVELOPE_SLOT_MIN}
         ctx.update(
-            horizon_deg=horizon_deg, azimuths_deg=horizon_az, horizon_tab=horizon_tab, sun=sun, wind_tbl=wind_tbl,
-            obs=obs, prevailing_deg=prevailing, p10_summary=p10_summary, lat=lat, lon=lon,
-            wind_summary=p10_p11.wind_summary(wind_tbl),
+            horizon_deg=horizon_deg, azimuths_deg=horizon_az, horizon_tab=horizon_tab, sun=sun,
+            p10_summary=p10_summary, lat=lat, lon=lon, point_ids=points_gdf["point_id"].to_numpy(),
         )
+        regime_info = [{k: g[k] for k in ("key", "name", "slug", "mean_direction_deg")} for g in ctx["regimes"]]
         quality_extra = {"p10_p11": {
             "geometry_epoch": args.geometry_epoch,
             "p10": {k: p10_summary[k] for k in ("window", "tz", "n_days", "n_daylight_point_slots", "date_dependent_share",
-                                              "class_share_of_daylight", "clock_agreement_all", "dose_slot_min")},
-            "p10_clock_agreement": sun["clock_agreement"].to_dict(orient="records"),
-            "p11": {**ctx["wind_summary"], "prevailing_wind_bearing_deg": prevailing,
+                                              "class_share_of_daylight", "dose_slot_min")},
+            "p11": {"campaign_regimes": regime_info,
                     "note": "ventilation columns are geometry-derived PROXIES; SBGL wind is an airport reference, not wind at the route"},
+            "walks": {"n_walks": int(len(ctx["walks"])), "n_walk_dates": len(ctx["walk_dates"]),
+                      "n_partial": int(ctx["walks"]["partial"].sum())},
         }}
         return new_cols, quality_extra
 
@@ -415,19 +409,10 @@ def main() -> int:
     if om2_df is None:
         print("[build_om_package] OM2 not requested — nothing written to the shared package this run")
         return 0
+    assert list(om2_df["point_id"]) == list(ctx["point_ids"]), "points table order differs from the horizon march order"
 
-    # P-05: shade. Real run when campaign CSVs exist under --csv-dir (v0.1.2:
-    # the Zenodo_release/fixed_data pilot pull); empty-schema table otherwise
-    # (no guessed demo run — see src/om_package/shade.py). OM2/shared only.
-    n_csv_pilot = len(csv_paths)
-    n_campaign_dates = 0
-    n_shade_rows = 0
-    shade_fraction_daylight_pct = 0.0
-
-    # om2_gdf is needed regardless of whether real shade runs this build:
-    # the nodata floor (README Known limits, manifest p05_shade) is a
-    # property of the OM2 points against the extended DTM, not of the
-    # shade computation itself.
+    # om2_gdf is needed for the nodata floor (README Known limits, manifest
+    # p05_shade): a property of the OM2 points against the extended DTM.
     om2_gdf = gpd.GeoDataFrame(
         om2_df[["point_id"]], geometry=gpd.points_from_xy(om2_df["x"], om2_df["y"]), crs=CRS
     )
@@ -444,63 +429,62 @@ def main() -> int:
         "shade.py's OM2_SHADE_MAX_DIST_M before shipping"
     )
 
-    if csv_paths:
-        print(f"[build_om_package] P-05: {n_csv_pilot} campaign CSVs found under {csv_dir} — computing real shade")
-        # lat/lon for pvlib sun position: the OM2 route's own centroid, reprojected
-        # WGS84 (EPSG:31983 -> 4326) — a single site-representative point, same
-        # simplification WP-04/WP-05 make for one site's sun position; computed from
-        # the actual route geometry, never a remembered/approximate coordinate.
-        from pyproj import Transformer
+    walks_df, walk_dates, regimes, season = ctx["walks"], ctx["walk_dates"], ctx["regimes"], ctx["season"]
+    lat, lon = ctx["lat"], ctx["lon"]
+    horizon_deg, horizon_az = ctx["horizon_deg"], ctx["azimuths_deg"]
 
-        transformer = Transformer.from_crs(CRS, "EPSG:4326", always_xy=True)
-        mare_lon, mare_lat = transformer.transform(om2_df["x"].mean(), om2_df["y"].mean())
-        write_table(campaign_windows_df, out_dir, "p05b_campaign_windows")
-        horizon_deg, horizon_az = ctx["horizon_deg"], ctx["azimuths_deg"]
-        frames = []
-        for _, row in campaign_windows_df.iterrows():
-            d = str(row["date"])
-            start_h = row["first_timestamp"].strftime("%H:00")
-            end_h = min(row["last_timestamp"], row["last_timestamp"].normalize() + pd.Timedelta("23h59min")).strftime("%H:59")
-            frames.append(
-                compute_shade(
-                    om2_gdf, [d], (start_h, end_h), step_min=SHADE_STEP_MIN,
-                    lat=mare_lat, lon=mare_lon, tz="UTC",
-                    horizon_deg=horizon_deg, horizon_azimuths_deg=horizon_az,
-                )
-            )
-        shade_table = pd.concat(frames, ignore_index=True)
-        n_campaign_dates = len(campaign_windows_df)
-        n_shade_rows = len(shade_table)
-        shade_fraction_daylight_pct = daylight_shade_fraction_pct(shade_table)
-        print(f"[build_om_package] P-05: {n_shade_rows} rows across {n_campaign_dates} campaign dates "
-              f"({shade_fraction_daylight_pct}% of daylight rows in building shade, tz=UTC)")
-    else:
-        shade_table = build_empty_shade_table()
-    write_table(shade_table, out_dir, "p05_building_shade")
+    # P-05: shade on the walk dates, daylight only, Rio local time; parquet only.
+    print(f"[build_om_package] P-05: shade on {len(walk_dates)} walk dates ...")
+    shade_summary, shade_fig = compute_shade_local(
+        om2_df["point_id"], walk_dates, SHADE_STEP_MIN, lat, lon, LOCAL_TZ, horizon_deg, horizon_az,
+        out_dir / "p05_building_shade.parquet",
+    )
+    n_campaign_dates = shade_summary["n_dates"]
+    n_shade_rows = shade_summary["n_rows"]
+    shade_fraction_daylight_pct = shade_summary["shade_fraction_daylight_pct"]
+    print(f"[build_om_package] P-05: {n_shade_rows} rows across {n_campaign_dates} walk dates "
+          f"({shade_fraction_daylight_pct}% in building shade, daylight only, {LOCAL_TZ})")
+    shade_fig = shade_fig.rename(columns={"timestamp_local": "timestamp"})
+    calendar_windows = walks_df.assign(date=walks_df["date"].astype(str)).groupby("date").agg(
+        first_timestamp=("start_local", "min"), last_timestamp=("end_local", "max")).reset_index()
 
     # P-10 / P-11 package-root tables (computed in om2_extras above).
     sun = ctx["sun"]
     write_table(sun["envelope"], out_dir, "p10_sun_envelope")
     write_table(sun["dose"], out_dir, "p10_sun_dose")
-    write_table(sun["clock_agreement"], out_dir, "p10_clock_agreement")
     ctx["horizon_tab"].to_parquet(out_dir / "p10_horizon_profiles.parquet", index=False)
-    ctx["wind_tbl"].to_csv(out_dir / "p11_wind_observed.csv", index=False)
+    regimes_tbl = p10_p11.wind_regimes_table(season)
+    regimes_tbl.to_csv(out_dir / "p11_wind_regimes.csv", index=False)
+    by_hour_tbl = p10_p11.regime_by_hour_table(season, paths.root)
+    by_hour_tbl.to_csv(out_dir / "p11_regime_by_hour.csv", index=False)
+
+    # P-12: walks and per-walk point values.
+    tags = tag_walks(walks_df, load_campaign(paths.root), season["campaign"])
+    walks_tbl = walk_tables.walks_table(walks_df, tags)
+    write_table(walks_tbl, out_dir, "p02b_walks")
+    regime_measures = [f"{stem}_{g['slug']}" for g in regimes for stem in p10_p11.REGIME_MEASURE_STEMS]
+    t12 = time.time()
+    p12 = walk_tables.walk_points_table(
+        om2_df, ctx["fixes"], walks_df, ctx["horizon_tab"], horizon_deg, horizon_az,
+        regime_measures=regime_measures, lat=lat, lon=lon,
+    )
+    write_table(p12, out_dir, "p12_walk_points")
+    print(f"[build_om_package] P-12: {len(walks_tbl)} walks, {len(p12)} walk-point rows ({time.time() - t12:.0f} s); "
+          f"walks tagged: {walks_tbl['wind_regime'].value_counts().to_dict()}")
     print(
         f"[build_om_package] P-10/P-11: envelope {len(sun['envelope'])} rows, dose {len(sun['dose'])} rows, "
-        f"horizon {len(ctx['horizon_tab'])} rows, wind {len(ctx['wind_tbl'])} observations"
+        f"horizon {len(ctx['horizon_tab'])} rows, regimes {len(regimes_tbl)} rows, by-hour {len(by_hour_tbl)} rows"
     )
 
     # P-08: data dictionary (package-wide, not per-route). OM2/shared only.
-    dict_df = dictionary_dataframe()
+    dict_df = dictionary_dataframe(regimes=regimes)
     write_table(dict_df, out_dir, "p08_data_dictionary")
 
-    # Figures (PI, 2026-09-27): spatial result first (F1/F2, route overlaid
-    # on the favela buildings), then the sampling along the route (F3/F4) —
-    # replaces the old contact_sheet.py (route floating in blank space).
-    # A rebuild into an existing version directory must not carry the
-    # superseded sheet along: the manifest hashes the whole tree, so a stale
-    # file would ship (and be sworn to) as part of the package.
+    # Figures. The ventilation figures and the report figure list are the
+    # report lane's to redo for two regimes.
     (out_dir / "OM2" / "contact_sheet.png").unlink(missing_ok=True)
+    for stale in ("map_vent_shelter.png", "profiles_vent.png", "wind_rose_compare.png"):
+        (out_dir / "OM2" / stale).unlink(missing_ok=True)
     try:
         buildings = gpd.read_file(paths.buildings_mare)
     except Exception as exc:  # pragma: no cover - missing source is a build-config error, not a figure bug
@@ -513,21 +497,21 @@ def main() -> int:
         print(f"[build_om_package] WARNING: could not load Maré territory ({exc}); figures will ship without community outlines")
         subunits = None
 
-    tz_label = "UTC" if n_shade_rows else "n/a (no campaign rows)"
+    tz_label = "Rio local time (UTC-3)"
     map_form_path = out_dir / "OM2" / "map_form.png"
     build_map_form(om2_df, buildings, subunits, map_form_path, route_id="OM2", version=args.version)
     print(f"[build_om_package] F1 map (form/SVF): {map_form_path}")
 
     map_shade_path = out_dir / "OM2" / "map_shade.png"
-    build_map_shade(om2_df, shade_table, buildings, subunits, map_shade_path, route_id="OM2", version=args.version, tz=tz_label)
+    build_map_shade(om2_df, shade_fig, buildings, subunits, map_shade_path, route_id="OM2", version=args.version, tz=tz_label)
     print(f"[build_om_package] F2 map (shade): {map_shade_path}")
 
     profiles_path = out_dir / "OM2" / "profiles.png"
-    build_profiles(om2_df, shade_table, profiles_path, dictionary_df=dict_df, route_id="OM2", version=args.version)
+    build_profiles(om2_df, shade_fig, profiles_path, dictionary_df=dict_df, route_id="OM2", version=args.version)
     print(f"[build_om_package] F3 profiles: {profiles_path}")
 
     shade_calendar_path = out_dir / "OM2" / "shade_calendar.png"
-    build_shade_calendar(om2_df, shade_table, campaign_windows_df, shade_calendar_path, route_id="OM2", version=args.version)
+    build_shade_calendar(om2_df, shade_fig, calendar_windows, shade_calendar_path, route_id="OM2", version=args.version)
     print(f"[build_om_package] F4 shade calendar: {shade_calendar_path}")
 
     window = (args.window_start, args.window_end)
@@ -538,20 +522,11 @@ def main() -> int:
     build_sun_dose(om2_df, sun["envelope"], sun["dose"], sun_dose_path, route_id="OM2", version=args.version,
                    geometry_label=args.geometry_epoch)
     print(f"[build_om_package] F5/F6 sun figures: {sun_envelope_path}, {sun_dose_path}")
+    del shade_fig
 
-    prevailing = ctx["prevailing_deg"]
-    clim = climatology_rose(paths.root)
-    vent_idx = compute_indices(om2_df, prevailing, ctx["horizon_deg"], ctx["azimuths_deg"])
-    build_map_shelter(om2_df, vent_idx, buildings, subunits, out_dir / "OM2" / "map_vent_shelter.png", prevailing,
-                      route_id="OM2", version=args.version, wind_source=clim["label"].removesuffix(" climatology, 10 m"))
-    build_profiles_vent(om2_df, vent_idx, out_dir / "OM2" / "profiles_vent.png", prevailing, route_id="OM2", version=args.version)
-    build_wind_rose_compare(campaign_window_rose(ctx["obs"]), clim, out_dir / "OM2" / "wind_rose_compare.png")
-    print("[build_om_package] V1-V3 ventilation-proxy figures written")
-
-    # P-03/P-05, structural fix (PI, 2026-09-27): the aggregation script and
-    # the shade join example now travel INSIDE the package, not just in the
-    # repo's scripts/ — a recipient with only this directory can still
-    # re-aggregate to any segment length and exercise the join example.
+    # The aggregation script and the shade join example travel INSIDE the
+    # package, so a recipient with only this directory can re-aggregate (also
+    # p12_walk_points per walk, --by walk_id) and exercise the join example.
     shipped_dir = Path(__file__).resolve().parents[1] / "src" / "om_package" / "shipped"
     for shipped_name in ("aggregate_to_segments.py", "join_shade_example.py"):
         shutil.copyfile(shipped_dir / shipped_name, out_dir / "OM2" / shipped_name)
@@ -601,7 +576,7 @@ def main() -> int:
         internal_routes_status=internal_status,
         decisions=decisions,
         dtm_native_resolution_m=dtm_res_m,
-        n_csv_pilot=n_csv_pilot,
+        n_walks=len(walks_df),
         n_campaign_dates=n_campaign_dates,
         n_shade_rows=n_shade_rows,
         shade_fraction_daylight_pct=shade_fraction_daylight_pct,
@@ -610,7 +585,6 @@ def main() -> int:
         wind_source=wind_source,
         geometry_label=args.geometry_epoch,
         route_length_m=manifest["routes"][0]["length_m"],
-        prevailing_deg=prevailing,
         version=args.version,
     )
     changelog_kwargs = dict(version=args.version)
@@ -623,24 +597,32 @@ def main() -> int:
     # io_utils.hash_tree's ``exclude`` docstring). The final write, with the
     # file hashes, is the last thing the build does to the package.
     manifest["p05_shade"] = {
-        "n_csv_pilot": n_csv_pilot,
+        "n_walks": len(walks_df),
         "n_campaign_dates": n_campaign_dates,
         "n_rows": n_shade_rows,
         "shade_fraction_daylight_pct": shade_fraction_daylight_pct,
-        "tz": "UTC (labelling choice, campaign timezone UNRESOLVED)" if n_shade_rows else None,
+        "tz": LOCAL_TZ,
         "max_dist_m": OM2_SHADE_MAX_DIST_M,
         "nodata_floor_m": nodata_floor,
-        "campaign_dates": [str(d) for d in campaign_windows_df["date"]] if campaign_windows_df is not None else [],
+        "campaign_dates": walk_dates,
     }
     manifest["provenance"] = {"decisions": decisions, "wind_source": wind_source}
     manifest["geometry_epoch"] = args.geometry_epoch
     manifest["p10"] = {
         **{k: ctx["p10_summary"][k] for k in ("window", "tz", "n_days", "n_daylight_point_slots", "date_dependent_share",
-                                              "class_share_of_daylight", "clock_agreement_all", "dose_slot_min", "dose_hours", "envelope_slot_min")},
-        "campaign_dates": [str(d) for d in campaign_windows_df["date"]],
+                                              "class_share_of_daylight", "dose_slot_min", "dose_hours", "envelope_slot_min")},
+        "campaign_dates": walk_dates,
     }
-    manifest["p11"] = {**ctx["wind_summary"], "prevailing_wind_bearing_deg": prevailing,
-                       "station": wind_source["station"], "window_utc": wind_source["window_utc"]}
+    manifest["p11"] = {
+        "station": wind_source["station"], "window_utc": wind_source["window_utc"],
+        "campaign_regimes": [{k: g[k] for k in ("key", "name", "slug", "mean_direction_deg")} for g in regimes],
+        "regimes": regimes_tbl.to_dict(orient="records"),
+    }
+    manifest["walks"] = {
+        "source_dir": MATCHED_DIR.as_posix(), "n_walks": int(len(walks_tbl)), "n_dates": n_campaign_dates,
+        "n_partial": int(walks_tbl["partial"].sum()), "n_walk_point_rows": int(len(p12)),
+        "tagged_by_regime": walks_tbl["wind_regime"].value_counts().to_dict(),
+    }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
     # First pass: README/CHANGELOG without the conformance section, so
@@ -648,12 +630,12 @@ def main() -> int:
     # already has every other P-01..P-09 artefact (including a README with
     # its required headings) on disk.
     (out_dir / "README.md").write_text(render_readme(**readme_kwargs))
-    (out_dir / "CHANGELOG.md").write_text(render_changelog(**changelog_kwargs))
+    (pkg_internal_dir / "CHANGELOG.md").write_text(render_changelog(n_om2_points=n_om2_points, **changelog_kwargs))
 
     # P-00: mechanical conformance to the PI's package spec (P-01..P-11),
     # computed from the files just written — never typed by hand (see
     # src/om_package/spec.py).
-    conf = write_conformance(out_dir)
+    conf = write_conformance(out_dir, out_dir=pkg_internal_dir)
     counts = {s: sum(1 for it in conf["items"] if it["status"] == s)
               for s in ("delivered", "delivered (scoped)", "partial", "pending", "descoped")}
     print(
@@ -681,13 +663,13 @@ def main() -> int:
     # self-hash that could never verify. See io_utils.hash_tree's
     # ``exclude`` docstring.
     # report.md/.pdf land before the hash pass so they ship in the manifest.
-    report_md, report_pdf = write_report(out_dir)
+    report_md, report_pdf = write_report_stub(out_dir, args.version)
     print(f"[build_om_package] wrote {report_md} and {report_pdf}")
     # Disclosure greplist (PI decides each hit — never auto-removed). Written
     # before hashing: written after, the manifest carried the previous
     # build's hash of this file.
-    write_disclosure_hits(out_dir)
-    print(f"[build_om_package] wrote disclosure hits to {out_dir / 'p00_disclosure_hits.txt'}")
+    hits_path = write_disclosure_hits(out_dir, pkg_internal_dir)
+    print(f"[build_om_package] wrote disclosure hits to {hits_path}")
     manifest["files"] = hash_tree(out_dir, exclude={"manifest.json"})
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(f"[build_om_package] wrote manifest to {out_dir / 'manifest.json'}")
