@@ -48,7 +48,7 @@ from src.om_package.spec import internal_dir_for  # noqa: E402
 DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
 
 BRISA_HUB = "https://brisa.theoalessandro.com"
-OPS_DECISION_ID = "om_release_v0_2_0"
+OPS_DECISION_ID = "om_release_v0_3_0"
 OPS_LINK = f"{BRISA_HUB}/ops#dec-{OPS_DECISION_ID}"
 PAPER_LINK = f"{BRISA_HUB}/paper/x1"
 # The results deck lives on the hub origin that serves this page (under
