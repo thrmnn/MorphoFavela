@@ -284,19 +284,6 @@ LOCAL_TZ = "America/Sao_Paulo"
 MATCHED_DIR = Path("data") / "maré" / "octopus" / "prerelease_v020" / "matched"
 
 
-def write_report_stub(out_dir: Path, version: str) -> tuple[Path, Path]:
-    """Placeholder report.md/.pdf: src/om_package/report.py still reads the
-    v0.2.0 tables (clock agreement, observed wind) and is rewritten by the
-    report lane; until then the package ships this stub, not a stale report."""
-    md = out_dir / "report.md"
-    md.write_text(
-        f"# Octopus OM2 report {version}\n\nPLACEHOLDER: the report for this version is being rewritten. "
-        "See README.md for the data description.\n",
-        encoding="utf-8",
-    )
-    pdf = render_markdown_pdf(md, out_dir / "report.pdf", css=report_css(version), title="Octopus OM2 report", md_format="markdown")
-    return md, pdf
-
 
 def main() -> int:
     t_start = time.time()
@@ -628,7 +615,7 @@ def main() -> int:
     # p00_spec_conformance can be computed over a package directory that
     # already has every other P-01..P-09 artefact (including a README with
     # its required headings) on disk.
-    (out_dir / "README.md").write_text(render_readme(**readme_kwargs))
+    (out_dir / "README.md").write_text(render_readme(out_dir))
     (pkg_internal_dir / "CHANGELOG.md").write_text(render_changelog(n_om2_points=n_om2_points, **changelog_kwargs))
 
     # P-00: mechanical conformance to the PI's package spec (P-01..P-11),
@@ -643,10 +630,6 @@ def main() -> int:
         + f" (of {len(conf['items'])})"
     )
 
-    # Second pass: README with the conformance section filled in.
-    (out_dir / "README.md").write_text(
-        render_readme(conformance_section=render_conformance_markdown(conf) + "\n", **readme_kwargs)
-    )
 
     # README.pdf is rendered from the FINAL README.md, before the hash pass
     # so it ships in the manifest like any other file.
@@ -662,14 +645,10 @@ def main() -> int:
     # self-hash that could never verify. See io_utils.hash_tree's
     # ``exclude`` docstring.
     # report.md/.pdf land before the hash pass so they ship in the manifest.
-    try:
-        from src.om_package.report import write_report
+    from src.om_package.report import write_report
 
-        write_report(out_dir)
-        print(f"[build_om_package] wrote {out_dir / 'report.md'} and {out_dir / 'report.pdf'}")
-    except Exception as exc:  # the report is prose on top of the finished data; its failure must not stop the build
-        print(f"[build_om_package] WARNING: report not written ({type(exc).__name__}: {exc}); writing the placeholder")
-        write_report_stub(out_dir, args.version)
+    write_report(out_dir)
+    print(f"[build_om_package] wrote {out_dir / 'report.md'} and {out_dir / 'report.pdf'}")
     # Disclosure greplist (PI decides each hit — never auto-removed). Written
     # before hashing: written after, the manifest carried the previous
     # build's hash of this file.

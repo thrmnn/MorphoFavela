@@ -702,7 +702,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"{tags.get(r2['name'], 0)} walks {r2['name']}{untag_txt}. {tbp['morning'].get(r2['name'], 0)} of the "
         f"{per['morning']['n']} morning walks had the {r2['name']} wind, and "
         f"{tbp['evening'].get(r1['name'], 0)} of the {per['evening']['n']} evening walks the {r1['name']} wind. "
-        "The airport wind is a regional reference measured at 10 m height, not the wind in the streets.\n",
+        "The airport wind is a regional reference, not the wind in the streets.\n",
     ]
 
     # 8 ------------------------------------------------------------------

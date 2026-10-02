@@ -286,7 +286,7 @@ def render_readme(package_dir) -> str:
         "## Known limits\n",
         "- Street form, sun, shade and ventilation come from 2019 building and terrain geometry.\n"
         "- The sun dose assumes a clear sky, so it is an upper bound.\n"
-        "- The airport wind is a regional reference at 10 m height, not the wind in the streets.\n"
+        "- The airport wind is a regional reference, not the wind in the streets.\n"
         "- An empty value in a joined column means no source sample within the join distance; an empty buffer "
         "mean means no building in the buffer.\n",
         "## Columns\n",
