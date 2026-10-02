@@ -66,7 +66,7 @@ td:first-child { width: 33%; }
 td:nth-child(2) { width: 40%; }
 td code { font-size: 6.8pt; background: none; padding: 0; }
 figure { margin: 6pt 0 8pt 0; break-inside: avoid; text-align: center; }
-figure img { height: auto; }
+figure img { max-width: 100%; height: auto; }
 figcaption { font-size: 8.4pt; line-height: 1.35; color: #444; margin: 3pt 0 0 0; text-align: left; }
 """
 

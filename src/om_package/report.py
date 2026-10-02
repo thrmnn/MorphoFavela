@@ -48,23 +48,21 @@ ALIGN_BAND_DEG = 30.0
 #: Walks at or above this coverage are "full" for picking the sensor figure's walk (as in figures.py).
 FULL_COVERAGE = 0.95
 
-#: (file under OM2/, largest printed height in cm). A figure prints at the
-#: 16 cm text width unless that would make it taller than its cap; the cap
-#: keeps a section heading, its lead paragraphs and the figure on one page.
-TEXT_WIDTH_CM = 16.0
+#: Figures in report order. Each prints at 100 % of its designed size
+#: (src/om_package/figures.py, vent_figures.py), 200 dpi.
 FIGURES = [
-    ("fig_route.png", 16.5),
-    ("fig_form.png", 15.5),
-    ("fig_shade_map.png", 18.0),
-    ("fig_shade_calendar.png", 18.0),
-    ("fig_sun_dose.png", 20.0),
-    ("fig_wind.png", 18.0),
-    ("fig_shelter_maps.png", 18.0),
-    ("fig_vent_profiles.png", 18.0),
-    ("fig_svf_sensor.png", 18.0),
+    "fig_route.png",
+    "fig_form.png",
+    "fig_shade_map.png",
+    "fig_shade_calendar.png",
+    "fig_sun_dose.png",
+    "fig_wind.png",
+    "fig_shelter_maps.png",
+    "fig_vent_profiles.png",
+    "fig_svf_sensor.png",
 ]
-_FIG_NO = {name: i + 1 for i, (name, _c) in enumerate(FIGURES)}
-_FIG_CAP_CM = dict(FIGURES)
+FIGURE_DPI = 200
+_FIG_NO = {name: i + 1 for i, name in enumerate(FIGURES)}
 
 #: Pairs of percentage keys allowed to print the same rounded value, because
 #: the sentences that carry them name different things (checked by
@@ -526,20 +524,17 @@ def file_table(package_dir: Path, f: dict, *, spec_items: dict | None = None) ->
 
 # --- report ------------------------------------------------------------------
 
-def _figure_width_pct(path: Path, cap_cm: float) -> float:
-    """Share of the text width at which the image prints no taller than cap_cm."""
-    if not path.exists():
-        return 100.0
+def _figure_width_cm(path: Path) -> float:
+    """Printed width: the image's own size at FIGURE_DPI."""
     from PIL import Image
     with Image.open(path) as im:
-        w, h = im.size
-    return min(100.0, 100.0 * cap_cm * w / (TEXT_WIDTH_CM * h))
+        return im.size[0] / FIGURE_DPI * 2.54
 
 
 def _figure(package_dir: Path, name: str, caption: str, *, source: bool = False) -> str:
-    width = _figure_width_pct(package_dir / "OM2" / name, _FIG_CAP_CM[name])
+    width = _figure_width_cm(package_dir / "OM2" / name)
     cap = caption + (" " + DATA_SOURCE if source else "")
-    return f"![Figure {_FIG_NO[name]}. {cap}](OM2/{name}){{width={width:.0f}%}}\n"
+    return f"![Figure {_FIG_NO[name]}. {cap}](OM2/{name}){{width={width:.2f}cm}}\n"
 
 
 def _fig(name: str) -> str:

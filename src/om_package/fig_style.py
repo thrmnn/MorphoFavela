@@ -164,6 +164,12 @@ def map_height_in(extent, width_in: float) -> float:
     return width_in * (ymax - ymin) / (xmax - xmin)
 
 
+def fit_map_width_in(extent, max_height_in: float, max_width_in: float = TEXT_WIDTH_IN) -> float:
+    """Map width at which the equal-aspect extent is no taller than max_height_in."""
+    xmin, xmax, ymin, ymax = extent
+    return min(max_width_in, max_height_in * (xmax - xmin) / (ymax - ymin))
+
+
 def north_arrow(ax, loc=(0.92, 0.90), size=0.09):
     ax.annotate("", xy=(loc[0], loc[1]), xytext=(loc[0], loc[1] - size), xycoords="axes fraction",
                 arrowprops=dict(arrowstyle="-|>", color="black", lw=1.2, mutation_scale=10), zorder=9)

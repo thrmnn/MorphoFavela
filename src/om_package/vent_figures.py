@@ -170,9 +170,9 @@ def build_fig_shelter_maps(points: pd.DataFrame, regimes: list[dict], buildings:
         cmap = fs.VAR_CMAP["shelter_angle"]
         o = points.sort_values("distance_along_m")
         extent = fs.route_extent(o, margin_m=30.0)
-        map_w = 0.485
+        map_w = 0.455
         h = fs.map_height_in(extent, fs.TEXT_WIDTH_IN * map_w)
-        bar_h_in = 0.75
+        bar_h_in = 0.7
         fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, h + bar_h_in))
         top = h / (h + bar_h_in)
         xy = o[["x", "y"]].to_numpy()
@@ -190,7 +190,7 @@ def build_fig_shelter_maps(points: pd.DataFrame, regimes: list[dict], buildings:
             fs.north_arrow(ax, loc=(0.92, 0.88), size=0.08)
             if i == 0:
                 fs.scale_bar(ax, 100.0)
-        cax = fig.add_axes([0.3, 0.5 / (h + bar_h_in), 0.4, 0.13 / (h + bar_h_in)])
+        cax = fig.add_axes([0.3, 0.46 / (h + bar_h_in), 0.4, 0.13 / (h + bar_h_in)])
         cb = fig.colorbar(lc, cax=cax, orientation="horizontal")
         cb.set_label("upwind shelter angle (degrees)", labelpad=2)
         out = fs.save(fig, out_path)

@@ -30,6 +30,15 @@ DOSE_ZERO_BELOW = 0.1
 COVERAGE_FULL = 0.95
 
 
+#: Designed heights (inches). Figures print at 100 % of their size, so each one
+#: has to fit its page with the section heading and the lead paragraph.
+ROUTE_MAX_HEIGHT_IN = 5.85
+SHADE_MAP_MAX_HEIGHT_IN = 4.85
+SHADE_BAR_COLUMN_IN = 1.0
+FORM_HEIGHT_IN = 6.2
+SUN_DOSE_HEIGHT_IN = 7.8
+
+
 def load_shade_frame(parquet_path: Path) -> pd.DataFrame:
     """The full shipped shade table (every 5 min step), columns the figures need, ids dictionary-encoded."""
     import pyarrow.parquet as pq
@@ -95,7 +104,8 @@ def build_fig_route(points: pd.DataFrame, buildings: gpd.GeoDataFrame | None, ou
         import matplotlib.pyplot as plt
 
         extent = fs.route_extent(points, margin_m=45.0)
-        fig, ax = plt.subplots(figsize=(fs.TEXT_WIDTH_IN, fs.map_height_in(extent, fs.TEXT_WIDTH_IN)))
+        w_in = fs.fit_map_width_in(extent, ROUTE_MAX_HEIGHT_IN)
+        fig, ax = plt.subplots(figsize=(w_in, fs.map_height_in(extent, w_in)))
         fs.draw_buildings(ax, buildings, extent)
         _route_line(ax, points, colour="#111111", lw=1.8)
 
@@ -119,7 +129,7 @@ def build_fig_form(points: pd.DataFrame, out_path: Path) -> Path:
     """Four stacked profiles sharing distance: building height, height-to-width
     ratio, sky view factor, plan area density. Neighbourhood band once on top."""
     panels = [
-        ("building_height_m", "building height (m)"),
+        ("building_height_m", "building\nheight (m)"),
         ("height_width_ratio", "height-to-width\nratio"),
         ("sky_view_factor", "sky view factor"),
         ("plan_density_lambda_p", "plan area density"),
@@ -130,7 +140,7 @@ def build_fig_form(points: pd.DataFrame, out_path: Path) -> Path:
         p = points.sort_values("distance_along_m")
         total = float(np.ceil(p["distance_along_m"].max() / 50) * 50)
         means = fs.ten_m_means(p, [c for c, _ in panels])
-        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 6.6))
+        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, FORM_HEIGHT_IN))
         gs = fig.add_gridspec(5, 1, height_ratios=[0.55, 1, 1, 1, 1], hspace=0.28, left=0.13, right=0.985,
                               top=0.99, bottom=0.115)
         axb = fig.add_subplot(gs[0])
@@ -172,9 +182,11 @@ def build_fig_shade_map(points: pd.DataFrame, shade_df: pd.DataFrame, buildings:
         frac = mean_shaded_fraction_by_point(shade_df)
         o = points.merge(frac, left_on="point_id", right_index=True, how="left").sort_values("distance_along_m")
         extent = fs.route_extent(o, margin_m=45.0)
-        map_w = 0.83
-        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, fs.map_height_in(extent, fs.TEXT_WIDTH_IN * map_w)))
-        ax = fig.add_axes([0.005, 0.005, map_w, 0.99])
+        map_in = fs.fit_map_width_in(extent, SHADE_MAP_MAX_HEIGHT_IN)
+        h_in = fs.map_height_in(extent, map_in)
+        w_in = map_in + SHADE_BAR_COLUMN_IN
+        fig = plt.figure(figsize=(w_in, h_in))
+        ax = fig.add_axes([0.005 * 6.3 / w_in, 0.005, map_in / w_in, 0.99])
         fs.draw_buildings(ax, buildings, extent)
         xy = o[["x", "y"]].to_numpy()
         v = o["mean_shaded_fraction"].to_numpy(float)
@@ -184,7 +196,7 @@ def build_fig_shade_map(points: pd.DataFrame, shade_df: pd.DataFrame, buildings:
         ax.add_collection(lc)
         fs.scale_bar(ax, 100.0)
         fs.north_arrow(ax)
-        cax = fig.add_axes([0.865, 0.25, 0.022, 0.5])
+        cax = fig.add_axes([(map_in + 0.3) / w_in, 0.25, 0.14 / w_in, 0.5])
         cb = fig.colorbar(lc, cax=cax)
         cb.set_label("share of daylight time in building shade")
         cb.set_ticks([0, 0.25, 0.5, 0.75, 1.0])
@@ -281,7 +293,7 @@ def build_fig_sun_dose(walks: pd.DataFrame, p12: pd.DataFrame, total_m: float, o
         y_e = np.arange(n_e + 1) + n_m + gap
         edges_x = np.arange(0, mats[1].shape[1] + 1) * 10.0
 
-        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 9.0))
+        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, SUN_DOSE_HEIGHT_IN))
         left, width, gapx = 0.215, 0.375, 0.02
         bottom, height = 0.125, 0.84
         axes = [fig.add_axes([left + i * (width + gapx), bottom, width, height]) for i in range(2)]

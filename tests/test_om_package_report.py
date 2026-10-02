@@ -103,12 +103,12 @@ def test_no_forbidden_strings(report_md, readme_md, token):
 
 def test_every_figure_embedded_once_in_order(report_md):
     hits = re.findall(r"!\[Figure (\d+)\. [^\]]+\]\(OM2/(fig_\w+\.png)\)", report_md)
-    assert [name for _n, name in hits] == [name for name, _cap in FIGURES]
+    assert [name for _n, name in hits] == [name for name in FIGURES]
     assert [int(n) for n, _name in hits] == list(range(1, len(FIGURES) + 1))
 
 
 def test_each_figure_cited_before_it_appears(report_md):
-    for i, (name, _cap) in enumerate(FIGURES, start=1):
+    for i, name in enumerate(FIGURES, start=1):
         image = report_md.index(f"](OM2/{name})")
         assert re.search(rf"Figure {i}\b(?!\.)", report_md[:image]), name
 
