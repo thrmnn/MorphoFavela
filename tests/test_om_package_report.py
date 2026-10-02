@@ -1,7 +1,10 @@
-"""Tests for the Octopus OM2 human report (src/om_package/report.py).
+"""Tests for the Octopus OM2 report (src/om_package/report.py) and README
+(src/om_package/package_docs.render_readme).
 
-Needs the real built package (outputs/_packages/mare_om2/v0.2.0/,
+Needs the real built package (outputs/_packages/mare_om2/<VERSION>/,
 gitignored); skipped when it is absent, as in tests/test_om_package_spec.py.
+Both documents are rendered fresh from the package files, so the tests check
+the renderers, not a stale report.md on disk.
 """
 from __future__ import annotations
 
@@ -11,141 +14,227 @@ from pathlib import Path
 
 import pytest
 
-from src.om_package.report import PROJECT_FORM, STUDY_TITLE, FIGURES, render_report_markdown
+from src.om_package.package_docs import USE_TERMS, VERSION, render_readme
+from src.om_package.report import (AUTHOR, FIGURES, PROJECT_FORM, STUDY_TITLE, _Pcts, compute_facts,
+                                   render_report_markdown, write_report)
 
 DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
-PACKAGE_DIR = DEFAULT_ROOT / "outputs" / "_packages" / "mare_om2" / "v0.2.0"
+PACKAGE_DIR = DEFAULT_ROOT / "outputs" / "_packages" / "mare_om2" / VERSION
 
 pytestmark = pytest.mark.skipif(
-    not PACKAGE_DIR.is_dir(), reason="mare_om2 v0.2.0 package not built at the default root"
+    not (PACKAGE_DIR / "p12_walk_points.parquet").is_file(),
+    reason=f"mare_om2 {VERSION} package not built at the default root",
 )
+
+SECTIONS = [
+    "What is in the package",
+    "The route",
+    "Street form",
+    "Sun and shade on the walk dates",
+    "Direct sun before each walk",
+    "Wind: two regimes",
+    "Ventilation for both regimes",
+    "Using the data with temperature readings",
+    "Contact",
+]
+FORBIDDEN = ["—", "–", "SBGL", "METAR", "H/W", "λ", "z0", "SVF", "LiDAR", r"\btree", "v0.1", "v0.2",
+             "v1.", "PLACEHOLDER", "novel", "robust", "significant", "Read with care", "sun_envelope.png",
+             "items the team asked", "What we need", "later version", "future version"]
+
+
+@pytest.fixture(scope="module")
+def facts() -> dict:
+    return compute_facts(PACKAGE_DIR)
 
 
 @pytest.fixture(scope="module")
 def report_md() -> str:
-    return (PACKAGE_DIR / "report.md").read_text(encoding="utf-8")
+    return render_report_markdown(PACKAGE_DIR)
+
+
+@pytest.fixture(scope="module")
+def readme_md() -> str:
+    return render_readme(PACKAGE_DIR)
+
+
+def _prose(readme: str) -> str:
+    """README without the generated column list (dictionary text, checked at its source)."""
+    head, rest = readme.split("## Columns", 1)
+    return head + "## Manifest" + rest.split("## Manifest", 1)[1]
 
 
 def _linked_copy(dest: Path) -> Path:
-    """The package as symlinks, so one file can be swapped without copying
-    the shade table."""
+    """The package as symlinks, so one file can be swapped without copying the big tables."""
     dest.mkdir()
     for f in PACKAGE_DIR.iterdir():
         (dest / f.name).symlink_to(f)
     return dest
 
 
-def test_report_md_matches_a_fresh_render(report_md):
-    assert render_report_markdown(PACKAGE_DIR) == report_md
-
-
-def test_render_is_deterministic():
-    assert render_report_markdown(PACKAGE_DIR) == render_report_markdown(PACKAGE_DIR)
-
-
-def test_project_named_only_in_parenthetical_form(report_md):
-    assert "MorphoFavela" in report_md
-    assert "MorphoFavela" not in report_md.replace(PROJECT_FORM, "")
-    assert report_md.count(PROJECT_FORM) <= 2
-
-
-def test_no_internal_ids(report_md):
-    for token in ("P-0", "P-1", "om_", "OCTOPUS_", "src/", ".parquet", ".py", "_proxy", "_deg"):
-        assert token not in report_md, token
-
-
-def test_every_package_figure_embedded_once_with_numbered_caption(report_md):
-    shipped = sorted(p.name for p in (PACKAGE_DIR / "OM2").glob("*.png"))
-    assert sorted(name for name, _h, _c in FIGURES) == shipped
-    for i, (name, _heading, _cls) in enumerate(FIGURES, start=1):
-        hits = re.findall(rf"!\[Figure (\d+)\. [^\]]+\]\(OM2/{re.escape(name)}\)", report_md)
-        assert hits == [str(i)], name
-
-
-def test_no_bare_project_name_or_em_dash(report_md):
-    assert not re.search(r"(?<!Brisa\+ \()MorphoFavela", report_md)
-    assert "\u2014" not in report_md and "\u2013" not in report_md
-
-
-def test_planted_manifest_share_mismatch_stops_the_build(tmp_path):
-    pkg = _linked_copy(tmp_path / "pkg")
+def _swap_manifest(pkg: Path, edit) -> None:
     manifest = json.loads((PACKAGE_DIR / "manifest.json").read_text(encoding="utf-8"))
-    manifest["p10"]["clock_agreement_all"] += 0.01
+    edit(manifest)
     (pkg / "manifest.json").unlink()
     (pkg / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-    with pytest.raises(ValueError, match="clock_agreement_all"):
+
+
+def test_sections_in_r6_order(report_md):
+    assert report_md.startswith("# ")
+    assert re.findall(r"(?m)^## (.+)$", report_md) == SECTIONS
+
+
+def test_opening_paragraph_names_study_author_and_project(report_md):
+    opening = report_md.split("\n## ", 1)[0]
+    for s in (STUDY_TITLE, AUTHOR, PROJECT_FORM, "no temperature analysis", "Rio local time"):
+        assert s in opening, s
+
+
+def test_project_named_only_in_parenthetical_form(report_md, readme_md):
+    for text in (report_md, readme_md):
+        assert not re.search(r"(?<!Brisa\+ \()MorphoFavela", text)
+
+
+@pytest.mark.parametrize("token", FORBIDDEN)
+def test_no_forbidden_strings(report_md, readme_md, token):
+    pat = token if token.startswith("\\b") else re.escape(token)
+    assert not re.search(pat, re.sub(r"\(OM2/fig_\w+\.png\)", "", report_md)), token
+    assert not re.search(pat, _prose(readme_md)), token
+
+
+def test_every_figure_embedded_once_in_order(report_md):
+    hits = re.findall(r"!\[Figure (\d+)\. [^\]]+\]\(OM2/(fig_\w+\.png)\)", report_md)
+    assert [name for _n, name in hits] == [name for name, _cap in FIGURES]
+    assert [int(n) for n, _name in hits] == list(range(1, len(FIGURES) + 1))
+
+
+def test_each_figure_cited_before_it_appears(report_md):
+    for i, (name, _cap) in enumerate(FIGURES, start=1):
+        image = report_md.index(f"](OM2/{name})")
+        assert re.search(rf"Figure {i}\b(?!\.)", report_md[:image]), name
+
+
+def test_numbers_come_from_the_package(report_md, facts):
+    walks = f"{facts['n_walks']} times on {facts['n_dates']} dates"
+    assert walks in report_md
+    assert f"{facts['n_flagged']:,} of the {facts['n_points']:,} points" in report_md
+    assert f"{facts['n_partial']} of the {facts['n_walks']} walks" in report_md
+    camp = facts["regimes"]["campaign"]
+    for g in camp.values():
+        assert f"mean direction of {g['dir']:.0f}°" in report_md
+        assert g["name"] in report_md
+    assert f"τ = t90 / {facts['ln10']:.3f}" in report_md
+
+
+def test_height_to_width_names_its_statistic(report_md, facts):
+    assert f"median of the point height-to-width ratios is {facts['hw_median_of_ratios']:.1f}" in report_md
+
+
+def test_no_direct_sun_statement_uses_the_dose_figure_cells(report_md, facts):
+    assert f"Counted over the {int(facts['dose_bin_m'])} m stretches of each walk, as the figure draws them" in report_md
+    assert f"{100 * facts['dose_cells_zero_1h']:.0f}% of walk stretches got no direct sun" in report_md
+    assert f"{100 * facts['dose_rows_zero_1h']:.0f}% of walk points got no direct sun" in report_md
+
+
+def test_wind_section_states_regimes_tags_and_broad_arc(report_md, facts):
+    wind = report_md.split("## Wind: two regimes", 1)[1].split("\n## ", 1)[0]
+    assert "16-sector wind rose" in wind
+    assert "broad northern arc" in wind and "confirms the east-southeast direction" in wind
+    for name, n in facts["walk_tags"].items():
+        if name != "none":
+            assert f"{n} walks {name}" in wind
+
+
+def test_r8_statements_present(report_md):
+    assert "assumes a clear sky, so it is an upper bound" in report_md
+    assert report_md.count("2019 building and terrain geometry") >= 3
+
+
+def test_one_question_for_the_team(report_md):
+    q = report_md.split("**One question for the team.**", 1)[1].split("\n", 1)[0]
+    assert "time constant" in q and "housing" in q and "63%" in q and "90%" in q
+
+
+def test_contact_line(report_md):
+    assert report_md.rstrip().endswith(f"{AUTHOR}, {PROJECT_FORM}.")
+
+
+def test_percentage_collisions_are_detected():
+    p = _Pcts()
+    p("a", 0.501)
+    p("b", 0.499)
+    with pytest.raises(ValueError, match="round alike"):
+        p.check()
+
+
+def test_file_table_lists_every_shipped_data_file(report_md):
+    table = report_md.split("## What is in the package", 1)[1].split("\n\n", 2)[1]
+    for f in PACKAGE_DIR.rglob("*"):
+        rel = f.relative_to(PACKAGE_DIR).as_posix()
+        if f.is_file() and not rel.endswith(".png") and not rel.startswith(("README", "report", "_")) \
+                and rel != "OM2/figure_facts.json":
+            assert f"`{rel.rsplit('.', 1)[0]}" in table or f"`{rel}`" in table, rel
+
+
+def test_unknown_shipped_file_stops_the_render(tmp_path):
+    pkg = _linked_copy(tmp_path / "pkg")
+    (pkg / "p99_extra.csv").write_text("a\n1\n")
+    with pytest.raises(ValueError, match="p99_extra"):
         render_report_markdown(pkg)
 
 
-def test_findings_quote_the_manifest_shares(report_md):
-    manifest = json.loads((PACKAGE_DIR / "manifest.json").read_text(encoding="utf-8"))
-    p10 = manifest["p10"]
-    assert f"{100 * p10['date_dependent_share']:.0f}% of daylight point-slots" in report_md
-    assert f"only {100 * p10['clock_agreement_all']:.0f}% of daylight point-slots" in report_md
-    assert f"({manifest['p11']['prevailing_wind_bearing_deg']:.0f}°)" in report_md
-    assert "outside the method's calibrated range" in report_md
-
-
-def test_study_title_matches_readme():
-    readme = " ".join((PACKAGE_DIR / "README.md").read_text(encoding="utf-8").split())
-    assert STUDY_TITLE in readme
-
-
-def test_planted_manifest_value_changes_the_text(tmp_path):
+def test_planted_manifest_mismatch_stops_the_build(tmp_path):
     pkg = _linked_copy(tmp_path / "pkg")
-    manifest = json.loads((PACKAGE_DIR / "manifest.json").read_text(encoding="utf-8"))
-    om2 = next(r for r in manifest["routes"] if r["route_id"] == "OM_2")
-    original = f"over {om2['length_m']:,.0f} m"
-    om2["length_m"] = 98765
-    (pkg / "manifest.json").unlink()
-    (pkg / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-    text = render_report_markdown(pkg)
-    assert "over 98,765 m" in text
-    assert original not in text
+    _swap_manifest(pkg, lambda m: m["walks"].__setitem__("n_partial", m["walks"]["n_partial"] + 1))
+    with pytest.raises(ValueError, match="n_partial"):
+        render_report_markdown(pkg)
 
 
-def test_planted_spec_status_changes_the_spec_sentence(tmp_path):
+def test_planted_route_length_changes_both_documents(tmp_path):
     pkg = _linked_copy(tmp_path / "pkg")
-    conf = json.loads((PACKAGE_DIR / "p00_spec_conformance.json").read_text(encoding="utf-8"))
-    before = render_report_markdown(PACKAGE_DIR)
-    for it in conf["items"]:
-        it["status"] = "delivered"
-    (pkg / "p00_spec_conformance.json").unlink()
-    (pkg / "p00_spec_conformance.json").write_text(json.dumps(conf), encoding="utf-8")
-    after = render_report_markdown(pkg)
-    assert f"Of the {len(conf['items'])} items the team asked for, {len(conf['items'])} are delivered." in after
-    assert after != before
+    _swap_manifest(pkg, lambda m: m["routes"][0].__setitem__("length_m", 98765.0))
+    assert "over 98,765 m" in render_report_markdown(pkg)
+    assert "OM2 route: 98,765 m" in render_readme(pkg)
 
 
-def test_report_pdf_ships_in_manifest():
-    pdf = PACKAGE_DIR / "report.pdf"
-    assert pdf.read_bytes().startswith(b"%PDF")
-    manifest = json.loads((PACKAGE_DIR / "manifest.json").read_text(encoding="utf-8"))
-    assert "report.pdf" in manifest["files"]
-    assert "report.md" in manifest["files"]
+def test_readme_and_report_agree_on_shared_numbers(report_md, readme_md, facts):
+    shared = [
+        f"{facts['n_points']:,} points, one every {facts['spacing_m']:g} m over {facts['length_m']:,.0f} m",
+        f"{facts['n_dates']} walk dates",
+        f"τ = t90 / {facts['ln10']:.3f}",
+        f"less than {100 * facts['partial_coverage']:.0f}% of the route",
+    ]
+    for s in shared:
+        assert s in report_md and s in readme_md, s
+    assert f"{facts['n_walks']} walks on {facts['n_dates']} dates" in readme_md
+    assert f"{facts['n_walks']} times on {facts['n_dates']} dates" in report_md
+    for g in facts["regimes"]["campaign"].values():
+        assert f"{g['dir']:.0f}°" in report_md and f"{g['dir']:.0f}°" in readme_md
 
 
-def test_disclosure_sweep_covers_report():
-    hits = (PACKAGE_DIR / "p00_disclosure_hits.txt").read_text(encoding="utf-8")
-    assert "report.md" in hits.splitlines()[4]
+def test_readme_has_spec_headings_and_method_parts(readme_md):
+    for h in ("## Sources and dates", "## CRS", "## Methods", "## Known limits", "## Use terms",
+              "## How to cite", "## Columns"):
+        assert h in readme_md, h
+    for s in ("Cassiano and Vincent", "SHA-256", "running maximum", "gap_interpolated", "`partial`",
+              "von Mises", "uniform background", "Macdonald et al. (1998)", "regular arrays of blocks",
+              "--by walk_id --segment-m 20 --tau 30", "exp(-Δt/τ)"):
+        assert s in readme_md, s
+    assert USE_TERMS in readme_md
 
 
-def test_manifest_daylight_share_equals_parquet():
+def test_readme_lists_every_column_of_every_data_table(readme_md):
     import pandas as pd
-    manifest = json.loads((PACKAGE_DIR / "manifest.json").read_text(encoding="utf-8"))
-    p05 = manifest["p05_shade"]
-    assert "shade_fraction_pct" not in p05
-    shade = pd.read_parquet(PACKAGE_DIR / "p05_building_shade.parquet", columns=["sun_altitude_deg", "shaded"])
-    day = shade[shade["sun_altitude_deg"] > 0]
-    assert p05["shade_fraction_daylight_pct"] == round(100 * float(day["shaded"].mean()), 1)
-    assert p05["shade_fraction_daylight_pct"] < round(100 * float(shade["shaded"].mean()), 1)
+
+    cols = readme_md.split("## Columns", 1)[1].split("## Manifest", 1)[0]
+    for col in pd.read_parquet(PACKAGE_DIR / "p02b_walks.parquet").columns:
+        assert f"`{col}`" in cols, col
+    for col in pd.read_parquet(PACKAGE_DIR / "OM2" / "points.parquet").columns:
+        assert f"`{col}`" in cols, col
 
 
-def test_readme_file_table_lists_every_shipped_file():
-    manifest = json.loads((PACKAGE_DIR / "manifest.json").read_text(encoding="utf-8"))
-    readme = (PACKAGE_DIR / "README.md").read_text(encoding="utf-8")
-    table = readme.split("## Files in this package", 1)[1].split("\n## ", 1)[0]
-    cells = " ".join(ln.split("|")[1] for ln in table.splitlines() if ln.startswith("| `"))
-    for name in [*manifest["files"], "manifest.json"]:
-        stem, dot, ext = name.rpartition(".")
-        assert f"`{name}`" in cells or f"`.{ext}`" in cells and f"`{stem}." in cells, name
+def test_write_report_renders_a_pdf(tmp_path):
+    pkg = _linked_copy(tmp_path / "pkg")
+    for name in ("report.md", "report.pdf"):
+        (pkg / name).unlink(missing_ok=True)
+    md, pdf = write_report(pkg)
+    assert not md.is_symlink() and pdf.read_bytes().startswith(b"%PDF")

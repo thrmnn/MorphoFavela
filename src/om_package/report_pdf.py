@@ -2,86 +2,96 @@
 (HTML -> PDF), the same pipeline as docs/technical_report/build_pdf.py
 (pdflatex chokes on the Unicode in the README; weasyprint does not).
 
-Two documents use it: README.pdf (the technical README, whose wide spec
-table needs a small font and aggressive wrapping to fit A4) and
-report.pdf (the short human report, see report.py, with readable body
-text and full-width figures, styled by report_css).
+Two documents use it: report.pdf (report_css: A4, 2.5 cm margins, one
+figure per block at text width) and README.pdf (readme_css: same page,
+smaller type and tight tables for the column lists). Both carry the running
+header "Octopus OM2 data package <version>" and a footer with the page
+number and the use terms.
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from pathlib import Path
 
 import weasyprint
 
-CSS = """
-@page {
+from .package_docs import USE_TERMS
+
+#: Must match src/om_package/fig_style.FONT_FAMILY, so text and figures share one family.
+FONT_FAMILY = "DejaVu Sans"
+
+
+def _css_string(s: str) -> str:
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _page_css(version: str, footer: str) -> str:
+    """A4, 2.5 cm margins (text width 16 cm), running header and footer."""
+    return f"""
+@page {{
   size: A4;
-  margin: 16mm 13mm 16mm 13mm;
-  @top-left { content: "Maré morphology, OM2 - data package"; font-size: 8pt; color: #666; }
-  @top-right { content: counter(page) " / " counter(pages); font-size: 8pt; color: #666; }
-}
-body { font-family: "Liberation Sans", "Arial", sans-serif; font-size: 9pt; line-height: 1.4; color: #1a1a1a; }
-h1 { font-size: 17pt; border-bottom: 2px solid #333; padding-bottom: 5px; margin-top: 0; }
-h2 { font-size: 13pt; margin-top: 16pt; border-bottom: 1px solid #bbb; page-break-after: avoid; }
-h3 { font-size: 11pt; page-break-after: avoid; }
-p, li { overflow-wrap: anywhere; }
-code, pre { font-family: "Liberation Mono", "Consolas", monospace; font-size: 8pt; background: #f5f5f5; overflow-wrap: anywhere; }
-pre { padding: 6px 8px; border: 1px solid #ddd; white-space: pre-wrap; page-break-inside: avoid; }
-pre code { background: none; }
-blockquote { margin: 0.6em 0; padding-left: 0.8em; border-left: 3px solid #bbb; color: #333; }
-table { border-collapse: collapse; margin: 0.7em 0; font-size: 7pt; line-height: 1.3; width: 100%; table-layout: auto; }
-th:first-child, td:first-child { white-space: nowrap; }
-td:nth-child(3), th:nth-child(3) { min-width: 17mm; }
-td:nth-child(5), th:nth-child(5) { min-width: 22mm; }
-th, td { border: 1px solid #bbb; padding: 2px 4px; text-align: left; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }
-th { background: #eee; }
-tr { page-break-inside: avoid; }
-table code { font-size: 6.5pt; }
-a { color: #2A5FA5; text-decoration: none; }
+  margin: 25mm 25mm 25mm 25mm;
+  @top-left {{ content: "Octopus OM2 data package {_css_string(version)}"; font-family: "{FONT_FAMILY}";
+               font-size: 7.5pt; color: #6b6b6b; vertical-align: bottom; padding-bottom: 4mm; }}
+  @bottom-left {{ content: "{_css_string(footer)}"; font-family: "{FONT_FAMILY}"; font-size: 7.5pt;
+                  color: #6b6b6b; vertical-align: top; padding-top: 4mm; }}
+  @bottom-right {{ content: counter(page); font-family: "{FONT_FAMILY}"; font-size: 7.5pt; color: #6b6b6b;
+                   vertical-align: top; padding-top: 4mm; }}
+}}
+html {{ font-family: "{FONT_FAMILY}", sans-serif; }}
+a {{ color: #0f5f57; text-decoration: none; }}
+code {{ font-family: "DejaVu Sans Mono", monospace; font-size: 0.86em; background: #f3f3f3; padding: 0 1.5pt; }}
 """
 
 
-def report_css(version: str) -> str:
-    """Stylesheet of the human report: A4, one figure per section at full
-    width, a small running header and footer. The version goes in the
-    header so a printed page says which package it describes."""
-    return """
-@page {
-  size: A4;
-  margin: 17mm 18mm 16mm 18mm;
-  @top-left { content: "Octopus OM2 data package, VERSION"; font-size: 7.5pt; color: #6b6b6b; }
-  @top-right { content: "Internal review draft"; font-size: 7.5pt; color: #6b6b6b; }
-  @bottom-center { content: counter(page) " / " counter(pages); font-size: 7.5pt; color: #6b6b6b; }
-}
-@page :first { @top-left { content: none; } @top-right { content: none; } }
-html { font-family: "Source Sans 3", "Liberation Sans", "Arial", sans-serif; }
-body { font-size: 10.5pt; line-height: 1.45; color: #1d1d1f; }
-h1 { font-family: "Source Serif 4", "Liberation Serif", Georgia, serif; font-size: 21pt; line-height: 1.15;
-     margin: 0 0 3pt 0; color: #111; }
-h2 { font-family: "Source Serif 4", "Liberation Serif", Georgia, serif; font-size: 14pt; color: #111;
-     margin: 14pt 0 5pt 0; padding-bottom: 2pt; border-bottom: 0.6pt solid #b9b9b9; break-after: avoid; }
-h3 { font-size: 11.5pt; margin: 0 0 4pt 0; color: #0f5f57; break-after: avoid; }
+def report_css(version: str, footer: str = USE_TERMS) -> str:
+    """Report: readable body, figures at text width with their caption kept
+    on the same page. A figure's size class caps its height so the section
+    heading, the lead paragraph and the figure share a page."""
+    return _page_css(version, footer) + """
+body { font-size: 9.4pt; line-height: 1.36; color: #1d1d1f; }
+h1 { font-size: 17pt; line-height: 1.2; margin: 0 0 8pt 0; color: #111; }
+h2 { font-size: 12.5pt; color: #111; margin: 12pt 0 5pt 0; padding-bottom: 2pt;
+     border-bottom: 0.6pt solid #b9b9b9; break-after: avoid; }
 p { margin: 0 0 5pt 0; orphans: 3; widows: 3; }
-ol, ul { margin: 2pt 0 6pt 0; padding-left: 16pt; }
-li { margin: 0 0 2.5pt 0; }
 strong { color: #111; }
-.meta p { font-size: 9pt; color: #555; margin: 0 0 9pt 0; padding-bottom: 6pt; border-bottom: 1.2pt solid #111; }
-.figsec { break-inside: avoid; margin: 0 0 12pt 0; padding-top: 4pt; }
-figure { margin: 6pt 0 0 0; break-inside: avoid; text-align: center; }
-figure img { max-width: 100%; width: auto; height: auto; }
-img.hero { max-height: 112mm; }
-img.map { max-height: 150mm; }
-img.tall { max-height: 160mm; }
-img.wide { max-height: 112mm; }
-figcaption { font-size: 8.8pt; line-height: 1.35; color: #444; margin: 4pt 0 0 0; text-align: left; }
-section.keep, .keep { break-inside: avoid; }
-.care { break-inside: avoid; background: #f4f6f7; border-left: 3pt solid #0f5f57; padding: 2pt 10pt 4pt 10pt;
-        margin: 10pt 0; }
-.care h2 { border-bottom: none; margin-top: 6pt; }
-a { color: #0f5f57; text-decoration: none; }
-""".replace("VERSION", version)
+table { border-collapse: collapse; width: 100%; font-size: 7.1pt; line-height: 1.22; margin: 4pt 0 8pt 0; }
+th, td { border-bottom: 0.4pt solid #c8c8c8; padding: 1.3pt 5pt 1.3pt 0; text-align: left; vertical-align: top;
+         overflow-wrap: anywhere; }
+th { border-bottom: 0.8pt solid #333; font-weight: bold; }
+tr { break-inside: avoid; }
+td:first-child { width: 33%; }
+td:nth-child(2) { width: 40%; }
+td code { font-size: 6.8pt; background: none; padding: 0; }
+figure { margin: 6pt 0 8pt 0; break-inside: avoid; text-align: center; }
+figure img { height: auto; }
+figcaption { font-size: 8.4pt; line-height: 1.35; color: #444; margin: 3pt 0 0 0; text-align: left; }
+"""
+
+
+def readme_css(version: str, footer: str = USE_TERMS) -> str:
+    """README: denser text, wrapped code and compact tables for the column lists."""
+    return _page_css(version, footer) + """
+body { font-size: 8.8pt; line-height: 1.4; color: #1a1a1a; }
+h1 { font-size: 16pt; margin: 0 0 6pt 0; }
+h2 { font-size: 12pt; margin: 14pt 0 4pt 0; border-bottom: 0.6pt solid #b9b9b9; break-after: avoid; }
+h3 { font-size: 10pt; margin: 10pt 0 3pt 0; break-after: avoid; }
+p, li { overflow-wrap: anywhere; margin: 0 0 4pt 0; }
+pre { padding: 5pt 7pt; border: 0.5pt solid #ddd; background: #f6f6f6; white-space: pre-wrap; font-size: 7.6pt;
+      break-inside: avoid; }
+pre code { background: none; padding: 0; }
+blockquote { margin: 0 0 8pt 0; padding: 3pt 8pt; border-left: 2.5pt solid #0f5f57; background: #f4f6f7; }
+table { border-collapse: collapse; margin: 4pt 0 8pt 0; font-size: 7pt; line-height: 1.3; width: 100%; }
+th, td { border-bottom: 0.4pt solid #c8c8c8; padding: 2pt 4pt 2pt 0; text-align: left; vertical-align: top;
+         overflow-wrap: anywhere; }
+th { border-bottom: 0.8pt solid #333; }
+tr { break-inside: avoid; }
+td code { font-size: 6.6pt; background: none; padding: 0; }
+td:first-child { width: 34%; }
+td:nth-child(2) { width: 14%; }
+"""
 
 
 def render_markdown_pdf(md: Path, pdf: Path, *, css: str, title: str, md_format: str = "gfm") -> Path:
@@ -97,8 +107,8 @@ def render_markdown_pdf(md: Path, pdf: Path, *, css: str, title: str, md_format:
     )
     if result.returncode != 0:
         raise RuntimeError(f"pandoc failed rendering {md}: {result.stderr}")
-    # pandoc sizes pipe-table columns from the dash counts (all equal here),
-    # which squeezes id/status; let the browser-style auto layout decide.
+    # pandoc sizes pipe-table columns from the dash counts (all equal here);
+    # let the auto layout decide.
     html.write_text(re.sub(r"<colgroup>.*?</colgroup>", "", html.read_text(encoding="utf-8"), flags=re.S),
                     encoding="utf-8")
     try:
@@ -113,5 +123,7 @@ def render_markdown_pdf(md: Path, pdf: Path, *, css: str, title: str, md_format:
 def render_readme_pdf(package_dir: Path) -> Path:
     """Write package_dir/README.pdf from package_dir/README.md."""
     package_dir = Path(package_dir)
+    version = json.loads((package_dir / "manifest.json").read_text(encoding="utf-8"))["package_version"]
     return render_markdown_pdf(package_dir / "README.md", package_dir / "README.pdf",
-                               css=CSS, title="Maré morphology, OM2 - data package")
+                               css=readme_css(version),
+                               title=f"Octopus OM2 data package {version}")

@@ -1,83 +1,129 @@
-"""The short human report for the Octopus OM2 package (PI, 2026-10-01):
-"made for human, simple words, straight to the point ... show the results
-and necessary context ... put the key figures in it". The README stays the
-technical document; this is what the page's "Download report (PDF)" button
-gives.
+"""The report of the Octopus OM2 data package (report.md / report.pdf).
 
-Every number in the text is read from the built package (manifest.json,
-p00_spec_conformance.json, OM2/p07_quality_report.json, OM2/points.parquet,
-p05_building_shade, p10_*, p11_wind_observed.csv) and formatted here, never
-typed. Where a number is also recorded in manifest.json, the value
-recomputed from the table must match it, or the build stops.
+Every number in the text is computed from the built package files by
+``compute_facts`` and formatted here, never typed. Where a value is also
+recorded in manifest.json or the quality report, the value recomputed from
+the table must match it, or the build stops (``_require``). The README
+(package_docs.render_readme) reads the same facts, so the two documents
+cannot disagree on a shared number.
 
-The text follows the research-writing style contract (no em dashes, no
-bare hedges), checked with style_lint.py.
+Percentages go through ``_Pcts``: two different quantities that round to
+the same printed percentage stop the render unless the pair is listed in
+``_UNCONFUSABLE`` with wording that keeps them apart (R9).
 """
 from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from src.om_package.figures import SEGMENT_LENGTH_M, dose_slots_for_figure
-from src.om_package.report_pdf import report_css, render_markdown_pdf
+from src.om_package.figures import SEGMENT_LENGTH_M
+from src.om_package.report_pdf import render_markdown_pdf, report_css
 from src.om_package.routes import ROUTE_FLAG_MAX_STREET_DIST_M
+from src.om_package.sensor_match import DEFAULT_TAUS_S, TRUNCATION_TAUS
 from src.om_package.shade import daylight_rows, daylight_shade_fraction_pct
-from src.om_package.vent_indices import DEFAULT_BUFFER_M
+from src.om_package.walks import GAP_FLAG_S, PARTIAL_COVERAGE
 from src.om_package.wind_obs import CLIM_YEAR_END, CLIM_YEAR_START
+from src.om_package.wind_regimes import N_SECTORS, TAG_MAX_GAP_MIN
 
 PROJECT_FORM = "Brisa+ (MorphoFavela)"
+AUTHOR = "Théo Alessandro Hermann"
 STUDY_TITLE = (
     "Street by street: explaining air temperature differences across streets "
     "and over time in Complexo da Maré"
 )
+DATA_SOURCE = ("Data: walks by Cassiano and Vincent (Octopus team); buildings and terrain 2019; "
+               "Galeão airport hourly weather reports.")
 SEGMENT_M = int(SEGMENT_LENGTH_M)
-#: k time constants in the segment-length rule L = v k tau.
-SEGMENT_K = 3
+#: The two time constants the sensor figure draws (fig_svf_sensor).
+FIGURE_TAUS_S = (10, 30)
+#: Dose below this (Wh/m2) is drawn as zero in fig_sun_dose; used when figure_facts.json is absent.
+DOSE_ZERO_BELOW = 0.1
+#: Canyon alignment within this many degrees of 0 counts as "along the wind", of 90 as "across".
+ALIGN_BAND_DEG = 30.0
+#: Walks at or above this coverage are "full" for picking the sensor figure's walk (as in figures.py).
+FULL_COVERAGE = 0.95
 
-#: Plain words for what an unfinished spec item waits on.
-_WAITS_ON = {
-    "OCTOPUS_CSV": "more campaign files",
-    "OCTOPUS_TZ": "the device clock",
-}
-#: Plain words for what the deliberate cut leaves out.
-_DESCOPED_PLAIN = {
-    "sky_view_factor_terrestrial": "terrestrial LiDAR (laser scans from street level)",
-    "airborne_vs_terrestrial_comparison": "terrestrial LiDAR (laser scans from street level)",
-    "height_change_2024_2026": "terrestrial LiDAR (laser scans from street level)",
-    "tree_shade": "tree shade",
-}
-
-#: (file under OM2/, section heading, size class). Order = figure number.
-#: The class caps the figure's height in report_css so a section's heading,
-#: text and figure share one page.
+#: (file under OM2/, largest printed height in cm). A figure prints at the
+#: 16 cm text width unless that would make it taller than its cap; the cap
+#: keeps a section heading, its lead paragraphs and the figure on one page.
+TEXT_WIDTH_CM = 16.0
 FIGURES = [
-    ("map_form.png", "The route", "hero"),
-    ("profiles.png", "Street form", "tall"),
-    ("map_shade.png", "Building shade on the campaign dates", "map"),
-    ("shade_calendar.png", "Shade by date and time of day", "tall"),
-    ("sun_envelope.png", "Does the date matter? Does the clock?", "wide"),
-    ("sun_dose.png", "Direct sun dose", "tall"),
-    ("map_vent_shelter.png", "Ventilation: shelter from the wind", "map"),
-    ("profiles_vent.png", "Ventilation: street direction and roughness", "tall"),
-    ("wind_rose_compare.png", "Wind during the campaign", "wide"),
+    ("fig_route.png", 16.5),
+    ("fig_form.png", 15.5),
+    ("fig_shade_map.png", 18.0),
+    ("fig_shade_calendar.png", 18.0),
+    ("fig_sun_dose.png", 20.0),
+    ("fig_wind.png", 18.0),
+    ("fig_shelter_maps.png", 18.0),
+    ("fig_vent_profiles.png", 18.0),
+    ("fig_svf_sensor.png", 18.0),
 ]
-_FIG_NO = {name: i + 1 for i, (name, _h, _c) in enumerate(FIGURES)}
+_FIG_NO = {name: i + 1 for i, (name, _c) in enumerate(FIGURES)}
+_FIG_CAP_CM = dict(FIGURES)
 
-_COMPASS_16 = ["north", "north-northeast", "northeast", "east-northeast", "east", "east-southeast",
-               "southeast", "south-southeast", "south", "south-southwest", "southwest", "west-southwest",
-               "west", "west-northwest", "northwest", "north-northwest"]
+#: Pairs of percentage keys allowed to print the same rounded value, because
+#: the sentences that carry them name different things (checked by
+#: _Pcts.check).
+_UNCONFUSABLE: set[frozenset] = {
+    # "of daylight time in building shade" (sun section) against "of that
+    # hour's airport reports" (wind section): different sections and units.
+    frozenset(("shade_pt_q75", "regime2_peak")),
+}
 
+#: Shipped file stems in table order. A data file not listed here stops the
+#: render, so a new file cannot ship undescribed.
+FILE_ORDER = ["OM2/points", "p02b_walks", "p12_walk_points", "p05_building_shade", "p10_sun_dose",
+              "p10_sun_envelope", "p10_horizon_profiles", "p11_wind_regimes", "p11_regime_by_hour",
+              "p08_data_dictionary", "OM2/p07_quality_report", "OM2/aggregate_to_segments",
+              "OM2/join_shade_example", "manifest.json"]
+
+
+def file_roles(f: dict) -> dict:
+    """What each shipped file holds, worded from the facts."""
+    hours = _join([str(h) for h in f["p10_dose_hours"]])
+    return {
+        "OM2/points": f"One row per {f['spacing_m']:g} m point: street form, sun hours, ventilation",
+        "p02b_walks": "One row per walk: times, route coverage, wind regime",
+        "p12_walk_points": "One row per walk and point: arrival time, shade, sun dose, sensor-matched values",
+        "p05_building_shade": f"Building shade per point every {f['shade_step_min']} minutes on each walk date",
+        "p10_sun_dose": f"Clear-sky direct sun dose over the past {hours} hours",
+        "p10_sun_envelope": "Per point and time of day: sunlit on all, some or no dates of the season",
+        "p10_horizon_profiles": "Horizon angle per point and compass direction",
+        "p11_wind_regimes": "The two wind regimes, campaign season and long term",
+        "p11_regime_by_hour": "Share of each wind regime by hour of day",
+        "p08_data_dictionary": "Definition and unit of every column",
+        "OM2/p07_quality_report": "Coverage of every point column, flagged points",
+        "OM2/aggregate_to_segments": "Script: means over segments of any length",
+        "OM2/join_shade_example": "Script: joins logger readings to the shade table",
+        "manifest.json": "Version, sources and a checksum for every file",
+    }
+
+
+#: Main columns named in the file table (only those present in the file are printed).
+FILE_MAIN_COLUMNS = {
+    "OM2/points": ["point_id", "distance_along_m", "sky_view_factor"],
+    "p02b_walks": ["walk_id", "start_local", "wind_regime"],
+    "p12_walk_points": ["walk_id", "point_id", "t_arrival_local"],
+    "p05_building_shade": ["point_id", "timestamp_local", "shaded"],
+    "p10_sun_dose": ["point_id", "scope", "local_slot"],
+    "p10_sun_envelope": ["point_id", "local_slot", "class"],
+    "p10_horizon_profiles": ["point_id", "azimuth_deg", "horizon_deg"],
+    "p11_wind_regimes": ["name", "mean_direction_deg", "share"],
+    "p11_regime_by_hour": ["local_hour", "regime", "share"],
+    "p08_data_dictionary": ["id", "definition", "unit"],
+}
+_NOT_DATA = {"report", "README"}
+
+
+# --- formatting ------------------------------------------------------------
 
 def _n(x: float) -> str:
     return f"{x:,.0f}"
-
-
-def _pct(x: float) -> str:
-    return f"{100 * x:.0f}%"
 
 
 def _day(d) -> str:
@@ -95,28 +141,57 @@ def count_word(n: int) -> str:
     return ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][n] if n < 10 else str(n)
 
 
-def _is_are(n: int) -> str:
-    return "is" if n == 1 else "are"
+def _cap(s: str) -> str:
+    return s[0].upper() + s[1:]
 
 
-def _compass(bearing: float) -> str:
-    return _COMPASS_16[int(((bearing % 360) + 11.25) // 22.5) % 16]
+def _hour(h: int) -> str:
+    return f"{int(h):02d}:00"
 
 
-def _circular_mean_deg(deg) -> float:
-    th = np.radians(np.asarray(deg, float))
-    return float(np.degrees(np.arctan2(np.sin(th).mean(), np.cos(th).mean())) % 360)
+class _Pcts:
+    """Formats fractions as percentages and remembers what each printed
+    value stands for, so two different quantities cannot share a printed
+    value unnoticed (R9)."""
+
+    def __init__(self):
+        self.seen: dict[str, str] = {}
+
+    def __call__(self, key: str, x: float, digits: int = 0) -> str:
+        s = f"{100 * x:.{digits}f}%"
+        self.seen.setdefault(key, s)
+        if self.seen[key] != s:
+            raise ValueError(f"percentage key {key!r} printed with two values: {self.seen[key]} and {s}")
+        return s
+
+    def collisions(self) -> list[tuple[str, str, str]]:
+        by_value: dict[str, list[str]] = {}
+        for k, s in self.seen.items():
+            by_value.setdefault(s, []).append(k)
+        out = []
+        for s, keys in by_value.items():
+            for i, a in enumerate(keys):
+                for b in keys[i + 1:]:
+                    if frozenset((a, b)) not in _UNCONFUSABLE:
+                        out.append((s, a, b))
+        return out
+
+    def check(self) -> None:
+        bad = self.collisions()
+        if bad:
+            raise ValueError("percentages that round alike, reword or list in _UNCONFUSABLE: "
+                             + "; ".join(f"{s}: {a} / {b}" for s, a, b in bad))
 
 
-def _fig(name: str) -> str:
-    return f"Figure {_FIG_NO[name]}"
-
+# --- facts -----------------------------------------------------------------
 
 def _require(name: str, table_value, manifest_value, *, tol: float = 1e-9) -> None:
     """Stop the build when a value recomputed from a table disagrees with
-    the manifest's copy of it."""
+    the manifest's (or quality report's) copy of it."""
     if isinstance(manifest_value, (int, np.integer)) and isinstance(table_value, (int, np.integer)):
         same = int(table_value) == int(manifest_value)
+    elif isinstance(manifest_value, (str, dict, list)):
+        same = table_value == manifest_value
     else:
         same = math.isclose(float(table_value), float(manifest_value), rel_tol=0, abs_tol=tol)
     if not same:
@@ -127,422 +202,593 @@ def _load(package_dir: Path) -> dict:
     def js(rel):
         return json.loads((package_dir / rel).read_text(encoding="utf-8"))
 
+    ff = package_dir / "OM2" / "figure_facts.json"
     return dict(
         manifest=js("manifest.json"),
-        conformance=js("p00_spec_conformance.json"),
         quality=js("OM2/p07_quality_report.json"),
+        figure_facts=js("OM2/figure_facts.json") if ff.exists() else {},
         points=pd.read_parquet(package_dir / "OM2" / "points.parquet"),
         shade=pd.read_parquet(package_dir / "p05_building_shade.parquet",
-                              columns=["point_id", "timestamp", "date", "sun_altitude_deg", "shaded"]),
-        envelope=pd.read_parquet(package_dir / "p10_sun_envelope.parquet"),
-        dose=pd.read_parquet(package_dir / "p10_sun_dose.parquet", columns=["point_id", "scope", "local_slot",
-                                                                            "dose_1h_wh_m2"]),
-        agreement=pd.read_parquet(package_dir / "p10_clock_agreement.parquet"),
-        wind=pd.read_csv(package_dir / "p11_wind_observed.csv", keep_default_na=False,
-                         na_values={"drct": [""], "speed_ms": [""]}),
+                              columns=["point_id", "timestamp_local", "date", "sun_altitude_deg", "shaded"]),
+        walks=pd.read_parquet(package_dir / "p02b_walks.parquet"),
+        p12=pd.read_parquet(package_dir / "p12_walk_points.parquet"),
+        regimes=pd.read_csv(package_dir / "p11_wind_regimes.csv"),
+        by_hour=pd.read_csv(package_dir / "p11_regime_by_hour.csv"),
+        dictionary=pd.read_parquet(package_dir / "p08_data_dictionary.parquet"),
     )
 
 
 def _segment_means(points: pd.DataFrame, col: str) -> pd.Series:
     """Mean of col per SEGMENT_M stretch, keyed by the stretch's start (m),
-    over points NOT flagged as possibly off the walked street."""
+    over points not flagged by route_geometry_flag."""
     on_street = points[~points["route_geometry_flag"].astype(bool)]
     seg = (on_street["distance_along_m"] // SEGMENT_M * SEGMENT_M).astype(int)
     return on_street.groupby(seg)[col].mean().dropna()
 
 
-def _spec_facts(f: dict, d: dict) -> None:
-    items = d["conformance"]["items"]
-    by_status: dict[str, list[dict]] = {}
-    for it in items:
-        by_status.setdefault(it["status"], []).append(it)
-    f["spec_total"] = len(items)
-    f["spec_by_status"] = {k: len(v) for k, v in by_status.items()}
-    waits = []
-    for it in by_status.get("partial", []) + by_status.get("pending", []):
-        for tok in it.get("pending_on") or []:
-            if tok not in waits:
-                waits.append(tok)
-    f["waits_on"] = waits
-    cut = []
-    for item in d["quality"].get("descoped_items", []):
-        plain = _DESCOPED_PLAIN.get(item, item.replace("_", " "))
-        if plain not in cut:
-            cut.append(plain)
-    f["descoped_plain"] = cut
+def _quartiles(s: pd.Series) -> tuple[float, float, float]:
+    s = s.dropna()
+    return float(s.quantile(0.25)), float(s.median()), float(s.quantile(0.75))
 
 
-def _form_facts(f: dict, pts: pd.DataFrame, quality: dict) -> None:
-    svf = pts["sky_view_factor"].dropna()
-    f["svf_n"] = int(svf.size)
-    f["svf_median"] = float(svf.median())
-    f["svf_q25"], f["svf_q75"] = (float(v) for v in svf.quantile([0.25, 0.75]))
-    svf_seg = _segment_means(pts, "sky_view_factor")
-    f["svf_min_seg"], f["svf_min_val"] = int(svf_seg.idxmin()), float(svf_seg.min())
-    f["svf_max_seg"], f["svf_max_val"] = int(svf_seg.idxmax()), float(svf_seg.max())
-    f["bh_median"] = float(pts["building_height_m"].median())
-    f["sw_median"] = float(pts["street_width_m"].median())
-    f["hw_median"] = float(pts["height_width_ratio"].median())
-    hw_seg = _segment_means(pts, "height_width_ratio")
-    f["hw_max_seg"], f["hw_max_val"] = int(hw_seg.idxmax()), float(hw_seg.max())
-    n_flag = quality["route_geometry_flagged_points"]
+def _route_facts(f: dict, d: dict) -> None:
+    m, pts = d["manifest"], d["points"]
+    om2 = next(r for r in m["routes"] if r["route_id"] == "OM_2")
+    _require("OM2 n_points", len(pts), om2["n_points"])
+    f["n_points"] = om2["n_points"]
+    f["length_m"] = om2["length_m"]
+    f["spacing_m"] = float(pts.sort_values("distance_along_m")["distance_along_m"].diff().median())
+    f["height_m"] = float(pts["height_m"].median())
+    ext = pts.dropna(subset=["neighbourhood"]).groupby("neighbourhood")["distance_along_m"].agg(["min", "max"])
+    ext = ext.sort_values("min")
+    _require("communities crossed", sorted(ext.index), sorted(om2["communities_crossed"]))
+    f["stretches"] = [(name, float(r["min"]), float(r["max"])) for name, r in ext.iterrows()]
+    n_flag = d["quality"]["route_geometry_flagged_points"]
     _require("route_geometry_flagged_points", int(pts["route_geometry_flag"].sum()), n_flag)
+    _require("manifest route_geometry_flagged_points", n_flag, om2["quality_summary"]["route_geometry_flagged_points"])
     f["n_flagged"] = n_flag
     f["flag_dist_m"] = ROUTE_FLAG_MAX_STREET_DIST_M
 
 
-def _shade_facts(f: dict, sh: pd.DataFrame, p05: dict) -> None:
-    f["shade_rows"] = len(sh)
-    if not len(sh):
-        return
-    step = sh.sort_values(["point_id", "timestamp"]).groupby("point_id")["timestamp"].diff().dropna()
-    f["step_min"] = int(step.median() / pd.Timedelta(minutes=1))
-    day = daylight_rows(sh).assign(hour=lambda x: x["timestamp"].dt.hour)
-    f["day_share"] = float(day["shaded"].mean())
+def _walk_facts(f: dict, d: dict) -> None:
+    w, m = d["walks"], d["manifest"]
+    _require("walks n_walks", len(w), m["walks"]["n_walks"])
+    _require("p05 n_walks", len(w), m["p05_shade"]["n_walks"])
+    dates = sorted(pd.to_datetime(w["date"]).dt.date.astype(str).unique())
+    _require("walks n_dates", len(dates), m["walks"]["n_dates"])
+    _require("walk dates", dates, sorted(m["p05_shade"]["campaign_dates"]))
+    f["n_walks"], f["n_dates"] = len(w), len(dates)
+    f["first_date"], f["last_date"] = dates[0], dates[-1]
+    start = pd.to_datetime(w["start_local"].str[:19])
+    minutes = start.dt.hour * 60 + start.dt.minute
+    f["periods"] = {}
+    for period, g in w.groupby("period"):
+        med = float(minutes[g.index].median())
+        f["periods"][period] = {"n": len(g), "start": f"{int(med // 60):02d}:{int(med % 60):02d}"}
+    f["duration_median_min"] = float(w["duration_min"].median())
+    n_partial = int(w["partial"].sum())
+    _require("walks n_partial", n_partial, m["walks"]["n_partial"])
+    _require("partial rule", int((w["coverage_share"] < PARTIAL_COVERAGE).sum()), n_partial)
+    f["n_partial"] = n_partial
+    f["partial_coverage"] = PARTIAL_COVERAGE
+    f["gap_flag_s"] = GAP_FLAG_S
+    p12 = d["p12"]
+    _require("p12 rows", len(p12), m["walks"]["n_walk_point_rows"])
+    f["n_walk_point_rows"] = len(p12)
+    f["gap_share"] = float((p12["arrival_source"] == "gap_interpolated").mean())
+
+
+def _form_facts(f: dict, pts: pd.DataFrame) -> None:
+    f["bh_median"] = float(pts["building_height_m"].median())
+    f["sw_median"] = float(pts["street_width_m"].median())
+    f["hw_median_of_ratios"] = float(pts["height_width_ratio"].median())
+    f["hw_ratio_of_medians"] = f["bh_median"] / f["sw_median"]
+    f["hw_q25"], _, f["hw_q75"] = _quartiles(pts["height_width_ratio"])
+    hw_seg = _segment_means(pts, "height_width_ratio")
+    f["hw_max_seg"], f["hw_max_val"] = int(hw_seg.idxmax()), float(hw_seg.max())
+    f["svf_q25"], f["svf_median"], f["svf_q75"] = _quartiles(pts["sky_view_factor"])
+    svf_seg = _segment_means(pts, "sky_view_factor")
+    f["svf_min_seg"], f["svf_min_val"] = int(svf_seg.idxmin()), float(svf_seg.min())
+    f["svf_max_seg"], f["svf_max_val"] = int(svf_seg.idxmax()), float(svf_seg.max())
+    f["lp_q25"], f["lp_median"], f["lp_q75"] = _quartiles(pts["plan_density_lambda_p"])
+
+
+def _shade_facts(f: dict, d: dict) -> None:
+    sh, p05 = d["shade"], d["manifest"]["p05_shade"]
+    _require("p05 n_rows", len(sh), p05["n_rows"])
     _require("p05 shade_fraction_daylight_pct", daylight_shade_fraction_pct(sh), p05["shade_fraction_daylight_pct"])
+    day = daylight_rows(sh)
+    ts = pd.DatetimeIndex(day["timestamp_local"])
+    day = day.assign(hour=ts.hour, minute=ts.hour * 60 + ts.minute)
+    step = day.sort_values(["point_id", "timestamp_local"]).groupby("point_id")["minute"].diff()
+    f["shade_step_min"] = int(step[step > 0].median())
+    f["shade_daylight"] = float(day["shaded"].mean())
     per_point = day.groupby("point_id")["shaded"].mean()
-    f["pt_q25"], f["pt_q75"] = (float(v) for v in per_point.quantile([0.25, 0.75]))
+    f["shade_pt_q25"], _, f["shade_pt_q75"] = _quartiles(per_point)
+    by_hour = day.groupby("hour")["shaded"].mean()
+    f["shade_hour_min"], f["shade_hour_min_val"] = int(by_hour.idxmin()), float(by_hour.min())
+    f["shade_first_hour"], f["shade_first_val"] = int(by_hour.index[0]), float(by_hour.iloc[0])
+    f["shade_last_hour"], f["shade_last_val"] = int(by_hour.index[-1]), float(by_hour.iloc[-1])
     hour_sets = [set(g["hour"]) for _, g in day.groupby("date")]
     common = sorted(set.intersection(*hour_sets))
-    f["common_hours"] = common
-    cc = day[day["hour"].isin(common)]
-    per_date = cc.groupby("date")["shaded"].mean()
-    f["date_min"], f["date_min_val"] = str(per_date.idxmin()), float(per_date.min())
-    f["date_max"], f["date_max_val"] = str(per_date.idxmax()), float(per_date.max())
+    f["common_hours"] = (common[0], common[-1])
+    per_date = day[day["hour"].isin(common)].groupby("date")["shaded"].mean()
+    f["shade_date_min"], f["shade_date_min_val"] = str(per_date.idxmin()), float(per_date.min())
+    f["shade_date_max"], f["shade_date_max_val"] = str(per_date.idxmax()), float(per_date.max())
+    f["shade_max_dist_m"] = float(p05["max_dist_m"])
+    f["nodata_floor_m"] = p05["nodata_floor_m"]
 
 
-def _sun_facts(f: dict, d: dict, p10: dict) -> None:
-    env = d["envelope"]
-    day = env[env["class"] != "night"]
-    _require("p10 n_daylight_point_slots", len(day), p10["n_daylight_point_slots"])
-    shares = day["class"].value_counts(normalize=True)
-    for cls, val in p10["class_share_of_daylight"].items():
-        _require(f"p10 class share {cls}", float(shares.get(cls, 0.0)), val)
-    _require("p10 date_dependent_share", float(shares.get("date_dependent", 0.0)), p10["date_dependent_share"])
-    f["date_dependent"] = float(shares.get("date_dependent", 0.0))
-    f["always_shaded"] = float(shares.get("always_shaded", 0.0))
-    f["always_sunlit"] = float(shares.get("always_sunlit", 0.0))
-    f["window"] = p10["window"]
-    f["tz"] = p10["tz"]
-    f["utc_offset_h"] = int(pd.Timestamp(p10["window"][0]).tz_localize(p10["tz"]).utcoffset()
-                            / pd.Timedelta(hours=1))
-
-    agree = d["agreement"]
-    overall = agree.loc[agree["scope"] == "all", "agreement_share"]
-    _require("p10 clock_agreement_all", float(overall.iloc[0]), p10["clock_agreement_all"])
-    per_date = agree[agree["scope"] != "all"]
-    f["clock_agree"] = float(overall.iloc[0])
-    f["clock_agree_min"] = float(per_date["agreement_share"].min())
-    f["clock_agree_max"] = float(per_date["agreement_share"].max())
-
-    dose = d["dose"]
-    slots = dose_slots_for_figure(env, dose)
-    f["dose_slots"] = slots
-    mid = slots[len(slots) // 2]
-    f["dose_slot"] = mid
-    at = dose[dose["local_slot"] == mid]
-    camp = at[at["scope"].isin(p10["campaign_dates"])].groupby("scope")["dose_1h_wh_m2"].max()
-    f["dose_hi_date"], f["dose_hi"] = str(camp.idxmax()), float(camp.max())
-    f["dose_lo_date"], f["dose_lo"] = str(camp.idxmin()), float(camp.min())
-    med = at[at["scope"] == "envelope_median"]["dose_1h_wh_m2"]
-    f["dose_zero_share"] = float((med == 0).mean())
-    f["dose_hours"] = p10["dose_hours"]
-    f["envelope_slot_min"] = p10["envelope_slot_min"]
+def _dose_facts(f: dict, d: dict) -> None:
+    """Sun dose before arrival, in the units the dose figure draws: the
+    figure colours 10 m means per walk and draws a mean below the zero
+    threshold grey. The share of grey cells is computed the same way here."""
+    p12, w = d["p12"], d["walks"]
+    fig = d["figure_facts"].get("sun_dose", {})
+    zero_below = float(fig.get("zero_drawn_below_wh_m2", DOSE_ZERO_BELOW))
+    bin_m = float(fig.get("bin_m", SEGMENT_LENGTH_M))
+    p = p12[["walk_id", "distance_along_m", "dose_1h_before_wh_m2", "dose_3h_before_wh_m2"]].merge(
+        w[["walk_id", "period"]], on="walk_id")
+    cells = p.assign(_b=np.floor(p["distance_along_m"] / bin_m).astype(int)).groupby(["walk_id", "_b"])
+    cell = cells[["dose_1h_before_wh_m2", "dose_3h_before_wh_m2"]].mean()
+    f["dose_bin_m"] = bin_m
+    f["dose_zero_below"] = zero_below
+    f["dose_cells_zero_1h"] = float((cell["dose_1h_before_wh_m2"] < zero_below).mean())
+    f["dose_cells_zero_3h"] = float((cell["dose_3h_before_wh_m2"] < zero_below).mean())
+    f["dose_rows_zero_1h"] = float((p["dose_1h_before_wh_m2"] < zero_below).mean())
+    f["dose_period"] = {}
+    for period, g in p.groupby("period"):
+        f["dose_period"][period] = {
+            "median_1h": float(g["dose_1h_before_wh_m2"].median()),
+            "zero_1h": float((g["dose_1h_before_wh_m2"] < zero_below).mean()),
+        }
+    f["dose_max_1h"] = float(p["dose_1h_before_wh_m2"].max())
+    f["dose_max_3h"] = float(p["dose_3h_before_wh_m2"].max())
+    p10 = d["manifest"]["p10"]
+    f["p10_window"] = p10["window"]
+    f["p10_dose_hours"] = p10["dose_hours"]
+    f["p10_dose_slot_min"] = p10["dose_slot_min"]
+    f["p10_envelope_slot_min"] = p10["envelope_slot_min"]
 
 
-def _vent_facts(f: dict, pts: pd.DataFrame, d: dict, p11: dict) -> None:
-    shelter = pts["upwind_shelter_deg_prevailing"].dropna()
-    f["shelter_median"] = float(shelter.median())
-    f["shelter_q25"], f["shelter_q75"] = (float(v) for v in shelter.quantile([0.25, 0.75]))
-    align = pts["canyon_alignment_prevailing_deg"].dropna()
-    third = 90 / 3
-    f["align_third_deg"] = third
-    f["align_along"] = float((align < third).mean())
-    f["align_across"] = float((align > 90 - third).mean())
-    z0 = pts["z0_macdonald_m"].dropna()
-    f["z0_median"] = float(z0.median())
-    h = pts[f"building_height_mean_buffer_{DEFAULT_BUFFER_M}m"]
-    f["z0_over_h_median"] = float((pts["z0_macdonald_m"] / h).dropna().median())
-    f["lp_buffer_m"] = DEFAULT_BUFFER_M
-    f["lp_median"] = float(pts[f"lambda_p_buffer_{DEFAULT_BUFFER_M}m"].median())
+def _wind_facts(f: dict, d: dict) -> None:
+    reg, m = d["regimes"], d["manifest"]
+    for row in m["p11"]["regimes"]:
+        mine = reg[(reg["period"] == row["period"]) & (reg["regime_key"] == row["regime_key"])].iloc[0]
+        for k in ("mean_direction_deg", "share", "mean_speed_ms"):
+            _require(f"p11 {row['period']} {row['regime_key']} {k}", float(mine[k]), row[k])
+    f["wind_window"] = m["p11"]["window_utc"]
+    f["clim_years"] = (CLIM_YEAR_START, CLIM_YEAR_END)
+    f["n_sectors"] = N_SECTORS
+    f["regimes"] = {}
+    for period, g in reg.groupby("period"):
+        f["regimes"][period] = {r["regime_key"]: {
+            "name": r["name"], "slug": r["column_slug"], "dir": float(r["mean_direction_deg"]),
+            "share": float(r["share"]), "speed": float(r["mean_speed_ms"]), "n": int(r["n_reports"]),
+            "mix_diff": float(r["mixture_difference_deg"]), "mix_dir": float(r["mixture_component_direction_deg"]),
+            "calm": float(r["period_calm_share"]),
+        } for _, r in g.iterrows()}
+    camp = f["regimes"]["campaign"]
+    bh = d["by_hour"]
+    bh = bh[bh["period"] == "campaign"].pivot(index="local_hour", columns="regime_key", values="share")
+    f["regime_peak"] = {k: (int(bh[k].idxmax()), float(bh[k].max())) for k in camp}
+    f["regime_major_hours"] = {k: [int(h) for h in bh.index[bh[k] > 0.5]] for k in camp}
 
-    w = d["wind"]
-    _require("p11 n_obs", len(w), p11["n_obs"])
-    _require("p11 n_calm", int(w["calm"].sum()), p11["n_calm"])
-    _require("p11 n_variable_direction", int(w["variable_direction"].sum()), p11["n_variable_direction"])
-    directional = w[~w["calm"] & ~w["variable_direction"] & w["drct"].notna()]
-    f["wind_window"] = p11["window_utc"]
-    f["wind_station"] = p11["station"]
-    f["wind_obs_bearing"] = _circular_mean_deg(directional["drct"])
-    f["wind_clim_bearing"] = float(p11["prevailing_wind_bearing_deg"])
-    for clock in ("utc", "local"):
-        col = f"used_if_device_clock_{clock}"
-        _require(f"p11 n_used_if_device_clock_{clock}", int((w[col] != "").sum()), p11[f"n_used_if_device_clock_{clock}"])
-        walk = directional[directional[col] != ""]
-        f[f"walk_n_{clock}"] = int((w[col] != "").sum())
-        f[f"walk_bearing_{clock}"] = _circular_mean_deg(walk["drct"]) if len(walk) else float("nan")
+    w = d["walks"]
+    tags = w["wind_regime"].value_counts().to_dict()
+    _require("walks tagged_by_regime", {k: int(v) for k, v in tags.items()}, m["walks"]["tagged_by_regime"])
+    f["walk_tags"] = {k: int(v) for k, v in tags.items()}
+    f["walk_tags_by_period"] = {p: g["wind_regime"].value_counts().to_dict() for p, g in w.groupby("period")}
+    untagged = w[~w["wind_regime"].isin([g["name"] for g in camp.values()])]
+    f["untagged"] = [{"regime": r["wind_regime"],
+                      "no_direction": bool(pd.isna(r["wind_direction_deg"]) and
+                                           abs(r["wind_report_minutes_from_mid"]) <= TAG_MAX_GAP_MIN)}
+                     for _, r in untagged.iterrows()]
+    f["tag_max_gap_min"] = TAG_MAX_GAP_MIN
+    ws = m["provenance"]["wind_source"]
+    f["wind_fetched"] = str(ws["fetched_utc"])[:10]
+    f["wind_n_obs"] = int(ws["n_obs"])
+
+
+def _vent_facts(f: dict, pts: pd.DataFrame) -> None:
+    f["vent"] = {}
+    for key, g in f["regimes"]["campaign"].items():
+        slug = g["slug"]
+        shelter = pts[f"upwind_shelter_angle_deg_{slug}"]
+        align = pts[f"canyon_alignment_deg_{slug}"].dropna()
+        f["vent"][key] = {
+            "shelter": _quartiles(shelter),
+            "align_along": float((align < ALIGN_BAND_DEG).mean()),
+            "align_across": float((align > 90 - ALIGN_BAND_DEG).mean()),
+            "frontal_median": float(pts[f"frontal_area_density_windward_{slug}"].median()),
+        }
+    f["align_band_deg"] = ALIGN_BAND_DEG
+    z0 = [c for c in pts.columns if c.startswith("z0_macdonald_m_")]
+    f["z0_median"] = {c: float(pts[c].median()) for c in z0}
+    f["zd_median"] = float(pts["zd_macdonald_m"].median())
+
+
+def _representative_walk(w: pd.DataFrame) -> pd.Series:
+    """Same rule as figures.pick_representative_walk: among walks covering
+    at least FULL_COVERAGE of the route, the one closest to the median duration."""
+    med = float(w["duration_min"].median())
+    full = w[w["coverage_share"] >= FULL_COVERAGE]
+    return full.loc[(full["duration_min"] - med).abs().idxmin()]
+
+
+def _sensor_facts(f: dict, d: dict) -> None:
+    p12, w, pts = d["p12"], d["walks"], d["points"]
+    for tau in DEFAULT_TAUS_S:
+        if f"sky_view_factor_tau{tau}s" not in p12.columns:
+            raise ValueError(f"p12_walk_points lacks sky_view_factor_tau{tau}s")
+    f["taus"] = list(DEFAULT_TAUS_S)
+    f["fig_taus"] = list(FIGURE_TAUS_S)
+    f["truncation_taus"] = TRUNCATION_TAUS
+    f["ln10"] = math.log(10.0)
+    rep = _representative_walk(w)
+    fig = d["figure_facts"].get("svf_sensor")
+    if fig:
+        _require("fig_svf_sensor walk_id", str(rep["walk_id"]), fig["walk_id"])
+    one = p12[p12["walk_id"] == rep["walk_id"]].merge(pts[["point_id", "sky_view_factor"]], on="point_id")
+    f["rep_walk"] = {"walk_id": str(rep["walk_id"]), "date": str(rep["date"]), "period": str(rep["period"]),
+                     "start": str(rep["start_local"])[11:16], "duration_min": float(rep["duration_min"]),
+                     "coverage": float(rep["coverage_share"])}
+    f["rep_spread"] = {"1m": float(one["sky_view_factor"].std())}
+    for tau in FIGURE_TAUS_S:
+        f["rep_spread"][tau] = float(one[f"sky_view_factor_tau{tau}s"].std())
+    f["tau_cols"] = sorted({re.sub(r"_tau\d+s$", "", c) for c in p12.columns if re.search(r"_tau\d+s$", c)})
 
 
 def compute_facts(package_dir: Path) -> dict:
-    """Every number the report states, computed from the package files."""
+    """Every number the report and the README state, computed from the package files."""
     d = _load(Path(package_dir))
-    m, pts = d["manifest"], d["points"]
-    om2 = next(r for r in m["routes"] if r["route_id"] == "OM_2")
-    _require("OM2 n_points", len(pts), om2["n_points"])
-    p05 = m["p05_shade"]
-    f: dict = {
-        "version": m["package_version"],
-        "built": _day(m["built_at_utc"][:10]),
-        "n_points": om2["n_points"],
-        "length_m": om2["length_m"],
-        "communities": list(om2["communities_crossed"]),
-        "spacing_m": float(pts.sort_values("distance_along_m")["distance_along_m"].diff().median()),
-        "height_m": float(pts["height_m"].median()),
-        "campaign_dates": sorted(p05["campaign_dates"]),
-        "use_terms": m["use_terms"],
-        "geometry_epoch": m["geometry_epoch"],
-        "k_tau": SEGMENT_K,
-        "k_tau_response": 1 - math.exp(-SEGMENT_K),
-    }
-    _spec_facts(f, d)
-    _form_facts(f, pts, d["quality"])
-    _shade_facts(f, d["shade"], p05)
-    _sun_facts(f, d, m["p10"])
-    _vent_facts(f, pts, d, m["p11"])
+    m = d["manifest"]
+    f: dict = {"version": m["package_version"], "use_terms": m["use_terms"], "crs": m["crs"],
+               "geometry_epoch": m["geometry_epoch"], "decisions": m["provenance"]["decisions"],
+               "wind_source": m["provenance"]["wind_source"]}
+    _route_facts(f, d)
+    _walk_facts(f, d)
+    _form_facts(f, d["points"])
+    _shade_facts(f, d)
+    _dose_facts(f, d)
+    _wind_facts(f, d)
+    _vent_facts(f, d["points"])
+    _sensor_facts(f, d)
+    f["dictionary"] = d["dictionary"]
     return f
 
 
-def _spec_sentence(f: dict) -> str:
-    s = f["spec_by_status"]
-    parts = []
-    if s.get("delivered"):
-        parts.append(f"{s['delivered']} {_is_are(s['delivered'])} delivered")
-    if s.get("delivered (scoped)"):
-        n = s["delivered (scoped)"]
-        parts.append(f"{n} {_is_are(n)} delivered with a deliberate cut")
-    waits = _join([_WAITS_ON.get(t, "input from the team") for t in f["waits_on"]])
-    if s.get("partial"):
-        n = s["partial"]
-        parts.append(f"{n} {_is_are(n)} partly delivered and wait{'s' if n == 1 else ''} on {waits}")
-    if s.get("pending"):
-        n = s["pending"]
-        parts.append(f"{n} wait{'s' if n == 1 else ''} on {waits}")
-    if s.get("descoped"):
-        n = s["descoped"]
-        parts.append(f"{n} {_is_are(n)} left out by decision")
-    return f"Of the {f['spec_total']} items the team asked for, {_join(parts)}."
+# --- shared text -------------------------------------------------------------
+
+def opening_paragraph(f: dict) -> str:
+    """The package in one paragraph; the README opens with the same text."""
+    names = [s[0] for s in f["stretches"]]
+    return (
+        f"This data package describes the street along the OM2 walking route in Complexo da Maré, Rio de Janeiro: "
+        f"{_n(f['n_points'])} points, one every {f['spacing_m']:g} m over {_n(f['length_m'])} m, through "
+        f"{_join(names)}. For each point it gives the street form, the building shade on the {f['n_dates']} walk "
+        "dates, the direct sun before each walk and ventilation measures for the two wind regimes of the "
+        f"season. It supports the Octopus team's study \"{STUDY_TITLE}\" (lead Jingxue, PI Simone). "
+        f"{AUTHOR} built it within the {PROJECT_FORM} research line. It holds no temperature analysis: that "
+        "is the Octopus team's work. All times are Rio local time (UTC-3, no daylight saving); the data "
+        "tables also carry the UTC time.\n"
+    )
 
 
-def _figure(name: str, caption: str) -> str:
-    size = next(c for n, _h, c in FIGURES if n == name)
-    return f"![{_fig(name)}. {caption}](OM2/{name}){{.{size}}}\n"
+def regime_title(name: str) -> str:
+    return f"{name} wind"
 
 
-def _section(name: str, body: list[str], caption: str, *, lead: str = "") -> list[str]:
-    heading = next(h for n, h, _c in FIGURES if n == name)
-    return ["::: figsec", lead + f"### {heading}\n", *body, _figure(name, caption), ":::\n"]
+def _file_groups(package_dir: Path) -> list[tuple[str, list[str]]]:
+    """(stem, [extensions]) for every shipped file except figures and the report."""
+    groups: dict[str, list[str]] = {}
+    for p in sorted(package_dir.rglob("*")):
+        if not p.is_file() or p.name.startswith("_"):
+            continue
+        rel = p.relative_to(package_dir).as_posix()
+        if rel.endswith(".png") or rel == "OM2/figure_facts.json":
+            continue
+        stem, ext = (rel, "") if rel == "manifest.json" else rel.rsplit(".", 1)
+        groups.setdefault(stem, []).append(ext)
+    return sorted(groups.items(), key=lambda kv: FILE_ORDER.index(kv[0]) if kv[0] in FILE_ORDER else 99)
 
 
-def render_report_markdown(package_dir: Path) -> str:
+def _columns_of(package_dir: Path, stem: str, exts: list[str]) -> list[str]:
+    if "parquet" in exts:
+        import pyarrow.parquet as pq
+        return pq.read_schema(package_dir / f"{stem}.parquet").names
+    if "csv" in exts:
+        return list(pd.read_csv(package_dir / f"{stem}.csv", nrows=0).columns)
+    return []
+
+
+def file_table(package_dir: Path, f: dict, *, spec_items: dict | None = None) -> str:
+    """Markdown table of the shipped files, built from the files present.
+    spec_items (stem -> item ids) adds a column, used by the README."""
+    roles = file_roles(f)
+    rows = []
+    for stem, exts in _file_groups(Path(package_dir)):
+        if stem in _NOT_DATA:
+            continue
+        if stem not in roles:
+            raise ValueError(f"shipped file {stem} has no description in report.file_roles")
+        present = _columns_of(Path(package_dir), stem, exts)
+        cols = [c for c in FILE_MAIN_COLUMNS.get(stem, []) if c in present]
+        name = stem if not exts[0] else f"{stem}.{exts[0]}" if len(exts) == 1 else \
+            f"{stem}.{'/'.join(sorted(exts, key=lambda e: e != 'parquet'))}"
+        cells = [f"`{name}`", roles[stem], " ".join(f"`{c}`" for c in cols)]
+        if spec_items is not None:
+            cells.append(spec_items.get(stem, ""))
+        rows.append("| " + " | ".join(cells) + " |")
+    head = ["File", "What it holds", "Main columns"] + (["Spec item"] if spec_items is not None else [])
+    return "\n".join(["| " + " | ".join(head) + " |", "|" + "---|" * len(head), *rows]) + "\n"
+
+
+# --- report ------------------------------------------------------------------
+
+def _figure_width_pct(path: Path, cap_cm: float) -> float:
+    """Share of the text width at which the image prints no taller than cap_cm."""
+    if not path.exists():
+        return 100.0
+    from PIL import Image
+    with Image.open(path) as im:
+        w, h = im.size
+    return min(100.0, 100.0 * cap_cm * w / (TEXT_WIDTH_CM * h))
+
+
+def _figure(package_dir: Path, name: str, caption: str, *, source: bool = False) -> str:
+    width = _figure_width_pct(package_dir / "OM2" / name, _FIG_CAP_CM[name])
+    cap = caption + (" " + DATA_SOURCE if source else "")
+    return f"![Figure {_FIG_NO[name]}. {cap}](OM2/{name}){{width={width:.0f}%}}\n"
+
+
+def _fig(name: str) -> str:
+    return f"Figure {_FIG_NO[name]}"
+
+
+def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> str:
+    """Sections in the R6 order. Each section opens with its finding, then
+    says how to read the figure, then shows it; definitions and the other
+    numbers follow the figure."""
     package_dir = Path(package_dir)
     f = compute_facts(package_dir)
-    if not f["use_terms"].upper().startswith("INTERNAL REVIEW DRAFT") or "redistribution" not in f["use_terms"]:
-        raise ValueError(f"use terms changed; update the report's wording to match: {f['use_terms']!r}")
-    dates = f["campaign_dates"]
-    utc = f"UTC{f['utc_offset_h']:+d}"
-    year = f["geometry_epoch"].split()[0]
+    pct = _pct or _Pcts()
+    camp = f["regimes"]["campaign"]
+    clim = f["regimes"]["climatology"]
+    k1, k2 = sorted(camp)
+    r1, r2 = camp[k1], camp[k2]
+    per = f["periods"]
+    y0, y1 = f["clim_years"]
     out: list[str] = []
 
-    out.append("# Street form, sun and ventilation along the OM2 route\n")
-    out.append(f"::: meta\nOctopus OM2 data package, version {f['version']}, built {f['built']}. "
-               "Internal review draft for the named Octopus team. Please do not share it further or cite it.\n:::\n")
-    out.append(
-        f"This package describes the street along the OM2 walking route in Maré: {_n(f['n_points'])} points, "
-        f"one every {f['spacing_m']:g} m over {_n(f['length_m'])} m, through {_join(f['communities'])}. "
-        "For each point it gives the street's shape, when it is in the sun or in building shade, "
-        "and how open it is to the wind. "
-        f"It supports the Octopus team's study \"{STUDY_TITLE}\" (lead Jingxue, PI Simone). "
-        f"Théo Alessandro Hermann built it for the {PROJECT_FORM} research project. "
-        "It holds no temperature analysis: that is the Octopus team's work.\n"
-    )
-    out.append("::: hero")
-    out.append(_figure("map_form.png",
-                       "The OM2 route over the Maré buildings, coloured by sky view: the share of open sky "
-                       "above a point, from 0 (none) to 1 (open). Dark stretches are the enclosed ones. "
-                       "Labels give metres from the route start."))
-    out.append(":::\n")
+    # 1 ------------------------------------------------------------------
+    out.append("# Street form, sun and wind along the OM2 route\n")
+    out.append(opening_paragraph(f))
 
-    out.append("## What is in it\n")
-    out.append(_spec_sentence(f) + " The technical README lists every item and every column.\n")
-    if f["descoped_plain"]:
-        cut = _join(f["descoped_plain"])
-        out.append(f"{cut[0].upper() + cut[1:]} {_is_are(len(f['descoped_plain']))} not in this version, "
-                   "by decision.\n")
-    out.append("What we need from the team, most useful first:\n")
+    # 2 ------------------------------------------------------------------
+    out.append("## What is in the package\n")
+    out.append(file_table(package_dir, f))
     out.append(
-        f"1. **The device clock.** Did the loggers record UTC or Rio local time ({utc})? "
-        "This changes more of the results than anything else (see Figure "
-        f"{_FIG_NO['sun_envelope.png']}).\n"
-        "2. **The air-temperature sensor's time constant**, as mounted. It sets the right segment length.\n"
-        "3. **The raw campaign files with GPS** and the route the team walked.\n"
+        "This report presents each measure, shows it along the route and explains how to pair it with "
+        "temperature readings. The README holds the full method and every column. The files follow the data "
+        "package specification agreed with the Octopus team.\n"
     )
 
-    # --- results ------------------------------------------------------
-    out += _section("profiles.png", [
-        f"The street is narrow and enclosed. The median building is {f['bh_median']:.1f} m tall and the median "
-        f"street is {f['sw_median']:.1f} m wide, so buildings are {f['hw_median']:.1f} times as tall as the "
-        f"street is wide. Among points on the walked street (excluding the {_n(f['n_flagged'])} flagged points), "
-        f"the deepest {SEGMENT_M} m stretch starts at {_n(f['hw_max_seg'])} m, where the ratio "
-        f"reaches {f['hw_max_val']:.1f}.\n",
-        f"Sky view has a median of {f['svf_median']:.2f}; half of the points lie between {f['svf_q25']:.2f} "
-        f"and {f['svf_q75']:.2f}. Among points on the walked street (excluding the {_n(f['n_flagged'])} flagged "
-        f"points), the most enclosed {SEGMENT_M} m stretch starts at {_n(f['svf_min_seg'])} m "
-        f"(mean {f['svf_min_val']:.2f}) and the most open one at {_n(f['svf_max_seg'])} m "
-        f"(mean {f['svf_max_val']:.2f}).\n",
-    ], f"Street form along the route. Grey: every metre. Blue: {SEGMENT_M} m means. Look for the stretches "
-       "where height-to-width rises and sky view drops together: those are the deep canyons.",
-       lead="## Results\n\n")
+    # 3 ------------------------------------------------------------------
+    stretches = _join([f"{name} ({_n(a)} to {_n(b)} m)" for name, a, b in f["stretches"]])
+    out += [
+        "## The route\n",
+        f"The route runs {_n(f['length_m'])} m through {stretches} ({_fig('fig_route.png')}). The map shows it "
+        "over the 2019 building footprints, labelled in metres from the start.\n",
+        _figure(package_dir, "fig_route.png", "The OM2 route over the building footprints of Nova Holanda, Parque Rubens Vaz "
+                "and Parque União. Labels give metres from the route start.", source=True),
+        f"Cassiano and Vincent walked the route {f['n_walks']} times on {f['n_dates']} dates between "
+        f"{_day(f['first_date'])} and {_day(f['last_date'])}: {per['morning']['n']} morning walks starting around "
+        f"{per['morning']['start']} and {per['evening']['n']} evening walks starting around "
+        f"{per['evening']['start']}, each taking about {f['duration_median_min']:.0f} minutes. Every walk goes "
+        "from the route start towards its end.\n",
+    ]
 
-    if f["shade_rows"]:
-        out += _section("map_shade.png", [
-            f"On the {len(dates)} campaign dates ({_day(dates[0])} to {_day(dates[-1])}), the route is in "
-            f"building shade {_pct(f['day_share'])} of daylight time. Half of the points are in shade for "
-            f"{_pct(f['pt_q25'])} to {_pct(f['pt_q75'])} of daylight.\n",
-        ], "Share of daylight each point spends in building shade, over all campaign dates. "
-           "Dark: mostly shaded. Light: mostly in sun.")
-        h0, h_end = f["common_hours"][0], f["common_hours"][-1]
-        out += _section("shade_calendar.png", [
-            "Each panel is one date. Over the daylight hours all dates share "
-            f"({h0:02d}:00 to {h_end:02d}:59 on the device clock read as UTC), the shaded share goes from "
-            f"{_pct(f['date_min_val'])} on {_day(f['date_min'])} to {_pct(f['date_max_val'])} on "
-            f"{_day(f['date_max'])}.\n",
-        ], "Building shade by date (one panel each): distance along the route against time of day, "
-           "with the device clock read as UTC. Dark: shade. Light: sun. Grey: night. "
-           "The red bracket marks the walk.")
+    # 4 ------------------------------------------------------------------
+    out += [
+        "## Street form\n",
+        f"The street is narrow and enclosed: the median of the point height-to-width ratios is "
+        f"{f['hw_median_of_ratios']:.1f}, and the median sky view factor is {f['svf_median']:.2f} "
+        f"({_fig('fig_form.png')}). "
+        f"Read the four profiles from the top: grey lines are the 1 m values, dark lines the {SEGMENT_M} m means. "
+        "Where the height-to-width ratio rises and the sky view factor drops together, the street is a deep "
+        "canyon.\n",
+        _figure(package_dir, "fig_form.png", f"Street form along the route: 1 m values (grey) and {SEGMENT_M} m means (dark). "
+                "The band on top names the neighbourhood of each stretch."),
+        "Four measures describe the street form, all from 2019 building and terrain geometry. "
+        f"**Building height** is the height of the buildings flanking the street (median {f['bh_median']:.1f} m). "
+        f"**Height-to-width ratio** is that height divided by the street width, face to face, at the same point; "
+        f"half of the points lie between {f['hw_q25']:.1f} and {f['hw_q75']:.1f}. Among points on the walked "
+        f"street, the deepest {SEGMENT_M} m stretch starts at {_n(f['hw_max_seg'])} m, with a mean ratio of "
+        f"{f['hw_max_val']:.1f}. **Sky view factor** is the share of the sky hemisphere visible "
+        f"{f['height_m']:g} m above the street, from 0 (none) to 1 (open sky); half of the points lie between "
+        f"{f['svf_q25']:.2f} and {f['svf_q75']:.2f}. The most enclosed {SEGMENT_M} m stretch starts at "
+        f"{_n(f['svf_min_seg'])} m (mean {f['svf_min_val']:.2f}) and the most open at {_n(f['svf_max_seg'])} m "
+        f"(mean {f['svf_max_val']:.2f}). **Plan density** is the share of ground covered by buildings in the "
+        f"10 m grid cell of the point: median {f['lp_median']:.2f}, half of the points between "
+        f"{f['lp_q25']:.2f} and {f['lp_q75']:.2f}.\n",
+    ]
 
-    out += _section("sun_envelope.png", [
-        f"**The date matters.** Over the season ({_day(f['window'][0])} to {_day(f['window'][1])}), "
-        f"{_pct(f['date_dependent'])} of daylight point-slots (one point at one {f['envelope_slot_min']}-minute "
-        "time of day) are sunny on some days and shaded on others. "
-        f"Only {_pct(f['always_sunlit'])} are always sunny and {_pct(f['always_shaded'])} always shaded. "
-        f"The {len(dates)} campaign dates are known from the device files, so use the per-date results.\n",
-        f"**The clock matters more.** If the loggers recorded UTC rather than Rio local time ({utc}), "
-        f"only {_pct(f['clock_agree'])} of daylight point-slots on the campaign dates keep the same sun or "
-        f"shade state ({_pct(f['clock_agree_min'])} to {_pct(f['clock_agree_max'])} by date). "
-        "Confirming the clock is the single most useful thing the team can send.\n",
-    ], "Left: for each time of day (Rio local time), the share of route points that are always shaded, "
-       "date-dependent or always sunny over the season. Right: where along the route the date matters most "
-       "(darker = more date-dependent).")
+    # 5 ------------------------------------------------------------------
+    h0, h1 = f["common_hours"]
+    out += [
+        "## Sun and shade on the walk dates\n",
+        f"On the {f['n_dates']} walk dates, the route is in building shade for "
+        f"{pct('shade_daylight', f['shade_daylight'])} of daylight time ({_fig('fig_shade_map.png')}). "
+        "The map colours each point by the share of daylight time it spends in building shade: dark points are "
+        "mostly shaded, light points mostly in sun.\n",
+        _figure(package_dir, "fig_shade_map.png", f"Share of daylight time each point spends in building shade, over the "
+                f"{f['n_dates']} walk dates.", source=True),
+        "A point is in **building shade** when buildings or terrain block the direct sun. Sun and shade are "
+        "computed from 2019 building and terrain geometry, every "
+        f"{f['shade_step_min']} minutes of daylight on each walk date. Half of the points spend between "
+        f"{pct('shade_pt_q25', f['shade_pt_q25'])} and {pct('shade_pt_q75', f['shade_pt_q75'])} of daylight time "
+        "in building shade.\n",
+        f"Shade changes more with the time of day than with the date ({_fig('fig_shade_calendar.png')}). Read "
+        "the calendar row by row: each row is one walk date, time of day runs left to right in Rio local time, "
+        "and the colour gives the share of route points in building shade.\n",
+        _figure(package_dir, "fig_shade_calendar.png", "Share of route points in building shade by walk date (rows) and time "
+                "of day (Rio local time). White: sun below the horizon."),
+        f"In the {_hour(f['shade_hour_min'])} hour only {pct('shade_hour_min', f['shade_hour_min_val'])} of route "
+        f"points are shaded, against {pct('shade_last', f['shade_last_val'])} in the "
+        f"{_hour(f['shade_last_hour'])} hour. Over the hours of daylight that all walk dates share ({_hour(h0)} "
+        f"to {h1:02d}:59), the shaded share of route points goes from "
+        f"{pct('shade_date_min', f['shade_date_min_val'])} on {_day(f['shade_date_min'])} to "
+        f"{pct('shade_date_max', f['shade_date_max_val'])} on {_day(f['shade_date_max'])}.\n",
+    ]
 
-    lo, hi = f["dose_lo_date"], f["dose_hi_date"]
-    out += _section("sun_dose.png", [
-        f"The dose is the direct sunlight energy a point receives over the past hour on a clear day. "
-        f"In the hour up to {f['dose_slot']}, a point in full sun gets up to {_n(f['dose_hi'])} Wh/m² on "
-        f"{_day(hi)} and {_n(f['dose_lo'])} Wh/m² on {_day(lo)}. "
-        f"On a typical day of the season, {_pct(f['dose_zero_share'])} of points get no direct sun in that "
-        f"hour. The package also gives {_join([f'{h}-hour' for h in f['dose_hours'] if h != 1])} doses.\n",
-    ], f"Direct sun in the past hour along the route, at {count_word(len(f['dose_slots']))} times of day "
-       "(Rio local time). "
-       "Coloured lines: the campaign dates. Grey band: lowest to highest over the season. "
-       "Drops to zero are building shade.")
+    # 6 ------------------------------------------------------------------
+    mo, ev = f["dose_period"]["morning"], f["dose_period"]["evening"]
+    out += [
+        "## Direct sun before each walk\n",
+        "Morning walkers reach streets that have had direct sun in the past hour; evening walkers reach many "
+        f"that have had none ({_fig('fig_sun_dose.png')}). "
+        "Each row is one walk, labelled by date and start time; morning walks are above the gap, evening walks "
+        f"below. Distance runs left to right in {SEGMENT_M} m means. One colour scale serves both panels; grey "
+        "is zero and white marks points the walk did not reach.\n",
+        _figure(package_dir, "fig_sun_dose.png", "Clear-sky direct sun dose in the hour (left) and the three hours (right) "
+                "before each walk reached each point.", source=True),
+        "The **direct sun dose** is the direct sunlight energy that reached a horizontal surface at the point "
+        "in the hour, or the three hours, before the walker arrived, in Wh/m². The arrival time comes from the "
+        "walk's own GPS timestamps. The dose comes from 2019 building and terrain geometry and assumes a clear "
+        "sky, so it is an upper bound.\n",
+        f"In the hour before arrival, the median dose is {_n(mo['median_1h'])} Wh/m² on morning walks and "
+        f"{_n(ev['median_1h'])} Wh/m² on evening walks. Counted over the {SEGMENT_M} m stretches of each walk, "
+        "as the figure draws them, "
+        f"{pct('dose_cells_zero_1h', f['dose_cells_zero_1h'])} of walk stretches got no direct sun at all in the "
+        f"hour before arrival (grey in the left panel), and {pct('dose_cells_zero_3h', f['dose_cells_zero_3h'])} "
+        f"got none in the three hours before (grey in the right panel). Counted over single 1 m points, "
+        f"{pct('dose_rows_zero_1h', f['dose_rows_zero_1h'])} of walk points got no direct sun in the hour before "
+        "arrival: a stretch with sun on some of its points is not grey.\n",
+    ]
 
-    obs_b, clim_b = f["wind_obs_bearing"], f["wind_clim_bearing"]
-    out += _section("map_vent_shelter.png", [
-        f"The ventilation measures are computed from the building geometry for wind from the "
-        f"{_compass(clim_b)} ({clim_b:.0f}°), the long-term prevailing direction at Galeão airport. "
-        "None of them is a measured or simulated wind.\n",
-        "**Shelter angle** is how high the buildings rise above the horizon when you look into the wind. "
-        f"A high angle means the wind is blocked close by. The median is {f['shelter_median']:.0f}°, and half "
-        f"of the points lie between {f['shelter_q25']:.0f}° and {f['shelter_q75']:.0f}°.\n",
-    ], f"Shelter angle toward the prevailing wind ({clim_b:.0f}°, arrow). Dark: buildings rise steeply "
-       "toward the wind, so the point is sheltered. Light: open toward the wind.")
+    # 7 ------------------------------------------------------------------
+    peak1, peak2 = f["regime_peak"][k1], f["regime_peak"][k2]
+    tags, tbp, untag = f["walk_tags"], f["walk_tags_by_period"], f["untagged"]
+    untag_txt = ""
+    if untag:
+        why = ("the nearest report gave no wind direction" if all(u["no_direction"] for u in untag)
+               else f"no report with a direction lies within {f['tag_max_gap_min']} minutes")
+        untag_txt = f" and {count_word(len(untag))} walk{'s' if len(untag) > 1 else ''} with no tag, because {why}"
+    out += [
+        "## Wind: two regimes\n",
+        f"Two winds alternate at Galeão airport: an {r1['name']} wind most of the afternoon and a {r2['name']} "
+        f"wind most of the morning ({_fig('fig_wind.png')}). "
+        "The roses show how often the wind comes from each direction, coloured by regime, with a line at each "
+        "regime's mean direction; the lower panel gives each regime's share of the reports by hour of day.\n",
+        _figure(package_dir, "fig_wind.png", f"Wind at Galeão airport. Top: wind roses for the campaign season (left) and "
+                f"{y0} to {y1} (right), coloured by regime. Bottom: share of each regime by hour of day in Rio "
+                f"local time (solid: campaign season; dashed: {y0} to {y1}).", source=True),
+        f"The regimes come from the Galeão airport hourly weather reports of the campaign season "
+        f"({_day(f['wind_window'][0])} to {_day(f['wind_window'][1])}) and of {y0} to {y1}. Each report goes to "
+        f"the nearer of the two peaks of the {f['n_sectors']}-sector wind rose. In the campaign season, the "
+        f"**{r1['name']}** regime has a mean direction of {r1['dir']:.0f}°, holds "
+        f"{pct('regime1_share', r1['share'])} of the reports and has a mean speed of {r1['speed']:.1f} m/s. The "
+        f"**{r2['name']}** regime has a mean direction of {r2['dir']:.0f}°, holds "
+        f"{pct('regime2_share', r2['share'])} of the reports and has a mean speed of {r2['speed']:.1f} m/s. "
+        f"The {r2['name']} regime spreads over a broad northern arc rather than one narrow direction: a check "
+        "that fits two circular distributions and a uniform background confirms the "
+        f"{r1['name']} direction (within {r1['mix_diff']:.0f}°) but not the {r2['name']} one. Over {y0} to {y1} "
+        f"the two regimes point the same way ({clim[k1]['dir']:.0f}° and {clim[k2]['dir']:.0f}°).\n",
+        f"The {r2['name']} wind is most frequent at {_hour(peak2[0])}, with "
+        f"{pct('regime2_peak', peak2[1])} of that hour's airport reports; the {r1['name']} wind peaks at "
+        f"{_hour(peak1[0])}, with {pct('regime1_peak', peak1[1])}. Each walk carries the regime of the airport "
+        f"report nearest its middle time: {tags.get(r1['name'], 0)} walks {r1['name']}, "
+        f"{tags.get(r2['name'], 0)} walks {r2['name']}{untag_txt}. {tbp['morning'].get(r2['name'], 0)} of the "
+        f"{per['morning']['n']} morning walks had the {r2['name']} wind, and "
+        f"{tbp['evening'].get(r1['name'], 0)} of the {per['evening']['n']} evening walks the {r1['name']} wind. "
+        "The airport wind is a regional reference measured at 10 m height, not the wind in the streets.\n",
+    ]
 
-    third = f["align_third_deg"]
-    out += _section("profiles_vent.png", [
-        "**Canyon alignment** is the angle between the street and the wind: 0° means the wind blows along "
-        f"the street, 90° across it. {_pct(f['align_along'])} of points are within {third:.0f}° of along the "
-        f"wind and {_pct(f['align_across'])} are within {third:.0f}° of across it, so the route alternates "
-        "between the two.\n",
-        "**Roughness length** (z0, Macdonald method) describes how much the buildings slow the wind above "
-        f"them. Along most of the route it is near zero: median {f['z0_median']:.3f} m, "
-        f"{100 * f['z0_over_h_median']:.1f}% of the mean building height. "
-        f"Maré is densely built (median plan density {f['lp_median']:.2f} within {f['lp_buffer_m']} m), "
-        "beyond the range the method was calibrated on (regular arrays of blocks). Read these values as "
-        "outside the method's calibrated range, not as a smooth surface.\n",
-    ], f"Ventilation measures along the route for wind from {clim_b:.0f}°. Grey: every metre. Blue: "
-       f"{SEGMENT_M} m means. From top: frontal density facing the wind, canyon alignment, shelter angle, "
-       "roughness length.")
+    # 8 ------------------------------------------------------------------
+    v1, v2 = f["vent"][k1], f["vent"][k2]
+    more, less = ((r1, v1), (r2, v2)) if v1["shelter"][1] > v2["shelter"][1] else ((r2, v2), (r1, v1))
+    band = f["align_band_deg"]
+    out += [
+        "## Ventilation for both regimes\n",
+        f"Buildings rise higher towards the {more[0]['name']} wind than towards the {less[0]['name']} wind: "
+        f"the median upwind shelter angle is {more[1]['shelter'][1]:.0f}° against {less[1]['shelter'][1]:.0f}° "
+        f"({_fig('fig_shelter_maps.png')} and {_fig('fig_vent_profiles.png')}). "
+        "The maps show the shelter angle for each regime side by side, with an arrow for the wind; the "
+        "profiles overlay both regimes in their colours.\n",
+        _figure(package_dir, "fig_shelter_maps.png", f"Upwind shelter angle for the {r1['name']} wind (left) and the "
+                f"{r2['name']} wind (right). Dark: buildings rise steeply towards the wind.", source=True),
+        "Three measures describe how open a point is to each wind. They are computed from 2019 building and "
+        "terrain geometry at each regime's mean direction; none is a measured or simulated wind. "
+        "**Frontal area density** is the building wall area facing the wind per unit of ground area, in the "
+        f"10 m grid cell of the point (median {v1['frontal_median']:.2f} for the {r1['name']} wind, "
+        f"{v2['frontal_median']:.2f} for the {r2['name']} wind). **Canyon alignment** is the angle between the "
+        f"street and the wind: 0° means the wind blows along the street, 90° across it. For the {r1['name']} "
+        f"wind, {pct('align1_along', v1['align_along'])} of points lie within {band:.0f}° of along and "
+        f"{pct('align1_across', v1['align_across'])} within {band:.0f}° of across. The {r2['name']} wind meets "
+        f"most streets at a slant: only {pct('align2_along', v2['align_along'])} of points lie within "
+        f"{band:.0f}° of along and {pct('align2_across', v2['align_across'])} within {band:.0f}° of across. "
+        "**Upwind shelter angle** is how high buildings and terrain rise above the horizon when you look into "
+        f"the wind. Half of the points lie between {v1['shelter'][0]:.0f}° and {v1['shelter'][2]:.0f}° for the "
+        f"{r1['name']} wind and between {v2['shelter'][0]:.0f}° and {v2['shelter'][2]:.0f}° for the "
+        f"{r2['name']} wind.\n",
+        _figure(package_dir, "fig_vent_profiles.png", f"Ventilation measures along the route for the two regimes (colours as "
+                f"in {_fig('fig_wind.png')}): frontal area density facing the wind, canyon alignment and upwind "
+                f"shelter angle, as {SEGMENT_M} m means."),
+    ]
 
-    walk = []
-    for clock, label in (("utc", "UTC"), ("local", "local time")):
-        if f[f"walk_n_{clock}"]:
-            b = f[f"walk_bearing_{clock}"]
-            walk.append(f"{_compass(b)} ({b:.0f}°) if the clock recorded {label}")
-    out += _section("wind_rose_compare.png", [
-        f"Over the campaign season ({f['wind_window'][0]} to {f['wind_window'][1]}), the observed wind at "
-        f"Galeão came on average from the {_compass(obs_b)} ({obs_b:.0f}°), close to the long-term "
-        f"{clim_b:.0f}°. "
-        + (f"During the walks themselves it came from the {_join(walk)}. " if walk else "")
-        + "The airport is a regional reference: wind in the streets is weaker and follows the street.\n",
-    ], f"Wind at Galeão airport (10 m): the campaign season (left) against {CLIM_YEAR_START} to {CLIM_YEAR_END} "
-       "(right). "
-       "Bars point to where the wind comes from; longer bars are more frequent, colour is mean speed.")
+    # 9 ------------------------------------------------------------------
+    rep, sp = f["rep_walk"], f["rep_spread"]
+    t_lo, t_hi = f["fig_taus"]
+    taus = _join([f"{t}" for t in f["taus"]])
+    flag_share = f["n_flagged"] / f["n_points"]
+    out += [
+        "## Using the data with temperature readings\n",
+        "A sensor carried at walking speed reads the air it has just passed, so the package also gives each "
+        f"measure as the sensor would see it ({_fig('fig_svf_sensor.png')}).\n",
+        _figure(package_dir, "fig_svf_sensor.png", f"Sky view factor along one full walk ({_day(rep['date'])}, "
+                f"{rep['period']}, starting at {rep['start']}): 1 m values (grey) and sensor-matched values for "
+                f"τ = {t_lo} s and τ = {t_hi} s (coloured)."),
+        "A **sensor-matched** value at a point is a weighted mean of the measure over the points the walk had "
+        "already passed. Each passed point gets the weight exp(-Δt/τ), where Δt is the time since the walker "
+        f"was there, from the walk's GPS timestamps, and τ is the sensor's time constant. Points more than "
+        f"{f['truncation_taus']:g}τ back are left out, and the weights are scaled to sum to one. The columns end "
+        f"in `_tau5s`, `_tau10s`, `_tau30s` and `_tau60s`, for τ = {taus} s, one row per walk and point in "
+        f"`p12_walk_points`. τ is the time to reach 63% of a step change; if only the 90% response time t90 is "
+        f"known, τ = t90 / {f['ln10']:.3f}. The segment script averages these rows per walk, for example "
+        "`--by walk_id --tau 30`. Along the walk in the figure, the standard deviation of the sky view factor "
+        f"drops from {sp['1m']:.2f} at 1 m to {sp[t_lo]:.2f} for τ = {t_lo} s and {sp[t_hi]:.2f} for "
+        f"τ = {t_hi} s: the slower the sensor, the smoother the profile it sees.\n",
+        f"**Flagged points.** {_n(f['n_flagged'])} of the {_n(f['n_points'])} points "
+        f"({pct('flag_share', flag_share)}) have `route_geometry_flag` set: they fall inside a building outline "
+        f"or more than {f['flag_dist_m']:g} m from a street centre line, because some alleys cannot be mapped. "
+        "Their street form values describe the nearest mapped street, not the alley walked. Run each analysis "
+        "with and without them.\n",
+        f"**Arrival times.** In `p12_walk_points`, `arrival_source` says how each arrival time was found: "
+        f"`gps` between fixes less than {f['gap_flag_s']} s apart, `gap_interpolated` across a longer gap "
+        f"({pct('gap_share', f['gap_share'])} of walk points). Down-weight or drop the interpolated rows. "
+        f"In `p02b_walks`, {f['n_partial']} of the {f['n_walks']} walks are marked `partial`: their GPS covers "
+        f"less than {pct('partial_rule', f['partial_coverage'])} of the route.\n",
+        "**One question for the team.** What is the time constant of the air temperature sensor as mounted, "
+        "with its housing, and is the value you have the 63% or the 90% response time? With it we can pick "
+        "the matching τ and the segment length.\n",
+    ]
 
-    # --- using the data ----------------------------------------------
-    out.append("::: keep")
-    out.append("## Using the data\n")
-    out.append(
-        f"**Choose the segment length from the sensor.** The points are {f['spacing_m']:g} m apart, but a sensor "
-        "carried at walking speed responds slowly: each reading blends the last stretch walked. Neighbouring "
-        f"{f['spacing_m']:g} m points are therefore not independent. A good segment length is L = v × k × τ, with v the walking speed, "
-        f"τ the sensor's time constant and k = {f['k_tau']} (about {_pct(f['k_tau_response'])} of a step "
-        "change). Match each reading to the segment that ends at that point, not one centred on it. "
-        "The segment script in the package re-aggregates the points to any L.\n"
-    )
-    out.append(
-        "**We need τ to set L.** What is the time constant of your air-temperature sensor as mounted "
-        "(with its housing), and is it the 63% or the 90% response time?\n"
-    )
-    out.append(
-        "**Robust subset.** Until the clock is confirmed, the points and times that are always sunny or "
-        "always shaded give the same answer under any date and either clock.\n"
-    )
-    out.append(":::\n")
-
-    # --- read with care ------------------------------------------------
-    out.append("::: care")
-    out.append("## Read with care\n")
-    out.append(
-        "- **Proxies, not measurements.** Sun, shade and ventilation values come from building geometry. "
-        "None is a measured air temperature, sunlight or wind.\n"
-        "- **Building shade only.** Trees are not included.\n"
-        "- **Clear sky.** The sun dose assumes no cloud, so it is an upper bound.\n"
-        f"- **Time.** The season results use Rio local time ({utc}, no daylight saving). The per-date shade "
-        "reads the device clock as UTC until the team confirms it.\n"
-        f"- **{year} geometry.** Buildings and terrain come from {year} data; 2024 airborne data will "
-        "replace them in a later version.\n"
-        f"- **Route.** {_n(f['n_flagged'])} of {_n(f['n_points'])} points "
-        f"({100 * f['n_flagged'] / f['n_points']:.1f}%) sit inside a building outline or more than "
-        f"{f['flag_dist_m']:g} m from a street centre line. The route was traced from a street map, so these "
-        "points possibly lie off the walked street.\n"
-    )
-    out.append(":::\n")
-
-    out.append("## Files and contact\n")
-    out.append(
-        "The data files sit in the package folder. The technical README gives the full method, the sources, "
-        "every column and the spec table. Contact: Théo Alessandro Hermann.\n"
-    )
+    # 10 -----------------------------------------------------------------
+    out.append("## Contact\n")
+    out.append(f"{AUTHOR}, {PROJECT_FORM}.\n")
+    pct.check()
     return "\n".join(out)
 
 
 def write_report(package_dir: Path) -> tuple[Path, Path]:
     """Write package_dir/report.md and render package_dir/report.pdf."""
+    from src.om_package.package_docs import USE_TERMS
+
     package_dir = Path(package_dir)
     md = package_dir / "report.md"
-    text = render_report_markdown(package_dir)
-    md.write_text(text, encoding="utf-8")
+    md.write_text(render_report_markdown(package_dir), encoding="utf-8")
     version = json.loads((package_dir / "manifest.json").read_text(encoding="utf-8"))["package_version"]
-    pdf = render_markdown_pdf(md, package_dir / "report.pdf", css=report_css(version),
-                              title="Octopus OM2 report", md_format="markdown")
+    pdf = render_markdown_pdf(md, package_dir / "report.pdf", css=report_css(version, USE_TERMS),
+                              title=f"Octopus OM2 data package {version}", md_format="markdown")
     return md, pdf
