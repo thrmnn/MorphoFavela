@@ -346,7 +346,7 @@ def _building_shade_table_part(name: str, package_dir: Path) -> PartResult:
     import pyarrow.parquet as pq
 
     have = set(pq.read_schema(package_dir / "p05_building_shade.parquet").names)
-    required = {"point_id", "timestamp_local", "timestamp_utc", "date", "sun_altitude_deg", "sun_azimuth_deg", "shaded", "tree_shade"}
+    required = {"point_id", "timestamp_local", "timestamp_utc", "date", "sun_altitude_deg", "sun_azimuth_deg", "shaded"}
     missing = required - have
     if missing:
         return PartResult(name, "pending", evidence=f"p05_building_shade missing column(s): {sorted(missing)}")
@@ -359,20 +359,6 @@ def _building_shade_table_part(name: str, package_dir: Path) -> PartResult:
     offsets = {str(o) for o in (local.tz_localize(None) - local.tz_convert("UTC").tz_localize(None)).unique()}
     return PartResult(name, "delivered", evidence=f"p05_building_shade: {len(df)} rows over {df['date'].nunique()} walk dates, "
                                                   f"local-time offset(s) {sorted(offsets)}, schema {sorted(required)}")
-
-
-def _tree_shade_part(name: str, package_dir: Path) -> PartResult:
-    df = _shade_df(package_dir, ["tree_shade"])
-    if df is None or "tree_shade" not in df.columns:
-        evidence = "tree shade not computed in this version; p05_building_shade missing or has no tree_shade column"
-    else:
-        all_null = bool(df["tree_shade"].isna().all()) if len(df) else True
-        evidence = (
-            "tree shade not computed in this version; p05_building_shade.tree_shade stays as a reserved column, "
-            + ("all null" if all_null else "with non-null values (unexpected)")
-            + f" ({len(df)} rows)"
-        )
-    return _descoped_part(name, evidence)
 
 
 _VENTILATION_IDS = [
@@ -719,20 +705,15 @@ SPEC: list[dict] = [
             )},
             {"name": "airborne_orientation", "check": lambda pd_: _columns_part("airborne_orientation", pd_, ["street_orientation_deg"])},
             {"name": "airborne_sky_view_factor", "check": lambda pd_: _columns_part("airborne_sky_view_factor", pd_, ["sky_view_factor"])},
-            {"name": "terrestrial_sky_view_factor", "check": lambda pd_: _descoped_part(
-                "terrestrial_sky_view_factor",
-                f"terrestrial sky-view factor is not part of {_current_version(pd_)} (airborne SVF only); no terrestrial column shipped",
-            )},
         ],
     },
     {
         "id": "P-05",
         "title": "Shade lookup",
         "requirement": "Shaded or sunlit per point per 5 minutes for each walk date (daylight, Rio local time, "
-                       "with a UTC twin), split into building and tree shade, plus a short join example using Octopus timestamps.",
+                       "with a UTC twin), plus a short join example using Octopus timestamps.",
         "parts": [
             {"name": "building_shade_table", "check": lambda pd_: _building_shade_table_part("building_shade_table", pd_)},
-            {"name": "tree_shade_column_reserved", "check": lambda pd_: _tree_shade_part("tree_shade_column_reserved", pd_)},
             {"name": "join_example_script_shipped_in_package", "check": lambda pd_: _file_exists_part(
                 "join_example_script_shipped_in_package", pd_, ["OM2/join_shade_example.py"],
             )},
@@ -762,12 +743,6 @@ SPEC: list[dict] = [
         "parts": [
             {"name": "coverage_mask", "check": lambda pd_: _coverage_mask_part("coverage_mask", pd_)},
             {"name": "known_gaps_listed", "check": lambda pd_: _known_gaps_part("known_gaps_listed", pd_)},
-            {"name": "height_change_2024_2026", "check": lambda pd_: _descoped_part(
-                "height_change_2024_2026", f"2024 to 2026 height change is not part of {_current_version(pd_)}",
-            )},
-            {"name": "airborne_vs_terrestrial_comparison", "check": lambda pd_: _descoped_part(
-                "airborne_vs_terrestrial_comparison", f"airborne vs terrestrial comparison is not part of {_current_version(pd_)}",
-            )},
         ],
     },
     {

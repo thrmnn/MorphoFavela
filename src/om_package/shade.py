@@ -3,9 +3,7 @@ dates, daylight only, in Rio local time (America/Sao_Paulo, UTC-3, no DST).
 Loggers record UTC; every shipped time column carries the local time and a
 UTC twin.
 
-Building-only shade (tree shade stays PENDING: no canopy layer for Maré; the
-``tree_shade`` column is reserved and always null so the table's shape does
-not change when canopy data lands).
+Building and terrain shade only.
 
 Method (compute_shade_local, given a marched horizon profile per point):
   1. sun_positions(): pvlib solar position (altitude, azimuth) for every
@@ -32,11 +30,6 @@ SHADE_TABLE_COLUMNS = [
     "sun_altitude_deg",
     "sun_azimuth_deg",
     "shaded",
-    # Reserved, explicitly empty (null) column — building-only P-05 releases
-    # once campaign dates are known; tree shade needs a canopy/DSM layer
-    # this package does not have (PI ruling 2026-09-24). Never inferred or
-    # guessed: always null until a real value is computed.
-    "tree_shade",
 ]
 
 
@@ -228,8 +221,7 @@ def compute_shade_local(
 
     Returns (summary, subsample): the summary holds row/date counts and the
     share of rows in building shade; the subsample is the table thinned to
-    every ``figure_step_min`` minutes, for the figures. ``tree_shade`` is
-    an explicitly null column."""
+    every ``figure_step_min`` minutes, for the figures."""
     import pyarrow as pa
     import pyarrow.parquet as pq
 
@@ -244,7 +236,6 @@ def compute_shade_local(
         ("sun_altitude_deg", pa.float32()),
         ("sun_azimuth_deg", pa.float32()),
         ("shaded", pa.bool_()),
-        ("tree_shade", pa.bool_()),
     ])
     n_rows = n_shaded = 0
     thinned = []
@@ -268,7 +259,6 @@ def compute_shade_local(
                 "sun_altitude_deg": np.tile(alt, n_pts).astype("float32"),
                 "sun_azimuth_deg": np.tile(az, n_pts).astype("float32"),
                 "shaded": shaded.reshape(-1),
-                "tree_shade": pd.array([None] * (n_pts * n_t), dtype="boolean"),
             })
             writer.write_table(pa.Table.from_pandas(frame, schema=schema, preserve_index=False))
             n_rows += len(frame)
@@ -284,8 +274,7 @@ def compute_shade_local(
 
 
 def build_empty_shade_table() -> pd.DataFrame:
-    """Correct schema (including the reserved, always-null tree_shade
-    column), zero rows."""
+    """Correct schema, zero rows."""
     return pd.DataFrame(columns=SHADE_TABLE_COLUMNS)
 
 

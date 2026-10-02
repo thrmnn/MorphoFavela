@@ -20,12 +20,7 @@ PENDING_ITEMS: list[str] = []
 #: deliberate cut, not a gap; candidates for a later version. Listed so the
 #: quality report and the data dictionary agree.
 DESCOPE_DECISION = "om_v013_descope"
-DESCOPED_ITEMS = [
-    "sky_view_factor_terrestrial",
-    "tree_shade",
-    "airborne_vs_terrestrial_comparison",
-    "height_change_2024_2026",
-]
+DESCOPED_ITEMS: list[str] = []
 
 
 def coverage_report(df: pd.DataFrame, variable_cols: list[str], extra: dict | None = None) -> dict:

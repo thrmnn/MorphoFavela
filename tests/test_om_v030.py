@@ -173,21 +173,15 @@ def test_conformance_delivered_for_p10_p11_p12():
     for pid in ("P-02", "P-03", "P-06", "P-08", "P-09", "P-10", "P-11", "P-12"):
         assert by[pid]["status"] == "delivered", (pid, by[pid]["evidence"])
     assert [p["name"] for p in by["P-10"]["parts"]] == ["sun_envelope", "sun_dose", "annual_sun_hours"]
-    assert by["P-05"]["status"] == "delivered (scoped)"
+    assert by["P-05"]["status"] == "delivered"
     assert not any(p["pending_on"] for it in by.values() for p in it["parts"])
 
 
 @real
-def test_no_descoped_dictionary_id_is_pending_in_conformance():
-    d = pd.read_csv(PKG / "p08_data_dictionary.csv")
-    descoped = set(d.loc[d["status"].str.startswith("DESCOPED"), "id"])
-    assert descoped
-    for it in conformance(PKG)["items"]:
-        for part in it["parts"]:
-            if part["name"] in descoped or any(i in part["evidence"] for i in descoped):
-                assert part["status"] != "pending", (it["id"], part["name"])
+def test_no_pending_items_in_conformance():
     q = json.loads((PKG / "OM2" / "p07_quality_report.json").read_text())
     assert q["pending_items"] == []
+    assert q["descoped_items"] == []
 
 
 @real

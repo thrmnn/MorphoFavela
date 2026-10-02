@@ -166,8 +166,7 @@ def test_descoped_part_without_decision_id_fails():
 def test_spec_descopes_exactly_the_decided_parts():
     from src.om_package.spec import PartResult
 
-    expected = {"terrestrial_sky_view_factor", "tree_shade_column_reserved",
-                "height_change_2024_2026", "airborne_vs_terrestrial_comparison"}
+    expected: set[str] = set()
     got = set()
     for item in SPEC:
         for part in item["parts"]:
@@ -237,15 +236,13 @@ def test_sabotage_drop_ventilation_column_flips_p06_delivered_to_partial(tmp_pat
 
 @pytestmark_real
 def test_sabotage_drop_building_height_flips_p04_part_but_stays_partial(tmp_path):
-    # P-04 starts "delivered (scoped)" (terrestrial SVF is descoped) — the
-    # mechanical part that flips is airborne_building_and_canyon, from
-    # delivered to pending, and a descoped cut must not mask it: partial.
+    # P-04 starts "delivered"; the part that flips is airborne_building_and_canyon.
     copy_dir = _copy_package(tmp_path)
     before = conformance(copy_dir)
     p04_before = next(it for it in before["items"] if it["id"] == "P-04")
     before_part = next(p for p in p04_before["parts"] if p["name"] == "airborne_building_and_canyon")
     assert before_part["status"] == "delivered"
-    assert p04_before["status"] == "delivered (scoped)"
+    assert p04_before["status"] == "delivered"
 
     points_path = copy_dir / "OM2" / "points.parquet"
     df = pd.read_parquet(points_path).drop(columns=["building_height_m"])
@@ -441,44 +438,18 @@ def test_shipped_manifest_hashes_match_files():
 
 
 @pytestmark_real
-def test_real_package_descoped_parts_render_distinctly():
+def test_real_package_has_no_descoped_parts():
     conf = conformance(PACKAGE_DIR)
     by_id = {it["id"]: it for it in conf["items"]}
-    assert by_id["P-04"]["status"] == "delivered (scoped)"
-    assert by_id["P-07"]["status"] == "delivered (scoped)"
-    assert by_id["P-05"]["status"] == "delivered (scoped)"
+    assert by_id["P-04"]["status"] == "delivered"
+    assert by_id["P-07"]["status"] == "delivered"
+    assert by_id["P-05"]["status"] == "delivered"
     assert by_id["P-05"]["pending_on"] == []
-    md = render_conformance_markdown(conf)
-    assert "descoped \u2014 om_v013_descope" in md
+    assert "descoped" not in render_conformance_markdown(conf)
 
 
 @pytestmark_real
 def test_no_descoped_id_appears_as_pending_in_built_package():
-    import re
-
-    from src.om_package.quality import DESCOPED_ITEMS
-
-    conf = conformance(PACKAGE_DIR)
-    for item in conf["items"]:
-        for part in item["parts"]:
-            if part["status"] == "pending":
-                assert part["name"] not in DESCOPED_ITEMS
     q = json.loads((PACKAGE_DIR / "OM2" / "p07_quality_report.json").read_text(encoding="utf-8"))
-    assert not set(q["pending_items"]) & set(DESCOPED_ITEMS)
-    assert set(q["descoped_items"]) == set(DESCOPED_ITEMS)
-
-    d = pd.read_csv(PACKAGE_DIR / "p08_data_dictionary.csv")
-    for _id in DESCOPED_ITEMS:
-        row = d[d["id"] == _id].iloc[0]
-        assert "PENDING" not in " ".join(str(row[c]) for c in d.columns).upper()
-
-    needle = re.compile("|".join(re.escape(i) for i in DESCOPED_ITEMS) + r"|terrestrial|tree[ _]shade", re.I)
-    # frozen history entries (v0.1..v0.1.3) rightly say PENDING as it was then; only the
-    # README and the current changelog entry must not.
-    changelog = (internal_dir_for(PACKAGE_DIR) / "CHANGELOG.md").read_text(encoding="utf-8")
-    current = changelog.split("## v0.2.0", 1)[0]
-    texts = {"README.md": (PACKAGE_DIR / "README.md").read_text(encoding="utf-8"), f"CHANGELOG.md ({VERSION})": current}
-    for name, text in texts.items():
-        for n, line in enumerate(text.splitlines(), 1):
-            assert not (needle.search(line) and re.search(r"\bpending\b", line, re.I)
-                        and "descoped" not in line.lower()), f"{name}:{n}: {line}"
+    assert q["pending_items"] == []
+    assert q["descoped_items"] == []

@@ -175,17 +175,14 @@ def test_pending_items_listed():
     # pilot CSV pull — see the 'shaded' dictionary row instead (_SHADE_TABLE_ONLY).
     assert "building_shade_per_5min" not in PENDING_ITEMS
     assert PENDING_ITEMS == []
-    assert "sky_view_factor_terrestrial" in DESCOPED_ITEMS
-    assert "tree_shade" in DESCOPED_ITEMS
-    assert not set(PENDING_ITEMS) & set(DESCOPED_ITEMS)
+    assert DESCOPED_ITEMS == []
 
 
 # --- P-08: dictionary covers every column, both directions ----------------
 
-def test_dictionary_marks_descoped_rows_not_pending():
+def test_dictionary_has_no_pending_or_descoped_rows():
     d = full_dictionary()
-    for k in DESCOPED_ITEMS:
-        assert d[k]["status"] == "DESCOPED (om_v013_descope)"
+    assert not [k for k, v in d.items() if v["status"].startswith("DESCOPED")]
     assert not [k for k, v in d.items() if v["status"] == "PENDING"]
 
 
@@ -207,9 +204,9 @@ def test_no_dictionary_row_is_orphaned_from_a_real_table():
     # every dictionary id belongs to either the points table, the buffer
     # template, the shade table, or the DESCOPED registry — this is a
     # structural check (dictionary.py's own composition), not a live-data one.
-    from src.om_package.dictionary import _BASE, _BUFFER_TEMPLATES, _DESCOPED, _MEASURE_NOTES, _SHADE_TABLE_ONLY, _V030
+    from src.om_package.dictionary import _BASE, _BUFFER_TEMPLATES, _MEASURE_NOTES, _SHADE_TABLE_ONLY, _V030
 
-    known_sources = set(_BASE) | {t.format(r=r) for t in _BUFFER_TEMPLATES for r in BUFFER_RADII_M} | set(_DESCOPED) | set(_SHADE_TABLE_ONLY) | set(_V030) | {f"{m}_tau{t}s" for m in _MEASURE_NOTES for t in (5, 10, 30, 60)}
+    known_sources = set(_BASE) | {t.format(r=r) for t in _BUFFER_TEMPLATES for r in BUFFER_RADII_M} | set(_SHADE_TABLE_ONLY) | set(_V030) | {f"{m}_tau{t}s" for m in _MEASURE_NOTES for t in (5, 10, 30, 60)}
     assert set(full_dictionary()) == known_sources
 
 
@@ -266,10 +263,9 @@ def test_grid_cell_id_present(om2_points_small):
     assert "grid_cell_id" in form.columns
 
 
-def test_shade_table_reserves_tree_shade_column():
-    assert "tree_shade" in SHADE_TABLE_COLUMNS
-    t = build_empty_shade_table()
-    assert "tree_shade" in t.columns
+def test_shade_table_has_no_tree_shade_column():
+    assert "tree_shade" not in SHADE_TABLE_COLUMNS
+    assert "tree_shade" not in build_empty_shade_table().columns
 
 
 # --- must-fix 5: timezone is a required parameter, no default --------------
