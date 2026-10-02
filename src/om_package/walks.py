@@ -61,7 +61,7 @@ def _route_edge_set(route_json: Path) -> set[tuple[int, int]]:
 
 def _read_walk(path: Path, walk_id: str, edge_set: set, line: LineString) -> pd.DataFrame:
     raw = pd.read_csv(path)
-    t = pd.to_datetime(raw["timestamp_utc"], utc=True, errors="coerce")
+    t = pd.to_datetime(raw["timestamp_utc"], utc=True, format="ISO8601", errors="coerce")
     ok = t.notna() & raw["matched_lon"].notna() & raw["matched_lat"].notna()
     raw, t = raw[ok], t[ok]
     on = np.array(
