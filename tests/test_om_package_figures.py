@@ -1,11 +1,8 @@
-"""Tests for src/om_package/figures.py — the OM2 package figures (PI,
-2026-09-27: spatial result first, then sampling along the route; route
-overlaid on the favela buildings). Synthetic data only: no real data/
-tree is read here.
-"""
+"""Tests for the OM2 report figures (src/om_package/figures.py, vent_figures.py,
+fig_style.py). Synthetic data only: no real data/ tree is read here."""
 from __future__ import annotations
 
-from pathlib import Path
+import re
 
 import geopandas as gpd
 import matplotlib
@@ -15,194 +12,171 @@ import pytest
 from PIL import Image
 from shapely.geometry import box
 
-from src.om_package import figures
-from src.om_package.segments import aggregate_to_segments
+from src.om_package import fig_style, figures, vent_figures
+from src.om_package.wind_regimes import find_regimes
 
-N_POINTS = 60
+N = 120
 
 
 @pytest.fixture
-def points_df() -> pd.DataFrame:
-    x = np.arange(N_POINTS, dtype=float)
-    y = np.zeros(N_POINTS)
-    neighbourhood = np.where(x < N_POINTS / 2, "CommunityA", "CommunityB")
+def points() -> pd.DataFrame:
+    x = np.arange(N, dtype=float)
     rng = np.random.default_rng(0)
-    return pd.DataFrame(
-        {
-            "point_id": [f"OM2-{i:06d}" for i in range(N_POINTS)],
-            "route_id": "OM_2",
-            "seq": np.arange(N_POINTS),
-            "x": x,
-            "y": y,
-            "distance_along_m": x,
-            "neighbourhood": neighbourhood,
-            "building_height_m": 5 + 2 * np.sin(x / 5),
-            "height_width_ratio": 0.5 + 0.1 * np.cos(x / 7),
-            "sky_view_factor": np.clip(0.5 + 0.3 * np.sin(x / 10), 0, 1),
-            "plan_density_lambda_p": np.clip(0.4 + 0.2 * np.cos(x / 9), 0, 1),
-            "ventilation_frontal_area_proxy": rng.uniform(0, 1, N_POINTS),
-        }
-    )
+    d = {
+        "point_id": [f"OM2-{i:06d}" for i in range(N)], "x": x, "y": 0.1 * x, "distance_along_m": x,
+        "neighbourhood": np.where(x < 50, "Alpha Town", np.where(x < 60, None, "Beta Park")),
+        "building_height_m": 5 + 2 * np.sin(x / 5), "height_width_ratio": 1 + 0.2 * np.cos(x / 7),
+        "sky_view_factor": np.clip(0.5 + 0.3 * np.sin(x / 10), 0, 1),
+        "plan_density_lambda_p": np.clip(0.4 + 0.2 * np.cos(x / 9), 0, 1),
+    }
+    for slug in ("east_southeast", "north_northwest"):
+        d[f"frontal_area_density_windward_{slug}"] = rng.uniform(0, 2, N)
+        d[f"canyon_alignment_deg_{slug}"] = rng.uniform(0, 90, N)
+        d[f"upwind_shelter_angle_deg_{slug}"] = rng.uniform(0, 80, N)
+    return pd.DataFrame(d)
 
 
 @pytest.fixture
 def buildings() -> gpd.GeoDataFrame:
-    geoms = [box(10, -6, 14, -2), box(38, 2, 42, 6), box(-5, -8, -1, -4)]
-    return gpd.GeoDataFrame({"altura": [6.0, 9.0, 4.0]}, geometry=geoms, crs="EPSG:31983")
+    return gpd.GeoDataFrame({"h": [6.0, 9.0]}, geometry=[box(10, -6, 14, -2), box(38, 2, 42, 6)], crs="EPSG:31983")
 
 
 @pytest.fixture
-def subunits() -> gpd.GeoDataFrame:
-    geoms = [box(-20, -20, N_POINTS / 2, 20), box(N_POINTS / 2, -20, N_POINTS + 20, 20)]
-    return gpd.GeoDataFrame({"name": ["CommunityA", "CommunityB"]}, geometry=geoms, crs="EPSG:31983")
-
-
-@pytest.fixture
-def shade_df(points_df) -> pd.DataFrame:
-    dates = ["2026-01-06", "2026-01-07"]
+def shade_df(points) -> pd.DataFrame:
+    ts = pd.date_range("2026-01-06 05:00", "2026-01-06 18:00", freq="5min", tz="America/Sao_Paulo")
+    ts2 = pd.date_range("2026-01-07 05:00", "2026-01-07 18:00", freq="5min", tz="America/Sao_Paulo")
     rows = []
-    for d in dates:
-        times = pd.date_range(f"{d} 09:00", f"{d} 10:00", freq="5min", tz="UTC")
-        for pid, x in zip(points_df["point_id"], points_df["x"]):
-            for t in times:
-                # deterministic shaded pattern: shaded where (x + minute) is even
-                shaded = bool((int(x) + t.minute) % 4 == 0)
-                # the first step of each date is night: shaded=True as the
-                # shade engine writes it, never counted as building shade
-                night = t.minute == 0 and t.hour == 9
-                rows.append({"point_id": pid, "timestamp": t, "date": d,
-                             "sun_altitude_deg": -5.0 if night else 30.0,
-                             "shaded": True if night else shaded, "tree_shade": None})
-    return pd.DataFrame(rows)
+    rng = np.random.default_rng(1)
+    for t in list(ts) + list(ts2):
+        for pid in points["point_id"][::10]:
+            rows.append((pid, t, str(t.date()), 30.0, bool(rng.random() < 0.5)))
+    return pd.DataFrame(rows, columns=["point_id", "timestamp_local", "date", "sun_altitude_deg", "shaded"])
 
 
 @pytest.fixture
-def campaign_windows_df() -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "date": ["2026-01-06", "2026-01-07"],
-            "first_timestamp": pd.to_datetime(["2026-01-06 09:00", "2026-01-07 09:00"], utc=True),
-            "last_timestamp": pd.to_datetime(["2026-01-06 10:00", "2026-01-07 10:00"], utc=True),
-        }
-    )
+def walks() -> pd.DataFrame:
+    return pd.DataFrame({
+        "walk_id": ["w1", "w2", "w3", "w4"], "date": ["2026-01-06", "2026-01-07", "2026-01-06", "2026-01-07"],
+        "period": ["morning", "morning", "evening", "evening"],
+        "start_local": ["2026-01-06T09:30:00-03:00", "2026-01-07T09:31:00-03:00",
+                        "2026-01-06T15:30:00-03:00", "2026-01-07T15:29:00-03:00"],
+        "duration_min": [20.0, 27.0, 26.0, 40.0], "coverage_share": [0.99, 0.97, 0.80, 0.99],
+    })
 
 
 @pytest.fixture
-def dictionary_df() -> pd.DataFrame:
-    rows = [
-        {"id": "building_height_m", "unit": "m"},
-        {"id": "height_width_ratio", "unit": "-"},
-        {"id": "sky_view_factor", "unit": "fraction [0,1]"},
-        {"id": "plan_density_lambda_p", "unit": "fraction [0,1]"},
-        {"id": "ventilation_frontal_area_proxy", "unit": "proxy, lambda_f (dimensionless)"},
-    ]
-    return pd.DataFrame(rows)
+def p12(points, walks) -> pd.DataFrame:
+    rng = np.random.default_rng(2)
+    parts = []
+    for w in walks["walk_id"]:
+        d = pd.DataFrame({"walk_id": w, "distance_along_m": points["distance_along_m"],
+                          "dose_1h_before_wh_m2": rng.uniform(0, 500, N), "dose_3h_before_wh_m2": rng.uniform(0, 1500, N),
+                          "sky_view_factor_tau10s": 0.5, "sky_view_factor_tau30s": 0.5})
+        parts.append(d)
+    return pd.concat(parts, ignore_index=True)
 
 
-# --------------------------------------------------------------- F1/F2 --
-
-def test_build_map_form_writes_png(tmp_path, points_df, buildings, subunits):
-    out = tmp_path / "map_form.png"
-    result = figures.build_map_form(points_df, buildings, subunits, out, route_id="OM2", version="v0.1.3")
-    assert result == out
-    assert out.exists() and out.stat().st_size > 0
-    with Image.open(out) as im:
-        assert im.width > 100 and im.height > 100
+def _size(path):
+    return Image.open(path).size
 
 
-def test_build_map_form_runs_without_buildings_or_subunits(tmp_path, points_df):
-    out = tmp_path / "map_form.png"
-    figures.build_map_form(points_df, None, None, out, route_id="OM2", version="v0.1.3")
-    assert out.exists() and out.stat().st_size > 0
+def test_route_form_and_shade_figures_are_written_at_print_width(tmp_path, points, buildings, shade_df):
+    figures.build_fig_route(points, buildings, tmp_path / "r.png")
+    figures.build_fig_form(points, tmp_path / "f.png")
+    figures.build_fig_shade_map(points, shade_df, buildings, tmp_path / "s.png")
+    for n in ("r", "f", "s"):
+        assert _size(tmp_path / f"{n}.png")[0] == round(fig_style.TEXT_WIDTH_IN * fig_style.DPI)
 
 
-def test_build_map_shade_writes_png(tmp_path, points_df, shade_df, buildings, subunits):
-    out = tmp_path / "map_shade.png"
-    figures.build_map_shade(points_df, shade_df, buildings, subunits, out, route_id="OM2", version="v0.1.3", tz="UTC")
-    assert out.exists() and out.stat().st_size > 0
-
-
-def test_build_map_shade_handles_empty_shade_table(tmp_path, points_df, buildings, subunits):
-    empty = pd.DataFrame(columns=["point_id", "timestamp", "date", "shaded", "tree_shade"])
-    out = tmp_path / "map_shade.png"
-    figures.build_map_shade(points_df, empty, buildings, subunits, out, route_id="OM2", version="v0.1.3")
-    assert out.exists() and out.stat().st_size > 0
-
-
-def test_mean_shaded_fraction_by_point_is_correct(shade_df):
-    frac = figures.mean_shaded_fraction_by_point(shade_df)
-    manual = shade_df[shade_df["sun_altitude_deg"] > 0].groupby("point_id")["shaded"].mean()
-    pd.testing.assert_series_equal(frac.sort_index(), manual.sort_index(), check_names=False)
-    with_night = shade_df.groupby("point_id")["shaded"].mean()
-    assert (with_night.sort_index() > frac.sort_index()).all()
-
-
-def test_mean_shaded_fraction_by_point_empty_input_is_empty_series():
-    frac = figures.mean_shaded_fraction_by_point(pd.DataFrame(columns=["point_id", "shaded"]))
-    assert len(frac) == 0
-
-
-# ------------------------------------------------------------------ F3 --
-
-def test_build_profiles_writes_png(tmp_path, points_df, shade_df, dictionary_df):
-    out = tmp_path / "profiles.png"
-    figures.build_profiles(points_df, shade_df, out, dictionary_df=dictionary_df, route_id="OM2", version="v0.1.3")
-    assert out.exists() and out.stat().st_size > 0
-    with Image.open(out) as im:
-        assert im.height > im.width  # stacked panels: tall figure
-
-
-def test_profile_segment_means_equal_segments_aggregate_to_segments(points_df, shade_df):
-    frac = figures.mean_shaded_fraction_by_point(shade_df)
-    expected_frame = points_df.merge(frac.rename("mean_shaded_fraction"), left_on="point_id", right_index=True, how="left")
-    expected = aggregate_to_segments(expected_frame, figures.SEGMENT_LENGTH_M)
-
-    got = figures.segment_means_for_profiles(points_df, shade_df, figures.SEGMENT_LENGTH_M)
-
-    pd.testing.assert_frame_equal(got.reset_index(drop=True), expected.reset_index(drop=True))
-    # sanity: segments really are ~10 m and conserve point count
-    assert got["n_points"].sum() == len(points_df)
-    assert (got["segment_end_m"] - got["segment_start_m"]).le(figures.SEGMENT_LENGTH_M).all()
-
-
-# ------------------------------------------------------------------ F4 --
-
-def test_build_shade_calendar_writes_png(tmp_path, points_df, shade_df, campaign_windows_df):
-    out = tmp_path / "shade_calendar.png"
-    figures.build_shade_calendar(points_df, shade_df, campaign_windows_df, out, route_id="OM2", version="v0.1.3")
-    assert out.exists() and out.stat().st_size > 0
-
-
-def test_build_shade_calendar_one_strip_per_date(tmp_path, points_df, shade_df, campaign_windows_df):
-    """More campaign dates -> a taller image (one strip per date)."""
-    one_date = shade_df[shade_df["date"] == "2026-01-06"]
-    out_one = tmp_path / "one.png"
-    out_two = tmp_path / "two.png"
-    figures.build_shade_calendar(points_df, one_date, campaign_windows_df, out_one)
-    figures.build_shade_calendar(points_df, shade_df, campaign_windows_df, out_two)
-    with Image.open(out_one) as im_one, Image.open(out_two) as im_two:
-        assert im_two.height > im_one.height
-
-
-def test_build_shade_calendar_handles_empty_shade_table(tmp_path, points_df):
-    empty = pd.DataFrame(columns=["point_id", "timestamp", "date", "shaded", "tree_shade"])
-    out = tmp_path / "shade_calendar.png"
-    figures.build_shade_calendar(points_df, empty, None, out)
-    assert out.exists() and out.stat().st_size > 0
-
-
-def test_dates_in_shade_table_sorted_unique(shade_df):
-    dates = figures._dates_in_shade_table(shade_df)
+def test_shade_calendar_matrix_is_share_of_points_by_date_and_time(shade_df):
+    mat, dates = figures.shade_calendar_matrix(shade_df)
     assert dates == ["2026-01-06", "2026-01-07"]
+    assert mat.shape[0] == 2 and np.nanmin(mat.to_numpy()) >= 0 and np.nanmax(mat.to_numpy()) <= 1
 
 
-# --------------------------------------------------------------- rcParams --
+def test_shade_calendar_written_with_facts(tmp_path, shade_df):
+    _, facts = figures.build_fig_shade_calendar(shade_df, tmp_path / "c.png")
+    assert facts["n_dates"] == 2 and facts["bin_min"] == 5 and (tmp_path / "c.png").exists()
 
-def test_figures_do_not_leak_rcparams(tmp_path, points_df, buildings, subunits):
-    """A leaked rcParam from one figure once broke the next drawn in the
-    same process — every renderer must restore the caller's rcParams.
-    Scoped with rc_context (not rcdefaults(), which would itself clobber
-    whatever rcParams other, unrelated test modules rely on persisting)."""
+
+def test_walk_order_groups_mornings_first_and_labels_with_start_time(walks):
+    o = figures.walk_order(walks.iloc[::-1])
+    assert o["walk_id"].tolist() == ["w1", "w2", "w3", "w4"]
+    assert o["label"].tolist() == ["6 Jan 09:30", "7 Jan 09:31", "6 Jan 15:30", "7 Jan 15:29"]
+
+
+def test_dose_matrix_bins_10_m_means_and_leaves_unwalked_bins_blank(p12):
+    p = p12[~((p12["walk_id"] == "w1") & (p12["distance_along_m"] >= 60))]
+    m = figures.dose_matrix(p, ["w1", "w2"], "dose_1h_before_wh_m2", 120.0)
+    assert m.shape == (2, 12)
+    assert np.isnan(m[0, 6:]).all() and np.isfinite(m[1]).all()
+    expect = p[(p["walk_id"] == "w2") & (p["distance_along_m"] < 10)]["dose_1h_before_wh_m2"].mean()
+    assert m[1, 0] == pytest.approx(expect)
+
+
+def test_sun_dose_figure_and_facts(tmp_path, walks, p12):
+    _, facts = figures.build_fig_sun_dose(walks, p12, 120.0, tmp_path / "d.png")
+    assert facts["n_walks"] == 4 and facts["n_morning"] == 2 and facts["zero_drawn_below_wh_m2"] == figures.DOSE_ZERO_BELOW
+
+
+def test_representative_walk_is_full_coverage_and_closest_to_median(walks):
+    w = figures.pick_representative_walk(walks)
+    assert w["walk_id"] == "w2"  # median duration 26.5; w3 is below 0.95 coverage
+
+
+def test_svf_sensor_figure_names_the_walk(tmp_path, points, walks, p12):
+    _, facts = figures.build_fig_svf_sensor(points, walks, p12, tmp_path / "v.png")
+    assert facts["walk_id"] == "w2" and facts["start_local"] == "09:31"
+
+
+def test_neighbourhood_stretches_fill_unnamed_points_and_cover_the_route(points):
+    s = fig_style.neighbourhood_stretches(points)
+    assert [x["name"] for x in s] == ["Alpha Town", "Beta Park"]
+    assert s[0]["start"] == 0 and s[0]["end"] == s[1]["start"]
+
+
+def _season():
+    rng = np.random.default_rng(3)
+    d = np.concatenate([rng.normal(120, 15, 600), rng.normal(340, 25, 400)]) % 360
+    d = np.round(d, -1) % 360
+    obs = pd.DataFrame({"valid_utc": pd.date_range("2026-01-01", periods=1000, freq="h", tz="UTC"),
+                        "drct": d, "speed_ms": 3.0, "calm": False, "variable": False})
+    res = find_regimes(obs)
+    return {"campaign": res, "climatology": res}, obs
+
+
+def test_wind_and_ventilation_figures(tmp_path, points, buildings):
+    season, obs = _season()
+    regs = [{"key": g["key"], "name": g["name"], "slug": g["name"].replace("-", "_"), "mean_direction_deg": g["mean_direction_deg"]}
+            for g in season["campaign"]["regimes"]]
+    pts = points.rename(columns=lambda c: c)
+    for stem in ("frontal_area_density_windward", "canyon_alignment_deg", "upwind_shelter_angle_deg"):
+        for slug, g in zip(("east_southeast", "north_northwest"), regs):
+            pts[f"{stem}_{g['slug']}"] = pts[f"{stem}_{slug}"]
+    rows = [(p, h, g["name"], g["key"], 0.5) for p in ("campaign", "climatology") for h in range(24) for g in regs]
+    by_hour = pd.DataFrame(rows, columns=["period", "local_hour", "regime", "regime_key", "share"])
+    calm = pd.DataFrame([(p, h, "calm", "calm", 0.01) for p in ("campaign", "climatology") for h in range(24)], columns=by_hour.columns)
+    _, facts = vent_figures.build_fig_wind(season, obs, obs, pd.concat([by_hour, calm]), tmp_path / "w.png")
+    assert facts["n_sectors"] == 16
+    vent_figures.build_fig_vent_profiles(pts, regs, tmp_path / "p.png")
+    _, f2 = vent_figures.build_fig_shelter_maps(pts, regs, buildings, tmp_path / "m.png")
+    assert f2["shelter_colour_limits_deg"][0] == 0.0
+
+
+def test_sector_shares_sum_to_100():
+    _, obs = _season()
+    assert vent_figures.sector_shares(obs).sum() == pytest.approx(100.0)
+
+
+def test_figures_do_not_leak_rcparams(tmp_path, points, buildings):
     with matplotlib.rc_context({"font.size": 42}):
-        figures.build_map_form(points_df, buildings, subunits, tmp_path / "map_form.png")
+        figures.build_fig_route(points, buildings, tmp_path / "r.png")
         assert matplotlib.rcParams["font.size"] == 42
+
+
+def test_no_dashes_or_abbreviations_in_figure_text():
+    src = "".join(open(f"src/om_package/{m}.py", encoding="utf-8").read() for m in ("figures", "vent_figures", "fig_style"))
+    labels = re.findall(r'(?:set_[xy]?label|label=|text\()[^\n]*?"([^"\n]*)"', src)
+    for t in labels:
+        assert "–" not in t and "—" not in t, t
+        assert not re.search(r"SBGL|METAR|H/W|SVF|\bz0\b|λ", t), t

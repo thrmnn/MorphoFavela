@@ -1,209 +1,194 @@
-"""Ventilation-proxy figures for the OM2 package (PI request: ventilation
-indices need figures). Every quantity drawn is a geometry-derived PROXY
-(see vent_indices.py), never measured air temperature or airflow; the wind
-rose is SBGL airport METAR, not wind at the route.
+"""OM2 report figures, part 2: wind regimes and ventilation.
 
-  V1 map_vent_shelter.png  route coloured by upwind shelter angle at the
-                           prevailing wind, same base map as figures.map_form,
-                           prevailing direction drawn as an arrow.
-  V2 profiles_vent.png     windward lambda_f, canyon alignment, shelter angle,
-                           z0 along route distance (1 m raw, 10 m means).
-  V3 wind_rose_compare.png campaign-window (observed) vs 2015-2024
-                           climatology, same radial and colour scale.
+Filenames are the contract with the report text (written under OM2/):
+fig_wind, fig_vent_profiles, fig_shelter_maps. Regime colours come from
+wind_regimes.REGIME_COLOURS; every ventilation measure is a geometry-derived
+proxy, the wind is airport (Galeao) reports.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
+import geopandas as gpd
 import matplotlib
-import matplotlib.patheffects as mpe
+import matplotlib.patheffects
 import numpy as np
 import pandas as pd
 
-from .figures import (SEGMENT_LENGTH_M, _distance_tick_rows, _draw_base_map, _draw_route_line, _rc)
-from .io_utils import DEFAULT_ROOT, Paths
-from .segments import aggregate_to_segments
-from .vent_indices import compute_indices
-from .ventilation import prevailing_wind_bearing_deg
-from .wind_obs import campaign_window_rose, climatology_rose, load_obs
+from . import fig_style as fs
+from .figures import _route_line
+from .wind_regimes import (COMPASS, N_SECTORS, REGIME_COLOURS, SECTOR_W, classify, clean)
 
-SHELTER_CMAP = "magma_r"
-_CAPTION = ("Brisa+ (MorphoFavela). Geometry-derived PROXIES from 2019 building geometry; "
-            "not measured air temperature or airflow.")
-
-PROFILE_PANELS = [
-    ("windward_lambda_f_proxy", "windward λf\n(proxy, -)"),
-    ("canyon_alignment_deg_proxy", "canyon alignment\n(proxy, deg; 0 = along)"),
-    ("upwind_shelter_deg_proxy", "upwind shelter angle\n(proxy, deg)"),
-    ("z0_m_proxy", "roughness length z0\n(proxy, m)"),
+#: (point-column stem, y label) of the three ventilation profiles.
+VENT_PANELS = [
+    ("frontal_area_density_windward", "windward frontal\narea density"),
+    ("canyon_alignment_deg", "canyon alignment\n(degrees)"),
+    ("upwind_shelter_angle_deg", "upwind shelter\nangle (degrees)"),
 ]
 
 
-def horizon_cache_path(root=DEFAULT_ROOT, version: str = "v0.1.3") -> Path:
-    return Path(root) / "data" / "maré" / "octopus" / "wind" / f"om2_point_horizon_{version}.npz"
+def regime_title(name: str) -> str:
+    return f"{name} wind"
 
 
-def load_or_compute_horizon(points_gdf, root=DEFAULT_ROOT, version: str = "v0.1.3", force: bool = False):
-    """(horizon_deg, azimuths_deg) per point, cached next to the wind data;
-    the marched profile is the one shade.point_horizon_profiles returns."""
-    cache = horizon_cache_path(root, version)
-    if cache.exists() and not force:
-        z = np.load(cache, allow_pickle=True)
-        if list(z["point_id"]) == list(points_gdf["point_id"]):
-            return z["horizon_deg"].astype(float), z["azimuths_deg"]
-    from .shade import point_horizon_profiles
-
-    h, az = point_horizon_profiles(points_gdf, Paths(root))
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(cache, point_id=points_gdf["point_id"].to_numpy(), horizon_deg=h, azimuths_deg=az)
-    return h.astype(float), az
+def sector_shares(obs: pd.DataFrame) -> np.ndarray:
+    """Share (%) of reports with a direction in each of the 16 sectors."""
+    act, _ = clean(obs)
+    idx = (((act["drct"].to_numpy(float) % 360.0) + SECTOR_W / 2) // SECTOR_W).astype(int) % N_SECTORS
+    f = np.bincount(idx, minlength=N_SECTORS).astype(float)
+    return 100.0 * f / f.sum()
 
 
-def _with_indices(points_df, indices):
-    cols = [c for c in indices.columns if c not in points_df.columns or c == "point_id"]
-    return points_df.merge(indices[cols], on="point_id", how="left")
+def sector_regime_keys(regimes: dict) -> np.ndarray:
+    centres = np.arange(N_SECTORS) * SECTOR_W
+    return classify(centres, regimes)
 
 
-def _draw_wind_arrow(ax, wind_from_deg: float, text: str):
-    """Arrow in axes coordinates pointing where the wind blows TO (from+180),
-    anchored top-left."""
-    import math
-
-    to = math.radians((wind_from_deg + 180.0) % 360.0)
-    dx, dy = math.sin(to), math.cos(to)
-    cx, cy, half = 0.10, 0.90, 0.07
-    ax.annotate("", xy=(cx + half * dx, cy + half * dy), xytext=(cx - half * dx, cy - half * dy),
-                xycoords="axes fraction", textcoords="axes fraction", zorder=7,
-                arrowprops=dict(arrowstyle="-|>", lw=3, color="#0b5394", mutation_scale=22))
-    ax.annotate(text, (cx, cy - 0.11), xycoords="axes fraction", ha="center", va="top", fontsize=8,
-                color="#0b5394", zorder=7, path_effects=[mpe.withStroke(linewidth=2.5, foreground="white")])
-
-
-def build_map_shelter(points_df, indices, buildings, subunits, out_path: Path, wind_dir_deg: float,
-                      route_id: str = "OM2", version: str = "", wind_source: str = "") -> Path:
-    with _rc():
+def build_fig_wind(season: dict, campaign_obs: pd.DataFrame, climatology_obs: pd.DataFrame,
+                   by_hour: pd.DataFrame, out_path: Path) -> tuple[Path, dict]:
+    """Two 16-sector roses (campaign season, 2015 to 2024) with bars coloured by
+    regime and the regime mean direction as a line, plus the share of reports by
+    local hour of day per regime."""
+    with fs.figure_style():
         import matplotlib.pyplot as plt
+        from matplotlib.lines import Line2D
 
-        from src.cartography import apply_publication_style
-        apply_publication_style()
+        periods = [("campaign season", "campaign", season["campaign"], campaign_obs),
+                   ("2015 to 2024", "climatology", season["climatology"], climatology_obs)]
+        shares = [sector_shares(o) for *_, o in periods]
+        rmax = float(np.ceil(max(s.max() for s in shares) / 5.0) * 5.0)
 
-        merged = _with_indices(points_df, indices)
-        fig, ax = plt.subplots(figsize=(9, 9))
-        _draw_base_map(ax, merged, buildings, subunits)
-        _draw_route_line(fig, ax, merged, "upwind_shelter_deg_proxy", SHELTER_CMAP,
-                         "upwind shelter angle, proxy (deg)")
-        _draw_wind_arrow(ax, wind_dir_deg, f"prevailing wind from {wind_dir_deg:.0f}°\n({wind_source}, circular mean)")
-        suffix = f" {version}" if version else ""
-        ax.set_title(f"{route_id} route{suffix}\nupwind shelter angle (proxy) at the prevailing wind", fontsize=10)
-        fig.text(0.02, 0.01, _CAPTION, fontsize=7, color="#555555")
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=150, bbox_inches="tight")
-        plt.close(fig)
-    return out_path
-
-
-def build_profiles_vent(points_df, indices, out_path: Path, wind_dir_deg: float, route_id: str = "OM2",
-                        version: str = "", segment_length_m: float = SEGMENT_LENGTH_M) -> Path:
-    with _rc():
-        import matplotlib.pyplot as plt
-
-        from src.cartography import apply_publication_style
-        apply_publication_style()
-
-        frame = _with_indices(points_df, indices).sort_values("distance_along_m")
-        segments = aggregate_to_segments(frame, segment_length_m)
-        ticks = _distance_tick_rows(frame)
-        fig, axes = plt.subplots(len(PROFILE_PANELS), 1, figsize=(10, 1.7 * len(PROFILE_PANELS) + 1.2), sharex=True)
-        for ax, (col, label) in zip(axes, PROFILE_PANELS):
-            ax.plot(frame["distance_along_m"], frame[col], color="#b0b0b0", lw=0.6, zorder=1, label="1 m raw")
-            seg_x = (segments["segment_start_m"] + segments["segment_end_m"]) / 2.0
-            ax.plot(seg_x, segments[col], color="#1a5fa5", lw=1.8, marker="o", markersize=2.5, zorder=2, label="10 m mean")
-            for _, row in ticks.iterrows():
-                ax.axvline(row["tick_distance_m"], color="#dddddd", lw=0.7, zorder=0)
-            ax.set_ylabel(label, fontsize=7.5)
-        axes[1].set_ylim(0, 90)
-        axes[1].set_yticks([0, 45, 90])
-        axes[0].legend(loc="upper right", fontsize=6, frameon=False)
-        axes[-1].set_xlabel("distance along route (m)")
-        for _, row in ticks.iterrows():
-            axes[0].annotate(str(row.get("neighbourhood") or ""), (row["tick_distance_m"], 1.02),
-                             xycoords=("data", "axes fraction"), fontsize=6.5, rotation=45, ha="left",
-                             va="bottom", color="#444444")
-        suffix = f" {version}" if version else ""
-        fig.suptitle(f"{route_id} ventilation proxies along the route at wind from {wind_dir_deg:.0f}°{suffix}", fontsize=10)
-        fig.text(0.01, 0.005, _CAPTION, fontsize=7, color="#555555")
-        fig.tight_layout(rect=(0, 0.015, 1, 0.96))
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=150, bbox_inches="tight")
-        plt.close(fig)
-    return out_path
-
-
-def build_wind_rose_compare(campaign: dict, climatology: dict, out_path: Path) -> Path:
-    """Two polar bar roses (16 sectors) on one radial and one colour scale:
-    bar length = frequency of directional reports, colour = mean speed."""
-    with _rc():
-        import matplotlib.pyplot as plt
-        from matplotlib.colors import Normalize
-
-        rmax = max(max(campaign["frequencies"]), max(climatology["frequencies"])) * 100 * 1.1
-        vmax = np.nanmax([np.nanmax(campaign["mean_speed_ms"]), np.nanmax(climatology["mean_speed_ms"])])
-        norm = Normalize(0, vmax)
-        cmap = matplotlib.colormaps["viridis"]
-        fig, axes = plt.subplots(1, 2, figsize=(10, 5.4), subplot_kw={"projection": "polar"})
-        for ax, r, title in zip(axes, (campaign, climatology),
-                                (f"Campaign window, observed\n{r_window(campaign)}", climatology["label"])):
-            centres = np.radians(r["centres_deg"])
-            width = 2 * np.pi / len(centres) * 0.9
-            speeds = np.nan_to_num(np.array(r["mean_speed_ms"], float))
-            ax.bar(centres, np.array(r["frequencies"]) * 100, width=width, color=cmap(norm(speeds)),
-                   edgecolor="white", linewidth=0.5)
+        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 5.6))
+        gs = fig.add_gridspec(2, 2, height_ratios=[1.55, 1.0], hspace=0.32, wspace=0.16, left=0.085, right=0.955,
+                              top=0.9, bottom=0.115)
+        centres = np.radians(np.arange(N_SECTORS) * SECTOR_W)
+        for col, ((title, _, res, _), share) in enumerate(zip(periods, shares)):
+            ax = fig.add_subplot(gs[0, col], projection="polar")
+            keys = sector_regime_keys(res)
+            ax.bar(centres, share, width=np.radians(SECTOR_W) * 0.92, color=[REGIME_COLOURS[k] for k in keys],
+                   edgecolor="white", linewidth=0.5, zorder=2)
+            for g in res["regimes"]:
+                th = np.radians(g["mean_direction_deg"])
+                ax.plot([th, th], [0, rmax], color=REGIME_COLOURS[g["key"]], lw=1.8, zorder=3,
+                        path_effects=[matplotlib.patheffects.withStroke(linewidth=3.2, foreground="white")])
             ax.set_theta_zero_location("N")
             ax.set_theta_direction(-1)
             ax.set_ylim(0, rmax)
-            ax.set_xticks(np.radians(np.arange(0, 360, 45)))
-            ax.set_xticklabels(["N", "NE", "E", "SE", "S", "SW", "W", "NW"])
-            ax.set_rlabel_position(225)
-            ax.tick_params(labelsize=8)
-            ax.set_title(f"{title}\nn={r['n_obs']:,} reports, calm or no direction {100 * r['calm_fraction']:.1f}%",
-                         fontsize=9, pad=14)
-        sm = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
-        fig.colorbar(sm, ax=axes, shrink=0.7, pad=0.04, label="mean speed (m/s)")
-        fig.suptitle("Wind at Galeão (SBGL), where the wind blows FROM; bar length = % of directional reports",
-                     fontsize=10)
-        fig.text(0.01, 0.01, "SBGL airport METAR at 10 m; not measured at the route. "
-                 "Brisa+ (MorphoFavela).", fontsize=7, color="#555555")
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=150, bbox_inches="tight")
-        plt.close(fig)
-    return out_path
+            ax.set_xticks(np.radians([0, 90, 180, 270]))
+            ax.set_xticklabels(["N", "E", "S", "W"])
+            ticks = np.arange(10, rmax + 1, 10)
+            ax.set_yticks(ticks)
+            ax.set_yticklabels([f"{t:.0f}%" for t in ticks], fontsize=fs.FONT_PT)
+            ax.set_rlabel_position(255)
+            ax.grid(color="#cccccc", lw=0.5)
+            ax.tick_params(axis="x", pad=2)
+            ax.set_title(title, fontsize=fs.FONT_PT, pad=14)
+
+        axh = fig.add_subplot(gs[1, :])
+        hours = np.arange(24)
+        for (title, key, res, _), ls in zip(periods, ("-", (0, (4, 2)))):
+            sub = by_hour[by_hour["period"] == key]
+            for rk, colour in (("reg1", REGIME_COLOURS["reg1"]), ("reg2", REGIME_COLOURS["reg2"])):
+                s = sub[sub["regime_key"] == rk].set_index("local_hour")["share"].reindex(hours) * 100
+                axh.plot(hours, s, color=colour, lw=1.6, ls=ls)
+            c = sub[sub["regime_key"] == "calm"].set_index("local_hour")["share"].reindex(hours) * 100
+            axh.plot(hours, c, color="#8c8c8c", lw=0.7, ls=ls)
+        axh.set_xlim(0, 23)
+        axh.set_xticks(np.arange(0, 24, 3))
+        axh.set_xlabel("hour of day, Rio local time")
+        axh.set_ylabel("share of reports (%)")
+        axh.set_ylim(0, 100)
+        names = {g["key"]: g["name"] for g in season["campaign"]["regimes"]}
+        handles = [Line2D([], [], color=REGIME_COLOURS[k], lw=1.8, label=regime_title(names[k])) for k in ("reg1", "reg2")]
+        handles.append(Line2D([], [], color="#8c8c8c", lw=0.8, label="calm"))
+        handles += [Line2D([], [], color="black", lw=1.2, ls="-", label="campaign season"),
+                    Line2D([], [], color="black", lw=1.2, ls=(0, (4, 2)), label="2015 to 2024")]
+        fig.legend(handles=handles, loc="lower center", ncol=5, frameon=False, bbox_to_anchor=(0.5, 0.0),
+                   handlelength=1.8, columnspacing=1.0, handletextpad=0.5, fontsize=fs.FONT_PT)
+        out = fs.save(fig, out_path)
+    return out, {"rose_radial_max_percent": rmax,
+                 "campaign_regimes": [{"key": g["key"], "name": g["name"], "mean_direction_deg": g["mean_direction_deg"],
+                                       "share_of_reports": g["share_of_reports"]} for g in season["campaign"]["regimes"]],
+                 "climatology_regimes": [{"key": g["key"], "name": g["name"], "mean_direction_deg": g["mean_direction_deg"],
+                                          "share_of_reports": g["share_of_reports"]} for g in season["climatology"]["regimes"]],
+                 "n_sectors": N_SECTORS}
 
 
-def r_window(r: dict) -> str:
-    w = r.get("window_utc")
-    return f"{w[0][:10]} to {w[1][:10]} UTC" if w else ""
+def build_fig_vent_profiles(points: pd.DataFrame, regimes: list[dict], out_path: Path) -> Path:
+    """Windward frontal area density, canyon alignment and upwind shelter angle
+    along the route (10 m means), both regimes overlaid; neighbourhood band on top."""
+    with fs.figure_style():
+        import matplotlib.pyplot as plt
+        from matplotlib.lines import Line2D
+
+        p = points.sort_values("distance_along_m")
+        total = float(np.ceil(p["distance_along_m"].max() / 50) * 50)
+        cols = [f"{stem}_{g['slug']}" for stem, _ in VENT_PANELS for g in regimes]
+        means = fs.ten_m_means(p, cols)
+        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 5.6))
+        gs = fig.add_gridspec(4, 1, height_ratios=[0.55, 1, 1, 1], hspace=0.28, left=0.13, right=0.985, top=0.99,
+                              bottom=0.13)
+        axb = fig.add_subplot(gs[0])
+        fs.draw_neighbourhood_band(axb, fs.neighbourhood_stretches(p), total, axes_in=fs.TEXT_WIDTH_IN * 0.855)
+        axes = [fig.add_subplot(gs[i + 1], sharex=axb) for i in range(3)]
+        for ax, (stem, label) in zip(axes, VENT_PANELS):
+            for g in regimes:
+                ax.plot(means["x"], means[f"{stem}_{g['slug']}"], color=REGIME_COLOURS[g["key"]], lw=1.2, zorder=3)
+            ax.set_ylabel(label)
+            ax.spines["bottom"].set_visible(False)
+            ax.tick_params(axis="x", length=0, labelbottom=False)
+        axes[1].set_ylim(0, 90)
+        axes[1].set_yticks([0, 45, 90])
+        axes[2].set_ylim(bottom=0)
+        axes[0].set_ylim(bottom=0)
+        axes[-1].spines["bottom"].set_visible(True)
+        axes[-1].tick_params(axis="x", length=3, labelbottom=True)
+        fs.distance_axis(axes[-1], total)
+        axes[-1].set_xlabel("distance along the route (m)")
+        handles = [Line2D([], [], color=REGIME_COLOURS[g["key"]], lw=1.8, label=regime_title(g["name"])) for g in regimes]
+        fig.legend(handles=handles, loc="lower center", ncol=2, frameon=False, bbox_to_anchor=(0.55, 0.0),
+                   handlelength=1.8, fontsize=fs.FONT_PT)
+        return fs.save(fig, out_path)
 
 
-def build_all(out_dir: Path, root=DEFAULT_ROOT, version: str = "v0.1.3") -> list[Path]:
-    """Render V1-V3 from the shipped points table of a package version."""
-    import geopandas as gpd
+def build_fig_shelter_maps(points: pd.DataFrame, regimes: list[dict], buildings: gpd.GeoDataFrame | None,
+                           out_path: Path) -> tuple[Path, dict]:
+    """Upwind shelter angle per point for each regime, side by side, one colour
+    scale and one set of limits, a wind arrow in the regime colour on each map."""
+    from matplotlib.collections import LineCollection
 
-    from src.sites.territory import load_territory
+    with fs.figure_style():
+        import matplotlib.pyplot as plt
 
-    paths = Paths(root)
-    points = gpd.read_parquet(paths.package_dir(version) / "OM2" / "points.parquet")
-    horizon, az = load_or_compute_horizon(points, root, version)
-    wind = prevailing_wind_bearing_deg(paths.wind_rose_json)
-    clim = climatology_rose(root)
-    idx = compute_indices(points, wind, horizon, az)
-    df = pd.DataFrame(points.drop(columns="geometry"))
-    buildings = gpd.read_file(paths.buildings_mare)
-    subunits = load_territory("maré", root=paths.root).subunits
-    out_dir = Path(out_dir)
-    obs = load_obs(root)
-    return [
-        build_map_shelter(df, idx, buildings, subunits, out_dir / "map_vent_shelter.png", wind, version=version,
-                          wind_source=clim["label"].removesuffix(" climatology, 10 m")),
-        build_profiles_vent(df, idx, out_dir / "profiles_vent.png", wind, version=version),
-        build_wind_rose_compare(campaign_window_rose(obs), clim, out_dir / "wind_rose_compare.png"),
-    ]
+        cols = [f"upwind_shelter_angle_deg_{g['slug']}" for g in regimes]
+        vmin = 0.0
+        vmax = float(np.ceil(np.nanmax([points[c].max() for c in cols]) / 5.0) * 5.0)
+        norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+        cmap = fs.VAR_CMAP["shelter_angle"]
+        o = points.sort_values("distance_along_m")
+        extent = fs.route_extent(o, margin_m=30.0)
+        map_w = 0.485
+        h = fs.map_height_in(extent, fs.TEXT_WIDTH_IN * map_w)
+        bar_h_in = 0.75
+        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, h + bar_h_in))
+        top = h / (h + bar_h_in)
+        xy = o[["x", "y"]].to_numpy()
+        lc = None
+        for i, (g, c) in enumerate(zip(regimes, cols)):
+            ax = fig.add_axes([0.01 + i * 0.5, 1 - top, map_w, top])
+            fs.draw_buildings(ax, buildings, extent)
+            v = o[c].to_numpy(float)
+            lc = LineCollection(np.stack([xy[:-1], xy[1:]], axis=1), cmap=cmap, norm=norm, linewidths=2.2, zorder=4,
+                                capstyle="round")
+            lc.set_array((v[:-1] + v[1:]) / 2)
+            ax.add_collection(lc)
+            fs.wind_arrow(ax, g["mean_direction_deg"], REGIME_COLOURS[g["key"]], regime_title(g["name"]),
+                         centre=(0.78, 0.45))
+            fs.north_arrow(ax, loc=(0.92, 0.88), size=0.08)
+            if i == 0:
+                fs.scale_bar(ax, 100.0)
+        cax = fig.add_axes([0.3, 0.5 / (h + bar_h_in), 0.4, 0.13 / (h + bar_h_in)])
+        cb = fig.colorbar(lc, cax=cax, orientation="horizontal")
+        cb.set_label("upwind shelter angle (degrees)", labelpad=2)
+        out = fs.save(fig, out_path)
+    return out, {"shelter_colour_limits_deg": [vmin, vmax]}

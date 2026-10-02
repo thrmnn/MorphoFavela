@@ -1,245 +1,47 @@
-"""OM2 package figures (PI, 2026-09-27): "I would like to see the spatial
-result and then the sampling along the route; overlay the route on top of
-the favela buildings to be easier to understand." Replaces the old
-contact_sheet.py (route floating in blank space, three noisy 1 m profiles)
-with:
+"""OM2 report figures, part 1: route, street form, shade and sun dose.
 
-  F1 map_form.png   — route coloured by sky_view_factor, over building
-                       footprints + community outlines (the spatial result).
-  F2 map_shade.png  — same base map, route coloured by mean shaded fraction
-                       (P-05, building-only).
-  F3 profiles.png   — sampling along the route: 1 m raw + 10 m segment
-                       means for building_height_m, height_width_ratio,
-                       sky_view_factor, plan_density_lambda_p,
-                       ventilation_frontal_area_proxy (PROXY) and mean
-                       shaded fraction.
-  F4 shade_calendar.png — one strip per campaign date, distance x time of
-                       day (UTC), shaded/sunlit, walk-window bracket.
-
-  F5 sun_envelope.png — (v0.2.0, P-10) share of points always sunlit /
-                       date-dependent / always shaded by local time of day,
-                       plus a map of each point's date-dependent share of
-                       daylight.
-  F6 sun_dose.png    — (v0.2.0, P-10) 1 h clear-sky direct-sun dose along the
-                       route at three local times: season envelope band and
-                       the campaign dates.
-
-Every renderer wraps its whole body in
-``matplotlib.rc_context(matplotlib.rcParamsDefault)`` — a leaked rcParam
-from one figure function once broke the next one drawn in the same
-process (see git history) — so each is self-contained regardless of call
-order.
+Filenames are the contract with the report text (written under OM2/):
+fig_route, fig_form, fig_shade_map, fig_shade_calendar, fig_sun_dose,
+fig_svf_sensor. The ventilation and wind figures are in vent_figures.py.
+Every figure is drawn at print width and styled by fig_style.
 """
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 import geopandas as gpd
 import matplotlib
-import matplotlib.patheffects as mpe
 import numpy as np
 import pandas as pd
 
-from .segments import aggregate_to_segments
+from . import fig_style as fs
 from .shade import daylight_rows
 
-#: Tick spacing along the route for both maps (F1/F2) and the profile
-#: panels' vertical guides (F3) — one constant so the three figures can
-#: never disagree on where a "100 m" mark falls.
-DISTANCE_TICK_INTERVAL_M = 100.0
-
-#: Segment length P-03 aggregates to for the bold line in F3 — the same
-#: length the package's shipped OM2/aggregate_to_segments.py defaults a
-#: recipient towards, so the figure and a recipient's own re-aggregation
-#: agree without them having to guess a length.
+#: Segment length of the 10 m means in every profile figure.
 SEGMENT_LENGTH_M = 10.0
+ROUTE_TICK_M = 250.0
 
-#: Padding around the route's own bounding box, as a fraction of its
-#: diagonal — never a typed metre count, so a longer or shorter route (or
-#: a different site's route reusing this module) gets a proportionate
-#: margin rather than a fixed-size one that swamps a short route or crops
-#: a long one.
-MAP_MARGIN_FRACTION = 0.15
-#: Floor under the fraction-derived margin, for the degenerate case of a
-#: near-zero-extent route (e.g. a single-point synthetic test) where
-#: `diagonal * MAP_MARGIN_FRACTION` would otherwise collapse the axes to a
-#: singular (zero-width) view.
-_MIN_MARGIN_M = 10.0
+#: Local slots used by the old dose figure; kept for the package page and report helpers.
+_DOSE_SLOT_QUANTILES = (0.25, 0.5, 0.75)
 
-SVF_CMAP = "cividis"  # src.config.SVF_CMAP — the project-standard SVF colormap
-SHADE_CMAP = "viridis"  # deliberately distinct from SVF_CMAP so the two maps read as different variables at a glance
-
-_BUILDING_FACE = "#e6e6e6"
-_BUILDING_EDGE = "#999999"
-_COMMUNITY_LINE = "#4d4d4d"
-
-_PROFILE_LABELS = {
-    "building_height_m": "building height",
-    "height_width_ratio": "H/W ratio",
-    "sky_view_factor": "sky view factor",
-    "plan_density_lambda_p": "plan density (λp)",
-    "ventilation_frontal_area_proxy": "ventilation frontal-area PROXY",
-    "mean_shaded_fraction": "daylight shaded fraction",
-}
-#: Order matches the PI's spec list; mean_shaded_fraction is derived (not a
-#: p08 dictionary row) so its unit is stated here rather than looked up.
-PROFILE_COLUMNS = [
-    "building_height_m",
-    "height_width_ratio",
-    "sky_view_factor",
-    "plan_density_lambda_p",
-    "ventilation_frontal_area_proxy",
-    "mean_shaded_fraction",
-]
-_MEAN_SHADED_FRACTION_UNIT = "fraction [0,1]"
+#: Dose below this (Wh/m2, the rounding step of the table) counts as zero and is drawn grey.
+DOSE_ZERO_BELOW = 0.1
+#: Rows closer than this to the walks' median duration are not preferred for the sensor figure; see pick_representative_walk.
+COVERAGE_FULL = 0.95
 
 
-def _rc():
-    return matplotlib.rc_context(matplotlib.rcParamsDefault)
+def load_shade_frame(parquet_path: Path) -> pd.DataFrame:
+    """The full shipped shade table (every 5 min step), columns the figures need, ids dictionary-encoded."""
+    import pyarrow.parquet as pq
 
-
-def _route_bounds_padded(points_df: pd.DataFrame, margin_fraction: float = MAP_MARGIN_FRACTION):
-    """Route bbox padded by a margin derived from the route's own extent
-    (never a typed metre count) — see MAP_MARGIN_FRACTION."""
-    xmin, xmax = float(points_df["x"].min()), float(points_df["x"].max())
-    ymin, ymax = float(points_df["y"].min()), float(points_df["y"].max())
-    diag = math.hypot(xmax - xmin, ymax - ymin)
-    margin = max(diag * margin_fraction, _MIN_MARGIN_M)
-    return xmin - margin, xmax + margin, ymin - margin, ymax + margin
-
-
-def _distance_tick_rows(points_df: pd.DataFrame, interval: float = DISTANCE_TICK_INTERVAL_M) -> pd.DataFrame:
-    """One row per tick (0, interval, 2*interval, ... up to the route's max
-    distance), each the point in `points_df` nearest that tick's distance.
-    """
-    max_d = float(points_df["distance_along_m"].max())
-    ticks = np.arange(0.0, max_d + interval, interval)
-    ticks = ticks[ticks <= max_d + 1e-6]
-    dist = points_df["distance_along_m"].to_numpy()
-    rows = []
-    for t in ticks:
-        idx = int(np.argmin(np.abs(dist - t)))
-        row = points_df.iloc[idx].to_dict()
-        row["tick_distance_m"] = float(t)
-        rows.append(row)
-    return pd.DataFrame(rows)
-
-
-def _communities_crossed(points_df: pd.DataFrame) -> set:
-    if "neighbourhood" not in points_df.columns:
-        return set()
-    return set(points_df["neighbourhood"].dropna().unique())
-
-
-def _draw_base_map(ax, points_df: pd.DataFrame, buildings: gpd.GeoDataFrame | None,
-                    subunits: gpd.GeoDataFrame | None):
-    """Buildings + community outlines/names + route bbox — the shared base
-    map for F1 and F2 (PI, 2026-09-27: overlay the route on the buildings,
-    not floating in blank space)."""
-    from shapely.geometry import box as shapely_box
-
-    xmin, xmax, ymin, ymax = _route_bounds_padded(points_df)
-    bbox_poly = shapely_box(xmin, ymin, xmax, ymax)
-    crossed = _communities_crossed(points_df)
-
-    if buildings is not None and len(buildings):
-        clipped = buildings.cx[xmin:xmax, ymin:ymax]
-        if len(clipped):
-            clipped.plot(ax=ax, facecolor=_BUILDING_FACE, edgecolor=_BUILDING_EDGE, linewidth=0.3, zorder=1)
-
-    if subunits is not None and len(subunits):
-        name_col = "name" if "name" in subunits.columns else subunits.columns[0]
-        visible = subunits[subunits.geometry.intersects(bbox_poly)]
-        if len(visible):
-            visible.boundary.plot(ax=ax, color=_COMMUNITY_LINE, linewidth=0.6, zorder=2)
-        for _, row in visible.iterrows():
-            name = row[name_col]
-            if name not in crossed:
-                continue
-            clip = row.geometry.intersection(bbox_poly)
-            if clip.is_empty:
-                continue
-            cx, cy = clip.centroid.x, clip.centroid.y
-            ax.annotate(
-                str(name), (cx, cy), fontsize=7, color="#333333", ha="center", va="center", zorder=3,
-                path_effects=[mpe.withStroke(linewidth=2.2, foreground="white")],
-            )
-
-    ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymin, ymax)
-    ax.set_aspect("equal", adjustable="box")
-    ax.set_axis_off()
-    return xmin, xmax, ymin, ymax
-
-
-def _draw_route_line(fig, ax, points_df: pd.DataFrame, color_col: str, cmap: str, label: str,
-                      vmin: float | None = None, vmax: float | None = None):
-    """Route as a LineCollection coloured by `color_col`, with distance
-    ticks every DISTANCE_TICK_INTERVAL_M beside the line, a colourbar, a
-    scale bar and a north arrow."""
-    from matplotlib.collections import LineCollection
-    from matplotlib.colors import Normalize
-
-    from src.cartography import add_north_arrow, add_scale_bar
-
-    ordered = points_df.sort_values("distance_along_m")
-    xy = ordered[["x", "y"]].to_numpy()
-    values = ordered[color_col].to_numpy(dtype=float)
-    segs = np.stack([xy[:-1], xy[1:]], axis=1)
-    seg_values = (values[:-1] + values[1:]) / 2.0
-
-    norm = Normalize(
-        vmin=vmin if vmin is not None else np.nanmin(values) if np.isfinite(values).any() else 0.0,
-        vmax=vmax if vmax is not None else np.nanmax(values) if np.isfinite(values).any() else 1.0,
-    )
-    lc = LineCollection(segs, cmap=cmap, norm=norm, linewidths=2.6, zorder=4)
-    lc.set_array(seg_values)
-    ax.add_collection(lc)
-    fig.colorbar(lc, ax=ax, label=label, shrink=0.75, pad=0.02)
-
-    ticks = _distance_tick_rows(ordered)
-    ax.scatter(ticks["x"], ticks["y"], s=10, color="black", zorder=5)
-    for _, row in ticks.iterrows():
-        ax.annotate(
-            f"{row['tick_distance_m']:.0f}", (row["x"], row["y"]), fontsize=7,
-            xytext=(4, 4), textcoords="offset points", zorder=5,
-            path_effects=[mpe.withStroke(linewidth=2.2, foreground="white")],
-        )
-
-    add_scale_bar(ax)
-    add_north_arrow(ax)
-
-
-def build_map_form(points_df: pd.DataFrame, buildings: gpd.GeoDataFrame | None,
-                    subunits: gpd.GeoDataFrame | None, out_path: Path,
-                    route_id: str = "OM2", version: str = "") -> Path:
-    """F1 — the spatial result: route coloured by sky_view_factor over
-    building footprints and community outlines."""
-    with _rc():
-        import matplotlib.pyplot as plt
-
-        from src.cartography import apply_publication_style
-        apply_publication_style()
-
-        fig, ax = plt.subplots(figsize=(9, 9))
-        _draw_base_map(ax, points_df, buildings, subunits)
-        _draw_route_line(fig, ax, points_df, "sky_view_factor", SVF_CMAP, "sky_view_factor")
-
-        version_suffix = f" {version}" if version else ""
-        ax.set_title(f"{route_id} route — n={len(points_df)} points{version_suffix}\ncoloured by sky_view_factor (airborne, 2019 source)", fontsize=10)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=150, bbox_inches="tight")
-        plt.close(fig)
-    return out_path
+    t = pq.read_table(parquet_path, columns=["point_id", "timestamp_local", "date", "sun_altitude_deg", "shaded"],
+                      read_dictionary=["point_id", "date"])
+    return t.to_pandas()
 
 
 def mean_shaded_fraction_by_point(shade_df: pd.DataFrame) -> pd.Series:
-    """Mean of `shaded` over the DAYLIGHT 5-min steps (sun above the
-    horizon) of every campaign date, per point_id — the P-05 result F2/F3
-    colour/plot by. Night steps are excluded: `shaded` is True there (no
-    direct sun), which is not building shade. Empty input yields an empty
-    (float) Series, never a guessed value."""
+    """Mean of `shaded` over the daylight steps of every walk date, per point_id.
+    Night steps are excluded: `shaded` is True there, which is not building shade."""
     if shade_df is None or len(shade_df) == 0 or "shaded" not in shade_df.columns:
         return pd.Series(dtype=float, name="mean_shaded_fraction")
     out = daylight_rows(shade_df).groupby("point_id")["shaded"].mean().astype(float)
@@ -247,291 +49,8 @@ def mean_shaded_fraction_by_point(shade_df: pd.DataFrame) -> pd.Series:
     return out
 
 
-def build_map_shade(points_df: pd.DataFrame, shade_df: pd.DataFrame,
-                     buildings: gpd.GeoDataFrame | None, subunits: gpd.GeoDataFrame | None,
-                     out_path: Path, route_id: str = "OM2", version: str = "", tz: str = "UTC") -> Path:
-    """F2 — same base map, route coloured by mean shaded fraction (P-05,
-    building-only; tree_shade PENDING)."""
-    with _rc():
-        import matplotlib.pyplot as plt
-
-        from src.cartography import apply_publication_style
-        apply_publication_style()
-
-        frac = mean_shaded_fraction_by_point(shade_df)
-        merged = points_df.merge(frac.rename("mean_shaded_fraction"), left_on="point_id", right_index=True, how="left")
-
-        fig, ax = plt.subplots(figsize=(9, 9))
-        _draw_base_map(ax, merged, buildings, subunits)
-        _draw_route_line(fig, ax, merged, "mean_shaded_fraction", SHADE_CMAP, "share of daylight in building shade",
-                          vmin=0.0, vmax=1.0)
-
-        version_suffix = f" {version}" if version else ""
-        n_dates = shade_df["date"].nunique() if shade_df is not None and len(shade_df) and "date" in shade_df.columns else 0
-        ax.set_title(
-            f"{route_id} route — n={len(points_df)} points{version_suffix}\n"
-            f"share of daylight in building shade, {n_dates} campaign date(s)",
-            fontsize=10,
-        )
-        caption = (
-            f"Building shade only, daylight steps only (sun above the horizon); times labelled {tz}."
-            if n_dates else "No campaign-date shade rows in this build — empty-schema P-05 table."
-        )
-        fig.text(0.02, 0.01, caption, fontsize=7, color="#555555")
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=150, bbox_inches="tight")
-        plt.close(fig)
-    return out_path
-
-
-def _profile_frame(points_df: pd.DataFrame, shade_df: pd.DataFrame) -> pd.DataFrame:
-    """points_df + a mean_shaded_fraction column — the frame F3's raw
-    traces and its `aggregate_to_segments` call both operate on, so the
-    figure and a directly-called `aggregate_to_segments` never disagree."""
-    frac = mean_shaded_fraction_by_point(shade_df)
-    return points_df.merge(frac.rename("mean_shaded_fraction"), left_on="point_id", right_index=True, how="left")
-
-
-def segment_means_for_profiles(points_df: pd.DataFrame, shade_df: pd.DataFrame,
-                                segment_length_m: float = SEGMENT_LENGTH_M) -> pd.DataFrame:
-    """The exact 10 m segment-mean table F3's bold trace is drawn from —
-    `src/om_package/segments.py aggregate_to_segments` on the profile
-    frame, nothing recomputed here. Exposed so a test can assert equality
-    with calling `aggregate_to_segments` directly (same function, same
-    input)."""
-    frame = _profile_frame(points_df, shade_df)
-    return aggregate_to_segments(frame, segment_length_m)
-
-
-def _dictionary_units(dictionary_df: pd.DataFrame | None) -> dict:
-    if dictionary_df is None or "id" not in dictionary_df.columns:
-        return {}
-    return dict(zip(dictionary_df["id"], dictionary_df.get("unit", [])))
-
-
-def _panel_label(col: str, units: dict) -> str:
-    base = _PROFILE_LABELS.get(col, col.replace("_", " "))
-    unit = units.get(col) if col != "mean_shaded_fraction" else _MEAN_SHADED_FRACTION_UNIT
-    if unit and unit not in ("-",):
-        return f"{base}\n({unit})"
-    return base
-
-
-def build_profiles(points_df: pd.DataFrame, shade_df: pd.DataFrame, out_path: Path,
-                    dictionary_df: pd.DataFrame | None = None, route_id: str = "OM2",
-                    version: str = "", segment_length_m: float = SEGMENT_LENGTH_M) -> Path:
-    """F3 — sampling along the route: faint 1 m raw values + bold 10 m
-    segment means, stacked panels sharing x = distance along route, with
-    vertical guides + community names at DISTANCE_TICK_INTERVAL_M."""
-    with _rc():
-        import matplotlib.pyplot as plt
-
-        from src.cartography import apply_publication_style
-        apply_publication_style()
-
-        frame = _profile_frame(points_df, shade_df).sort_values("distance_along_m")
-        segments = segment_means_for_profiles(points_df, shade_df, segment_length_m)
-        units = _dictionary_units(dictionary_df)
-        ticks = _distance_tick_rows(frame)
-
-        cols = [c for c in PROFILE_COLUMNS if c in frame.columns]
-        fig, axes = plt.subplots(len(cols), 1, figsize=(10, 1.7 * len(cols) + 1.2), sharex=True)
-        if len(cols) == 1:
-            axes = [axes]
-
-        for ax, col in zip(axes, cols):
-            ax.plot(frame["distance_along_m"], frame[col], color="#b0b0b0", lw=0.6, zorder=1, label="1 m raw")
-            if col in segments.columns:
-                seg_x = (segments["segment_start_m"] + segments["segment_end_m"]) / 2.0
-                ax.plot(seg_x, segments[col], color="#1a5fa5", lw=1.8, marker="o", markersize=2.5, zorder=2, label="10 m mean")
-            for _, row in ticks.iterrows():
-                ax.axvline(row["tick_distance_m"], color="#dddddd", lw=0.7, zorder=0)
-            ax.set_ylabel(_panel_label(col, units), fontsize=7.5)
-
-        axes[0].legend(loc="upper right", fontsize=6, frameon=False)
-        axes[-1].set_xlabel("distance along route (m)")
-
-        for _, row in ticks.iterrows():
-            name = row.get("neighbourhood") or ""
-            axes[0].annotate(
-                str(name), (row["tick_distance_m"], 1.02), xycoords=("data", "axes fraction"),
-                fontsize=6.5, rotation=45, ha="left", va="bottom", color="#444444",
-            )
-
-        version_suffix = f" {version}" if version else ""
-        fig.suptitle(f"{route_id} sampling along the route — n={len(frame)} points, {segment_length_m:g} m segments{version_suffix}", fontsize=10)
-        fig.tight_layout(rect=(0, 0, 1, 0.96))
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=150, bbox_inches="tight")
-        plt.close(fig)
-    return out_path
-
-
-def _dates_in_shade_table(shade_df: pd.DataFrame) -> list:
-    if shade_df is None or len(shade_df) == 0 or "date" not in shade_df.columns:
-        return []
-    return sorted(shade_df["date"].dropna().unique().tolist())
-
-
-def build_shade_calendar(points_df: pd.DataFrame, shade_df: pd.DataFrame,
-                          campaign_windows_df: pd.DataFrame | None, out_path: Path,
-                          route_id: str = "OM2", version: str = "") -> Path:
-    """F4 — one strip per campaign date: x = distance along route, y = time
-    of day (UTC, 5-min resolution), cell = building shade (dark) / sunlit
-    (light) / night, sun below the horizon (grey, never drawn as shade),
-    walk window drawn as a bracket."""
-    with _rc():
-        import matplotlib.pyplot as plt
-        from matplotlib.colors import ListedColormap
-
-        from src.cartography import apply_publication_style
-        apply_publication_style()
-
-        dates = _dates_in_shade_table(shade_df)
-        dist_by_point = points_df.set_index("point_id")["distance_along_m"]
-
-        n_rows = max(len(dates), 1)
-        fig, axes = plt.subplots(n_rows, 1, figsize=(10, 1.6 * n_rows + 1.0), sharex=True, squeeze=False)
-        axes = axes[:, 0]
-        cmap = ListedColormap(["#f4f1e8", "#2b2b2b", "#9aa3ad"])  # 0 sunlit, 1 building shade, 2 night
-
-        if not dates:
-            axes[0].text(0.5, 0.5, "No campaign-date shade rows in this build (empty-schema P-05 table).",
-                         ha="center", va="center", fontsize=9, transform=axes[0].transAxes)
-            axes[0].set_axis_off()
-        for ax, d in zip(axes, dates):
-            day = shade_df[shade_df["date"] == d].copy()
-            day["distance_along_m"] = day["point_id"].map(dist_by_point)
-            day = day.dropna(subset=["distance_along_m"])
-            day["state"] = day["shaded"].astype(float).where(day["sun_altitude_deg"] > 0, 2.0)
-            pivot = day.pivot_table(index="timestamp", columns="distance_along_m", values="state", aggfunc="first")
-            pivot = pivot.sort_index()
-            if pivot.shape[0] and pivot.shape[1]:
-                times = pd.to_datetime(pivot.index)
-                y_frac = [t.hour + t.minute / 60.0 for t in times]
-                ax.imshow(
-                    pivot.to_numpy(dtype=float),
-                    aspect="auto", cmap=cmap, vmin=0, vmax=2, interpolation="nearest",
-                    extent=[pivot.columns.min(), pivot.columns.max(), max(y_frac), min(y_frac)],
-                )
-            ax.set_ylabel(f"{d}\ntime (UTC)", fontsize=7.5)
-
-            if campaign_windows_df is not None and len(campaign_windows_df) and "date" in campaign_windows_df.columns:
-                win = campaign_windows_df[campaign_windows_df["date"].astype(str) == str(d)]
-                if len(win):
-                    first_t = pd.to_datetime(win["first_timestamp"].iloc[0])
-                    last_t = pd.to_datetime(win["last_timestamp"].iloc[0])
-                    y0 = first_t.hour + first_t.minute / 60.0
-                    y1 = last_t.hour + last_t.minute / 60.0
-                    xmin = points_df["distance_along_m"].min()
-                    bracket_x = xmin - (points_df["distance_along_m"].max() - xmin) * 0.03
-                    ax.annotate(
-                        "", xy=(bracket_x, y1), xytext=(bracket_x, y0),
-                        annotation_clip=False,
-                        arrowprops=dict(arrowstyle="-", color="#c0392b", lw=1.4,
-                                         connectionstyle="bar,fraction=0.15"),
-                    )
-
-        axes[-1].set_xlabel("distance along route (m)")
-        version_suffix = f" {version}" if version else ""
-        fig.suptitle(f"{route_id} building shade calendar — {len(dates)} campaign date(s){version_suffix}\n"
-                     "dark = building shade · light = sun · grey = night (sun below the horizon)", fontsize=10)
-        fig.tight_layout(rect=(0, 0, 1, 0.96))
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=150, bbox_inches="tight")
-        plt.close(fig)
-    return out_path
-
-
-#: Colours for the three P-10 classes; date_dependent carries the message.
-_CLASS_COLOURS = {"always_shaded": "#2b2b2b", "date_dependent": "#d98c1f", "always_sunlit": "#f4efd6"}
-_CLASS_ORDER = ["always_shaded", "date_dependent", "always_sunlit"]
-DATE_DEPENDENT_CMAP = "YlOrBr"
-_DATE_COLOURS = ["#1b6ca8", "#c0392b", "#2e8b57", "#8e44ad", "#7f6000"]
-#: How many local times the dose figure shows: the early / middle / late
-#: sun-up slot of the window (quartiles of the slot list, read from the data).
-_DOSE_SLOT_QUANTILES = (0.25, 0.5, 0.75)
-
-
-def _slot_hours(slots) -> np.ndarray:
-    return np.array([int(x[:2]) + int(x[3:5]) / 60.0 for x in slots])
-
-
-def daylight_date_dependent_share_by_point(envelope_df: pd.DataFrame) -> pd.Series:
-    """Per point: share of its daylight slots (class != night) that are
-    date_dependent."""
-    day = envelope_df[envelope_df["class"] != "night"]
-    out = (day["class"] == "date_dependent").groupby(day["point_id"]).mean().astype(float)
-    out.name = "date_dependent_share"
-    return out
-
-
-def class_shares_by_slot(envelope_df: pd.DataFrame) -> pd.DataFrame:
-    """Rows = local slot (daylight only), columns = class, values = share of
-    points in that class at that slot."""
-    day = envelope_df[envelope_df["class"] != "night"]
-    counts = day.groupby(["local_slot", "class"]).size().unstack(fill_value=0)
-    for c in _CLASS_ORDER:
-        if c not in counts.columns:
-            counts[c] = 0
-    counts = counts[_CLASS_ORDER]
-    return counts.div(counts.sum(axis=1), axis=0)
-
-
-def build_sun_envelope(points_df: pd.DataFrame, envelope_df: pd.DataFrame,
-                       buildings: gpd.GeoDataFrame | None, subunits: gpd.GeoDataFrame | None,
-                       out_path: Path, route_id: str = "OM2", version: str = "", window: tuple | None = None,
-                       tz_label: str = "Rio local time", geometry_label: str = "") -> Path:
-    """F5 — how much the unknown campaign date costs: (left) share of the
-    route's points always sunlit / date-dependent / always shaded at each
-    local time of day; (right) map of each point's date-dependent share of
-    daylight. Geometry-derived proxy (building horizon vs sun position)."""
-    with _rc():
-        import matplotlib.pyplot as plt
-
-        from src.cartography import apply_publication_style
-        apply_publication_style()
-
-        shares = class_shares_by_slot(envelope_df)
-        hours = _slot_hours(shares.index)
-        per_point = daylight_date_dependent_share_by_point(envelope_df)
-        merged = points_df.merge(per_point, left_on="point_id", right_index=True, how="left")
-
-        fig = plt.figure(figsize=(14, 7.2))
-        gs = fig.add_gridspec(1, 2, width_ratios=[1.0, 1.0], wspace=0.12)
-        ax = fig.add_subplot(gs[0, 0])
-        ax.stackplot(hours, [shares[c].to_numpy() * 100 for c in _CLASS_ORDER],
-                     colors=[_CLASS_COLOURS[c] for c in _CLASS_ORDER], edgecolor="#777777", linewidth=0.4,
-                     labels=["always shaded", "date-dependent", "always sunlit"])
-        ax.set_xlim(hours.min(), hours.max())
-        ax.set_ylim(0, 100)
-        ax.set_xlabel(f"local time of day ({tz_label})")
-        ax.set_ylabel("share of route points (%)")
-        ax.legend(loc="upper center", ncol=3, fontsize=8, frameon=True, framealpha=0.95)
-        wtxt = f"{window[0]} to {window[1]}" if window else "the analysis window"
-        ax.set_title(f"Sun class by time of day over {wtxt}\n(days with the sun up only)", fontsize=10)
-
-        axm = fig.add_subplot(gs[0, 1])
-        _draw_base_map(axm, merged, buildings, subunits)
-        _draw_route_line(fig, axm, merged, "date_dependent_share", DATE_DEPENDENT_CMAP,
-                         "share of daylight that is date-dependent", vmin=0.0, vmax=1.0)
-        axm.set_title("Where the campaign date matters\n(per point, over its daylight slots)", fontsize=10)
-
-        suffix = f" {version}" if version else ""
-        fig.suptitle(f"{route_id} sun exposure envelope{suffix}", fontsize=11)
-        geo = f" Geometry: {geometry_label}." if geometry_label else ""
-        fig.text(0.01, -0.02, "Brisa+ (MorphoFavela). Geometry-derived proxy (building and terrain horizon vs sun position); "
-                 "no cloud, no tree shade; not measured sunlight.\n" + geo.strip(), fontsize=7, color="#555555")
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=150, bbox_inches="tight")
-        plt.close(fig)
-    return out_path
-
-
 def dose_slots_for_figure(envelope_df: pd.DataFrame, dose_df: pd.DataFrame,
                           quantiles: tuple = _DOSE_SLOT_QUANTILES) -> list[str]:
-    """Local slots shown in F6: the slots at the given quantiles of the
-    sun-up slot list that also exist on the dose table's slot grid."""
     sun_up = sorted(envelope_df.loc[envelope_df["class"] != "night", "local_slot"].unique())
     on_grid = sorted(set(dose_df["local_slot"].unique()))
     pool = [x for x in sun_up if x in on_grid]
@@ -540,54 +59,291 @@ def dose_slots_for_figure(envelope_df: pd.DataFrame, dose_df: pd.DataFrame,
     return [pool[min(int(q * len(pool)), len(pool) - 1)] for q in quantiles]
 
 
-def build_sun_dose(points_df: pd.DataFrame, envelope_df: pd.DataFrame, dose_df: pd.DataFrame, out_path: Path,
-                   route_id: str = "OM2", version: str = "", tz_label: str = "Rio local time",
-                   geometry_label: str = "") -> Path:
-    """F6 — 1 h clear-sky direct-sun dose along the route at three local
-    times of day: band = min to max over every day of the season window,
-    grey line = median, coloured lines = the campaign dates. UPPER BOUND
-    (clear sky), geometry-derived proxy."""
-    with _rc():
+def _route_line(ax, points: pd.DataFrame, colour="black", lw=1.8, zorder=4):
+    from matplotlib.collections import LineCollection
+
+    o = points.sort_values("distance_along_m")
+    xy = o[["x", "y"]].to_numpy()
+    lc = LineCollection(np.stack([xy[:-1], xy[1:]], axis=1), colors=colour, linewidths=lw, zorder=zorder,
+                        capstyle="round")
+    ax.add_collection(lc)
+
+
+def _distance_ticks(points: pd.DataFrame, step: float = ROUTE_TICK_M) -> pd.DataFrame:
+    o = points.sort_values("distance_along_m")
+    d = o["distance_along_m"].to_numpy()
+    ticks = np.arange(0.0, d.max() + 1e-6, step)
+    rows = o.iloc[[int(np.argmin(np.abs(d - t))) for t in ticks]].copy()
+    rows["tick_m"] = ticks
+    return rows
+
+
+def _unit_normal(points: pd.DataFrame, distance_m: float, half_window_m: float = 15.0):
+    o = points.sort_values("distance_along_m")
+    d = o["distance_along_m"].to_numpy()
+    lo = o.iloc[int(np.argmin(np.abs(d - max(distance_m - half_window_m, 0))))]
+    hi = o.iloc[int(np.argmin(np.abs(d - (distance_m + half_window_m))))]
+    tx, ty = hi["x"] - lo["x"], hi["y"] - lo["y"]
+    n = float(np.hypot(tx, ty)) or 1.0
+    return -ty / n, tx / n
+
+
+def build_fig_route(points: pd.DataFrame, buildings: gpd.GeoDataFrame | None, out_path: Path) -> Path:
+    """Route over building footprints: distance ticks every 250 m, neighbourhood
+    names once per stretch, scale bar, north arrow. No colour-coded variable."""
+    with fs.figure_style():
         import matplotlib.pyplot as plt
 
-        from src.cartography import apply_publication_style
-        apply_publication_style()
+        extent = fs.route_extent(points, margin_m=45.0)
+        fig, ax = plt.subplots(figsize=(fs.TEXT_WIDTH_IN, fs.map_height_in(extent, fs.TEXT_WIDTH_IN)))
+        fs.draw_buildings(ax, buildings, extent)
+        _route_line(ax, points, colour="#111111", lw=1.8)
 
-        col = "dose_1h_wh_m2"
-        slots = dose_slots_for_figure(envelope_df, dose_df)
-        dist = points_df.set_index("point_id")["distance_along_m"]
-        dates = sorted(s for s in dose_df["scope"].astype(str).unique() if not s.startswith("envelope_"))
-        n = max(len(slots), 1)
-        fig, axes = plt.subplots(n, 1, figsize=(10, 2.6 * n + 1.2), sharex=True, squeeze=False)
-        axes = axes[:, 0]
-        for ax, slot in zip(axes, slots):
-            sl = dose_df[dose_df["local_slot"] == slot].copy()
-            sl["d"] = sl["point_id"].map(dist)
-            sl = sl.dropna(subset=["d"]).sort_values("d")
-            wide = sl.pivot_table(index="d", columns="scope", values=col, aggfunc="first")
-            lo, hi, med = (wide[f"envelope_{k}"] for k in ("min", "max", "median"))
-            ax.fill_between(wide.index, lo, hi, color="#cfd8e3", label="season envelope (min to max)", zorder=1)
-            ax.plot(wide.index, med, color="#555555", lw=0.8, label="season median", zorder=2)
-            for d, c in zip(dates, _DATE_COLOURS * (len(dates) // len(_DATE_COLOURS) + 1)):
-                if d in wide.columns:
-                    ax.plot(wide.index, wide[d], color=c, lw=0.9, label=d, zorder=3)
-            ax.set_ylabel(f"1 h dose up to {slot}\n(Wh/m2)", fontsize=8)
-            ax.set_ylim(bottom=0)
-        if not slots:
-            axes[0].text(0.5, 0.5, "No dose rows in this build.", ha="center", va="center", transform=axes[0].transAxes)
-            axes[0].set_axis_off()
-        else:
-            axes[0].legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=7, frameon=False)
-        axes[-1].set_xlabel("distance along route (m)")
-        suffix = f" {version}" if version else ""
-        fig.suptitle(f"{route_id} direct-sun dose, 1 h window, along the route{suffix}\n"
-                     f"campaign dates vs the season envelope ({tz_label})", fontsize=10)
-        geo = f" Geometry: {geometry_label}." if geometry_label else ""
-        fig.text(0.01, 0.005, "Brisa+ (MorphoFavela). Clear-sky direct beam on a horizontal plane, zero where building/terrain horizon\n"
-                 "blocks the sun: an UPPER BOUND and a geometry-derived proxy, not measured sunlight." + geo,
-                 fontsize=7, color="#555555")
-        fig.tight_layout(rect=(0, 0.05, 1, 0.94))
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=150, bbox_inches="tight")
-        plt.close(fig)
-    return out_path
+        ticks = _distance_ticks(points)
+        ax.scatter(ticks["x"], ticks["y"], s=16, color="white", edgecolor="black", linewidth=0.9, zorder=6)
+        o = points.sort_values("distance_along_m")
+        items = [{"xy": (r["x"], r["y"]), "text": f"{r['tick_m']:,.0f} m"} for _, r in ticks.iterrows()]
+        for s_ in fs.neighbourhood_stretches(points):
+            mid = (s_["start"] + s_["end"]) / 2
+            r = o.iloc[int(np.argmin(np.abs(o["distance_along_m"].to_numpy() - mid)))]
+            items.append({"xy": (r["x"], r["y"]), "text": s_["name"], "kw": {"fontstyle": "italic"}})
+        fs.place_labels(fig, ax, items, o[["x", "y"]].to_numpy())
+
+        fs.scale_bar(ax, 100.0)
+        fs.north_arrow(ax)
+        fig.subplots_adjust(left=0.01, right=0.99, top=0.995, bottom=0.005)
+        return fs.save(fig, out_path)
+
+
+def build_fig_form(points: pd.DataFrame, out_path: Path) -> Path:
+    """Four stacked profiles sharing distance: building height, height-to-width
+    ratio, sky view factor, plan area density. Neighbourhood band once on top."""
+    panels = [
+        ("building_height_m", "building height (m)"),
+        ("height_width_ratio", "height-to-width\nratio"),
+        ("sky_view_factor", "sky view factor"),
+        ("plan_density_lambda_p", "plan area density"),
+    ]
+    with fs.figure_style():
+        import matplotlib.pyplot as plt
+
+        p = points.sort_values("distance_along_m")
+        total = float(np.ceil(p["distance_along_m"].max() / 50) * 50)
+        means = fs.ten_m_means(p, [c for c, _ in panels])
+        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 6.6))
+        gs = fig.add_gridspec(5, 1, height_ratios=[0.55, 1, 1, 1, 1], hspace=0.28, left=0.13, right=0.985,
+                              top=0.99, bottom=0.07)
+        axb = fig.add_subplot(gs[0])
+        fs.draw_neighbourhood_band(axb, fs.neighbourhood_stretches(p), total, axes_in=fs.TEXT_WIDTH_IN * 0.855)
+        axes = [fig.add_subplot(gs[i + 1], sharex=axb) for i in range(4)]
+        for ax, (col, label) in zip(axes, panels):
+            ax.plot(p["distance_along_m"], p[col], color=fs.POINT_GREY, lw=0.5, zorder=1)
+            ax.plot(means["x"], means[col], color=fs.LINE_DARK, lw=1.2, zorder=3)
+            ax.set_ylabel(label)
+            ax.spines["bottom"].set_visible(False)
+            ax.tick_params(axis="x", length=0, labelbottom=False)
+            hi = float(max(np.nanpercentile(p[col], 99.5), np.nanmax(means[col])))
+            lo = float(np.nanmin(p[col]))
+            ax.set_ylim(min(lo, 0.0) if col != "sky_view_factor" else 0.0, hi * 1.05 if col != "sky_view_factor" else 1.0)
+        for ax in axes:
+            ax.sharex(axb)
+        axes[-1].spines["bottom"].set_visible(True)
+        axes[-1].tick_params(axis="x", length=3, labelbottom=True)
+        fs.distance_axis(axes[-1], total)
+        axes[-1].set_xlabel("distance along the route (m)")
+        axes[0].set_xlim(0, total)
+        return fs.save(fig, out_path)
+
+
+def _shade_norm():
+    return matplotlib.colors.Normalize(vmin=0.0, vmax=1.0)
+
+
+def build_fig_shade_map(points: pd.DataFrame, shade_df: pd.DataFrame, buildings: gpd.GeoDataFrame | None,
+                        out_path: Path) -> Path:
+    """Share of daylight time in building shade per point, over the walk dates."""
+    from matplotlib.collections import LineCollection
+
+    with fs.figure_style():
+        import matplotlib.pyplot as plt
+
+        frac = mean_shaded_fraction_by_point(shade_df)
+        o = points.merge(frac, left_on="point_id", right_index=True, how="left").sort_values("distance_along_m")
+        extent = fs.route_extent(o, margin_m=45.0)
+        map_w = 0.83
+        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, fs.map_height_in(extent, fs.TEXT_WIDTH_IN * map_w)))
+        ax = fig.add_axes([0.005, 0.005, map_w, 0.99])
+        fs.draw_buildings(ax, buildings, extent)
+        xy = o[["x", "y"]].to_numpy()
+        v = o["mean_shaded_fraction"].to_numpy(float)
+        lc = LineCollection(np.stack([xy[:-1], xy[1:]], axis=1), cmap=fs.VAR_CMAP["shade"], norm=_shade_norm(),
+                            linewidths=2.6, zorder=4, capstyle="round")
+        lc.set_array((v[:-1] + v[1:]) / 2)
+        ax.add_collection(lc)
+        fs.scale_bar(ax, 100.0)
+        fs.north_arrow(ax)
+        cax = fig.add_axes([0.865, 0.25, 0.022, 0.5])
+        cb = fig.colorbar(lc, cax=cax)
+        cb.set_label("share of daylight time in building shade")
+        cb.set_ticks([0, 0.25, 0.5, 0.75, 1.0])
+        return fs.save(fig, out_path)
+
+
+def shade_calendar_matrix(shade_df: pd.DataFrame, bin_min: int = 5) -> tuple[pd.DataFrame, list[str]]:
+    """Rows = walk dates, columns = local minutes since midnight (daylight bins),
+    values = share of route points in building shade."""
+    day = daylight_rows(shade_df)
+    ts = day["timestamp_local"] if "timestamp_local" in day.columns else day["timestamp"]
+    ts = pd.DatetimeIndex(ts)
+    minutes = (ts.hour * 60 + ts.minute) // bin_min * bin_min
+    share = day.groupby([day["date"].astype(str).to_numpy(), np.asarray(minutes)])["shaded"].mean()
+    mat = share.unstack(level=1).sort_index()
+    return mat, [str(d) for d in mat.index]
+
+
+def build_fig_shade_calendar(shade_df: pd.DataFrame, out_path: Path, bin_min: int = 5) -> tuple[Path, dict]:
+    with fs.figure_style():
+        import matplotlib.pyplot as plt
+
+        mat, dates = shade_calendar_matrix(shade_df, bin_min)
+        mins = mat.columns.to_numpy(float)
+        edges_x = np.append(mins, mins[-1] + bin_min) / 60.0
+        n = len(dates)
+        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 6.2))
+        ax = fig.add_axes([0.085, 0.085, 0.765, 0.905])
+        cax = fig.add_axes([0.87, 0.085, 0.022, 0.905])
+        cmap = matplotlib.colormaps[fs.VAR_CMAP["shade"]].copy()
+        cmap.set_bad("white")
+        mesh = ax.pcolormesh(edges_x, np.arange(n + 1), np.ma.masked_invalid(mat.to_numpy(float)), cmap=cmap,
+                             norm=_shade_norm(), shading="flat", rasterized=True)
+        ax.set_ylim(n, 0)
+        ax.set_xlim(edges_x[0], edges_x[-1])
+        lab = [f"{pd.Timestamp(d).day} {pd.Timestamp(d).strftime('%b')}" for d in dates]
+        ax.set_yticks(np.arange(n) + 0.5)
+        ax.set_yticklabels(lab)
+        ax.tick_params(axis="y", length=0)
+        hours = np.arange(np.ceil(edges_x[0]), edges_x[-1] + 0.01, 2)
+        ax.set_xticks(hours)
+        ax.set_xticklabels([f"{int(h):02d}:00" for h in hours])
+        ax.set_xlabel("time of day, Rio local time")
+        for s in ("left", "bottom"):
+            ax.spines[s].set_visible(False)
+        cb = fig.colorbar(mesh, cax=cax)
+        cb.set_label("share of route points in building shade")
+        cb.set_ticks([0, 0.25, 0.5, 0.75, 1.0])
+        out = fs.save(fig, out_path)
+    return out, {"n_dates": n, "bin_min": bin_min, "first_bin_local": f"{int(mins[0]) // 60:02d}:{int(mins[0]) % 60:02d}",
+                 "last_bin_local": f"{int(mins[-1]) // 60:02d}:{int(mins[-1]) % 60:02d}",
+                 "colour_limits": [0.0, 1.0]}
+
+
+def walk_order(walks: pd.DataFrame) -> pd.DataFrame:
+    """Walks sorted by date within each period, morning first, with the row label."""
+    w = walks.copy()
+    start = pd.to_datetime(w["start_local"].str[:19])
+    w["_start"] = start
+    w["label"] = [f"{t.day} {t.strftime('%b')} {t:%H:%M}" for t in start]
+    w["_grp"] = (w["period"] != "morning").astype(int)
+    return w.sort_values(["_grp", "_start"]).reset_index(drop=True)
+
+
+def dose_matrix(p12: pd.DataFrame, walk_ids: list[str], column: str, total_m: float, step_m: float = 10.0) -> np.ndarray:
+    nb = int(np.ceil(total_m / step_m))
+    b = np.minimum(np.floor(p12["distance_along_m"].to_numpy(float) / step_m).astype(int), nb - 1)
+    g = p12.assign(_b=b).groupby(["walk_id", "_b"])[column].mean()
+    wide = g.unstack("_b").reindex(index=walk_ids, columns=range(nb))
+    return wide.to_numpy(float)
+
+
+def build_fig_sun_dose(walks: pd.DataFrame, p12: pd.DataFrame, total_m: float, out_path: Path) -> tuple[Path, dict]:
+    """R10: walks as rows (mornings above evenings), distance as columns, colour
+    = clear-sky direct sun dose in the 1 h (left) and 3 h (right) before arrival;
+    one shared scale, zero grey, points outside a walk blank."""
+    with fs.figure_style():
+        import matplotlib.pyplot as plt
+
+        order = walk_order(walks)
+        ids = order["walk_id"].tolist()
+        mats = {h: dose_matrix(p12, ids, f"dose_{h}h_before_wh_m2", total_m) for h in (1, 3)}
+        vmax = float(np.nanpercentile(mats[3], 99.5))
+        vmax = float(np.ceil(vmax / 250.0) * 250.0)
+        norm = matplotlib.colors.Normalize(vmin=DOSE_ZERO_BELOW, vmax=vmax)
+        cmap = matplotlib.colormaps[fs.VAR_CMAP["sun_dose"]].copy()
+        cmap.set_under(fs.ZERO_GREY)
+        cmap.set_bad("white")
+
+        n_m = int((order["_grp"] == 0).sum())
+        n_e = len(order) - n_m
+        gap = 1.2
+        y_m = np.arange(n_m + 1)
+        y_e = np.arange(n_e + 1) + n_m + gap
+        edges_x = np.arange(0, mats[1].shape[1] + 1) * 10.0
+
+        fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 9.0))
+        left, width, gapx = 0.215, 0.375, 0.02
+        bottom, height = 0.125, 0.84
+        axes = [fig.add_axes([left + i * (width + gapx), bottom, width, height]) for i in range(2)]
+        for ax, h, name in zip(axes, (1, 3), ("1 hour before", "3 hours before")):
+            m = np.ma.masked_invalid(mats[h])
+            ax.pcolormesh(edges_x, y_m, m[:n_m], cmap=cmap, norm=norm, shading="flat", rasterized=True)
+            ax.pcolormesh(edges_x, y_e, m[n_m:], cmap=cmap, norm=norm, shading="flat", rasterized=True)
+            ax.set_ylim(y_e[-1], 0)
+            ax.set_xlim(0, total_m)
+            fs.distance_axis(ax, total_m, step=500.0)
+            ax.set_xlabel("distance along the route (m)")
+            ax.set_title(name, fontsize=fs.FONT_PT, pad=3)
+            for s in ("left", "bottom"):
+                ax.spines[s].set_visible(False)
+            ax.tick_params(axis="y", length=0)
+        centres = np.concatenate([y_m[:-1] + 0.5, y_e[:-1] + 0.5])
+        axes[0].set_yticks(centres)
+        axes[0].set_yticklabels(order["label"].tolist())
+        axes[1].set_yticks([])
+        for lab, y0, y1 in (("morning walks", y_m[0], y_m[-1]), ("evening walks", y_e[0], y_e[-1])):
+            axes[0].annotate(lab, xy=(-0.40, 0), xycoords=("axes fraction", "data"), xytext=(-0.40, (y0 + y1) / 2),
+                             textcoords=("axes fraction", "data"), rotation=90, ha="center", va="center",
+                             fontsize=fs.FONT_PT)
+        cax = fig.add_axes([left + 0.02, 0.05, 2 * width + gapx - 0.04, 0.012])
+        sm = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
+        cb = fig.colorbar(sm, cax=cax, orientation="horizontal", extend="min", extendfrac=0.03)
+        cb.set_label("clear-sky direct sun dose (Wh/m²); grey = zero", labelpad=2)
+        cb.set_ticks(np.arange(0, vmax + 1, 500))
+        out = fs.save(fig, out_path)
+    return out, {"colour_limits_wh_m2": [DOSE_ZERO_BELOW, vmax], "zero_drawn_below_wh_m2": DOSE_ZERO_BELOW,
+                 "colour_scale_note": "one scale for both panels, upper limit set from the 99.5th percentile of the 3 hour doses; larger values take the top colour",
+                 "n_walks": len(order), "n_morning": n_m, "n_evening": n_e, "bin_m": 10,
+                 "max_10m_mean_1h_wh_m2": float(np.nanmax(mats[1])), "max_10m_mean_3h_wh_m2": float(np.nanmax(mats[3]))}
+
+
+def pick_representative_walk(walks: pd.DataFrame) -> pd.Series:
+    """Among walks with coverage >= 0.95, the one closest to the median duration of all walks."""
+    med = float(walks["duration_min"].median())
+    full = walks[walks["coverage_share"] >= COVERAGE_FULL]
+    return full.loc[(full["duration_min"] - med).abs().idxmin()]
+
+
+def build_fig_svf_sensor(points: pd.DataFrame, walks: pd.DataFrame, p12: pd.DataFrame, out_path: Path) -> tuple[Path, dict]:
+    """Sky view factor at 1 m and sensor-matched (tau = 10 s and 30 s) along one full-coverage walk."""
+    walk = pick_representative_walk(walks)
+    with fs.figure_style():
+        import matplotlib.pyplot as plt
+
+        w = p12[p12["walk_id"] == walk["walk_id"]].sort_values("distance_along_m")
+        pts = points.sort_values("distance_along_m")
+        fig, ax = plt.subplots(figsize=(fs.TEXT_WIDTH_IN, 2.7))
+        ax.plot(pts["distance_along_m"], pts["sky_view_factor"], color="#a0a0a0", lw=0.6, label="1 m values", zorder=1)
+        for tau in (10, 30):
+            ax.plot(w["distance_along_m"], w[f"sky_view_factor_tau{tau}s"], color=fs.TAU_COLOURS[tau], lw=1.4,
+                    label=f"sensor-matched, time constant {tau} s", zorder=3)
+        fs.distance_axis(ax, float(pts["distance_along_m"].max()))
+        ax.set_xlabel("distance along the route (m)")
+        ax.set_ylabel("sky view factor")
+        ax.set_ylim(0, 1)
+        ax.legend(loc="upper right", ncol=1, frameon=False, handlelength=1.8, fontsize=fs.FONT_PT)
+        fig.subplots_adjust(left=0.1, right=0.985, top=0.97, bottom=0.2)
+        out = fs.save(fig, out_path)
+    start = pd.Timestamp(str(walk["start_local"])[:19])
+    return out, {"walk_id": str(walk["walk_id"]), "date": str(walk["date"]), "start_local": start.strftime("%H:%M"),
+                 "period": str(walk["period"]), "duration_min": float(walk["duration_min"]),
+                 "coverage_share": float(walk["coverage_share"]),
+                 "median_duration_min_all_walks": float(walks["duration_min"].median())}
