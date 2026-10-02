@@ -26,10 +26,15 @@ from any sensor; see the README, "Using the data".
 Run (from inside the package directory):
     python OM2/aggregate_to_segments.py --points OM2/points.parquet \\
         --segment-m 20 --out OM2/segments_20m.parquet
+
+If the input holds sensor-matched columns named ``<col>_tau<tau>s``, add
+``--tau 30`` (repeatable, or ``--tau 10,30``) to keep only those time
+constants; without ``--tau`` every column is aggregated as before.
 """
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -41,6 +46,23 @@ DEFAULT_SEGMENT_M = 10.0
 #: with src/om_package/segments.py's _ID_COLS by hand (this file has no
 #: repo import to share it from).
 _ID_COLS = {"point_id", "route_id", "seq", "distance_along_m", "height_m", "geometry", "x", "y"}
+
+
+_TAU_COL = re.compile(r"_tau([0-9.]+)s$")
+
+
+def select_taus(points_df: pd.DataFrame, taus) -> pd.DataFrame:
+    """Keep only ``<col>_tau<tau>s`` columns whose tau (seconds) is in
+    ``taus``; other columns pass through. A table with no such columns is
+    returned unchanged. Raises if it has some but none match ``taus``."""
+    wanted = {float(t) for t in taus}
+    tau_cols = {c: float(m.group(1)) for c in points_df.columns if (m := _TAU_COL.search(str(c)))}
+    if not tau_cols:
+        return points_df
+    available = sorted(set(tau_cols.values()))
+    if not wanted & set(available):
+        raise ValueError(f"no sensor-matched columns for tau {sorted(wanted)} s; available: {available}")
+    return points_df.drop(columns=[c for c, v in tau_cols.items() if v not in wanted])
 
 
 def aggregate_to_segments(
@@ -83,11 +105,18 @@ def main() -> int:
         "--segment-m", "--segment-length-m", dest="segment_m", type=float, default=DEFAULT_SEGMENT_M,
         help=f"segment length in metres (default {DEFAULT_SEGMENT_M:g}, a placeholder, not sensor-derived)",
     )
+    ap.add_argument(
+        "--tau", action="append", default=None, metavar="SECONDS",
+        help="keep only sensor-matched <col>_tau<tau>s columns for these tau (s); repeatable or comma list",
+    )
     ap.add_argument("--out", required=True, help="output path (.parquet or .csv)")
     args = ap.parse_args()
 
     points_path = Path(args.points)
     df = pd.read_parquet(points_path) if points_path.suffix == ".parquet" else pd.read_csv(points_path)
+
+    if args.tau:
+        df = select_taus(df, [float(t) for chunk in args.tau for t in chunk.split(",") if t.strip()])
 
     segments = aggregate_to_segments(df, args.segment_m)
 
