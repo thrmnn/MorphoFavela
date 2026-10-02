@@ -182,7 +182,7 @@ def build_fig_shade_map(points: pd.DataFrame, shade_df: pd.DataFrame, buildings:
         frac = mean_shaded_fraction_by_point(shade_df)
         o = points.merge(frac, left_on="point_id", right_index=True, how="left").sort_values("distance_along_m")
         extent = fs.route_extent(o, margin_m=45.0)
-        map_in = fs.fit_map_width_in(extent, SHADE_MAP_MAX_HEIGHT_IN)
+        map_in = fs.fit_map_width_in(extent, SHADE_MAP_MAX_HEIGHT_IN, fs.TEXT_WIDTH_IN - SHADE_BAR_COLUMN_IN)
         h_in = fs.map_height_in(extent, map_in)
         w_in = map_in + SHADE_BAR_COLUMN_IN
         fig = plt.figure(figsize=(w_in, h_in))

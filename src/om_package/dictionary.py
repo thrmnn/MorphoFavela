@@ -453,6 +453,10 @@ _RETIRED = {
     "speed_ms": "mean_speed_ms (p11_wind_observed.csv is no longer shipped)",
     "calm": "p11_regime_by_hour (p11_wind_observed.csv is no longer shipped)",
     "variable_direction": "p11_wind_observed.csv is no longer shipped",
+    "sky_view_factor_terrestrial": "nothing: not part of this package",
+    "tree_shade": "nothing: not part of this package",
+    "airborne_vs_terrestrial_comparison": "nothing: not part of this package",
+    "height_change_2024_2026": "nothing: not part of this package",
 }
 
 _WIND = ("Galeão airport reports at 10 m, a regional reference and not wind at the route; regimes come from the peaks "
@@ -514,6 +518,9 @@ _V030 = {
     "zd_macdonald_m": None,  # placeholder replaced below
 }
 del _V030["zd_macdonald_m"]
+
+for _id in ("sky_view_factor_terrestrial", "tree_shade", "airborne_vs_terrestrial_comparison", "height_change_2024_2026"):
+    _V030[_id] = _row("Identifier kept so that identifiers are never reused. No table has a column of this name.", "-", "-", "-", "-")
 
 _MEASURE_NOTES = {
     "sky_view_factor": "sky view factor", "height_width_ratio": "height-to-width ratio",

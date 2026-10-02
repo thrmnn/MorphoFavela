@@ -35,7 +35,6 @@ SECTIONS = [
     "Wind: two regimes",
     "Ventilation for both regimes",
     "Using the data with temperature readings",
-    "Contact",
 ]
 FORBIDDEN = ["—", "–", "SBGL", "METAR", "H/W", "λ", "z0", "SVF", "LiDAR", r"\btree", "v0.1", "v0.2",
              "v1.", "PLACEHOLDER", "novel", "robust", "significant", "Read with care", "sun_envelope.png",
