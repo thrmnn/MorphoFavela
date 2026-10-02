@@ -41,10 +41,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from .io_utils import DEFAULT_ROOT, Paths
-from .ventilation import prevailing_wind_bearing_deg
-from .wind_obs import wind_at
-
 MACDONALD_A = 4.43
 MACDONALD_BETA = 1.0
 MACDONALD_CD = 1.2
@@ -112,13 +108,6 @@ def macdonald_zd_z0(lambda_p, lambda_f, h_mean_m, a: float = MACDONALD_A, beta: 
     return zd_h * h, z0_h * h
 
 
-def prevailing_direction_deg(root=DEFAULT_ROOT) -> float:
-    """Frequency-weighted circular mean of the 2015-2024 SBGL climatology
-    (data/maré/wind_rose.json), as ventilation.py uses. A circular mean of a
-    spread rose is a summary bearing, not necessarily a mode."""
-    return prevailing_wind_bearing_deg(Paths(root).wind_rose_json)
-
-
 def compute_indices(points: pd.DataFrame, wind_dir_deg: float, horizon_deg: np.ndarray | None = None,
                     azimuths_deg: np.ndarray | None = None, buffer_m: int = DEFAULT_BUFFER_M) -> pd.DataFrame:
     """All six proxies for every point at one wind direction. ``points`` is
@@ -140,22 +129,4 @@ def compute_indices(points: pd.DataFrame, wind_dir_deg: float, horizon_deg: np.n
     out["z0_m_proxy"] = z0
     out["zd_m_proxy"] = zd
     out["open_space_fraction_proxy"] = 1.0 - lp
-    return out
-
-
-def indices_at_prevailing(points, horizon_deg=None, azimuths_deg=None, root=DEFAULT_ROOT,
-                          buffer_m: int = DEFAULT_BUFFER_M) -> pd.DataFrame:
-    return compute_indices(points, prevailing_direction_deg(root), horizon_deg, azimuths_deg, buffer_m)
-
-
-def indices_at_observed(points, timestamp_utc, horizon_deg=None, azimuths_deg=None, obs=None,
-                        root=DEFAULT_ROOT, buffer_m: int = DEFAULT_BUFFER_M) -> pd.DataFrame | None:
-    """Proxies at the SBGL direction nearest timestamp_utc (see
-    wind_obs.wind_at); None when no usable observation is within 60 min."""
-    w = wind_at(timestamp_utc, obs=obs, root=root)
-    if w is None:
-        return None
-    out = compute_indices(points, w["drct"], horizon_deg, azimuths_deg, buffer_m)
-    out["sbgl_valid_utc"] = w["valid_utc"]
-    out["sbgl_speed_ms"] = w["speed_ms"]
     return out

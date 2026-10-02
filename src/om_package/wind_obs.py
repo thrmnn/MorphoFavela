@@ -10,10 +10,7 @@ The fetched CSV is cached under <root>/data/maré/octopus/wind/ with a
 manifest.json (url, fetched UTC, sha256, counts). If the fetch fails,
 fetch_sbgl raises: wind is never synthesised.
 
-Clock caveat: METAR times are UTC. Whether the Octopus device clocks log
-UTC or Rio local time (fixed UTC-3, no DST since 2019) is UNKNOWN, so
-callers of wind_at must pass UTC; ``device_to_utc`` converts once the
-clock is known.
+METAR times are UTC; Rio local time is America/Sao_Paulo (UTC-3, no DST).
 """
 from __future__ import annotations
 
@@ -33,8 +30,6 @@ STATION = "SBGL"
 WINDOW_START = "2025-12-01"
 WINDOW_END = "2026-04-30"
 CACHE_STEM = "sbgl_metar_20251201_20260430"
-MAX_GAP_MIN = 60
-LOCAL_UTC_OFFSET_H = -3
 CLIM_YEAR_START = 2015
 CLIM_YEAR_END = 2024
 ASOS_URL = "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py"
@@ -116,40 +111,6 @@ def load_obs(root: Path | str = DEFAULT_ROOT) -> pd.DataFrame:
     out["calm"] = out["speed_ms"] < CALM_MS
     out["variable"] = ~out["calm"] & out["drct"].isna() & out["speed_ms"].notna()
     return out.sort_values("valid_utc").reset_index(drop=True)
-
-
-def device_to_utc(ts, clock: str) -> pd.Timestamp:
-    """Device-clock timestamp -> UTC. clock is 'utc' or 'local' (UTC-3)."""
-    t = pd.Timestamp(ts)
-    if t.tzinfo is not None:
-        return t.tz_convert("UTC")
-    if clock == "utc":
-        return t.tz_localize("UTC")
-    if clock == "local":
-        return (t - pd.Timedelta(hours=LOCAL_UTC_OFFSET_H)).tz_localize("UTC")
-    raise ValueError("clock must be 'utc' or 'local'")
-
-
-def wind_at(timestamp_utc, obs: pd.DataFrame | None = None, root: Path | str = DEFAULT_ROOT,
-            max_gap_min: float = MAX_GAP_MIN) -> dict | None:
-    """Nearest SBGL observation with a usable direction within max_gap_min
-    of timestamp_utc, else None. Calm and variable-direction reports have no
-    direction and are skipped, so the result may be older than a calm report
-    that is nearer in time. Returns {valid_utc, gap_min, drct, speed_ms}."""
-    obs = load_obs(root) if obs is None else obs
-    usable = obs[obs["drct"].notna() & ~obs["calm"]]
-    if usable.empty:
-        return None
-    t = pd.Timestamp(timestamp_utc)
-    t = t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
-    gaps = (usable["valid_utc"] - t).abs()
-    i = gaps.idxmin()
-    gap_min = gaps[i].total_seconds() / 60.0
-    if gap_min > max_gap_min:
-        return None
-    row = usable.loc[i]
-    return {"valid_utc": row["valid_utc"], "gap_min": gap_min,
-            "drct": float(row["drct"]), "speed_ms": float(row["speed_ms"])}
 
 
 def rose(drct: np.ndarray, speed_ms: np.ndarray, n_sectors: int = 16) -> dict:

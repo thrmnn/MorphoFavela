@@ -59,21 +59,6 @@ def _obs():
                          "variable": [False, False, False]})
 
 
-def test_wind_at_within_and_beyond_60_min():
-    obs = _obs()
-    got = wo.wind_at("2026-01-01 12:20", obs=obs)
-    assert got["drct"] == 100.0 and got["gap_min"] == pytest.approx(20.0)
-    assert wo.wind_at("2026-01-01 12:00", obs=obs)["drct"] == 100.0
-    assert wo.wind_at("2026-01-01 15:01", obs=obs) is None
-    assert wo.wind_at("2026-01-01 10:59", obs=obs) is None
-    assert wo.wind_at("2026-01-01 13:00", obs=obs)["gap_min"] == pytest.approx(60.0)
-
-
-def test_device_to_utc():
-    assert wo.device_to_utc("2026-01-01 09:00", "local") == pd.Timestamp("2026-01-01 12:00", tz="UTC")
-    assert wo.device_to_utc("2026-01-01 09:00", "utc") == pd.Timestamp("2026-01-01 09:00", tz="UTC")
-
-
 def test_rose_sectors_and_exclusions():
     r = wo.rose(np.array([0.0, 359.0, 11.0, 90.0]), np.array([2.0, 4.0, 6.0, 8.0]), 16)
     assert r["frequencies"][0] == pytest.approx(0.75)

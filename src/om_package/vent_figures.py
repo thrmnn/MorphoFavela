@@ -23,7 +23,8 @@ import pandas as pd
 from .figures import (SEGMENT_LENGTH_M, _distance_tick_rows, _draw_base_map, _draw_route_line, _rc)
 from .io_utils import DEFAULT_ROOT, Paths
 from .segments import aggregate_to_segments
-from .vent_indices import compute_indices, prevailing_direction_deg
+from .vent_indices import compute_indices
+from .ventilation import prevailing_wind_bearing_deg
 from .wind_obs import campaign_window_rose, climatology_rose, load_obs
 
 SHELTER_CMAP = "magma_r"
@@ -192,7 +193,7 @@ def build_all(out_dir: Path, root=DEFAULT_ROOT, version: str = "v0.1.3") -> list
     paths = Paths(root)
     points = gpd.read_parquet(paths.package_dir(version) / "OM2" / "points.parquet")
     horizon, az = load_or_compute_horizon(points, root, version)
-    wind = prevailing_direction_deg(root)
+    wind = prevailing_wind_bearing_deg(paths.wind_rose_json)
     clim = climatology_rose(root)
     idx = compute_indices(points, wind, horizon, az)
     df = pd.DataFrame(points.drop(columns="geometry"))

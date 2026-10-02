@@ -65,19 +65,6 @@ def test_annual_sun_hours():
     assert 3000 < a["open"] < 5000 and a["canyon"] < 0.1 * a["open"]
 
 
-def test_clock_readings_differ_by_exactly_offset():
-    r = se.clock_readings(["2026-03-19 12:00:00", "2025-12-05 02:30:00"])
-    assert ((r["local_B"] - r["local_A"]) == pd.Timedelta(hours=3)).all()
-    assert r.loc[0, "slot_A"] == "09:00" and r.loc[0, "slot_B"] == "12:00"
-
-
-def test_exact_date_agreement_bounds():
-    out = se.exact_date_agreement(_h(), ["2026-03-19", "2026-03-30"], lat=LAT, lon=LON)
-    assert list(out["date"]) == ["2026-03-19", "2026-03-30", "all"]
-    assert out["agreement_share"].between(0, 1).all()
-    assert out.loc[out.date == "all", "agreement_share"].iloc[0] < 1.0
-
-
 def test_tidy_collapses_repeated_azimuths():
     az = np.array([0.0, 0.0, 90.0])
     t = se._tidy(np.array(["a"]), np.array([[1.0, 3.0, 2.0]]), az)
