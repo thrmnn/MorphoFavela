@@ -232,3 +232,51 @@ def place_labels(fig, ax, items, avoid_xy, radii=(7, 12, 18, 26, 36, 48), n_angl
             if best[0] < 1:
                 break
         placed.append(best[1])
+
+
+FLAG_LABEL = "route inside a building outline or more than 10 m from a mapped street"
+FLAG_MIN_M = 5.0
+
+
+def flagged_spans(points: pd.DataFrame, min_len_m: float = FLAG_MIN_M) -> list[tuple[float, float]]:
+    """Distance spans of route_geometry_flag runs: runs closer than min_len_m are
+    merged, runs shorter than min_len_m are dropped."""
+    if "route_geometry_flag" not in points.columns:
+        return []
+    p = points.sort_values("distance_along_m")
+    f = p["route_geometry_flag"].astype(bool).to_numpy()
+    d = p["distance_along_m"].to_numpy(float)
+    runs, st = [], None
+    for i, v in enumerate(f):
+        if v and st is None:
+            st = i
+        if not v and st is not None:
+            runs.append([d[st], d[i - 1]])
+            st = None
+    if st is not None:
+        runs.append([d[st], d[-1]])
+    merged = []
+    for r in runs:
+        if merged and r[0] - merged[-1][1] < min_len_m:
+            merged[-1][1] = r[1]
+        else:
+            merged.append(r)
+    return [(a, b) for a, b in merged if b - a + 1 >= min_len_m]
+
+
+def shade_flagged(axes, spans):
+    for ax in axes:
+        for a, b in spans:
+            ax.axvspan(a, b + 1, facecolor="#ececec", edgecolor="#b5b5b5", hatch="////", lw=0, zorder=0)
+
+
+def flag_handle():
+    from matplotlib.patches import Patch
+
+    return Patch(facecolor="#ececec", edgecolor="#b5b5b5", hatch="////", lw=0, label=FLAG_LABEL)
+
+
+def flag_facts(spans) -> dict:
+    return {"flagged_spans_m": [[float(a), float(b)] for a, b in spans],
+            "flagged_total_length_m": float(sum(b - a + 1 for a, b in spans)),
+            "flagged_min_run_m": FLAG_MIN_M}

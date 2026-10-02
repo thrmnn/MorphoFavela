@@ -56,12 +56,13 @@ def build_fig_wind(season: dict, campaign_obs: pd.DataFrame, climatology_obs: pd
         periods = [("campaign season", "campaign", season["campaign"], campaign_obs),
                    ("2015 to 2024", "climatology", season["climatology"], climatology_obs)]
         shares = [sector_shares(o) for *_, o in periods]
-        rmax = float(np.ceil(max(s.max() for s in shares) / 5.0) * 5.0)
+        rmax = float(np.ceil(max(s.max() for s in shares) * 1.05 * 2.0) / 2.0)
 
         fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 5.6))
         gs = fig.add_gridspec(2, 2, height_ratios=[1.55, 1.0], hspace=0.32, wspace=0.16, left=0.085, right=0.955,
                               top=0.9, bottom=0.115)
         centres = np.radians(np.arange(N_SECTORS) * SECTOR_W)
+        ring_end = rmax
         for col, ((title, _, res, _), share) in enumerate(zip(periods, shares)):
             ax = fig.add_subplot(gs[0, col], projection="polar")
             keys = sector_regime_keys(res)
@@ -69,17 +70,17 @@ def build_fig_wind(season: dict, campaign_obs: pd.DataFrame, climatology_obs: pd
                    edgecolor="white", linewidth=0.5, zorder=2)
             for g in res["regimes"]:
                 th = np.radians(g["mean_direction_deg"])
-                ax.plot([th, th], [0, rmax], color=REGIME_COLOURS[g["key"]], lw=1.8, zorder=3,
+                ax.plot([th, th], [0, ring_end], color=REGIME_COLOURS[g["key"]], lw=1.8, zorder=3,
                         path_effects=[matplotlib.patheffects.withStroke(linewidth=3.2, foreground="white")])
             ax.set_theta_zero_location("N")
             ax.set_theta_direction(-1)
             ax.set_ylim(0, rmax)
             ax.set_xticks(np.radians([0, 90, 180, 270]))
             ax.set_xticklabels(["N", "E", "S", "W"])
-            ticks = np.arange(10, rmax + 1, 10)
+            ticks = np.arange(5, rmax, 5)
             ax.set_yticks(ticks)
-            ax.set_yticklabels([f"{t:.0f}%" for t in ticks], fontsize=fs.FONT_PT)
-            ax.set_rlabel_position(255)
+            ax.set_yticklabels(["" if t == 5 else f"{t:.0f}%" for t in ticks], fontsize=fs.FONT_PT)
+            ax.set_rlabel_position(245)
             ax.grid(color="#cccccc", lw=0.5)
             ax.tick_params(axis="x", pad=2)
             ax.set_title(title, fontsize=fs.FONT_PT, pad=14)
@@ -127,7 +128,7 @@ def build_fig_vent_profiles(points: pd.DataFrame, regimes: list[dict], out_path:
         means = fs.ten_m_means(p, cols)
         fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 5.6))
         gs = fig.add_gridspec(4, 1, height_ratios=[0.55, 1, 1, 1], hspace=0.28, left=0.13, right=0.985, top=0.99,
-                              bottom=0.13)
+                              bottom=0.17)
         axb = fig.add_subplot(gs[0])
         fs.draw_neighbourhood_band(axb, fs.neighbourhood_stretches(p), total, axes_in=fs.TEXT_WIDTH_IN * 0.855)
         axes = [fig.add_subplot(gs[i + 1], sharex=axb) for i in range(3)]
@@ -145,8 +146,10 @@ def build_fig_vent_profiles(points: pd.DataFrame, regimes: list[dict], out_path:
         axes[-1].tick_params(axis="x", length=3, labelbottom=True)
         fs.distance_axis(axes[-1], total)
         axes[-1].set_xlabel("distance along the route (m)")
+        fs.shade_flagged(axes, fs.flagged_spans(p))
         handles = [Line2D([], [], color=REGIME_COLOURS[g["key"]], lw=1.8, label=regime_title(g["name"])) for g in regimes]
-        fig.legend(handles=handles, loc="lower center", ncol=2, frameon=False, bbox_to_anchor=(0.55, 0.0),
+        fig.legend(handles=[fs.flag_handle()], loc="lower center", frameon=False, bbox_to_anchor=(0.55, 0.0))
+        fig.legend(handles=handles, loc="lower center", ncol=2, frameon=False, bbox_to_anchor=(0.55, 0.045),
                    handlelength=1.8, fontsize=fs.FONT_PT)
         return fs.save(fig, out_path)
 

@@ -132,7 +132,7 @@ def build_fig_form(points: pd.DataFrame, out_path: Path) -> Path:
         means = fs.ten_m_means(p, [c for c, _ in panels])
         fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 6.6))
         gs = fig.add_gridspec(5, 1, height_ratios=[0.55, 1, 1, 1, 1], hspace=0.28, left=0.13, right=0.985,
-                              top=0.99, bottom=0.07)
+                              top=0.99, bottom=0.115)
         axb = fig.add_subplot(gs[0])
         fs.draw_neighbourhood_band(axb, fs.neighbourhood_stretches(p), total, axes_in=fs.TEXT_WIDTH_IN * 0.855)
         axes = [fig.add_subplot(gs[i + 1], sharex=axb) for i in range(4)]
@@ -152,6 +152,8 @@ def build_fig_form(points: pd.DataFrame, out_path: Path) -> Path:
         fs.distance_axis(axes[-1], total)
         axes[-1].set_xlabel("distance along the route (m)")
         axes[0].set_xlim(0, total)
+        fs.shade_flagged(axes, fs.flagged_spans(p))
+        fig.legend(handles=[fs.flag_handle()], loc="lower center", frameon=False, bbox_to_anchor=(0.55, 0.0))
         return fs.save(fig, out_path)
 
 
@@ -303,11 +305,20 @@ def build_fig_sun_dose(walks: pd.DataFrame, p12: pd.DataFrame, total_m: float, o
             axes[0].annotate(lab, xy=(-0.40, 0), xycoords=("axes fraction", "data"), xytext=(-0.40, (y0 + y1) / 2),
                              textcoords=("axes fraction", "data"), rotation=90, ha="center", va="center",
                              fontsize=fs.FONT_PT)
-        cax = fig.add_axes([left + 0.02, 0.05, 2 * width + gapx - 0.04, 0.012])
+        cax = fig.add_axes([left + 0.09, 0.05, 2 * width + gapx - 0.11, 0.012])
         sm = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
-        cb = fig.colorbar(sm, cax=cax, orientation="horizontal", extend="min", extendfrac=0.03)
-        cb.set_label("clear-sky direct sun dose (Wh/m²); grey = zero", labelpad=2)
-        cb.set_ticks(np.arange(0, vmax + 1, 500))
+        cb = fig.colorbar(sm, cax=cax, orientation="horizontal")
+        ticks = [DOSE_ZERO_BELOW, *range(500, int(vmax) + 1, 500)]
+        cb.set_ticks(ticks)
+        cb.set_ticklabels(["0", *[f"{t:,}" for t in ticks[1:]]])
+        cb.set_label("clear-sky direct sun dose (Wh/m²)", labelpad=2)
+        sw = fig.add_axes([left + 0.02, 0.05, 0.03, 0.012])
+        sw.set_facecolor(fs.ZERO_GREY)
+        sw.set_xticks([])
+        sw.set_yticks([])
+        for sp in sw.spines.values():
+            sp.set_visible(True)
+        fig.text(left + 0.035, 0.038, "zero", ha="center", va="top", fontsize=fs.FONT_PT)
         out = fs.save(fig, out_path)
     return out, {"colour_limits_wh_m2": [DOSE_ZERO_BELOW, vmax], "zero_drawn_below_wh_m2": DOSE_ZERO_BELOW,
                  "colour_scale_note": "one scale for both panels, upper limit set from the 99.5th percentile of the 3 hour doses; larger values take the top colour",
@@ -339,7 +350,10 @@ def build_fig_svf_sensor(points: pd.DataFrame, walks: pd.DataFrame, p12: pd.Data
         ax.set_xlabel("distance along the route (m)")
         ax.set_ylabel("sky view factor")
         ax.set_ylim(0, 1)
-        ax.legend(loc="upper right", ncol=1, frameon=False, handlelength=1.8, fontsize=fs.FONT_PT)
+        fs.shade_flagged([ax], fs.flagged_spans(pts))
+        h, l = ax.get_legend_handles_labels()
+        ax.legend(h + [fs.flag_handle()], l + [fs.FLAG_LABEL], loc="upper right", ncol=1, frameon=False,
+                  handlelength=1.8, fontsize=fs.FONT_PT)
         fig.subplots_adjust(left=0.1, right=0.985, top=0.97, bottom=0.2)
         out = fs.save(fig, out_path)
     start = pd.Timestamp(str(walk["start_local"])[:19])

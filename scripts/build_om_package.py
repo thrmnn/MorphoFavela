@@ -77,6 +77,7 @@ from src.om_package.figures import (
     build_fig_sun_dose,
     build_fig_svf_sensor,
 )
+from src.om_package import fig_style as fs_style
 from src.om_package.vent_figures import build_fig_shelter_maps, build_fig_vent_profiles, build_fig_wind
 from src.om_package.formvars import compute_form_variables
 from src.om_package.io_utils import Paths, hash_tree, write_table
@@ -506,7 +507,8 @@ def main() -> int:
     del shade_fig
     shade_full = load_shade_frame(out_dir / "p05_building_shade.parquet")
     route_total_m = float(om2_df["distance_along_m"].max())
-    facts: dict = {"route_length_m": route_total_m, "n_points": int(len(om2_df))}
+    facts: dict = {"route_length_m": route_total_m, "n_points": int(len(om2_df)),
+                   **fs_style.flag_facts(fs_style.flagged_spans(om2_df))}
     build_fig_route(om2_df, buildings, fig_dir / "fig_route.png")
     build_fig_form(om2_df, fig_dir / "fig_form.png")
     build_fig_shade_map(om2_df, shade_full, buildings, fig_dir / "fig_shade_map.png")
