@@ -182,3 +182,13 @@ def test_no_dashes_or_abbreviations_in_figure_text():
     for t in labels:
         assert "–" not in t and "—" not in t, t
         assert not re.search(r"SBGL|METAR|H/W|SVF|\bz0\b|λ", t), t
+
+
+def test_print_width_survives_a_global_tight_bbox(tmp_path, points):
+    import matplotlib
+
+    # src/cartography.py sets savefig.bbox="tight" at import; in the full suite
+    # that cropped fig_form below text width.
+    with matplotlib.rc_context({"savefig.bbox": "tight"}):
+        figures.build_fig_form(points, tmp_path / "f.png")
+    assert _size(tmp_path / "f.png")[0] == round(fig_style.TEXT_WIDTH_IN * fig_style.DPI)

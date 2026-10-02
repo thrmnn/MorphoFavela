@@ -75,7 +75,10 @@ def save(fig, path):
     from pathlib import Path
 
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=DPI)
+    # Print size is the contract (text width, fonts >= 8 pt): never inherit a
+    # global savefig.bbox="tight" that would crop the canvas.
+    with matplotlib.rc_context({"savefig.bbox": "standard"}):
+        fig.savefig(path, dpi=DPI)
     import matplotlib.pyplot as plt
 
     plt.close(fig)
