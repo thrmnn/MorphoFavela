@@ -1,22 +1,16 @@
 """P-01 README + P-09 CHANGELOG for the mare_om2 package. Generated, not
-hand-edited — rebuild via scripts/build_om_package.py after any source/method
-change (never hand-edit data/outputs, per CLAUDE.md).
+hand-edited: rebuild via scripts/build_om_package.py.
 
-Audit fix (2026-09-27): every value rendered here that describes a
-measured or provenance fact (fetch dates, the nodata floor, which
-internal routes actually exist on disk, the named-team decision date) is
-now a REQUIRED parameter with no default — see ``require_nodata_floor_m``
-below. A caller that cannot supply one must compute it (see
-``scripts/build_om_package.py``) rather than let this module quietly fall
-back to a stale number.
+render_readme(package_dir) reads every number from the built package
+through report.compute_facts, the same facts the report uses, so the two
+documents agree. The column list comes from p08_data_dictionary and the
+files actually shipped.
 """
 from __future__ import annotations
 
-import math
 from datetime import date
+from pathlib import Path
 
-from .routes import ROUTE_FLAG_MAX_STREET_DIST_M
-from .shade import SHADE_STEP_MIN
 from .vent_indices import DEFAULT_BUFFER_M
 
 #: The one place the package version is set; the build default and every
@@ -34,21 +28,7 @@ VERSION_DATE = date.today().isoformat()
 #: (``om_use_terms``) and its date travel in manifest.json's
 #: ``provenance.decisions``, not as a prose interview code (audit fix,
 #: 2026-09-27 — see src/om_package/provenance.py).
-USE_TERMS = (
-    "INTERNAL REVIEW DRAFT — Octopus LRP #2 team members only; not for "
-    "redistribution or citation; to be revisited at submission."
-)
-
-
-def _decision(decisions: list[dict], decision_id: str) -> dict:
-    """The one entry in ``decisions`` (provenance.read_om_decisions()'s
-    output) with this id. Raises — never silently substitutes another
-    entry or an empty string — if it's absent, since every call site below
-    needs that specific decision's resolution text."""
-    for d in decisions:
-        if d["id"] == decision_id:
-            return d
-    raise KeyError(f"decision '{decision_id}' not found in {[d.get('id') for d in decisions]}")
+USE_TERMS = "Internal draft for the Octopus team. Please do not share or cite."
 
 
 def require_nodata_floor_m(p05_shade: dict) -> dict:
@@ -61,417 +41,270 @@ def require_nodata_floor_m(p05_shade: dict) -> dict:
     return p05_shade["nodata_floor_m"]
 
 
-README_TEMPLATE = """\
-> **{use_terms}**
+#: Spec item(s) per shipped file, for the README file table.
+SPEC_ITEMS = {
+    "OM2/points": "P-02, P-03, P-04, P-06, P-10, P-11",
+    "p02b_walks": "P-12",
+    "p12_walk_points": "P-12",
+    "p05_building_shade": "P-05",
+    "p10_sun_dose": "P-10",
+    "p10_sun_envelope": "P-10",
+    "p10_horizon_profiles": "P-10",
+    "p11_wind_regimes": "P-11",
+    "p11_regime_by_hour": "P-11",
+    "p08_data_dictionary": "P-08",
+    "OM2/p07_quality_report": "P-07",
+    "OM2/aggregate_to_segments": "P-03",
+    "OM2/join_shade_example": "P-05",
+    "manifest.json": "",
+}
+#: Columns with no data dictionary row, described here.
+_STRUCTURAL_COLUMNS = {
+    "geometry": ("", "Point geometry (GeoParquet; the same point as `x`, `y`)."),
+}
+#: The quality report's own columns (CSV form; the JSON adds summary blocks).
+_QUALITY_COLUMNS = {
+    "variable": ("text", "Column of `OM2/points`."), "present": ("bool", "The column exists in the points table."),
+    "coverage_fraction": ("fraction [0,1]", "Share of points with a value."),
+    "n_valid": ("count", "Points with a value."), "n_total": ("count", "Points in the route."),
+}
+#: The data dictionary's own columns.
+_DICTIONARY_COLUMNS = {
+    "id": "Column name.", "definition": "What the column holds.", "unit": "Unit or type.",
+    "source": "Input data.", "method": "How it is computed.", "limits": "What the value cannot tell.",
+    "status": "computed, or why the column is empty or kept for compatibility.",
+}
 
-# Maré morphology, OM2 — data package {version}
 
-Built for Octopus LRP #2 ("Street by street: explaining air temperature
-differences across streets and over time in Complexo da Maré", lead
-Jingxue, PI Simone). Théo Alessandro Hermann contributes street-form, sun and
-ventilation variables from the Brisa+ (MorphoFavela) pipeline in a support
-role. This package contains no temperature analysis and no conclusions;
-those are the Octopus team's work.
+def _column_rows(package_dir: Path, f: dict) -> list[str]:
+    """One table per data file, one row per column, from p08_data_dictionary.
+    Sensor-matched columns (<measure>_tau<s>s) share one row per measure."""
+    import re
 
-**Read first:** `report.pdf` (the short human report: results, key figures,
-what to read with care). This README is the technical document: files,
-sources, methods, limits.
+    from .report import FILE_ORDER, _columns_of, _file_groups
 
-**Named team (release card `om_release_v0_2_0`; use terms per PI decision `om_use_terms`, {om_use_terms_date}):** Jingxue,
-Vincent, Simone. This release goes to the three of them only, as an
-internal review draft; not for wider redistribution or citation (see Use
-terms). The decision's full resolution text travels in this package's
-`manifest.json` under `provenance.decisions` (id `om_use_terms`).
+    d = f["dictionary"]
+    live = d[~d["status"].astype(str).str.startswith("RETIRED")].set_index("id")
+    out: list[str] = []
+    missing: list[str] = []
+    groups = dict(_file_groups(package_dir))
+    for stem in FILE_ORDER:
+        exts = groups.get(stem)
+        cols = _columns_of(package_dir, stem, exts) if exts else []
+        if not cols:
+            continue
+        rows, seen = [], set()
+        for c in cols:
+            m = re.fullmatch(r"(.+)_tau(\d+)s", c)
+            if m:
+                base = m.group(1)
+                if base in seen:
+                    continue
+                seen.add(base)
+                taus = [re.fullmatch(rf"{re.escape(base)}_tau(\d+)s", x).group(1) for x in cols
+                        if re.fullmatch(rf"{re.escape(base)}_tau(\d+)s", x)]
+                name = f"`{base}_tau<{','.join(taus)}>s`"
+                unit = str(live.loc[c, "unit"]) if c in live.index else ""
+                definition = f"Sensor-matched `{base}` (see Methods, sensor-matched values)."
+            elif stem == "p08_data_dictionary" and c in _DICTIONARY_COLUMNS:
+                name, unit, definition = f"`{c}`", "text", _DICTIONARY_COLUMNS[c]
+            elif stem == "OM2/p07_quality_report" and c in _QUALITY_COLUMNS:
+                name, (unit, definition) = f"`{c}`", _QUALITY_COLUMNS[c]
+            elif c in _STRUCTURAL_COLUMNS:
+                name, (unit, definition) = f"`{c}`", _STRUCTURAL_COLUMNS[c]
+            elif c in live.index:
+                row = live.loc[c]
+                name, unit = f"`{c}`", str(row["unit"])
+                definition = ("Reserved column, always empty." if str(row["status"]).startswith("DESCOPED")
+                              else " ".join(str(row["definition"]).split()))
+            else:
+                missing.append(f"{stem}:{c}")
+                continue
+            rows.append(f"| {name} | {unit.replace('|', '/')} | {definition.replace('|', '/')} |")
+        label = stem if not exts[0] else f"{stem}.{'/'.join(sorted(exts, key=lambda e: e != 'parquet'))}"
+        out += [f"### `{label}`\n", "| Column | Unit | Definition |", "|---|---|---|", *rows, ""]
+    if missing:
+        raise ValueError(f"columns with no row in p08_data_dictionary: {missing}")
+    return out
 
-Generated {version_date} by `scripts/build_om_package.py`
-(source: `src/om_package/`; every code path named in this README lives in
-the Brisa+ (MorphoFavela) repository).
 
-## Files in this package
+def render_readme(package_dir) -> str:
+    """README.md, every number from report.compute_facts over the built
+    package, so the README and the report state the same values."""
+    from pathlib import Path
 
-| File | What it holds | Spec item |
-|---|---|---|
-| `report.pdf`, `report.md` | Short human report: results, key figures, caveats | — |
-| `README.md`, `README.pdf` | This technical document | P-01 |
-| `manifest.json` | Version, CRS, use terms, decisions, wind source, P-10/P-11 summaries, sha256 per file | — |
-| `OM2/points.parquet`, `.gpkg`, `.csv` | One row per route point (1 m): form, buffer, ventilation-proxy and sun columns | P-02, P-03, P-04, P-06, P-10, P-11 |
-| `OM2/aggregate_to_segments.py` | Standalone re-aggregation of the points to any segment length | P-03 |
-| `p05_building_shade.parquet` | Building shade per point and {shade_step_min}-min step on each walk date, daylight only, Rio local time (parquet only) | P-05 |
-| `p02b_walks.parquet`, `.csv` | One row per logger walk: timing, coverage, wind regime tag | P-12 |
-| `p12_walk_points.parquet`, `.csv` | One row per walk and route point: arrival time, shade and dose at arrival, sensor-matched values | P-12 |
-| `OM2/join_shade_example.py` | Example join of device data to the shade table | P-05 |
-| `OM2/p07_quality_report.json`, `.csv` | Coverage per column, flagged points, P-10/P-11 summary block | P-07 |
-| `p08_data_dictionary.parquet`, `.csv` | One row per variable: definition, unit, source, method, limits | P-08 |
-| `p10_sun_envelope.parquet`, `.csv` | Per point and local {envelope_slot_min}-min slot over the season: always sunlit / always shaded / date-dependent / night | P-10 |
-| `p10_sun_dose.parquet`, `.csv` | Clear-sky direct-sun dose over the past {dose_hours_list} h, per campaign date and as a season min/median/max | P-10 |
-| `p10_horizon_profiles.parquet` | Marched horizon angle per point and azimuth (input to every sun result) | P-10 |
-| `p11_wind_regimes.csv`, `p11_regime_by_hour.csv` | The two wind regimes (campaign season and 2015-2024 climatology) and their share by local hour | P-11 |
-| `OM2/map_form.png`, `OM2/profiles.png` | Route map coloured by sky view; form variables along the route | P-04 |
-| `OM2/map_shade.png`, `OM2/shade_calendar.png` | Daylight shade share per point; shade by date and time | P-05 |
-| `OM2/sun_envelope.png`, `OM2/sun_dose.png` | Date-dependent share by time of day and along the route; {dose_hours_first} h dose along the route | P-10 |
+    import pyproj
 
-{conformance_section}
-## Release scope
+    from .report import (AUTHOR, PROJECT_FORM, _day, _join, _n, compute_facts, file_table,
+                         opening_paragraph)
+    from .sensor_match import DEFAULT_TAUS_S
+    from .walk_dose import WALK_DOSE_HOURS, WALK_DOSE_STEP_MIN
+    from .wind_regimes import N_SECTORS
 
-**OM2 only.** This directory (`outputs/_packages/mare_om2/{version}/`)
-contains OM2 exclusively. OM1/OM3/OM4 are built by the exact same code
-path (`--route ALL`) writing to an internal build directory outside this
-package (`outputs/_packages/_internal/mare_routes/{version}/`) whenever
-that path is run — they are never copied or symlinked into `mare_om2/`,
-so zipping/sharing this directory cannot leak them. **For {version}:
-{internal_routes_status}** **{version} supports RQ2's within-route
-spatial/temporal analysis only.** RQ3's between-route holdout needs
-OM1/OM3/OM4 released, which is a PI decision for a later version.
+    package_dir = Path(package_dir)
+    f = compute_facts(package_dir)
+    camp, clim = f["regimes"]["campaign"], f["regimes"]["climatology"]
+    k1, k2 = sorted(camp)
+    r1, r2 = camp[k1], camp[k2]
+    y0, y1 = f["clim_years"]
+    ws = f["wind_source"]
+    floor = require_nodata_floor_m({"nodata_floor_m": f["nodata_floor_m"]})
+    radii = sorted({int(c.split("_")[-1][:-1]) for c in
+                    __import__("pyarrow.parquet", fromlist=["x"]).read_schema(package_dir / "OM2" / "points.parquet").names
+                    if c.startswith("lambda_p_buffer_")})
+    taus = _join([str(t) for t in DEFAULT_TAUS_S])
+    walk_hours = _join([str(h) for h in WALK_DOSE_HOURS])
+    p10_hours = _join([str(h) for h in f["p10_dose_hours"]])
+    flag_pct = 100 * f["n_flagged"] / f["n_points"]
+    z0_med = _join([f"{v:.3f} m" for v in f["z0_median"].values()])
+    lines = [
+        f"> **{USE_TERMS}**\n",
+        f"# Octopus OM2 data package {f['version']}\n",
+        opening_paragraph(f),
+        "The report (`report.pdf`) presents each measure with figures. This README gives the method, the "
+        "sources and every column.\n",
+        "## Files in this package\n",
+        file_table(package_dir, f, spec_items=SPEC_ITEMS),
+        "Also shipped: `README.md` and `README.pdf` (this document, spec item P-01), `report.md` and "
+        "`report.pdf` (the report) and `OM2/fig_*.png` (the report figures).\n",
+        "## Sources and dates\n",
+        "| Source | Date | Used for |",
+        "|---|---|---|",
+        f"| Walk dataset by Cassiano and Vincent (Octopus team): matched GPS tracks, one CSV per walk, and the OM2 "
+        f"route file | {f['n_walks']} walks on {f['n_dates']} dates, {_day(f['first_date'])} to "
+        f"{_day(f['last_date'])}; the dataset's pre-release manifest records a SHA-256 checksum per file | route "
+        "points, walk timing, arrival times, walk dates |",
+        f"| Building footprints with heights and the terrain model | {f['geometry_epoch']} | street form, shade, "
+        "sun, ventilation, `route_geometry_flag` |",
+        "| Street centre lines of Maré | same layer set | street form sampling, `route_geometry_flag` |",
+        f"| Galeão airport hourly weather reports (Iowa Environmental Mesonet archive) | campaign season "
+        f"{_day(ws['window_utc'][0])} to {_day(ws['window_utc'][1])}, fetched {_day(f['wind_fetched'])}; "
+        f"{y0} to {y1} for the long-term regimes | wind regimes, walk wind tags |",
+        "| Neighbourhood boundaries of Maré | | `neighbourhood` |",
+        "",
+        "The fetch address and SHA-256 checksum of the airport reports are in `manifest.json` under "
+        "`provenance.wind_source`.\n",
+        "## CRS (coordinate reference system)\n",
+        f"{pyproj.CRS(f['crs']).name} ({f['crs']}) for every point and geometry. The `x` and `y` columns are in "
+        "metres in this system.\n",
+        "## Methods\n",
+        "### Route points\n",
+        f"The route is the walk dataset's OM2 route: {_n(f['length_m'])} m, sampled every {f['spacing_m']:g} m "
+        f"along its centre line into {_n(f['n_points'])} points at {f['height_m']:g} m above the ground. "
+        "`point_id` is `OM2-` plus the distance from the route start in metres, zero-padded. Some points fall "
+        "inside building outlines or far from a street centre line, because some alleys cannot be mapped; "
+        f"`route_geometry_flag` marks the {_n(f['n_flagged'])} points ({flag_pct:.1f}%) that lie inside a "
+        f"building outline or more than {f['flag_dist_m']:g} m from a street centre line.\n",
+        "### Street form\n",
+        "Building height, street width and their ratio come from cross-sections of the flanking buildings at "
+        "street samples; sky view factor is ray-cast from 1.5 m above street samples over 145 sky patches "
+        "against the 2019 buildings and terrain; plan density is the building share of the 10 m grid cell. Each "
+        "point takes the nearest sample within a maximum distance and stays empty beyond it, never a guessed "
+        "value; `*_join_dist_m` gives that distance. The height-to-width ratio is computed per point; the "
+        f"median of the point ratios is {f['hw_median_of_ratios']:.2f}, and the ratio of the median height to "
+        f"the median width is {f['hw_ratio_of_medians']:.2f}. Buffer columns give plan density, building count "
+        f"and mean building height within {_join([str(r) for r in radii])} m of each point.\n",
+        "### Shade and sun\n",
+        "Sun, shade and ventilation are computed from 2019 building and terrain geometry. For each point the "
+        f"horizon (the angle of the highest building or terrain) is marched once in every direction up to "
+        f"{f['shade_max_dist_m']:g} m, below the distance where the terrain data first run out "
+        f"({floor['min']:.0f} m at the nearest point, {floor['median']:.0f} m at the median point). A point is in "
+        "building shade when the sun is below that horizon. The shade table covers every "
+        f"{f['shade_step_min']} minutes of daylight on the {f['n_dates']} walk dates, in Rio local time "
+        f"(`timestamp_local`) with a UTC twin (`timestamp_utc`); the route is in building shade for "
+        f"{100 * f['shade_daylight']:.1f}% of daylight time.\n",
+        "The **direct sun dose** is the clear-sky direct beam energy on a horizontal surface, in Wh/m². It "
+        "assumes a clear sky, so it is an upper bound. `p12_walk_points` gives it for the "
+        f"{walk_hours} hours before each walk reached each point, summed in {WALK_DOSE_STEP_MIN}-minute steps "
+        f"from the walk's GPS arrival times. `p10_sun_dose` gives it for the past {p10_hours} hours at "
+        f"{f['p10_dose_slot_min']}-minute times of day, for each walk date and as the lowest, median and highest "
+        f"over the season {_day(f['p10_window'][0])} to {_day(f['p10_window'][1])}. `p10_sun_envelope` classes "
+        f"each point and {f['p10_envelope_slot_min']}-minute time of day over that season as always sunlit, "
+        "always shaded or sunlit on some dates only. `annual_sun_hours` counts the hours per year with the sun "
+        "above the point's horizon.\n",
+        "### Walk timing and arrival times\n",
+        "Only GPS fixes matched to edges of the OM2 route count. Walkers only move forward, so the distance "
+        "along the route is a running maximum over time. A point's arrival time is interpolated in time along "
+        "the route between the fixes before and after it; where the walker stopped, it is the first moment the "
+        f"point was reached. `arrival_source` is `gap_interpolated` when those fixes are more than "
+        f"{f['gap_flag_s']} s apart ({100 * f['gap_share']:.1f}% of walk points) and `gps` otherwise. A walk "
+        f"whose fixes cover less than {100 * f['partial_coverage']:.0f}% of the route is marked `partial` "
+        f"({f['n_partial']} of {f['n_walks']} walks). Points a walk did not reach have no row.\n",
+        "### Wind regimes\n",
+        "Reports with a speed below the calm threshold "
+        f"({ws['calm_threshold_ms']:g} m/s) or no direction are set aside. The primary method takes the "
+        f"{N_SECTORS}-sector wind rose, smooths it with weights 1, 2, 1 over neighbouring sectors and keeps the "
+        "two highest peaks at least two sectors apart; each report goes to the nearer peak, and a regime's "
+        "direction is the circular mean of its reports. The check fits two von Mises distributions plus a "
+        "uniform background to the directions (with a uniform spread of 5° to undo the 10° reporting steps). In "
+        f"the campaign season the check confirms the {r1['name']} regime (nearest fitted direction "
+        f"{r1['mix_dir']:.0f}°, {r1['mix_diff']:.0f}° from the regime) but not the {r2['name']} one (nearest "
+        f"fitted direction {r2['mix_dir']:.0f}°, {r2['mix_diff']:.0f}° away): the {r2['name']} reports spread "
+        f"over a broad northern arc. {y0} to {y1} gives the same picture. Each walk takes the regime of the "
+        f"report nearest its middle time, if that report is within {f['tag_max_gap_min']} minutes and has a "
+        "direction.\n",
+        "| Period | Regime | Mean direction | Share of reports | Mean speed |",
+        "|---|---|---|---|---|",
+        *[f"| {per} | {g['name']} | {g['dir']:.0f}° | {100 * g['share']:.1f}% | {g['speed']:.1f} m/s |"
+          for per, regs in (("campaign season", camp), (f"{y0} to {y1}", clim)) for g in regs.values()],
+        "",
+        "### Ventilation measures\n",
+        "Each measure is computed at the mean direction of each campaign-season regime, and its columns end "
+        f"in the regime name (`_{r1['slug']}`, `_{r2['slug']}`). None is a measured or simulated wind. Frontal "
+        "area density facing the wind is interpolated between the eight compass columns of the 10 m grid cell. "
+        "Canyon alignment is the angle between the street axis and the wind, from 0° (along) to 90° (across). "
+        "Upwind shelter angle is the horizon angle in the direction the wind comes from. Open space fraction "
+        f"is the unbuilt share of the {DEFAULT_BUFFER_M} m buffer.\n",
+        "Roughness length and displacement height follow Macdonald et al. (1998), from the plan density and "
+        f"mean building height of the {DEFAULT_BUFFER_M} m buffer and the frontal area density facing the wind. "
+        "The method was calibrated on regular arrays of blocks, sparser than Maré. Along most of the route the "
+        f"displacement height approaches the roof height (median {f['zd_median']:.1f} m) and the roughness "
+        f"length falls towards zero (medians {z0_med}): read these values as outside the calibrated range. "
+        "They are in the data only.\n",
+        "### Sensor-matched values\n",
+        "A sensor carried along the route reads air it has already passed. The sensor-matched value of a "
+        "measure X at point i is the weighted mean of X over the points j the walk had passed, with weights "
+        "exp(-Δt/τ), Δt = t_i - t_j from the walk's arrival times, leaving out points more than "
+        f"{f['truncation_taus']:g}τ back and scaling the weights to sum to one. Empty X values are skipped. τ is "
+        "the sensor time constant, the time to reach 63% of a step change; if only the 90% response time t90 "
+        f"is known, τ = t90 / {f['ln10']:.3f}. Columns are given for τ = {taus} s.\n",
+        "### Segment script\n",
+        "`OM2/aggregate_to_segments.py` (pandas and pyarrow only) averages points over segments of any "
+        "length. Run it from inside the package directory:\n",
+        "```\npython OM2/aggregate_to_segments.py --points OM2/points.parquet \\\n"
+        "    --segment-m 20 --out OM2/segments_20m.parquet\n```\n",
+        "For one row per walk and segment, with one time constant:\n",
+        "```\npython OM2/aggregate_to_segments.py --points p12_walk_points.parquet \\\n"
+        "    --by walk_id --segment-m 20 --tau 30 --out segments_by_walk.parquet\n```\n",
+        "A segment ends at the point a reading was taken; a sensor reading describes the route behind the walker.\n",
+        "## Using the data\n",
+        "Loggers record UTC; Rio local time is UTC-3 with no daylight saving. Join logger readings to "
+        "`p12_walk_points` by `walk_id` and the nearest `t_arrival_utc`, or to the shade table by `point_id` "
+        "and `timestamp_utc` floored to the shade step (`OM2/join_shade_example.py`). Run each analysis with "
+        "and without the points flagged by `route_geometry_flag`, and down-weight or drop rows whose "
+        "`arrival_source` is `gap_interpolated`.\n",
+        "## Known limits\n",
+        "- Street form, sun, shade and ventilation come from 2019 building and terrain geometry.\n"
+        "- The sun dose assumes a clear sky, so it is an upper bound.\n"
+        "- The airport wind is a regional reference at 10 m height, not the wind in the streets.\n"
+        "- An empty value in a joined column means no source sample within the join distance; an empty buffer "
+        "mean means no building in the buffer.\n",
+        "## Columns\n",
+        *_column_rows(package_dir, f),
+        "## Manifest\n",
+        "`manifest.json` records the package version, the coordinate system, the use terms, the decisions "
+        "behind this release, the wind source, summary values and a SHA-256 checksum for every other file. "
+        "It excludes its own hash, because a file cannot record its own checksum.\n",
+        "## Use terms\n",
+        f"{USE_TERMS}\n",
+        "## How to cite\n",
+        f"Please do not cite this draft. The package was produced with the {PROJECT_FORM} pipeline by {AUTHOR}; "
+        "authorship is to be discussed with the lead author when the contribution list is drafted.\n",
+        "## Contact\n",
+        f"{AUTHOR}, {PROJECT_FORM}.\n",
+    ]
+    return "\n".join(lines)
 
-## Coverage vs Table 1
-
-**This package covers surface structure only** — route-point geometry,
-building height/plan density/canyon form, ventilation-geometry proxies,
-sun exposure (P-05 exact-date shade, P-10 sun exposure that does not need
-the exact date) and observed-wind-based ventilation indices (P-11). Surface cover (vegetation
-fraction, impervious fraction) and façade materials belong to other
-Octopus LRP #2 team members' packages, not this one; there is no PENDING
-row here for them, because they are out of this package's scope, not a
-gap in it.
-
-## CRS
-
-SIRGAS 2000 / UTM 23S — EPSG:31983 — for every point, buffer and segment
-geometry in this package. Route files arrive in WGS84 lon/lat (Google
-Drive OM_1..OM_4_inferred_route.json) and are reprojected once, before
-densification.
-
-## Sources and dates
-
-| Source | Date / vintage | Used for |
-|---|---|---|
-| OM_1..OM_4_inferred_route.json (Google Drive, PI-owned folder) | {route_fetch_date_label} | P-02 route points |
-| data/maré/raw/buildings_mare.shp + buildings_extended_300m.gpkg | 2019 cadastral clip (RJ IPP municipal layer, `buildings_RJ_2019.shp` — see data/README.md) | P-04 building height/plan density, P-03 buffers, route_geometry_flag |
-| data/maré/raw/mare_dtm.tif (+ extended DTM) | vintage not recorded in data/README.md | canyon H/W, SVF |
-| data/maré/raw/street_mare.shp | vintage not recorded in data/README.md | street network for SVF/canyon sampling, route_geometry_flag |
-| outputs/maré/svf_v2/svf_streets.gpkg | ray-cast from the above, 1.5 m pedestrian height, 145-patch Tregenza sky (src/svf_v2) | P-04 sky_view_factor |
-| outputs/maré/morphometrics/canyon/hw_streets.gpkg | derived from the above (scripts/brisa_ventilation/02_hw_canyon_proxy.py: flanking-building cross-section at each street sample, search radius = that script's SEARCH_RADIUS) | P-04 street_width_m, building_height_m, height_width_ratio |
-| outputs/maré/features/features_grid.parquet | 10 m grid, derived from the above | P-04 plan_density_lambda_p, grid_cell_id, P-06 ventilation proxies incl. lambda_f_<dir> |
-| data/maré/wind_rose.json | ASOS Galeão (SBGL) METAR, 2015-2024 | P-06 wind-alignment proxy |
-| data/maré/octopus/wind/ (SBGL METAR, Iowa Environmental Mesonet ASOS archive) | window {wind_window}, fetched {wind_fetched}; fetch URL and sha256 in `manifest.json` `provenance.wind_source` | P-11 wind regimes (`p11_wind_regimes.csv`) |
-| Walk dataset (data/maré/octopus/prerelease_v020/matched/, Cassiano and Vincent) | {n_walks} walks on {n_campaign_dates} dates; sha256 per file in its manifest | walk timing (`p02b_walks`), arrival times (`p12_walk_points`), walk dates for P-05 / P-10 |
-| data/maré/neighbourhoods.gpkg | community boundary crosswalk | neighbourhood attribution |
-
-The extended DTM (`dtm_extended_300m.tif`, used for P-05 shade's horizon
-march) is **{dtm_native_resolution_m:g} m native resolution** (read from
-the raster at build time), resampled to 1 m by
-`src/brisa_solar/wp02_surface.build_surface` to match WP-04's `CELL_M`.
-
-**Geometry epoch: {geometry_label}.** The buildings + terrain layers are the
-source for every {version} P-04/P-06/P-10/P-11 variable. The epoch is a build
-parameter (`--buildings`, `--dtm`, and the form-variable inputs under
-`--root`), so 2024 airborne LiDAR and footprints can replace it later without
-a code change.
-
-**The buildings + terrain cadastral layer is the source for every
-{version} P-04/P-06 variable.** No terrestrial (ground-instrument) source
-is used: terrestrial-LiDAR analysis is out of scope for {version} by
-decision `om_v013_descope` — see Known limits.
-
-## Methods
-
-### Route points (P-02)
-
-OM route edges are chained by `edge_order`,
-oriented geometrically (nearest-endpoint chaining — a stored LINESTRING
-may run opposite to its declared (u,v)), then sampled every 1 m along
-the chained centreline at 1.5 m pedestrian height (matches this repo's
-own SVF/street-sampling convention, src/svf_v2/sampling.py). No
-segments are imposed at this stage. Point IDs are deterministic:
-`<route>-<metres from route start, zero-padded>`, e.g. `OM2-000042` —
-and PROVISIONAL (see Known limits).
-
-### Aggregation (P-03)
-
-Buffer variables (5/10/20/50 m circular buffers
-around each point) and segment aggregation (any length, on demand) are
-both re-runnable. Buffer variables are computed at build time. Segment
-aggregation ships two ways: `scripts/aggregate_om_points.py` (repo-only
-CLI, same logic) and, new in v0.1.3, **`OM2/aggregate_to_segments.py`
-travels inside this package itself** — standalone (pandas + pyarrow
-only, no Brisa+ (MorphoFavela) import), so a recipient with only this directory
-can still re-aggregate. Usage (run from inside the package directory):
-```
-python OM2/aggregate_to_segments.py --points OM2/points.parquet \\
-    --segment-m 20 --out OM2/segments_20m.parquet
-```
-Point count is conserved (every point lands in exactly one segment);
-the four buffer radii (5/10/20/50 m) are already columns on
-`OM2/points.*` — this script only groups points into segments, it does
-not recompute buffers.
-
-### Form variables (P-04)
-
-Nearest-neighbour spatial joins from the
-airborne sources above (each capped at a max join distance — beyond it
-a point gets NaN, never a guessed value) plus street_orientation_deg,
-computed directly from the route's own local tangent, plus
-`grid_cell_id` (the same features_grid cell used for
-`plan_density_lambda_p`) so models can cluster the 10 m-grid variables.
-
-### Ventilation (P-06)
-
-Four PROXIES (never a flow simulation) — wind
-alignment, OMNIDIRECTIONAL frontal-area density, openness, distance to
-open space — plus the 8 per-compass-direction frontal-area columns
-(`lambda_f_N` .. `lambda_f_NW`) passed through unchanged, so a
-windward-specific figure can be built downstream without this package
-guessing the wind direction that matters. See the data dictionary
-(P-08) for exact formulas.
-
-### Route geometry flag (`route_geometry_flag`)
-
-True where a point falls inside a
-`buildings_mare` footprint OR more than {route_flag_max_dist_m:g} m from the nearest
-`street_mare` centreline (`src/om_package/routes.py`,
-`ROUTE_FLAG_MAX_STREET_DIST_M`) — both are signs the OSM-inferred route
-drifted off the street the team actually walked. See Known limits for
-the measured counts.
-
-### Shade (P-05)
-
-(`src/om_package/shade.py`.) The horizon is marched once for all {n_om2_points}
-route points (`point_horizon_profiles()`, the WP-02/WP-04 engine, real
-145-patch Tregenza directions, `max_dist_m={shade_max_dist_m:g} m`).
-`compute_shade_local()` then writes {n_shade_rows} (point x {shade_step_min}-min
-step) rows across the {n_campaign_dates} walk dates, daylight only, in Rio
-local time (`timestamp_local`, with a `timestamp_utc` twin), as parquet only
-({shade_fraction_daylight_pct}% of rows in building shade). The schema
-reserves a `tree_shade` column (always null). `OM2/join_shade_example.py`
-joins `p05_building_shade` to a device CSV by `point_id` and `timestamp_utc`
-floored to {shade_step_min} minutes (run from inside the package directory):
-```
-python OM2/join_shade_example.py --shade p05_building_shade.parquet \\
-    --device path/to/octopus_log_with_point_id.csv --out joined_example.csv
-```
-
-### Walks (P-12)
-
-(`src/om_package/walks.py`, `walk_tables.py`, `sensor_match.py`,
-`walk_dose.py`.) `p02b_walks` lists each logger walk. `p12_walk_points` gives,
-for each walk and each route point the walk reached, the arrival time, whether
-the point was shaded then, the clear-sky direct dose in the 1 h and 3 h before
-arrival, and sensor-matched values (exponentially weighted mean of the points
-already passed, tau = 5, 10, 30, 60 s) of the form and ventilation measures.
-Re-aggregate to segments per walk with
-`python OM2/aggregate_to_segments.py --points p12_walk_points.parquet --by walk_id --segment-m 20 --tau 30 --out segments.parquet`.
-
-### Sun exposure (P-10)
-
-(`src/om_package/sun_envelope.py`,
-`src/om_package/p10_p11.py`): the horizon is marched once per point
-(`p10_horizon_profiles.parquet`) and every date or time then costs only a
-sun-position lookup. *Envelope*: for each point and local time of day
-(Rio local time, {envelope_slot_min}-min slots) over every day of the season window
-{p10_window}, classify as always sunlit, always shaded or date-dependent
-(counting only days with the sun up), with the sunlit share of days.
-*Dose*: clear-sky direct-beam energy on a horizontal plane over the
-preceding {dose_hours_and} h (slots of {dose_slot_min} min), for each walk date
-and as a min/median/max over the season window. *Annual sun hours*:
-hours per year with the sun above the point's horizon. Every quantity is a geometry-derived proxy (no cloud, no
-tree shade, not measured sunlight); the dose is clear-sky, hence an upper
-bound. Rio local time is a fixed UTC-3 (no daylight saving since 2019);
-the loggers record UTC.
-
-### Ventilation indices (P-11)
-
-(`src/om_package/vent_indices.py`, `wind_regimes.py`): the SBGL (Galeão
-airport, 10 m) reports are split into two wind regimes by the peaks of the
-smoothed 16-sector rose, for the campaign season and for the 2015-2024
-climatology (`p11_wind_regimes.csv`, with a von Mises mixture check beside
-each regime; `p11_regime_by_hour.csv`). Per-point columns are computed at each
-campaign regime's mean direction and named by regime:
-`frontal_area_density_windward_<regime>`, `canyon_alignment_deg_<regime>`,
-`upwind_shelter_angle_deg_<regime>`, `z0_macdonald_m_<regime>` (Macdonald et
-al. 1998), plus `zd_macdonald_m` and `open_space_fraction`. All are PROXIES
-from building geometry, never measured or simulated air temperature or air
-movement; SBGL is a regional reference, not wind at the route.
-
-### Figures
-
-(`src/om_package/figures.py`, PI ruling 2026-09-27 — spatial
-result first, then the sampling along the route): `OM2/map_form.png`
-(route over the Maré buildings, coloured by `sky_view_factor`),
-`OM2/map_shade.png` (same base map, coloured by the share of daylight in building shade),
-`OM2/profiles.png` (1 m raw + 10 m segment means for the form/shade
-variables along the route), `OM2/shade_calendar.png` (one strip per
-campaign date, distance vs time of day, shaded/sunlit). New in {version}:
-`OM2/sun_envelope.png` and `OM2/sun_dose.png`. (Ventilation figures:
-to be redrawn for the two regimes.)
-
-## Using the data
-
-### Join device data to P-05 / P-10
-
-Loggers record UTC; P-05 carries `timestamp_utc` and `timestamp_local`. P-10 is
-keyed by Rio local time of day (`local_slot`):
-```
-ts = pd.to_datetime(device["Timestamp"], utc=True)
-device["slot_local"] = ts.dt.tz_convert("America/Sao_Paulo").dt.floor("5min").dt.strftime("%H:%M")
-```
-
-### Segment length (note for the Octopus team)
-
-The points are 1 m apart.
-A sensor carried at walking speed does not resolve that: its reading at any
-instant is a weighted average over the stretch of route just walked, so
-neighbouring 1 m points are strongly correlated and a 1 m point is not an
-independent observation. Treat the 1 m points as the geometry grid and
-choose the analysis segment from the sensor:
-**L ≈ v × k × τ**, with v the walking speed (m/s), τ the sensor's response
-time constant (s) and k the number of time constants; k = 3 gives about
-{three_tau_pct:.0f}% of a step response (1 - e^-3). For one walk of T
-seconds over the whole route (length {route_length_m:.0f} m) the mean speed
-is v = {route_length_m:.0f} m / T. **This package holds no value for τ, so it
-does not state an L.** *Question for the team: what is the time constant of
-your air-temperature sensor as mounted (housing/shield included), and is it
-quoted as a 63% or a 90% response time?* Two consequences: the reading at a
-point reflects the route *behind* the walker, so match it to a segment that
-ends at that point rather than one centred on it; and models that treat
-segments shorter than L as independent will understate uncertainty, so
-cluster by `grid_cell_id` or by blocks of at least L. Re-aggregate with
-```
-python OM2/aggregate_to_segments.py --points OM2/points.parquet \\
-    --segment-m <L> --out OM2/segments.parquet
-```
-(`--segment-m` defaults to 10 m, a placeholder for the build's profile
-figures, not a sensor-derived value.)
-
-## Known limits
-
-### Time
-
-- Loggers record UTC. Rio local time is America/Sao_Paulo (UTC-3, no daylight
-  saving). Shipped time columns are Rio local time (`_local`, ISO 8601 with
-  offset); data tables also carry a `_utc` twin. The season envelope is
-  date-dependent for {date_dependent_pct:.1f}% of daylight point-slots; the rest
-  (`always_sunlit` / `always_shaded`) holds on every day of the window.
-
-### What the values are
-
-- **Sun and ventilation quantities are geometry-derived proxies.** No tree
-  shade, no cloud (the dose is clear-sky, an upper bound), diffuse and
-  reflected radiation excluded; none is measured sunlight, air temperature or
-  air movement. SBGL wind is an airport reference at 10 m, matched to a
-  campaign time only within the match gap in `manifest.json` `p11`; it is
-  not wind at the route.
-- **Sky-view factor is an UPPER BOUND under canopy.** The ray-cast mesh is
-  buildings + bare-earth terrain only — no vegetation is in the scene — so
-  a tree-covered point's real sky view is <= the reported
-  `sky_view_factor`, never more.
-- Ventilation columns are geometry-derived PROXIES, not simulated or
-  measured airflow. The P-06 proxies are isotropic, so they say nothing
-  about upwind fetch beyond axis alignment; the P-11 columns are computed
-  at a wind direction and are direction-specific.
-- **`z0_macdonald_m` is outside its calibrated range along most of the
-  route.** Macdonald et al. (1998) was calibrated on regular arrays of
-  obstacles; Maré's plan density in the {vent_buffer_m} m buffer is beyond that range,
-  so the displacement height approaches the roof height and z0 falls
-  toward zero. Read a near-zero z0 here as out of range, not as a smooth
-  surface; `zd_macdonald_m` carries the same caveat.
-- **NaN has two distinct causes** in the point table's joined columns —
-  they are not interchangeable and are documented separately per column
-  in the data dictionary (P-08): (1) *beyond the join-distance cap*
-  (`building_height_m`, `sky_view_factor`, `plan_density_lambda_p`,
-  `grid_cell_id`, ventilation proxies — a point too far from any source
-  sample); (2) *no feature in the buffer* (`building_height_mean_buffer_*m`
-  — zero buildings intersect that point's buffer, a real "no building
-  here" result, not a join gap).
-- Nearest-neighbour joins carry a `*_join_dist_m` column; check it before
-  trusting a value near a data-layer edge.
-
-### Geometry and route
-
-- **Geometry epoch is {geometry_label}.** The horizon march is limited to the
-  DTM's valid radius (see `max_dist_m` below); 2024 airborne data are not
-  used yet.
-- **No terrestrial ground-truth comparison exists yet.** Every P-04/P-06
-  variable is derived from the cadastral buildings + DTM layers in
-  Sources and dates above.
-- **route_geometry_flag**: {n_route_geometry_flagged}/{n_om2_points}
-  OM2 points ({route_flag_pct}%) are flagged — inside a building footprint
-  or more than {route_flag_max_dist_m:g} m from the nearest street centreline. Of the
-  {n_lambda_p_ones} points with `plan_density_lambda_p == 1.0`,
-  {n_lambda_p_ones_flagged} ({lambda_p_share_explained_pct}%) are
-  explained by this flag. Of the remaining {n_lambda_p_remainder} points,
-  {n_lambda_p_remainder_plausible} have `building_count_buffer_10m > 0`
-  and a recorded `building_height_mean_buffer_10m` (consistent with a
-  fully-built 10 m cell rather than a join defect) — {n_lambda_p_remainder_not_checked}
-  remain unchecked.
-- **point_id is PROVISIONAL.** It is minted from the OSM-inferred route
-  file, not the team's own om_routes.gpkg. The ID string is stable across
-  rebuilds of the same route file, but the place it names may move when
-  v0.2 rebuilds on the real route — that release will publish an
-  old->new `point_id` crosswalk (decision `om_route_geometry`).
-- **max_dist_m={shade_max_dist_m:g} m, not WP-04's 500 m citywide
-  default**, for the horizon march behind P-05: `dtm_extended_300m.tif`
-  (the DTM raster only — the footprint layer has no nodata) has real
-  nodata starting between
-  {nodata_floor_min_m:.0f} m and {nodata_floor_max_m:.0f} m from OM2
-  points (median {nodata_floor_median_m:.0f} m; measured per point at
-  build time via `shade.nodata_floor_m()` — its raster bounding box is a
-  rectangle, but valid coverage inside it is not). WP-02's horizon march
-  (`wp02_horizon.py`) is not NaN-safe (`torch.maximum` propagates NaN), so
-  a full-radius pilot run returned all-NaN horizon values before this was
-  caught; {shade_max_dist_m:g} m is safely under every OM2 point's
-  measured nodata floor and was NOT patched into the shared WP-02 engine
-  (P1's citywide/WP-04 defended numbers also depend on it) — this scoping
-  fix lives only in `point_horizon_profiles()`.
-
-### Device files and route files
-
-- **Walk dataset.** Walk timing comes from the team's walk files (matched
-  GPS tracks, one CSV per walk, sha256 per file in their manifest). Only fixes
-  matched to edges of the OM2 route count; arrival times are interpolated
-  between fixes (flagged `gap_interpolated` when the fix gap exceeds 60 s).
-  The join example (`OM2/join_shade_example.py`) joins by a pre-assigned
-  `point_id` plus an exact floor-to-5-minutes `timestamp_utc` match.
-- om_routes.gpkg (Google Drive) was NOT fetched — too large for the
-  connector. Pending if the team needs it.
-
-### Out of scope by decision
-
-- **Terrestrial SVF: OUT OF SCOPE for this version, by decision**
-  (`om_v013_descope`) — the terrestrial-LiDAR analysis is not part of
-  {version}; it may come in a later version.
-- **Building shade: computed for {n_campaign_dates} walk dates**
-  (see P-05 above, decision `om_shade_release`). **Tree shade: OUT OF SCOPE for
-  this version, by decision** (`om_v013_descope`); it may come in a later
-  version. `tree_shade` stays in the shade schema as a reserved,
-  always-null column.
-- **Height change 2024->2026 and the airborne-vs-terrestrial comparison:
-  OUT OF SCOPE for this version, by decision** (`om_v013_descope`); they
-  may come in a later version.
-
-## Manifest
-
-`manifest.json` records `package_version`, `crs`, `use_terms`,
-`provenance.decisions` (the Octopus panel and release decisions, id +
-resolution text — see above), `provenance.wind_source` (the SBGL source
-manifest: station, fetch URL, fetch time, sha256, counts), `p10` / `p11`
-(window, slot grids, match gap, summary shares), per-route build stats (relative output
-paths), and a `sha256` per OTHER file in this package (recompute and
-compare before trusting a copy — `manifest.json` excludes its own hash,
-since a file cannot record its own checksum before it is written).
-Parquet tables built from a GeoDataFrame (`points.parquet`) carry
-GeoParquet `geo` metadata as well as plain `x`/`y` columns, so both
-GeoParquet-aware and plain-pandas readers work without extra steps.
-
-## Use terms
-
-{use_terms}
-
-## How to cite
-
-This package was produced with the Brisa+ (MorphoFavela) pipeline (Théo Alessandro Hermann).
-Authorship is to be discussed with the lead author when the Octopus LRP #2
-contribution list is drafted (decision `om_credit`).
-"""
 
 #: Frozen literal text — v0.1's shipped CHANGELOG entry, read verbatim
 #: from outputs/_packages/mare_om2/v0.1.2/CHANGELOG.md (audit fix,
@@ -761,92 +594,6 @@ geometry for now; every geometry input is a build parameter, so moving to the
   2024 to 2026 height change.
 
 """
-
-
-def render_readme(
-    n_om2_points: int,
-    n_route_geometry_flagged: int,
-    n_lambda_p_ones: int,
-    n_lambda_p_ones_flagged: int,
-    lambda_p_share_explained_pct: float,
-    n_lambda_p_remainder: int,
-    n_lambda_p_remainder_plausible: int,
-    route_fetch_date_label: str,
-    nodata_floor_m: dict,
-    internal_routes_status: str,
-    decisions: list[dict],
-    dtm_native_resolution_m: float,
-    n_walks: int = 0,
-    n_campaign_dates: int = 0,
-    n_shade_rows: int = 0,
-    shade_fraction_daylight_pct: float = 0.0,
-    shade_max_dist_m: float = 100.0,
-    conformance_section: str = "",
-    *,
-    p10_summary: dict,
-    wind_source: dict,
-    geometry_label: str,
-    route_length_m: float,
-    version: str = VERSION,
-) -> str:
-    """Render README.md. The route_geometry_flag/lambda_p/shade numbers,
-    the nodata floor, the internal-routes on-disk state, the route fetch
-    date label and the resolution decisions are all computed by the
-    caller (build_om_package.py) from the actual OM2 build or from
-    brisaverse's tasks.json, never hardcoded here (CLAUDE.md's 'never
-    fabricate a value') — every one of them is a REQUIRED parameter, so a
-    caller that forgets to compute one gets a loud TypeError instead of a
-    silently-defaulted number. ``conformance_section`` is the rendered
-    P-00 conformance table (src/om_package/spec.py
-    render_conformance_markdown) — the build calls this twice: once with
-    it empty to get a package directory conformance can be computed over,
-    once with the computed table to produce the README actually shipped.
-    """
-    route_flag_pct = round(100 * n_route_geometry_flagged / n_om2_points, 1) if n_om2_points else 0.0
-    n_lambda_p_remainder_not_checked = n_lambda_p_remainder - n_lambda_p_remainder_plausible
-    floor = nodata_floor_m
-    return README_TEMPLATE.format(
-        version=version,
-        version_date=VERSION_DATE,
-        route_fetch_date_label=route_fetch_date_label,
-        conformance_section=conformance_section,
-        use_terms=USE_TERMS,
-        om_use_terms_date=_decision(decisions, "om_use_terms")["resolved_utc"][:10],
-        internal_routes_status=internal_routes_status,
-        dtm_native_resolution_m=dtm_native_resolution_m,
-        n_om2_points=n_om2_points,
-        n_route_geometry_flagged=n_route_geometry_flagged,
-        route_flag_pct=route_flag_pct,
-        n_lambda_p_ones=n_lambda_p_ones,
-        n_lambda_p_ones_flagged=n_lambda_p_ones_flagged,
-        lambda_p_share_explained_pct=lambda_p_share_explained_pct,
-        n_lambda_p_remainder=n_lambda_p_remainder,
-        n_lambda_p_remainder_plausible=n_lambda_p_remainder_plausible,
-        n_lambda_p_remainder_not_checked=n_lambda_p_remainder_not_checked,
-        n_walks=n_walks,
-        n_campaign_dates=n_campaign_dates,
-        n_shade_rows=n_shade_rows,
-        shade_fraction_daylight_pct=shade_fraction_daylight_pct,
-        shade_max_dist_m=shade_max_dist_m,
-        nodata_floor_min_m=floor["min"],
-        nodata_floor_median_m=floor["median"],
-        nodata_floor_max_m=floor["max"],
-        p10_window=" to ".join(p10_summary["window"]),
-        dose_slot_min=p10_summary["dose_slot_min"],
-        envelope_slot_min=p10_summary["envelope_slot_min"],
-        shade_step_min=SHADE_STEP_MIN,
-        dose_hours_list=", ".join(map(str, p10_summary["dose_hours"])),
-        dose_hours_and=" and ".join([", ".join(map(str, p10_summary["dose_hours"][:-1])), str(p10_summary["dose_hours"][-1])]) if len(p10_summary["dose_hours"]) > 1 else str(p10_summary["dose_hours"][0]),
-        dose_hours_first=p10_summary["dose_hours"][0],
-        route_flag_max_dist_m=ROUTE_FLAG_MAX_STREET_DIST_M,
-        date_dependent_pct=100 * p10_summary["date_dependent_share"],
-        wind_window=" to ".join(wind_source["window_utc"]),
-        wind_fetched=str(wind_source["fetched_utc"])[:10],
-        geometry_label=geometry_label,
-        route_length_m=route_length_m,
-        three_tau_pct=100 * (1 - math.exp(-3)),
-        vent_buffer_m=DEFAULT_BUFFER_M,
-    )
 
 
 #: The newest entry: the only part of CHANGELOG.md rendered fresh on every build.

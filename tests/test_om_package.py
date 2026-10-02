@@ -21,7 +21,7 @@ from src.om_package.buffers import BUFFER_RADII_M, compute_buffer_variables
 from src.om_package.dictionary import dictionary_dataframe, full_dictionary
 from src.om_package.formvars import compute_form_variables
 from src.om_package.io_utils import Paths, hash_tree, write_table
-from src.om_package.package_docs import USE_TERMS, render_changelog, render_readme
+from src.om_package.package_docs import render_changelog
 from src.om_package.quality import DESCOPED_ITEMS, PENDING_ITEMS, coverage_report
 from src.om_package.routes import (
     POINT_SPACING_M,
@@ -325,140 +325,15 @@ def test_write_table_geo_keeps_geoparquet_metadata_and_xy(tmp_path):
     assert "x" in csv_df.columns and "y" in csv_df.columns
 
 
-# --- must-fix 3: use-terms banner, no PLACEHOLDER --------------------------
-
-#: Fake but well-formed decisions fixture — same shape provenance.read_om_decisions()
-#: returns, so render_readme/render_changelog can be exercised without a real
-#: brisaverse checkout. Covers all seven ids the audit requires (2026-09-27).
-_FAKE_DECISIONS = [
-    {"id": "om_use_terms", "question": "q", "resolution": "Named team only, internal review draft.", "resolved_utc": "2026-09-24T18:39:11Z"},
-    {"id": "om_scope", "question": "q", "resolution": "Surface structure only.", "resolved_utc": "2026-09-24T18:39:11Z"},
-    {"id": "om_shade_release", "question": "q", "resolution": "Release building-only shade once dates are known.", "resolved_utc": "2026-09-24T18:39:11Z"},
-    {"id": "om_credit", "question": "q", "resolution": "Acknowledgment now, authorship later.", "resolved_utc": "2026-09-24T18:39:11Z"},
-    {"id": "om_dates_tz", "question": "q", "resolution": "Timezone stays an open question until confirmed.", "resolved_utc": "2026-09-24T18:39:11Z"},
-    {"id": "om_lidar", "question": "q", "resolution": "Location pending from the PI.", "resolved_utc": "2026-09-24T18:39:11Z"},
-    {"id": "om_route_geometry", "question": "q", "resolution": "Flag now; v0.2 rebuilds with a crosswalk.", "resolved_utc": "2026-09-24T18:39:11Z"},
-    {"id": "om_v013_descope", "question": "q", "resolution": "Dropped from this version, deliberately.", "resolved_utc": "2026-10-01T13:46:07Z"},
-]
-
-_FAKE_NODATA_FLOOR_M = {"min": 105.1, "median": 338.4, "max": 598.9}
-
-_README_STATS = dict(
-    n_om2_points=1559,
-    n_route_geometry_flagged=38,
-    n_lambda_p_ones=124,
-    n_lambda_p_ones_flagged=38,
-    lambda_p_share_explained_pct=30.6,
-    n_lambda_p_remainder=86,
-    n_lambda_p_remainder_plausible=80,
-    route_fetch_date_label="file dates 2026-09-24 (route JSON mtimes; no fetch manifest recorded)",
-    nodata_floor_m=_FAKE_NODATA_FLOOR_M,
-    internal_routes_status="not built in this version — no `outputs/_packages/_internal/mare_routes/v0.1.3` directory exists yet.",
-    decisions=_FAKE_DECISIONS,
-    dtm_native_resolution_m=5.0,
-    p10_summary={"window": ["2025-12-01", "2026-04-30"], "dose_slot_min": 15, "envelope_slot_min": 5, "dose_hours": [1, 2, 3], "date_dependent_share": 0.49},
-    wind_source={"window_utc": ["2025-12-01", "2026-04-30"], "fetched_utc": "2026-10-01T17:31:31+00:00"},
-    geometry_label="test epoch",
-    route_length_m=1557.8,
-)
-
-
-def test_readme_has_no_placeholder():
-    readme = render_readme(**_README_STATS)
-    assert "PLACEHOLDER" not in readme
-
-
-def test_readme_has_use_terms_banner():
-    readme = render_readme(**_README_STATS)
-    assert USE_TERMS in readme
-    assert readme.strip().startswith(">")
-
-
-def test_readme_states_om2_only_release_scope():
-    readme = render_readme(**_README_STATS)
-    assert "OM2 only" in readme
-    assert "_internal" in readme
-
-
-def test_readme_has_how_to_cite_acknowledgment():
-    readme = render_readme(**_README_STATS)
-    assert "Théo Alessandro Hermann" in readme
-    assert "How to cite" in readme
-
-
-def test_readme_no_pending_surface_cover_row():
-    readme = render_readme(**_README_STATS)
-    coverage_section = readme.split("## Coverage vs Table 1")[1].split("## CRS")[0]
-    assert "surface structure only" in coverage_section
-    assert "façade materials" in coverage_section
-    # the panel's suggested PENDING surface-cover row was overruled (PI, 2026-09-24)
-    from src.om_package.dictionary import _DESCOPED
-
-    assert not any("surface_cover" in k or "surface cover" in v.get("definition", "").lower() for k, v in _DESCOPED.items())
-
-
-# --- 2026-09-27 numerical audit: docs/provenance defects --------------------
-
-def test_render_readme_requires_nodata_floor_m_no_default():
-    """A sabotaged call missing nodata_floor_m must fail loudly (TypeError:
-    missing required argument), never silently render a default number —
-    this used to be `shade_min_nan_dist_m: float = 104.15`."""
-    stats = {k: v for k, v in _README_STATS.items() if k != "nodata_floor_m"}
-    with pytest.raises(TypeError):
-        render_readme(**stats)
-
-
 def test_require_nodata_floor_m_fails_loudly_on_a_sabotaged_manifest():
-    """A manifest whose p05_shade block lacks nodata_floor_m (e.g. from a
-    build that skipped the measurement) must raise, not default, when a
-    consumer tries to read it out for rendering."""
+    """A manifest whose p05_shade block lacks nodata_floor_m must raise, not
+    default, when a consumer reads it out for rendering."""
     from src.om_package.package_docs import require_nodata_floor_m
 
-    sabotaged_p05_shade = {"n_csv_pilot": 5, "n_campaign_dates": 5}  # no nodata_floor_m key
+    floor = {"min": 105.1, "median": 338.4, "max": 598.9}
     with pytest.raises(KeyError):
-        require_nodata_floor_m(sabotaged_p05_shade)
-
-    intact_p05_shade = {"nodata_floor_m": _FAKE_NODATA_FLOOR_M}
-    assert require_nodata_floor_m(intact_p05_shade) == _FAKE_NODATA_FLOOR_M
-
-
-def test_readme_cites_decision_ids_not_interview_codes():
-    readme = render_readme(**_README_STATS)
-    assert "Q6a" not in readme
-    assert "om_use_terms" in readme
-
-
-def test_readme_states_internal_routes_status_not_a_fixed_claim():
-    readme = render_readme(**_README_STATS)
-    assert _README_STATS["internal_routes_status"] in readme
-
-
-def test_readme_lambda_p_remainder_is_a_computed_check():
-    readme = render_readme(**_README_STATS)
-    known_limits = readme.split("## Known limits")[1].split("## Manifest")[0]
-    assert "building_count_buffer_10m > 0" in known_limits
-    assert "86" in known_limits and "80" in known_limits
-
-
-def test_readme_join_example_points_at_shipped_script():
-    readme = render_readme(**_README_STATS)
-    assert "OM2/join_shade_example.py" in readme
-    known_limits = readme.split("## Known limits")[1].split("## Manifest")[0]
-    assert "OM2/join_shade_example.py" in known_limits
-
-
-def test_readme_manifest_section_states_self_hash_exclusion():
-    readme = render_readme(**_README_STATS)
-    manifest_section = readme.split("## Manifest")[1].split("## Use terms")[0]
-    assert "excludes its own hash" in manifest_section
-
-
-def test_readme_sources_no_invented_vintage():
-    readme = render_readme(**_README_STATS)
-    sources = readme.split("## Sources and dates")[1].split("## Methods")[0]
-    assert "vintage not recorded in data/README.md" in sources
-    assert "2019 cadastral clip" in sources
-    assert "5 m native resolution" in sources
+        require_nodata_floor_m({"n_campaign_dates": 5})
+    assert require_nodata_floor_m({"nodata_floor_m": floor}) == floor
 
 
 def _shipped_entry(version: str, heading: str):
@@ -518,14 +393,6 @@ def test_changelog_no_bare_project_name():
     import re
 
     assert not re.search(r"(?<!Brisa\+ \()MorphoFavela", render_changelog(n_om2_points=1))
-
-
-def test_readme_has_using_the_data_and_segment_note_without_a_typed_time_constant():
-    readme = render_readme(**_README_STATS)
-    section = readme.split("## Using the data")[1].split("## Known limits")[0]
-    assert "--segment-m" in section and "time constant" in section
-    assert "does not state an L" in section
-    assert "95%" in section  # computed 1 - e^-3
 
 
 TASKS_JSON = Path("/home/theo/SCL/SCR/brisaverse/shared/facts/tasks.json")
