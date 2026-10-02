@@ -621,7 +621,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"street, the deepest {SEGMENT_M} m stretch starts at {_n(f['hw_max_seg'])} m, with a mean ratio of "
         f"{f['hw_max_val']:.1f}. **Sky view factor** is the share of the sky hemisphere visible "
         f"{f['height_m']:g} m above the street, from 0 (none) to 1 (open sky); half of the points lie between "
-        f"{f['svf_q25']:.2f} and {f['svf_q75']:.2f}. The most enclosed {SEGMENT_M} m stretch starts at "
+        f"{f['svf_q25']:.2f} and {f['svf_q75']:.2f}. Among points on the walked street, the most enclosed {SEGMENT_M} m stretch starts at "
         f"{_n(f['svf_min_seg'])} m (mean {f['svf_min_val']:.2f}) and the most open at {_n(f['svf_max_seg'])} m "
         f"(mean {f['svf_max_val']:.2f}). **Plan area density** is the share of ground covered by buildings in the "
         f"10 m grid cell of the point: median {f['lp_median']:.2f}, half of the points between "
@@ -648,7 +648,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "and the colour gives the share of route points in building shade.\n",
         f"In the {_hour(f['shade_hour_min'])} hour only {pct('shade_hour_min', f['shade_hour_min_val'])} of route "
         f"points are shaded, against {pct('shade_last', f['shade_last_val'])} in the "
-        f"{_hour(f['shade_last_hour'])} hour. Over the hours of daylight that all walk dates share ({_hour(h0)} "
+        f"{_hour(f['shade_last_hour'])} hour. Over the clock hours of daylight that all walk dates share ({_hour(h0)} "
         f"to {h1:02d}:59), the shaded share of route points goes from "
         f"{pct('shade_date_min', f['shade_date_min_val'])} on {_day(f['shade_date_min'])} to "
         f"{pct('shade_date_max', f['shade_date_max_val'])} on {_day(f['shade_date_max'])}.\n",
@@ -669,7 +669,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "in the hour, or the three hours, before the walker arrived, in Wh/m². The arrival time comes from the "
         "walk's own GPS timestamps. The dose comes from 2019 building and terrain geometry and assumes a clear "
         "sky, so it is an upper bound.\n",
-        f"In the hour before arrival, the median dose is {_n(mo['median_1h'])} Wh/m² on morning walks and "
+        f"In the hour before arrival, the median dose per 1 m walk point is {_n(mo['median_1h'])} Wh/m² on morning walks and "
         f"{_n(ev['median_1h'])} Wh/m² on evening walks. Counted over the {SEGMENT_M} m stretches of each walk, "
         "as the figure draws them, "
         f"{pct('dose_cells_zero_1h', f['dose_cells_zero_1h'])} of walk stretches got no direct sun at all in the "
