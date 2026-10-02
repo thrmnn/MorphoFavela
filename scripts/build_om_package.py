@@ -87,11 +87,10 @@ from src.om_package import p10_p11, walk_tables
 from src.om_package.walks import load_walks
 from src.om_package.wind_regimes import season_regimes, tag_walks, load_campaign, load_climatology
 from src.om_package.provenance import read_om_decisions, read_wind_source_manifest
-from src.om_package.report_pdf import render_markdown_pdf, render_readme_pdf, report_css
+from src.om_package.report_pdf import render_readme_pdf
 from src.om_package.quality import write_quality_report
 from src.om_package.routes import compute_route_geometry_flag, densify_route, route_length_m
-from src.om_package.spec import internal_dir_for, render_conformance_markdown, write_conformance
-from src.sites.territory import load_territory
+from src.om_package.spec import internal_dir_for, write_conformance
 from src.om_package.shade import (
     OM2_SHADE_MAX_DIST_M,
     SHADE_STEP_MIN,
@@ -286,7 +285,6 @@ MATCHED_DIR = Path("data") / "maré" / "octopus" / "prerelease_v020" / "matched"
 
 
 def main() -> int:
-    t_start = time.time()
     ap = argparse.ArgumentParser()
     ap.add_argument("--route", default="OM2", help="OM1|OM2|OM3|OM4|ALL — non-OM2 routes always go to the internal build dir")
     ap.add_argument("--out", default=None, help="shared package dir for OM2 (default: <root>/outputs/_packages/mare_om2/<version>)")
@@ -393,7 +391,7 @@ def main() -> int:
             manifest["routes"].append(result)
             om2_df = pd.read_parquet(route_out_dir / "OM2" / "points.parquet")
         else:
-            print(f"  (internal-only, not part of the shared package)")
+            print("  (internal-only, not part of the shared package)")
         print(f"  length_m={result['length_m']:.1f} n_points={result['n_points']} communities={result['communities_crossed']}")
 
     if om2_df is None:
@@ -435,8 +433,6 @@ def main() -> int:
     print(f"[build_om_package] P-05: {n_shade_rows} rows across {n_campaign_dates} walk dates "
           f"({shade_fraction_daylight_pct}% in building shade, daylight only, {LOCAL_TZ})")
     shade_fig = shade_fig.rename(columns={"timestamp_local": "timestamp"})
-    calendar_windows = walks_df.assign(date=walks_df["date"].astype(str)).groupby("date").agg(
-        first_timestamp=("start_local", "min"), last_timestamp=("end_local", "max")).reset_index()
 
     # P-10 / P-11 package-root tables (computed in om2_extras above).
     sun = ctx["sun"]
@@ -481,12 +477,6 @@ def main() -> int:
     except Exception as exc:  # pragma: no cover - missing source is a build-config error, not a figure bug
         print(f"[build_om_package] WARNING: could not load buildings_mare ({exc}); figures will ship without the building base layer")
         buildings = None
-    try:
-        territory = load_territory("maré", root=paths.root)
-        subunits = territory.subunits
-    except Exception as exc:  # pragma: no cover - same: a missing/broken territory registry entry, not a figure bug
-        print(f"[build_om_package] WARNING: could not load Maré territory ({exc}); figures will ship without community outlines")
-        subunits = None
 
     fig_dir = out_dir / "OM2"
     for stale in ("map_form.png", "map_shade.png", "profiles.png", "shade_calendar.png", "sun_envelope.png", "sun_dose.png"):
@@ -526,53 +516,9 @@ def main() -> int:
     lambda_p_share_explained_pct = (
         round(100 * n_lambda_p_ones_flagged / n_lambda_p_ones, 1) if n_lambda_p_ones else 0.0
     )
-    # The lambda_p==1.0 points NOT explained by route_geometry_flag used to
-    # be asserted "plausible fully-built 10 m cells" with no check (audit
-    # fix, 2026-09-27) — actually check building_count_buffer_10m > 0 and a
-    # recorded building_height_mean_buffer_10m for each of them.
-    lambda_p_remainder = lambda_p_ones[~lambda_p_ones["route_geometry_flag"].astype(bool)]
-    n_lambda_p_remainder = len(lambda_p_remainder)
-    n_lambda_p_remainder_plausible = (
-        int(
-            (
-                (lambda_p_remainder["building_count_buffer_10m"] > 0)
-                & lambda_p_remainder["building_height_mean_buffer_10m"].notna()
-            ).sum()
-        )
-        if n_lambda_p_remainder
-        else 0
-    )
-
     decisions = read_om_decisions()
     wind_source = read_wind_source_manifest(paths.root)
-    internal_status = internal_routes_status(paths.root, args.version)
-    fetch_date_label = route_fetch_date_label(paths)
-    dtm_res_m = dtm_native_resolution_m(paths)
 
-    readme_kwargs = dict(
-        n_om2_points=n_om2_points,
-        n_route_geometry_flagged=n_route_geometry_flagged,
-        n_lambda_p_ones=n_lambda_p_ones,
-        n_lambda_p_ones_flagged=n_lambda_p_ones_flagged,
-        lambda_p_share_explained_pct=lambda_p_share_explained_pct,
-        n_lambda_p_remainder=n_lambda_p_remainder,
-        n_lambda_p_remainder_plausible=n_lambda_p_remainder_plausible,
-        route_fetch_date_label=fetch_date_label,
-        nodata_floor_m=nodata_floor,
-        internal_routes_status=internal_status,
-        decisions=decisions,
-        dtm_native_resolution_m=dtm_res_m,
-        n_walks=len(walks_df),
-        n_campaign_dates=n_campaign_dates,
-        n_shade_rows=n_shade_rows,
-        shade_fraction_daylight_pct=shade_fraction_daylight_pct,
-        shade_max_dist_m=OM2_SHADE_MAX_DIST_M,
-        p10_summary=ctx["p10_summary"],
-        wind_source=wind_source,
-        geometry_label=args.geometry_epoch,
-        route_length_m=manifest["routes"][0]["length_m"],
-        version=args.version,
-    )
     changelog_kwargs = dict(version=args.version)
     # Manifest content that does not depend on file hashes goes down BEFORE
     # conformance: P-11's observed-wind part reads provenance.wind_source from
