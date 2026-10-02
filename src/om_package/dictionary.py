@@ -7,6 +7,7 @@ from __future__ import annotations
 from .buffers import BUFFER_RADII_M
 from .routes import ROUTE_FLAG_MAX_STREET_DIST_M
 from .shade import SHADE_STEP_MIN
+from .sensor_match import DEFAULT_TAUS_S
 from .sun_envelope import ENVELOPE_SLOT_MIN
 from .vent_indices import DEFAULT_BUFFER_M, MACDONALD_A, MACDONALD_BETA, MACDONALD_CD, VON_KARMAN
 
@@ -242,7 +243,7 @@ _BASE.update({
         "unit": "HH:MM, America/Sao_Paulo local time",
         "source": "src/om_package/sun_envelope.py",
         "method": f"slot grid over the 24 h day; envelope table at {ENVELOPE_SLOT_MIN} min, dose table on its own (coarser) grid stated in manifest.json p10.dose_slot_min",
-        "limits": "Local time, not the device clock: whether the Octopus device clocks log UTC or local time is UNKNOWN (decision om_dates_tz). Map a device timestamp to a slot under both readings (clock_readings in src/om_package/sun_envelope.py; OM2/join_shade_example.py states the UTC-labelled P-05 convention).",
+        "limits": "Rio local time (the loggers record UTC): convert a device timestamp with tz_convert('America/Sao_Paulo') before taking its slot.",
         "status": "computed",
     },
     "class": {
@@ -270,11 +271,11 @@ _BASE.update({
         "status": "computed",
     },
     "scope": {
-        "definition": "Which case a P-10 row describes: a campaign date (YYYY-MM-DD), envelope_min / envelope_median / envelope_max (statistic over every day of the window), or 'all' (clock-agreement row pooled over the campaign dates).",
+        "definition": "Which case a P-10 row describes: a walk date (YYYY-MM-DD, Rio local date) or envelope_min / envelope_median / envelope_max (statistic over every day of the window).",
         "unit": "category",
         "source": "src/om_package/p10_p11.py",
-        "method": "campaign dates are read off the campaign CSVs (p05b_campaign_windows)",
-        "limits": "A campaign date here is a calendar date in Rio local time; the device clock reading is unresolved (see local_slot).",
+        "method": "walk dates are the unique Rio local dates of the walks in p02b_walks",
+        "limits": "-",
         "status": "computed",
     },
     "dose_1h_wh_m2": {
@@ -451,16 +452,151 @@ _DESCOPED: dict[str, dict] = {
 }
 
 _SHADE_TABLE_ONLY = {
-    "timestamp": {"definition": f"Clock timestamp of a shade evaluation ({SHADE_STEP_MIN}-min step).", "unit": "datetime, labelled UTC (a stated operating-rule choice, NOT a resolution of the still-UNRESOLVED campaign timezone — see src/om_package/shade.py module docstring; tz is a required, no-default parameter of every shade/join function)", "source": "src/om_package/shade.py", "method": "pd.date_range over the requested time window", "limits": "-", "status": "computed"},
-    "date": {"definition": "Calendar date of a shade evaluation.", "unit": "date", "source": "src/om_package/shade.py", "method": "-", "limits": "-", "status": "computed"},
+    "timestamp_local": {"definition": f"Rio local time of a shade evaluation ({SHADE_STEP_MIN}-min step), with the -03:00 offset.", "unit": "datetime, America/Sao_Paulo (UTC-3)", "source": "src/om_package/shade.py", "method": "local 5-min grid of each walk date, sun above the horizon only", "limits": "-", "status": "computed"},
+    "timestamp_utc": {"definition": "The same instant as timestamp_local, in UTC (the loggers record UTC).", "unit": "datetime, UTC", "source": "src/om_package/shade.py", "method": "timestamp_local converted to UTC", "limits": "-", "status": "computed"},
+    "timestamp": {"definition": f"Clock timestamp of a shade evaluation ({SHADE_STEP_MIN}-min step).", "unit": "-", "source": "src/om_package/shade.py", "method": "pd.date_range over the requested time window", "limits": "-", "status": "computed"},
+    "date": {"definition": "Rio local calendar date: of a shade evaluation (p05_building_shade) or of a walk (p02b_walks).", "unit": "date, YYYY-MM-DD", "source": "src/om_package/shade.py; src/om_package/walks.py", "method": "local date of the timestamp", "limits": "-", "status": "computed"},
     "sun_altitude_deg": {"definition": "Apparent solar elevation at the evaluation timestamp.", "unit": "degrees", "source": "pvlib.solarposition.get_solarposition", "method": "-", "limits": "-", "status": "computed"},
     "sun_azimuth_deg": {"definition": "Solar azimuth (clockwise from north) at the evaluation timestamp.", "unit": "degrees", "source": "pvlib.solarposition.get_solarposition", "method": "-", "limits": "-", "status": "computed"},
-    "shaded": {"definition": "True when the point gets no direct sun at this timestamp: a building (not tree) blocks the sun, or the sun is below the horizon (night, sun_altitude_deg <= 0). Night rows are no direct sun, not building shade: take building-shade shares over rows with sun_altitude_deg > 0 only.", "unit": "bool", "source": "src/om_package/shade.py is_shaded()", "method": "sun altitude vs. marched horizon angle at the sun's azimuth (point_horizon_profiles(), wired v0.1.2, max_dist_m=100m — see README Known limits)", "limits": "v0.1.2 covers only the pilot's 5 campaign dates (one CSV per device pulled 2026-09-25); more dates arrive as more CSVs are pulled. tz='UTC' labelling, not a resolved local time.", "status": "computed"},
+    "shaded": {"definition": "True when the point gets no direct sun at this timestamp: a building (not tree) blocks the sun, or the sun is below the horizon (night, sun_altitude_deg <= 0). Night rows are no direct sun, not building shade: take building-shade shares over rows with sun_altitude_deg > 0 only.", "unit": "bool", "source": "src/om_package/shade.py is_shaded()", "method": "sun altitude vs. marched horizon angle at the sun's azimuth (point_horizon_profiles(), wired v0.1.2, max_dist_m=100m — see README Known limits)", "limits": "Computed on the walk dates only, daylight steps only, Rio local time slots.", "status": "computed"},
 }
 
 
-def full_dictionary(radii=BUFFER_RADII_M) -> dict[str, dict]:
+RETIRED_IN = "v0.3.0"
+#: id -> what replaced it. A retired id keeps its row (ids are never reused).
+_RETIRED = {
+    "windward_lambda_f_prevailing": "frontal_area_density_windward_<regime>",
+    "canyon_alignment_prevailing_deg": "canyon_alignment_deg_<regime>",
+    "upwind_shelter_deg_prevailing": "upwind_shelter_angle_deg_<regime>",
+    "z0_macdonald_m": "z0_macdonald_m_<regime>",
+    "timestamp": "timestamp_local and timestamp_utc",
+    "agreement_share": "removed with the clock sensitivity analysis (loggers record UTC)",
+    "n_daylight_point_slots": "removed with the clock sensitivity analysis (loggers record UTC)",
+    "used_if_device_clock_utc": "removed with the clock sensitivity analysis (loggers record UTC)",
+    "used_if_device_clock_local": "removed with the clock sensitivity analysis (loggers record UTC)",
+    "valid_utc": "p11_wind_regimes and p11_regime_by_hour (p11_wind_observed.csv is no longer shipped)",
+    "valid_local": "p11_wind_regimes and p11_regime_by_hour (p11_wind_observed.csv is no longer shipped)",
+    "drct": "p11_wind_regimes and p11_regime_by_hour (p11_wind_observed.csv is no longer shipped)",
+    "speed_ms": "mean_speed_ms (p11_wind_observed.csv is no longer shipped)",
+    "calm": "p11_regime_by_hour (p11_wind_observed.csv is no longer shipped)",
+    "variable_direction": "p11_wind_observed.csv is no longer shipped",
+}
+
+_WIND = ("SBGL (Galeao airport) METAR, 10 m, a regional reference and not wind at the route; regimes come from the peaks "
+         "of the smoothed 16-sector rose (src/om_package/wind_regimes.py).")
+_REGIME_LIMITS = (
+    "PROXY, not simulated or measured air movement. " + _WIND + " The regime direction is the mean of the reports "
+    "nearest that rose peak."
+)
+
+
+def _row(definition, unit, source, method, limits="-"):
+    return {"definition": definition, "unit": unit, "source": source, "method": method, "limits": limits,
+            "status": "computed"}
+
+
+_V030 = {
+    "walk_id": _row("Identifier of one logger walk of OM2, OM2_<date>_<period> (duration appended only if two walks share both).", "-",
+                    "file names of the walk dataset (data/maré/octopus/prerelease_v020/matched/)", "src/om_package/walks.py _walk_ids",
+                    "The walk dataset is by Cassiano and Vincent; the date in the id is the UTC date of the file name."),
+    "period": _row("In p02b_walks: part of the day of the walk (morning or evening). In p11_wind_regimes and p11_regime_by_hour: the wind record the row describes (campaign = the campaign-season window; climatology = 2015-2024).", "category",
+                   "walk file names; src/om_package/wind_regimes.py", "as named", "-"),
+    "start_local": _row("Rio local time of the first logged row of the walk, with the -03:00 offset.", "ISO 8601, America/Sao_Paulo", "walk file", "first timestamp converted from UTC (loggers record UTC)", "-"),
+    "start_utc": _row("The same instant as start_local, in UTC.", "ISO 8601, UTC", "walk file", "first logged timestamp", "-"),
+    "end_local": _row("Rio local time of the last logged row of the walk, with the -03:00 offset.", "ISO 8601, America/Sao_Paulo", "walk file", "last timestamp converted from UTC", "-"),
+    "end_utc": _row("The same instant as end_local, in UTC.", "ISO 8601, UTC", "walk file", "last logged timestamp", "-"),
+    "duration_min": _row("Minutes from the first to the last logged row of the walk.", "min", "walk file", "end - start", "-"),
+    "coverage_share": _row("Share of the route length between the first and the last on-route fix of the walk.", "fraction [0,1]", "walk file; OM2 route", "(last - first distance along the route) / route length", "A walk below 0.9 is flagged partial."),
+    "share_on_route": _row("Share of the walk's logged rows matched to edges of the OM2 route.", "fraction [0,1]", "walk file; OM2 route", "rows on route / all rows", "Side-street detours are dropped from arrival times, not projected onto the route."),
+    "share_interpolated": _row("Share of the on-route rows whose position the map matcher interpolated.", "fraction [0,1]", "walk file", "match_status == interpolated", "-"),
+    "max_gap_s": _row("Longest time between two consecutive on-route fixes.", "s", "walk file", "max diff of on-route timestamps", "-"),
+    "partial": _row("True when the walk covers less than 0.9 of the route.", "bool", "p02b_walks", "coverage_share < 0.9", "-"),
+    "wind_regime": _row("Wind regime of the walk: the regime name of the nearest SBGL report to the walk's mid time, 'calm' if that report is calm, 'none' if it is more than 60 min away or has no direction.", "category (regime name, calm, none)", _WIND, "nearest report to the walk's mid time, classified to the nearer campaign regime peak (src/om_package/wind_regimes.py tag_walks)", "Airport wind, not wind at the route."),
+    "wind_report_time_local": _row("Rio local time of the SBGL report used to tag the walk.", "ISO 8601, America/Sao_Paulo", "SBGL METAR", "as reported, converted from UTC", "-"),
+    "wind_report_time_utc": _row("The same instant as wind_report_time_local, in UTC.", "ISO 8601, UTC", "SBGL METAR", "as reported", "-"),
+    "wind_direction_deg": _row("Direction the wind blows FROM in the SBGL report used to tag the walk; empty for calm or none.", "degrees clockwise from north", "SBGL METAR", "as reported", "Reported on a coarse direction grid by the source."),
+    "wind_speed_ms": _row("Wind speed in the SBGL report used to tag the walk.", "m/s", "SBGL METAR", "knots x the knot-to-m/s factor of scripts/build_wind_rose.py", "-"),
+    "wind_report_minutes_from_mid": _row("Minutes from the walk's mid time to that report (negative = report before).", "min", "SBGL METAR; walk file", "report time - walk mid time", "-"),
+    "t_arrival_local": _row("Rio local time at which the walk reached this point, with the -03:00 offset.", "ISO 8601, America/Sao_Paulo", "walk file; OM2 route", "time interpolated linearly against distance along the route between on-route fixes (src/om_package/walks.py arrival_times)", "Distance is a running maximum, so arrival times never go backwards; interpolated across gaps (see arrival_source)."),
+    "t_arrival_utc": _row("The same instant as t_arrival_local, in UTC.", "ISO 8601, UTC", "walk file", "as t_arrival_local", "-"),
+    "arrival_source": _row("How the arrival time was obtained: gps (between fixes less than 60 s apart) or gap_interpolated (bracketed by a longer gap).", "category", "walk file", "src/om_package/walks.py arrival_times", "Rows outside the walk (outside_walk) are not shipped."),
+    "shaded_at_arrival": _row("True when the point is in building shade, or the sun is below the horizon, at the moment the walk reaches it. Matched columns <...>_tau<s>s carry it as 0/1.", "bool", "p10_horizon_profiles; pvlib solar position", "sun altitude at t_arrival vs the marched horizon at the sun's azimuth (src/om_package/shade.py is_shaded)", "Geometry-derived (buildings and terrain), no tree shade, no cloud."),
+    "dose_1h_before_wh_m2": _row("Clear-sky direct-beam energy on a horizontal plane in the 1 h before the walk reached this point; zero while the point is shaded by the building horizon.", "Wh/m2 (rounded to 0.1)", "pvlib Ineichen clear-sky DNI; p10_horizon_profiles", "integral over [t_arrival - 1 h, t_arrival] on a 1-min grid (src/om_package/walk_dose.py)", "Clear-sky upper bound, geometry-derived, not measured radiation."),
+    "dose_3h_before_wh_m2": _row("As dose_1h_before_wh_m2, over the 3 h before arrival.", "Wh/m2 (rounded to 0.1)", "see dose_1h_before_wh_m2", "see dose_1h_before_wh_m2", "Clear-sky upper bound."),
+    "regime_key": _row("Key of a wind regime: reg1 is the larger regime of the campaign season; climatology regimes take the key of the nearest campaign regime. 'calm' in p11_regime_by_hour.", "category", "src/om_package/wind_regimes.py", "see wind_regimes.find_regimes, assign_keys", "-"),
+    "name": _row("Regime name: the 16-point compass name of the regime's mean direction (east-southeast, north-northwest ...).", "category", "src/om_package/wind_regimes.py", "compass_name(mean_direction_deg)", "Names follow the data; the climatology's name can differ from the campaign's."),
+    "column_slug": _row("The regime name lowercased with hyphens and spaces as underscores; the suffix of the regime's point columns.", "category", "name", "src/om_package/p10_p11.py regime_slug", "-"),
+    "mean_direction_deg": _row("Circular mean direction the wind blows FROM, of the reports assigned to the regime.", "degrees clockwise from north", _WIND, "circular mean of the member reports", "Airport wind, not wind at the route."),
+    "share": _row("In p11_wind_regimes: share of the directional (non-calm) reports in the regime. In p11_regime_by_hour: share of the reports in that local hour in the regime or calm.", "fraction [0,1]", _WIND, "count / count", "Variable and missing-direction reports are excluded."),
+    "mean_speed_ms": _row("Mean wind speed of the reports in the regime.", "m/s", "SBGL METAR (Iowa ASOS archive), reported in knots", "mean of the member reports", "Airport wind, 10 m."),
+    "n_reports": _row("Number of reports in the regime.", "count", "SBGL METAR", "count", "-"),
+    "period_calm_share": _row("Share of all reports in the period that are calm, a bookkeeping column repeated on both regime rows.", "fraction [0,1]", "SBGL METAR", "calm reports / all reports", "-"),
+    "mixture_component_direction_deg": _row("Mean direction of the von Mises mixture component nearest the regime (the check on the regime split).", "degrees", "SBGL METAR", "two von Mises components plus a uniform background fitted by EM to the reports with a seeded +/-5 degree jitter that undoes the 10 degree reporting steps (wind_regimes.vonmises_mixture)", "A check only: the regimes themselves come from the rose peaks."),
+    "mixture_difference_deg": _row("Circular difference between the regime's mean direction and that mixture component.", "degrees", "SBGL METAR", "see mixture_component_direction_deg", "-"),
+    "mixture_component_weight": _row("Mixture weight of that component.", "fraction [0,1]", "SBGL METAR", "see mixture_component_direction_deg", "-"),
+    "mixture_component_kappa": _row("Concentration of that component (larger = narrower).", "-", "SBGL METAR", "see mixture_component_direction_deg", "-"),
+    "mixture_background_weight": _row("Weight of the uniform background in the mixture.", "fraction [0,1]", "SBGL METAR", "see mixture_component_direction_deg", "-"),
+    "local_hour": _row("Rio local hour of day (0-23) of the SBGL reports.", "hour", "SBGL METAR", "valid time converted to America/Sao_Paulo", "-"),
+    "regime": _row("In p11_regime_by_hour: the regime name or 'calm'.", "category", "src/om_package/wind_regimes.py hourly_frequency", "each report goes to the nearer regime peak; calm = speed below the calm threshold", "-"),
+    "zd_macdonald_m": None,  # placeholder replaced below
+}
+del _V030["zd_macdonald_m"]
+
+_MEASURE_NOTES = {
+    "sky_view_factor": "sky view factor", "height_width_ratio": "height-to-width ratio",
+    "building_height_m": "building height", "plan_density_lambda_p": "plan area density",
+    "shaded_at_arrival": "shaded at arrival (0/1)", "dose_1h_before_wh_m2": "direct dose in the 1 h before arrival",
+}
+
+
+def _regime_rows(regimes: list[dict]) -> dict[str, dict]:
+    out = {}
+    for g in regimes:
+        sl, nm = g["slug"], g["name"]
+        where = f"at the mean direction of the campaign-season '{nm}' wind regime (p11_wind_regimes)"
+        out[f"frontal_area_density_windward_{sl}"] = _row(
+            f"PROXY: frontal-area density (Oke 1988 lambda_f of the nearest 10 m grid cell) facing the wind, {where}.", "dimensionless",
+            "lambda_f_<dir> columns of this table", "circular linear interpolation between the two nearest of the 8 compass-direction columns (src/om_package/vent_indices.py windward_lambda_f)",
+            _REGIME_LIMITS + " 10 m-cell resolution; NaN where the lambda_f_<dir> columns are NaN.")
+        out[f"canyon_alignment_deg_{sl}"] = _row(
+            f"PROXY: angle between the street axis and the wind axis, folded to 0-90 deg (0 = along the street, channelling; 90 = across), {where}.", "degrees [0,90]",
+            "street_orientation_deg of this table", "absolute difference of the undirected axes folded mod 180 and then to 0-90 (src/om_package/vent_indices.py canyon_alignment_deg)",
+            _REGIME_LIMITS + " Axis alignment only; says nothing about building-scale blocking.")
+        out[f"upwind_shelter_angle_deg_{sl}"] = _row(
+            f"PROXY: horizon (obstruction) angle at the upwind azimuth, how high the surroundings rise toward the wind, {where}.", "degrees",
+            f"p10_horizon_profiles.parquet (marched horizon of {_GEOM})", "horizon angle at the marched azimuth nearest the regime direction (src/om_package/vent_indices.py upwind_shelter_deg)",
+            _REGIME_LIMITS + " Horizon march limited to the DTM's valid radius.")
+        out[f"z0_macdonald_m_{sl}"] = _row(
+            f"PROXY: aerodynamic roughness length z0 by Macdonald et al. (1998) from the 50 m buffer's plan density and mean building height and the windward frontal-area density, {where}.", "m",
+            f"lambda_p_buffer_{DEFAULT_BUFFER_M}m, building_height_mean_buffer_{DEFAULT_BUFFER_M}m, frontal_area_density_windward_{sl} of this table",
+            f"Macdonald, Griffiths & Hall (1998), Atmos. Environ. 32(11):1857-1864; A={MACDONALD_A:g}, beta={MACDONALD_BETA:g}, Cd={MACDONALD_CD:g}, kappa={VON_KARMAN:g} (src/om_package/vent_indices.py macdonald_zd_z0)",
+            _REGIME_LIMITS + " Staggered-array constants applied to an irregular favela fabric; NaN where the 50 m buffer has no building.")
+    return out
+
+
+def _matched_rows(regimes: list[dict], taus=DEFAULT_TAUS_S) -> dict[str, dict]:
+    measures = {**_MEASURE_NOTES}
+    for g in regimes:
+        for stem in ("frontal_area_density_windward", "canyon_alignment_deg", "upwind_shelter_angle_deg"):
+            measures[f"{stem}_{g['slug']}"] = f"{stem.replace('_', ' ')} at the {g['name']} regime"
+    out = {}
+    for m, note in measures.items():
+        for tau in taus:
+            out[f"{m}_tau{float(tau):g}s"] = _row(
+                f"Sensor-matched {note}: the exponentially weighted mean of {m} over the points the walk had already passed, as seen by a sensor with time constant {float(tau):g} s.",
+                "as " + m, "this table; walk file", f"sum w x / sum w over points j reached no later than this one and at most 5 tau earlier, w = exp(-dt / {float(tau):g} s) (src/om_package/sensor_match.py)",
+                "tau is the 63 % response time (tau = t90 / ln 10). Empty where no point within 5 tau has a value. One value per walk and point; segment with aggregate_to_segments.py --by walk_id.")
+    return out
+
+
+def full_dictionary(radii=BUFFER_RADII_M, regimes: list[dict] | None = None) -> dict[str, dict]:
+    """regimes: [{slug, name}] of the campaign-season wind regimes (rows for
+    the regime-named point columns); without them those rows are absent."""
+    regimes = regimes or []
     d = dict(_BASE)
+    d.update(_V030)
+    d.update(_regime_rows(regimes))
+    d.update(_matched_rows(regimes))
     for template_id, template in _BUFFER_TEMPLATES.items():
         for r in radii:
             col_id = template_id.format(r=r)
@@ -471,13 +607,15 @@ def full_dictionary(radii=BUFFER_RADII_M) -> dict[str, dict]:
         d[k] = v
     for k, v in _SHADE_TABLE_ONLY.items():
         d.setdefault(k, v)
+    for k, note in _RETIRED.items():
+        d[k] = {**d[k], "status": f"RETIRED ({RETIRED_IN}): replaced by {note}"}
     return d
 
 
-def dictionary_dataframe(radii=BUFFER_RADII_M):
+def dictionary_dataframe(radii=BUFFER_RADII_M, regimes: list[dict] | None = None):
     import pandas as pd
 
-    d = full_dictionary(radii)
+    d = full_dictionary(radii, regimes)
     rows = []
     for col_id, meta in d.items():
         row = {"id": col_id}

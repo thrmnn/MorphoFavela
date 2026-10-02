@@ -1,19 +1,11 @@
 #!/usr/bin/env python3
 """P-05 — join example: match this package's ``p05_building_shade`` table
-(``point_id``, ``timestamp`` at 5-minute steps) against a real Octopus
-device CSV, by ``point_id`` and timestamp floored to 5 minutes.
+(``point_id``, ``timestamp_utc`` and ``timestamp_local`` at 5-minute steps, on
+the walk dates, daylight only) against a real Octopus device CSV, by
+``point_id`` and the device ``Timestamp`` (UTC) floored to 5 minutes.
 
-TIMEZONE CAVEAT (read src/om_package/shade.py's module docstring for the
-full story — this is the short version): ``p05_building_shade.timestamp``
-is **UTC-labelled as a stated operating-rule choice for this cycle, NOT a
-resolution of the still-UNRESOLVED campaign timezone.** GPS-fix rows in a
-device CSV are UTC per firmware (u-blox NMEA/UBX time); RTC-fallback
-(no-fix) rows may be local time (America/Sao_Paulo, UTC-3) or something
-else the firmware does not record — the two are not distinguishable after
-the fact from the CSV alone. This script does not localize the device
-CSV's ``Timestamp`` column; it treats it as already UTC, same as the
-shade table. Re-derive both sides once the team confirms the campaign
-clock (tasks OCTOPUS_CSV / OCTOPUS_TZ).
+Time: the loggers record UTC; Rio local time is America/Sao_Paulo (UTC-3, no
+DST). The shade table carries both, so the join uses ``timestamp_utc``.
 
 SPATIAL-JOIN CAVEAT: this join is by ``point_id``, not by GPS coordinate.
 The device CSV must already carry the ``point_id`` its rows belong to
@@ -21,19 +13,12 @@ The device CSV must already carry the ``point_id`` its rows belong to
 spatial join done with the full Brisa+ (MorphoFavela) repo's geopandas/KDTree
 tooling). This standalone script (pandas + pyarrow only, no Brisa+ (MorphoFavela)
 import) deliberately does not perform that spatial join itself — see
-``src/om_package/shade.py``'s ``OCTOPUS_JOIN_EXAMPLE`` in the repo for
-the nearest-OM2-point version, once a real GPS-track CSV (Timestamp,
-Latitude, Longitude, ...) is available (the pilot pull so far has none —
-see this package's README, P-05 Known limits).
+the nearest-OM2-point version of a spatial join.
 
-Real device CSV columns confirmed against the team's Drive pull
-(src/om_package/shade.py ``infer_campaign_windows`` docstring, 2026-09-25):
-``Timestamp,Latitude,Longitude,Temperature,Humidity,PM1.0,PM2.5,PM4.0,
-PM10.0`` (GPS-track schema) or ``Timestamp,Temperature,Humidity,PM1.0,
-PM2.5,PM2.5_cal,PM4.0,PM10.0`` (no-GPS fixed-site schema, device codes
-I_1/I_3/I_4/O_3/O_4). Latitude == Longitude == 0.0 is the firmware's
-no-fix sentinel (octopus_outdoor.ino) and is dropped before joining, when
-those columns are present.
+Device CSV columns: ``Timestamp,Latitude,Longitude,Temperature,Humidity,
+PM1.0,PM2.5,PM4.0,PM10.0`` (GPS-track schema). Latitude == Longitude == 0.0
+is the firmware's no-fix sentinel and is dropped before joining, when those
+columns are present.
 
 Run (from inside the package directory):
     python OM2/join_shade_example.py --shade p05_building_shade.parquet \\
@@ -63,8 +48,8 @@ def drop_nofix_rows(df: pd.DataFrame, lat_col: str = "Latitude", lon_col: str = 
 
 
 def join_shade_to_device(shade_df: pd.DataFrame, device_df: pd.DataFrame) -> pd.DataFrame:
-    """Inner join on (point_id, timestamp floored to 5 minutes). Both
-    sides' timestamps are treated as UTC-labelled — see module docstring."""
+    """Inner join on (point_id, timestamp_utc = device Timestamp (UTC)
+    floored to 5 minutes)."""
     if "point_id" not in device_df.columns:
         raise ValueError(
             "device CSV has no 'point_id' column — this example joins by point_id "
@@ -74,14 +59,14 @@ def join_shade_to_device(shade_df: pd.DataFrame, device_df: pd.DataFrame) -> pd.
     device_df = drop_nofix_rows(device_df)
 
     shade = shade_df.copy()
-    shade["timestamp"] = pd.to_datetime(shade["timestamp"], utc=True)
+    shade["timestamp_utc"] = pd.to_datetime(shade["timestamp_utc"], utc=True)
 
     device = device_df.copy()
     device["timestamp_5min_utc"] = pd.to_datetime(device["Timestamp"], utc=True).dt.floor("5min")
 
     merged = shade.merge(
         device,
-        left_on=["point_id", "timestamp"],
+        left_on=["point_id", "timestamp_utc"],
         right_on=["point_id", "timestamp_5min_utc"],
         how="inner",
         suffixes=("_shade", "_device"),

@@ -19,7 +19,9 @@ from .routes import ROUTE_FLAG_MAX_STREET_DIST_M
 from .shade import SHADE_STEP_MIN
 from .vent_indices import DEFAULT_BUFFER_M
 
-VERSION = "v0.2.0"
+#: The one place the package version is set; the build default and every
+#: rendered heading read it.
+VERSION = "v0.3.0"
 #: read from the clock at import time, never typed — this is the date this
 #: version is BUILT, not the date any source data was fetched (the
 #: "fetched" date in the README is computed at build time from the route
@@ -91,26 +93,22 @@ the Brisa+ (MorphoFavela) repository).
 |---|---|---|
 | `report.pdf`, `report.md` | Short human report: results, key figures, caveats | — |
 | `README.md`, `README.pdf` | This technical document | P-01 |
-| `CHANGELOG.md` | Version history | P-09 |
 | `manifest.json` | Version, CRS, use terms, decisions, wind source, P-10/P-11 summaries, sha256 per file | — |
-| `p00_spec_conformance.json`, `.csv` | Status of every spec item, computed from this directory | P-00 |
-| `p00_disclosure_hits.txt` | Names and internal ids found in the text files, for the PI's release review | — |
 | `OM2/points.parquet`, `.gpkg`, `.csv` | One row per route point (1 m): form, buffer, ventilation-proxy and sun columns | P-02, P-03, P-04, P-06, P-10, P-11 |
 | `OM2/aggregate_to_segments.py` | Standalone re-aggregation of the points to any segment length | P-03 |
-| `p05_building_shade.parquet`, `.csv` | Building shade per point and {shade_step_min}-min step on each campaign date (UTC-labelled) | P-05 |
-| `p05b_campaign_windows.parquet`, `.csv` | Campaign dates and walk windows read off the device files | P-05 |
+| `p05_building_shade.parquet` | Building shade per point and {shade_step_min}-min step on each walk date, daylight only, Rio local time (parquet only) | P-05 |
+| `p02b_walks.parquet`, `.csv` | One row per logger walk: timing, coverage, wind regime tag | P-12 |
+| `p12_walk_points.parquet`, `.csv` | One row per walk and route point: arrival time, shade and dose at arrival, sensor-matched values | P-12 |
 | `OM2/join_shade_example.py` | Example join of device data to the shade table | P-05 |
 | `OM2/p07_quality_report.json`, `.csv` | Coverage per column, flagged points, P-10/P-11 summary block | P-07 |
 | `p08_data_dictionary.parquet`, `.csv` | One row per variable: definition, unit, source, method, limits | P-08 |
 | `p10_sun_envelope.parquet`, `.csv` | Per point and local {envelope_slot_min}-min slot over the season: always sunlit / always shaded / date-dependent / night | P-10 |
 | `p10_sun_dose.parquet`, `.csv` | Clear-sky direct-sun dose over the past {dose_hours_list} h, per campaign date and as a season min/median/max | P-10 |
-| `p10_clock_agreement.parquet`, `.csv` | Share of daylight point-slots with the same sun state under the two device-clock readings | P-10 |
 | `p10_horizon_profiles.parquet` | Marched horizon angle per point and azimuth (input to every sun result) | P-10 |
-| `p11_wind_observed.csv` | SBGL airport wind for the season, flagged by the walk each report matches under each clock reading | P-11 |
+| `p11_wind_regimes.csv`, `p11_regime_by_hour.csv` | The two wind regimes (campaign season and 2015-2024 climatology) and their share by local hour | P-11 |
 | `OM2/map_form.png`, `OM2/profiles.png` | Route map coloured by sky view; form variables along the route | P-04 |
 | `OM2/map_shade.png`, `OM2/shade_calendar.png` | Daylight shade share per point; shade by date and time | P-05 |
 | `OM2/sun_envelope.png`, `OM2/sun_dose.png` | Date-dependent share by time of day and along the route; {dose_hours_first} h dose along the route | P-10 |
-| `OM2/map_vent_shelter.png`, `OM2/profiles_vent.png`, `OM2/wind_rose_compare.png` | Shelter angle map; ventilation proxies along the route; observed vs climatology wind | P-11 |
 
 {conformance_section}
 ## Release scope
@@ -154,9 +152,9 @@ densification.
 | outputs/maré/svf_v2/svf_streets.gpkg | ray-cast from the above, 1.5 m pedestrian height, 145-patch Tregenza sky (src/svf_v2) | P-04 sky_view_factor |
 | outputs/maré/morphometrics/canyon/hw_streets.gpkg | derived from the above (scripts/brisa_ventilation/02_hw_canyon_proxy.py: flanking-building cross-section at each street sample, search radius = that script's SEARCH_RADIUS) | P-04 street_width_m, building_height_m, height_width_ratio |
 | outputs/maré/features/features_grid.parquet | 10 m grid, derived from the above | P-04 plan_density_lambda_p, grid_cell_id, P-06 ventilation proxies incl. lambda_f_<dir> |
-| data/maré/wind_rose.json | ASOS Galeão (SBGL) METAR, 2015-2024 | P-06 wind-alignment proxy; prevailing bearing for the P-11 columns |
-| data/maré/octopus/wind/ (SBGL METAR, Iowa Environmental Mesonet ASOS archive) | window {wind_window}, fetched {wind_fetched}; fetch URL and sha256 in `manifest.json` `provenance.wind_source` | P-11 observed wind (`p11_wind_observed.csv`), `OM2/wind_rose_compare.png` |
-| Octopus campaign CSVs (data/maré/octopus/csv/) | {n_campaign_dates} campaign dates; no GPS columns | campaign dates for P-05 / P-10 |
+| data/maré/wind_rose.json | ASOS Galeão (SBGL) METAR, 2015-2024 | P-06 wind-alignment proxy |
+| data/maré/octopus/wind/ (SBGL METAR, Iowa Environmental Mesonet ASOS archive) | window {wind_window}, fetched {wind_fetched}; fetch URL and sha256 in `manifest.json` `provenance.wind_source` | P-11 wind regimes (`p11_wind_regimes.csv`) |
+| Walk dataset (data/maré/octopus/prerelease_v020/matched/, Cassiano and Vincent) | {n_walks} walks on {n_campaign_dates} dates; sha256 per file in its manifest | walk timing (`p02b_walks`), arrival times (`p12_walk_points`), walk dates for P-05 / P-10 |
 | data/maré/neighbourhoods.gpkg | community boundary crosswalk | neighbourhood attribution |
 
 The extended DTM (`dtm_extended_300m.tif`, used for P-05 shade's horizon
@@ -237,32 +235,31 @@ the measured counts.
 
 ### Shade (P-05)
 
-Function + CLI (`src/om_package/shade.py`), now RUN for
-real against a {n_csv_pilot}-file pilot pull from the team's Drive
-(`Zenodo_release/fixed_data/`, one CSV per device: I_1/I_3/I_4/O_3/O_4).
-`infer_campaign_windows()` read {n_campaign_dates} campaign dates/walk
-windows straight off those files (no epoch-reset rows found in the
-pilot). `point_horizon_profiles()` is now WIRED to the real WP-02/WP-04
-horizon engine (`src.brisa_solar.wp02_surface.build_surface` +
-`wp02_horizon.patch_visibility(..., return_horizon=True)`, real 145-patch
-Tregenza directions) and was run for all {n_om2_points} OM2 points on the
-laptop GPU. `compute_shade()` then produced {n_shade_rows} real
-(point x 5-min-timestamp) rows across the {n_campaign_dates} campaign
-dates (walk windows padded to the hour), **computed in UTC**
-({shade_fraction_daylight_pct}% of daylight rows in building shade; `shaded`
-is also true at night, sun below the horizon, so shares are taken over
-rows with `sun_altitude_deg > 0` only) — see Known limits for why UTC
-and why `max_dist_m={shade_max_dist_m:g} m`, not WP-04's 500 m citywide
-default. The schema reserves a `tree_shade` column (always null). New in
-v0.1.3, **`OM2/join_shade_example.py` travels inside this package** —
-joins `p05_building_shade` (`point_id`, `timestamp` at {shade_step_min}-min steps,
-**UTC-labelled, not a resolved local time** — see Known limits) against
-a real Octopus device CSV, matching `point_id` and floor-to-{shade_step_min}-minutes
-`timestamp`. Usage (run from inside the package directory):
+(`src/om_package/shade.py`.) The horizon is marched once for all {n_om2_points}
+route points (`point_horizon_profiles()`, the WP-02/WP-04 engine, real
+145-patch Tregenza directions, `max_dist_m={shade_max_dist_m:g} m`).
+`compute_shade_local()` then writes {n_shade_rows} (point x {shade_step_min}-min
+step) rows across the {n_campaign_dates} walk dates, daylight only, in Rio
+local time (`timestamp_local`, with a `timestamp_utc` twin), as parquet only
+({shade_fraction_daylight_pct}% of rows in building shade). The schema
+reserves a `tree_shade` column (always null). `OM2/join_shade_example.py`
+joins `p05_building_shade` to a device CSV by `point_id` and `timestamp_utc`
+floored to {shade_step_min} minutes (run from inside the package directory):
 ```
 python OM2/join_shade_example.py --shade p05_building_shade.parquet \\
     --device path/to/octopus_log_with_point_id.csv --out joined_example.csv
 ```
+
+### Walks (P-12)
+
+(`src/om_package/walks.py`, `walk_tables.py`, `sensor_match.py`,
+`walk_dose.py`.) `p02b_walks` lists each logger walk. `p12_walk_points` gives,
+for each walk and each route point the walk reached, the arrival time, whether
+the point was shaded then, the clear-sky direct dose in the 1 h and 3 h before
+arrival, and sensor-matched values (exponentially weighted mean of the points
+already passed, tau = 5, 10, 30, 60 s) of the form and ventilation measures.
+Re-aggregate to segments per walk with
+`python OM2/aggregate_to_segments.py --points p12_walk_points.parquet --by walk_id --segment-m 20 --tau 30 --out segments.parquet`.
 
 ### Sun exposure (P-10)
 
@@ -274,31 +271,26 @@ sun-position lookup. *Envelope*: for each point and local time of day
 {p10_window}, classify as always sunlit, always shaded or date-dependent
 (counting only days with the sun up), with the sunlit share of days.
 *Dose*: clear-sky direct-beam energy on a horizontal plane over the
-preceding {dose_hours_and} h (slots of {dose_slot_min} min), for each campaign
-date and as a min/median/max over the season window. *Annual sun hours*:
-hours per year with the sun above the point's horizon. *Clock agreement*:
-the exact-date shade recomputed with the device clock read as UTC and as
-Rio local time. Every quantity is a geometry-derived proxy (no cloud, no
+preceding {dose_hours_and} h (slots of {dose_slot_min} min), for each walk date
+and as a min/median/max over the season window. *Annual sun hours*:
+hours per year with the sun above the point's horizon. Every quantity is a geometry-derived proxy (no cloud, no
 tree shade, not measured sunlight); the dose is clear-sky, hence an upper
 bound. Rio local time is a fixed UTC-3 (no daylight saving since 2019);
-whether the device clocks log UTC or local time is UNKNOWN, which is why
-the envelope is indexed by local time of day, not by date.
+the loggers record UTC.
 
 ### Ventilation indices (P-11)
 
-(`src/om_package/vent_indices.py`,
-`src/om_package/wind_obs.py`): `p11_wind_observed.csv` holds the SBGL
-(Galeão airport, 10 m) observations of the window, each flagged with the
-campaign date it would be matched to (nearest report with a usable
-direction, within the match gap recorded in `manifest.json` `p11`) under
-each device-clock reading. Per-point columns are evaluated at the
-prevailing bearing ({prevailing_deg:.0f} deg, the circular mean of the
-2015-2024 SBGL climatology): `windward_lambda_f_prevailing`,
-`canyon_alignment_prevailing_deg`, `upwind_shelter_deg_prevailing`,
-`z0_macdonald_m` / `zd_macdonald_m` (Macdonald et al. 1998) and
-`open_space_fraction`. All are PROXIES from building geometry, never
-measured or simulated air temperature or air movement; SBGL is a regional
-reference, not wind at the route.
+(`src/om_package/vent_indices.py`, `wind_regimes.py`): the SBGL (Galeão
+airport, 10 m) reports are split into two wind regimes by the peaks of the
+smoothed 16-sector rose, for the campaign season and for the 2015-2024
+climatology (`p11_wind_regimes.csv`, with a von Mises mixture check beside
+each regime; `p11_regime_by_hour.csv`). Per-point columns are computed at each
+campaign regime's mean direction and named by regime:
+`frontal_area_density_windward_<regime>`, `canyon_alignment_deg_<regime>`,
+`upwind_shelter_angle_deg_<regime>`, `z0_macdonald_m_<regime>` (Macdonald et
+al. 1998), plus `zd_macdonald_m` and `open_space_fraction`. All are PROXIES
+from building geometry, never measured or simulated air temperature or air
+movement; SBGL is a regional reference, not wind at the route.
 
 ### Figures
 
@@ -309,34 +301,19 @@ result first, then the sampling along the route): `OM2/map_form.png`
 `OM2/profiles.png` (1 m raw + 10 m segment means for the form/shade
 variables along the route), `OM2/shade_calendar.png` (one strip per
 campaign date, distance vs time of day, shaded/sunlit). New in {version}:
-`OM2/sun_envelope.png` (date-dependent share by local time of day, and a
-map of each point's date-dependent share of daylight), `OM2/sun_dose.png`
-({dose_hours_first} h dose along the route: season envelope band and the campaign dates)
-and three ventilation-proxy figures from `src/om_package/vent_figures.py`
-(`OM2/map_vent_shelter.png`, `OM2/profiles_vent.png`,
-`OM2/wind_rose_compare.png`, campaign-window observed wind vs the
-2015-2024 climatology).
+`OM2/sun_envelope.png` and `OM2/sun_dose.png`. (Ventilation figures:
+to be redrawn for the two regimes.)
 
 ## Using the data
 
 ### Join device data to P-05 / P-10
 
-P-05 (`p05_building_shade`) is keyed
-by 5-min timestamps *labelled UTC* (exact campaign dates). P-10 is keyed
-by **local** time of day and so does not depend on the date. Because the
-device clock is unresolved, map a device timestamp to a local slot under
-both readings and compare:
+Loggers record UTC; P-05 carries `timestamp_utc` and `timestamp_local`. P-10 is
+keyed by Rio local time of day (`local_slot`):
 ```
-ts = pd.to_datetime(device["Timestamp"])
-as_utc = ts.dt.tz_localize("UTC").dt.tz_convert("America/Sao_Paulo")  # clock logged UTC
-as_local = ts                                                        # clock logged local time
-device["slot_if_utc"] = as_utc.dt.floor("5min").dt.strftime("%H:%M")
-device["slot_if_local"] = as_local.dt.floor("5min").dt.strftime("%H:%M")
+ts = pd.to_datetime(device["Timestamp"], utc=True)
+device["slot_local"] = ts.dt.tz_convert("America/Sao_Paulo").dt.floor("5min").dt.strftime("%H:%M")
 ```
-`p10_clock_agreement` says how often the two readings give the same sun
-state at exact-date resolution; where it is low, use the P-10 classes
-(`always_sunlit`, `always_shaded`) as the date- and clock-robust subset and
-treat `date_dependent` slots as unresolved.
 
 ### Segment length (note for the Octopus team)
 
@@ -367,26 +344,13 @@ figures, not a sensor-derived value.)
 
 ## Known limits
 
-### Time and the device clock
+### Time
 
-- **Device clock UNKNOWN (UTC or Rio local time).** P-10 is indexed by local
-  time of day and reports both readings. Across the {n_campaign_dates}
-  campaign dates the sun state of a point-slot is identical under the two
-  readings in {clock_agreement_pct:.1f}% of daylight point-slots (pooled,
-  `p10_clock_agreement`): exact-date shade (P-05) is not reliable until the
-  clock is confirmed. The season envelope is date-dependent for
-  {date_dependent_pct:.1f}% of daylight point-slots; the rest
+- Loggers record UTC. Rio local time is America/Sao_Paulo (UTC-3, no daylight
+  saving). Shipped time columns are Rio local time (`_local`, ISO 8601 with
+  offset); data tables also carry a `_utc` twin. The season envelope is
+  date-dependent for {date_dependent_pct:.1f}% of daylight point-slots; the rest
   (`always_sunlit` / `always_shaded`) holds on every day of the window.
-- **Timezone is still UNRESOLVED** for the OM2 campaign (decision
-  `om_dates_tz`): GPS-fix Timestamp rows are UTC per firmware;
-  RTC-fallback (no-fix) rows may be local time or something else the
-  firmware does not record. Every function in `src/om_package/shade.py`
-  that needs a timezone takes it as a required parameter with no default.
-  **{version}'s P-05 table is computed with `tz="UTC"`** (current
-  operating rule for this cycle) — this is a stated labelling choice, NOT
-  a resolution of the open question; treat every timestamp in
-  `p05_building_shade` as UTC-labelled, re-derive if the team confirms
-  otherwise, and do not read it as local Rio clock time.
 
 ### What the values are
 
@@ -461,25 +425,12 @@ figures, not a sensor-derived value.)
 
 ### Device files and route files
 
-- **The Zenodo_release/fixed_data pilot CSVs have NO Latitude/Longitude
-  column** (`Timestamp,Temperature,Humidity,PM1.0,PM2.5,PM2.5_cal,PM4.0,
-  PM10.0` — confirmed on one CSV per device, I_1/I_3/I_4/O_3/O_4). This
-  looks like a fixed-site indoor/outdoor logger schema, not the OM2
-  GPS-track schema `OCTOPUS_JOIN_EXAMPLE` documents (which needs
-  Latitude/Longitude to pick the nearest OM2 point and to drop 0/0 no-fix
-  rows). Whether I_1/I_3/I_4/O_3/O_4 ARE the OM2 device under another
-  naming convention, or a separate fixed-site deployment, is UNVERIFIED —
-  see `docs/research/octopus_lidar_sources.md` §5 and the team message.
-  `infer_campaign_windows()` was made schema-tolerant (v0.1.2): it reports
-  `has_gps=False`, `n_fix=n_rows`, `n_no_fix=0` for this schema rather
-  than raising. The join example shipped in this package
-  (`OM2/join_shade_example.py`, see Methods above, P-05) joins by a
-  pre-assigned `point_id` plus an exact floor-to-5-minutes `timestamp`
-  match; it cannot run on these pilot CSVs as they are (no `point_id`, no
-  GPS column), and its only exercise so far is the package's own test with
-  a synthetic device file. The repo-internal example (`OCTOPUS_JOIN_EXAMPLE`
-  in `src/om_package/shade.py`, nearest 5-min timestamp with a tolerance)
-  is the one that was run on a real pilot file, temporal step only.
+- **Walk dataset.** Walk timing comes from the team's walk files (matched
+  GPS tracks, one CSV per walk, sha256 per file in their manifest). Only fixes
+  matched to edges of the OM2 route count; arrival times are interpolated
+  between fixes (flagged `gap_interpolated` when the fix gap exceeds 60 s).
+  The join example (`OM2/join_shade_example.py`) joins by a pre-assigned
+  `point_id` plus an exact floor-to-5-minutes `timestamp_utc` match.
 - om_routes.gpkg (Google Drive) was NOT fetched — too large for the
   connector. Pending if the team needs it.
 
@@ -488,10 +439,8 @@ figures, not a sensor-derived value.)
 - **Terrestrial SVF: OUT OF SCOPE for this version, by decision**
   (`om_v013_descope`) — the terrestrial-LiDAR analysis is not part of
   {version}; it may come in a later version.
-- **Building shade: computed for {n_campaign_dates} pilot campaign dates**
-  (see P-05 above, decision `om_shade_release`) — more dates arrive as
-  more of the team's Drive CSVs are pulled; an empty table still ships
-  when no CSVs are found at build time. **Tree shade: OUT OF SCOPE for
+- **Building shade: computed for {n_campaign_dates} walk dates**
+  (see P-05 above, decision `om_shade_release`). **Tree shade: OUT OF SCOPE for
   this version, by decision** (`om_v013_descope`); it may come in a later
   version. `tree_shade` stays in the shade schema as a reserved,
   always-null column.
@@ -750,18 +699,15 @@ package. Both addressed directly, not just documented around.
 
 """
 
-#: The newest entry — the only part of CHANGELOG.md rendered fresh on every
-#: build; v0.1.3 and older are frozen literal text above.
-CURRENT_ENTRY_TEMPLATE = """\
-# Changelog — mare_om2
-
-## {version} — {version_date}
+#: Frozen literal text: v0.2.0's entry as shipped.
+V020_ENTRY = """\
+## v0.2.0 — 2026-10-02
 
 Sun exposure that does not depend on knowing the campaign date or the device
 clock, and ventilation indices tied to observed wind. Data stays on the 2019
 geometry for now; every geometry input is a build parameter, so moving to the
 2024 airborne LiDAR and footprints later is one argument (`--buildings`,
-`--dtm`), not a code change. {version} is a new directory; v0.1.3 is untouched.
+`--dtm`), not a code change. v0.2.0 is a new directory; v0.1.3 is untouched.
 
 - **P-10 sun exposure (new spec item)**: `p10_sun_envelope.parquet/.csv`
   (per point and local time of day over the campaign season: always sunlit,
@@ -830,7 +776,7 @@ def render_readme(
     internal_routes_status: str,
     decisions: list[dict],
     dtm_native_resolution_m: float,
-    n_csv_pilot: int = 0,
+    n_walks: int = 0,
     n_campaign_dates: int = 0,
     n_shade_rows: int = 0,
     shade_fraction_daylight_pct: float = 0.0,
@@ -841,7 +787,6 @@ def render_readme(
     wind_source: dict,
     geometry_label: str,
     route_length_m: float,
-    prevailing_deg: float,
     version: str = VERSION,
 ) -> str:
     """Render README.md. The route_geometry_flag/lambda_p/shade numbers,
@@ -878,7 +823,7 @@ def render_readme(
         n_lambda_p_remainder=n_lambda_p_remainder,
         n_lambda_p_remainder_plausible=n_lambda_p_remainder_plausible,
         n_lambda_p_remainder_not_checked=n_lambda_p_remainder_not_checked,
-        n_csv_pilot=n_csv_pilot,
+        n_walks=n_walks,
         n_campaign_dates=n_campaign_dates,
         n_shade_rows=n_shade_rows,
         shade_fraction_daylight_pct=shade_fraction_daylight_pct,
@@ -895,19 +840,55 @@ def render_readme(
         dose_hours_first=p10_summary["dose_hours"][0],
         route_flag_max_dist_m=ROUTE_FLAG_MAX_STREET_DIST_M,
         date_dependent_pct=100 * p10_summary["date_dependent_share"],
-        clock_agreement_pct=100 * p10_summary["clock_agreement_all"],
         wind_window=" to ".join(wind_source["window_utc"]),
         wind_fetched=str(wind_source["fetched_utc"])[:10],
         geometry_label=geometry_label,
         route_length_m=route_length_m,
-        prevailing_deg=prevailing_deg,
         three_tau_pct=100 * (1 - math.exp(-3)),
         vent_buffer_m=DEFAULT_BUFFER_M,
     )
 
 
-def render_changelog(version: str = VERSION, version_date: str = VERSION_DATE) -> str:
+#: The newest entry: the only part of CHANGELOG.md rendered fresh on every build.
+CURRENT_ENTRY_TEMPLATE = """\
+# Changelog — mare_om2
+
+## {version} — {version_date}
+
+Walk-level timing, two wind regimes, and every time in Rio local time. The OM2
+route is the new 1 m-spaced route ({n_om2_points} points); geometry stays on
+the 2019 epoch. {version} is a new directory; earlier versions are untouched.
+
+- **Time**: every shipped time column is Rio local time (ISO 8601 with the
+  -03:00 offset, suffix `_local`); the loggers record UTC, and a `_utc` twin
+  is kept in the data tables. The device-clock sensitivity analysis is gone:
+  `p10_clock_agreement` and `p11_wind_observed.csv` are not shipped.
+- **Walks (new)**: `p02b_walks` (one row per logger walk: start, end,
+  duration, coverage, partial flag, wind regime tag; replaces
+  `p05b_campaign_windows`) and `p12_walk_points` (one row per walk and route
+  point: arrival time, shaded at arrival, clear-sky direct dose in the 1 h and
+  3 h before arrival, and sensor-matched values at tau = 5, 10, 30 and 60 s).
+- **Wind regimes (new)**: `p11_wind_regimes.csv` and `p11_regime_by_hour.csv`
+  replace the single prevailing direction. Ventilation point columns are
+  computed for both campaign-season regimes and named by regime
+  (`frontal_area_density_windward_<regime>`, `canyon_alignment_deg_<regime>`,
+  `upwind_shelter_angle_deg_<regime>`, `z0_macdonald_m_<regime>`); the
+  `*_prevailing` columns and `z0_macdonald_m` are retired.
+- **Shade (P-05)**: computed on the walk dates, daylight only, in local time
+  (`timestamp_local`, `timestamp_utc`); parquet only.
+- **Segment script**: `aggregate_to_segments.py` accepts `--by walk_id` for
+  `p12_walk_points`, with `--tau`.
+- **Dictionary**: rows for every new column; retired ids keep their row,
+  marked RETIRED.
+- Descoped by decision `om_v013_descope` and still out of scope: terrestrial
+  sky-view factor, tree shade, the airborne-vs-terrestrial comparison and the
+  2024 to 2026 height change.
+
+"""
+
+
+def render_changelog(n_om2_points: int, version: str = VERSION, version_date: str = VERSION_DATE) -> str:
     """Render CHANGELOG.md: only the newest entry is rendered; v0.1.3 and
     older are frozen literal text (see the constants above)."""
-    current = CURRENT_ENTRY_TEMPLATE.format(version=version, version_date=version_date)
-    return current + V013_ENTRY + V012_ENTRY + CHANGELOG_V011_ENTRY + CHANGELOG_V01_ENTRY
+    current = CURRENT_ENTRY_TEMPLATE.format(version=version, version_date=version_date, n_om2_points=n_om2_points)
+    return current + V020_ENTRY + V013_ENTRY + V012_ENTRY + CHANGELOG_V011_ENTRY + CHANGELOG_V01_ENTRY

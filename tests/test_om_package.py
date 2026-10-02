@@ -35,7 +35,6 @@ from src.om_package.shade import (
     SHADE_TABLE_COLUMNS,
     build_empty_shade_table,
     drop_nofix_rows,
-    infer_campaign_windows,
     sun_positions,
 )
 from src.om_package.ventilation import LAMBDA_F_DIRECTION_COLS, compute_ventilation_proxies
@@ -210,9 +209,9 @@ def test_no_dictionary_row_is_orphaned_from_a_real_table():
     # every dictionary id belongs to either the points table, the buffer
     # template, the shade table, or the DESCOPED registry — this is a
     # structural check (dictionary.py's own composition), not a live-data one.
-    from src.om_package.dictionary import _BASE, _BUFFER_TEMPLATES, _DESCOPED, _SHADE_TABLE_ONLY
+    from src.om_package.dictionary import _BASE, _BUFFER_TEMPLATES, _DESCOPED, _MEASURE_NOTES, _SHADE_TABLE_ONLY, _V030
 
-    known_sources = set(_BASE) | {t.format(r=r) for t in _BUFFER_TEMPLATES for r in BUFFER_RADII_M} | set(_DESCOPED) | set(_SHADE_TABLE_ONLY)
+    known_sources = set(_BASE) | {t.format(r=r) for t in _BUFFER_TEMPLATES for r in BUFFER_RADII_M} | set(_DESCOPED) | set(_SHADE_TABLE_ONLY) | set(_V030) | {f"{m}_tau{t}s" for m in _MEASURE_NOTES for t in (5, 10, 30, 60)}
     assert set(full_dictionary()) == known_sources
 
 
@@ -295,57 +294,6 @@ def test_drop_nofix_rows_removes_zero_zero_sentinel():
     assert not ((out["Latitude"] == 0.0) & (out["Longitude"] == 0.0)).any()
 
 
-def test_infer_campaign_windows(tmp_path):
-    csv_path = tmp_path / "log0.csv"
-    csv_path.write_text(
-        "Timestamp,Latitude,Longitude,Temperature\n"
-        "2026-03-01 08:00:00,-22.860,-43.240,27.5\n"
-        "2026-03-01 08:00:05,0.0,0.0,27.6\n"
-        "2026-03-01 08:00:10,-22.861,-43.241,27.6\n"
-    )
-    windows = infer_campaign_windows([csv_path])
-    assert len(windows) == 1
-    row = windows.iloc[0]
-    assert str(row["date"]) == "2026-03-01"
-    assert row["n_rows"] == 3
-    assert row["n_fix"] == 2
-    assert row["n_no_fix"] == 1
-    assert row["first_timestamp"] == pd.Timestamp("2026-03-01 08:00:00")
-    assert row["last_timestamp"] == pd.Timestamp("2026-03-01 08:00:10")
-    assert row["has_gps"] == True  # noqa: E712
-    assert row["n_epoch_reset"] == 0
-
-
-def test_infer_campaign_windows_no_gps_schema(tmp_path):
-    # v0.1.2: the Zenodo_release/fixed_data pilot pull (2026-09-25) has no
-    # Latitude/Longitude column at all (I_1/I_3/I_4/O_3/O_4 device schema) —
-    # infer_campaign_windows must report has_gps=False, n_fix=n_rows,
-    # n_no_fix=0 instead of raising a KeyError.
-    csv_path = tmp_path / "O_4_log.csv"
-    csv_path.write_text(
-        "Timestamp,Temperature,Humidity,PM1.0,PM2.5,PM2.5_cal,PM4.0,PM10.0\n"
-        "2026-01-06 13:32:09,30.80,60.1,0.0,0.0,0,0.0,0.0\n"
-        "2026-01-06 13:32:14,30.83,60.2,0.1,0.2,4,0.3,0.4\n"
-    )
-    windows = infer_campaign_windows([csv_path])
-    row = windows.iloc[0]
-    assert row["has_gps"] == False  # noqa: E712
-    assert row["n_fix"] == 2
-    assert row["n_no_fix"] == 0
-
-
-def test_infer_campaign_windows_flags_epoch_reset(tmp_path):
-    csv_path = tmp_path / "log_epoch.csv"
-    csv_path.write_text(
-        "Timestamp,Latitude,Longitude,Temperature\n"
-        "2000-01-01 00:00:00,0.0,0.0,25.0\n"
-        "2000-01-01 00:00:05,0.0,0.0,25.1\n"
-        "2026-03-01 08:00:10,-22.861,-43.241,27.6\n"
-    )
-    windows = infer_campaign_windows([csv_path])
-    assert windows.iloc[0]["n_epoch_reset"] == 2
-
-
 # --- must-fix 7: manifest and GeoParquet -------------------------------------
 
 def test_hash_tree_matches_file_contents(tmp_path):
@@ -410,12 +358,10 @@ _README_STATS = dict(
     internal_routes_status="not built in this version — no `outputs/_packages/_internal/mare_routes/v0.1.3` directory exists yet.",
     decisions=_FAKE_DECISIONS,
     dtm_native_resolution_m=5.0,
-    p10_summary={"window": ["2025-12-01", "2026-04-30"], "dose_slot_min": 15, "envelope_slot_min": 5, "dose_hours": [1, 2, 3], "date_dependent_share": 0.49,
-                 "clock_agreement_all": 0.37},
+    p10_summary={"window": ["2025-12-01", "2026-04-30"], "dose_slot_min": 15, "envelope_slot_min": 5, "dose_hours": [1, 2, 3], "date_dependent_share": 0.49},
     wind_source={"window_utc": ["2025-12-01", "2026-04-30"], "fetched_utc": "2026-10-01T17:31:31+00:00"},
     geometry_label="test epoch",
     route_length_m=1557.8,
-    prevailing_deg=91.5,
 )
 
 
@@ -539,14 +485,14 @@ def _normalised(text: str) -> str:
 def test_render_changelog_old_entries_are_frozen_not_rendered_from_state():
     """v0.1.3 and older render identically whatever the current version is
     (no live state reaches them)."""
-    a = render_changelog(version="v0.2.0")
-    b = render_changelog(version="v9.9.9", version_date="2099-01-01")
+    a = render_changelog(n_om2_points=1, version="v0.2.0")
+    b = render_changelog(n_om2_points=1, version="v9.9.9", version_date="2099-01-01")
     assert a.split("## v0.1.3", 1)[1] == b.split("## v0.1.3", 1)[1]
 
 
 def test_render_changelog_frozen_entries_match_shipped_v013_modulo_project_name():
     shipped, _ = _shipped_entry("v0.1.3", "## v0.1.3 — 2026-10-01")
-    rendered = render_changelog()
+    rendered = render_changelog(n_om2_points=1)
     for heading, nxt in (("## v0.1.3 — 2026-10-01", "## v0.1.2"), ("## v0.1.2 — 2026-09-25", "## v0.1.1"),
                          ("## v0.1.1 — 2026-09-24", "## v0.1 — 2026-09-24"), ("## v0.1 — 2026-09-24", None)):
         want = _normalised(_entry(shipped, heading, nxt))
@@ -555,7 +501,7 @@ def test_render_changelog_frozen_entries_match_shipped_v013_modulo_project_name(
 
 
 def test_render_changelog_v011_entry_fixes_the_version_drift_bug():
-    rendered = render_changelog()
+    rendered = render_changelog(n_om2_points=1)
     v011 = rendered.split("## v0.1.1 — 2026-09-24\n", 1)[1].split("## v0.1 — 2026-09-24", 1)[0]
     assert "mare_routes/v0.1.1/" in v011
     assert "OM1" in v011
@@ -563,7 +509,7 @@ def test_render_changelog_v011_entry_fixes_the_version_drift_bug():
 
 
 def test_render_changelog_v012_entry_no_qcodes_no_hardcoded_floor():
-    rendered = render_changelog()
+    rendered = render_changelog(n_om2_points=1)
     v012 = rendered.split("## v0.1.2 — 2026-09-25\n", 1)[1].split("## v0.1.1 — 2026-09-24", 1)[0]
     assert "Q1/Q5" not in v012
     assert "~104-330" not in v012
@@ -573,7 +519,7 @@ def test_render_changelog_v012_entry_no_qcodes_no_hardcoded_floor():
 def test_changelog_no_bare_project_name():
     import re
 
-    assert not re.search(r"(?<!Brisa\+ \()MorphoFavela", render_changelog())
+    assert not re.search(r"(?<!Brisa\+ \()MorphoFavela", render_changelog(n_om2_points=1))
 
 
 def test_readme_has_using_the_data_and_segment_note_without_a_typed_time_constant():

@@ -1,5 +1,6 @@
 """P-00 — the PI's package spec (P-01..P-09, verbatim, 2026-09-23; P-10/P-11
-added 2026-10-01 for v0.2.0, worded here, not verbatim) encoded
+added 2026-10-01 for v0.2.0 and reworded for v0.3.0, P-12 added for v0.3.0,
+worded here, not verbatim) encoded
 as data, plus a mechanical conformance check against a BUILT package
 directory.
 
@@ -26,8 +27,9 @@ A part may instead be ``descoped``: a deliberate, decided cut (PI,
 never ``pending_on`` (nothing unblocks it in this version).
 
 ``conformance(package_dir)`` returns the full result; the build writes it
-to ``p00_spec_conformance.json``/``.csv`` and renders it into the README's
-"Conformance to the package spec" section
+to ``p00_spec_conformance.json``/``.csv`` in the INTERNAL directory beside the
+package (``internal_dir_for``), not in the shipped folder, and renders it into
+the README's "Conformance to the package spec" section
 (``render_conformance_markdown``).
 """
 from __future__ import annotations
@@ -93,14 +95,11 @@ def _points_df(package_dir: Path) -> pd.DataFrame | None:
     return None
 
 
-def _shade_df(package_dir: Path) -> pd.DataFrame | None:
+def _shade_df(package_dir: Path, columns: list[str] | None = None) -> pd.DataFrame | None:
+    """The shade table is parquet only (millions of rows); read only the
+    columns a check needs."""
     pq = package_dir / "p05_building_shade.parquet"
-    if pq.exists():
-        return pd.read_parquet(pq)
-    csv = package_dir / "p05_building_shade.csv"
-    if csv.exists():
-        return pd.read_csv(csv)
-    return None
+    return pd.read_parquet(pq, columns=columns) if pq.exists() else None
 
 
 def _quality_report(package_dir: Path) -> dict:
@@ -126,8 +125,16 @@ def _readme_text(package_dir: Path) -> str:
     return p.read_text(encoding="utf-8") if p.exists() else ""
 
 
+def internal_dir_for(package_dir: Path | str) -> Path:
+    """Where the files that must not ship (CHANGELOG.md, the conformance
+    table, the disclosure hits) are written:
+    <packages>/_internal/<mare_om2>/<version>/ beside the shipped folder."""
+    package_dir = Path(package_dir)
+    return package_dir.parent.parent / "_internal" / package_dir.parent.name / package_dir.name
+
+
 def _changelog_text(package_dir: Path) -> str:
-    p = package_dir / "CHANGELOG.md"
+    p = internal_dir_for(package_dir) / "CHANGELOG.md"
     return p.read_text(encoding="utf-8") if p.exists() else ""
 
 
@@ -204,35 +211,6 @@ def _file_exists_part(name: str, package_dir: Path, rel_paths: list[str]) -> Par
     return PartResult(name, "delivered", evidence=f"present: {', '.join(rel_paths)}")
 
 
-def _first_meaningful(*values: object) -> str | None:
-    """First value that is neither empty nor the dictionary's own "no
-    caveat" placeholder ('-'), or None if every value is empty/placeholder."""
-    for v in values:
-        s = "" if v is None else str(v).strip()
-        if s and s != "-":
-            return s
-    return None
-
-
-def _pending_part(name: str, package_dir: Path, dict_id: str, pending_on: list[str]) -> PartResult:
-    """A part this package cannot deliver yet, by PI ruling — never a
-    'maybe delivered' guess. reason is read verbatim from the data
-    dictionary's own row for dict_id: whichever of limits/unit/source
-    actually carries text (some rows put the caveat in 'unit', e.g. the
-    shade table's 'timestamp' row; 'limits' there is just '-')."""
-    row = _dictionary_row(package_dir, dict_id)
-    if row is None:
-        return PartResult(
-            name, "pending",
-            evidence=f"p08_data_dictionary.csv has no row for '{dict_id}'",
-            pending_on=list(pending_on),
-            reason="no dictionary row found — see tasks.json for status",
-        )
-    reason = _first_meaningful(row.get("limits"), row.get("unit"), row.get("source")) or "PENDING (see data dictionary)"
-    evidence = f"p08_data_dictionary.csv row '{dict_id}': status={row.get('status')}"
-    return PartResult(name, "pending", evidence=evidence, pending_on=list(pending_on), reason=reason)
-
-
 #: PI decision (resolved 2026-10-01) that dropped the terrestrial-LiDAR
 #: analysis and tree shade from v0.1.3 (still out of scope in v0.2.0). Both
 #: stay candidates for a later version (OMPKG2); this is a cut of this
@@ -280,7 +258,7 @@ _CHANGELOG_ENTRY_RE = re.compile(r"^##\s+(v[\d.]+)\s+—\s+(\d{4}-\d{2}-\d{2})\s
 def _changelog_entry_part(name: str, package_dir: Path) -> PartResult:
     text = _changelog_text(package_dir)
     if not text:
-        return PartResult(name, "pending", evidence="CHANGELOG.md not found")
+        return PartResult(name, "pending", evidence="CHANGELOG.md not found in the internal directory")
     version = _current_version(package_dir)
     for v, d in _CHANGELOG_ENTRY_RE.findall(text):
         if v == version:
@@ -362,23 +340,29 @@ def _buffer_columns_part(name: str, package_dir: Path) -> PartResult:
 
 
 def _building_shade_table_part(name: str, package_dir: Path) -> PartResult:
-    df = _shade_df(package_dir)
+    df = _shade_df(package_dir, ["timestamp_local", "date"]) if (package_dir / "p05_building_shade.parquet").exists() else None
     if df is None:
         return PartResult(name, "pending", evidence="p05_building_shade table not found")
-    required = {"point_id", "timestamp", "date", "sun_altitude_deg", "sun_azimuth_deg", "shaded", "tree_shade"}
-    missing = required - set(df.columns)
+    import pyarrow.parquet as pq
+
+    have = set(pq.read_schema(package_dir / "p05_building_shade.parquet").names)
+    required = {"point_id", "timestamp_local", "timestamp_utc", "date", "sun_altitude_deg", "sun_azimuth_deg", "shaded", "tree_shade"}
+    missing = required - have
     if missing:
         return PartResult(name, "pending", evidence=f"p05_building_shade missing column(s): {sorted(missing)}")
     if len(df) == 0:
         return PartResult(
             name, "pending",
-            evidence="p05_building_shade has the correct schema but 0 rows (no campaign CSVs found at build time)",
+            evidence="p05_building_shade has the correct schema but 0 rows",
         )
-    return PartResult(name, "delivered", evidence=f"p05_building_shade: {len(df)} rows, schema {sorted(required)}")
+    local = pd.DatetimeIndex(df["timestamp_local"])
+    offsets = {str(o) for o in (local.tz_localize(None) - local.tz_convert("UTC").tz_localize(None)).unique()}
+    return PartResult(name, "delivered", evidence=f"p05_building_shade: {len(df)} rows over {df['date'].nunique()} walk dates, "
+                                                  f"local-time offset(s) {sorted(offsets)}, schema {sorted(required)}")
 
 
 def _tree_shade_part(name: str, package_dir: Path) -> PartResult:
-    df = _shade_df(package_dir)
+    df = _shade_df(package_dir, ["tree_shade"])
     if df is None or "tree_shade" not in df.columns:
         evidence = "tree shade not computed in this version; p05_building_shade missing or has no tree_shade column"
     else:
@@ -452,18 +436,27 @@ P10_COLUMNS = {
     "p10_horizon_profiles": ["point_id", "azimuth_deg", "horizon_deg"],
 }
 P10_CLASSES = {"always_sunlit", "always_shaded", "date_dependent", "night"}
-P11_WIND_COLUMNS = [
-    "valid_utc", "valid_local", "drct", "speed_ms", "calm", "variable_direction",
-    "used_if_device_clock_utc", "used_if_device_clock_local",
-]
-P11_INDEX_COLUMNS = {
-    "windward_lambda_f": "windward_lambda_f_prevailing",
-    "canyon_alignment": "canyon_alignment_prevailing_deg",
-    "upwind_shelter": "upwind_shelter_deg_prevailing",
-    "open_space_fraction": "open_space_fraction",
+P11_REGIME_COLUMNS = ["period", "regime_key", "name", "column_slug", "mean_direction_deg", "share", "mean_speed_ms",
+                      "n_reports", "mixture_component_direction_deg", "mixture_difference_deg"]
+P11_HOUR_COLUMNS = ["period", "local_hour", "regime", "regime_key", "share"]
+#: point-column stems evaluated per campaign wind regime (the slug is appended)
+P11_REGIME_STEMS = {
+    "windward_lambda_f": "frontal_area_density_windward",
+    "canyon_alignment": "canyon_alignment_deg",
+    "upwind_shelter": "upwind_shelter_angle_deg",
+    "roughness_z0": "z0_macdonald_m",
 }
-P11_ROUGHNESS_COLUMNS = ["z0_macdonald_m", "zd_macdonald_m"]
-P11_PROXY_IDS = [*P11_INDEX_COLUMNS.values(), *P11_ROUGHNESS_COLUMNS]
+P11_STATIC_COLUMNS = {"roughness_zd": "zd_macdonald_m", "open_space_fraction": "open_space_fraction"}
+P12_WALK_COLUMNS = ["walk_id", "date", "period", "start_local", "start_utc", "end_local", "end_utc", "duration_min",
+                    "coverage_share", "share_on_route", "share_interpolated", "max_gap_s", "partial", "wind_regime"]
+P12_POINT_COLUMNS = ["walk_id", "point_id", "distance_along_m", "t_arrival_local", "t_arrival_utc", "arrival_source",
+                     "shaded_at_arrival", "dose_1h_before_wh_m2", "dose_3h_before_wh_m2"]
+P12_TAUS_S = (5, 10, 30, 60)
+P12_BASE_MEASURES = ["sky_view_factor", "height_width_ratio", "building_height_m", "plan_density_lambda_p",
+                     "shaded_at_arrival", "dose_1h_before_wh_m2"]
+P12_REGIME_MEASURE_STEMS = ["frontal_area_density_windward", "canyon_alignment_deg", "upwind_shelter_angle_deg"]
+_ISO_LOCAL = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}-03:00$"
+P11_PROXY_STATIC_IDS = ["zd_macdonald_m", "open_space_fraction"]
 
 
 def _read_table(package_dir: Path, stem: str) -> pd.DataFrame | None:
@@ -543,53 +536,54 @@ def _sun_dose_part(name: str, package_dir: Path) -> PartResult:
     )
 
 
-def _clock_agreement_part(name: str, package_dir: Path) -> PartResult:
-    bad = _both_formats_part(name, package_dir, ["p10_clock_agreement"])
-    if bad:
-        return bad
-    df, bad = _table_with_columns(name, package_dir, "p10_clock_agreement", ["scope", "n_daylight_point_slots", "agreement_share"])
-    if bad:
-        return bad
-    if "all" not in set(df["scope"].astype(str)):
-        return PartResult(name, "pending", evidence="p10_clock_agreement has no pooled 'all' row")
-    share = df["agreement_share"].dropna()
-    if ((share < 0) | (share > 1)).any():
-        return PartResult(name, "pending", evidence="p10_clock_agreement has agreement_share outside [0,1]")
-    overall = float(df.loc[df["scope"].astype(str) == "all", "agreement_share"].iloc[0])
-    return PartResult(
-        name, "delivered",
-        evidence=f"p10_clock_agreement: {len(df) - 1} campaign date(s) + pooled row; pooled UTC-vs-local agreement {overall:.3f}",
-    )
-
-
-def _wind_observed_part(name: str, package_dir: Path) -> PartResult:
-    p = package_dir / "p11_wind_observed.csv"
+def regime_slugs(package_dir: Path) -> list[str]:
+    """Slugs of the campaign-season regimes, read off p11_wind_regimes.csv."""
+    p = package_dir / "p11_wind_regimes.csv"
     if not p.exists():
-        return PartResult(name, "pending", evidence="missing file(s): p11_wind_observed.csv")
+        return []
     df = pd.read_csv(p)
-    missing = [c for c in P11_WIND_COLUMNS if c not in df.columns]
+    return df.loc[df["period"] == "campaign", "column_slug"].tolist()
+
+
+def _wind_regimes_part(name: str, package_dir: Path) -> PartResult:
+    missing = [f for f in ("p11_wind_regimes.csv", "p11_regime_by_hour.csv") if not (package_dir / f).exists()]
     if missing:
-        return PartResult(name, "pending", evidence=f"p11_wind_observed.csv missing column(s): {missing}")
-    if len(df) == 0:
-        return PartResult(name, "pending", evidence="p11_wind_observed.csv has 0 rows")
+        return PartResult(name, "pending", evidence=f"missing file(s): {', '.join(missing)}")
+    reg = pd.read_csv(package_dir / "p11_wind_regimes.csv")
+    hour = pd.read_csv(package_dir / "p11_regime_by_hour.csv")
+    for tab, cols, stem in ((reg, P11_REGIME_COLUMNS, "p11_wind_regimes"), (hour, P11_HOUR_COLUMNS, "p11_regime_by_hour")):
+        gone = [c for c in cols if c not in tab.columns]
+        if gone:
+            return PartResult(name, "pending", evidence=f"{stem} missing column(s): {gone}")
+    if set(reg["period"]) != {"campaign", "climatology"} or reg.groupby("period").size().ne(2).any():
+        return PartResult(name, "pending", evidence="p11_wind_regimes needs two regimes for each of campaign and climatology")
     mp = package_dir / "manifest.json"
     src = (json.loads(mp.read_text(encoding="utf-8")).get("provenance", {}).get("wind_source") if mp.exists() else None) or {}
     if not src.get("sha256") or not src.get("url"):
         return PartResult(name, "pending", evidence="manifest.json provenance.wind_source lacks the source url/sha256")
-    n_used = int(((df["used_if_device_clock_utc"].fillna("") != "") | (df["used_if_device_clock_local"].fillna("") != "")).sum())
+    camp = reg[reg["period"] == "campaign"]
+    desc = ", ".join(f"{r['name']} {r['mean_direction_deg']:.0f} deg ({r['share']:.2f})" for _, r in camp.iterrows())
     return PartResult(
         name, "delivered",
-        evidence=f"p11_wind_observed.csv: {len(df)} SBGL observations ({src.get('station')}, 10 m), {n_used} matched to a campaign "
-                 f"window under at least one clock reading; source sha256 in manifest.json provenance.wind_source",
+        evidence=f"p11_wind_regimes: campaign regimes {desc}; p11_regime_by_hour: {len(hour)} rows; "
+                 f"source sha256 in manifest.json provenance.wind_source ({src.get('station')}, 10 m)",
     )
+
+
+def _regime_columns_part(name: str, package_dir: Path, key: str) -> PartResult:
+    slugs = regime_slugs(package_dir)
+    if not slugs:
+        return PartResult(name, "pending", evidence="p11_wind_regimes.csv not found or has no campaign regimes")
+    return _columns_part(name, package_dir, [f"{P11_REGIME_STEMS[key]}_{sl}" for sl in slugs])
 
 
 def _p11_labelled_proxy_part(name: str, package_dir: Path) -> PartResult:
     df = _dictionary_df(package_dir)
     if df is None:
         return PartResult(name, "pending", evidence="p08_data_dictionary.csv not found")
+    ids = [*P11_PROXY_STATIC_IDS, *(f"{stem}_{sl}" for sl in regime_slugs(package_dir) for stem in P11_REGIME_STEMS.values())]
     missing, unlabelled = [], []
-    for vid in P11_PROXY_IDS:
+    for vid in ids:
         hit = df[df["id"] == vid]
         if hit.empty:
             missing.append(vid)
@@ -599,7 +593,77 @@ def _p11_labelled_proxy_part(name: str, package_dir: Path) -> PartResult:
         return PartResult(name, "pending", evidence=f"p08_data_dictionary.csv missing row(s): {missing}")
     if unlabelled:
         return PartResult(name, "pending", evidence=f"dictionary row(s) not labelled PROXY: {unlabelled}")
-    return PartResult(name, "delivered", evidence=f"all {len(P11_PROXY_IDS)} P-11 index dictionary rows contain 'PROXY'")
+    return PartResult(name, "delivered", evidence=f"all {len(ids)} P-11 index dictionary rows contain 'PROXY'")
+
+
+# ------------------------------------------------------------- P-12 --
+
+def _walks_part(name: str, package_dir: Path) -> PartResult:
+    bad = _both_formats_part(name, package_dir, ["p02b_walks"])
+    if bad:
+        return bad
+    df, bad = _table_with_columns(name, package_dir, "p02b_walks", P12_WALK_COLUMNS)
+    if bad:
+        return bad
+    if not df["walk_id"].is_unique:
+        return PartResult(name, "pending", evidence="p02b_walks has duplicate walk_id values")
+    for c in ("start_local", "end_local"):
+        if not df[c].astype(str).str.match(_ISO_LOCAL).all():
+            return PartResult(name, "pending", evidence=f"p02b_walks.{c} is not Rio local ISO time with a -03:00 offset")
+    tagged = df["wind_regime"].value_counts().to_dict()
+    return PartResult(
+        name, "delivered",
+        evidence=f"p02b_walks: {len(df)} walks on {df['date'].nunique()} dates, {int(df['partial'].sum())} partial; "
+                 f"wind regime tags {tagged}",
+    )
+
+
+def _walk_points_part(name: str, package_dir: Path) -> PartResult:
+    bad = _both_formats_part(name, package_dir, ["p12_walk_points"])
+    if bad:
+        return bad
+    df, bad = _table_with_columns(name, package_dir, "p12_walk_points", P12_POINT_COLUMNS)
+    if bad:
+        return bad
+    if (df["arrival_source"] == "outside_walk").any():
+        return PartResult(name, "pending", evidence="p12_walk_points still holds outside_walk rows")
+    if df.duplicated(["walk_id", "point_id"]).any():
+        return PartResult(name, "pending", evidence="p12_walk_points has duplicate (walk_id, point_id) rows")
+    if not df["t_arrival_local"].astype(str).str.match(_ISO_LOCAL).all():
+        return PartResult(name, "pending", evidence="p12_walk_points.t_arrival_local is not Rio local ISO time with a -03:00 offset")
+    walks = _read_table(package_dir, "p02b_walks")
+    if walks is not None and not set(df["walk_id"]) <= set(walks["walk_id"]):
+        return PartResult(name, "pending", evidence="p12_walk_points holds walk_id values absent from p02b_walks")
+    return PartResult(
+        name, "delivered",
+        evidence=f"p12_walk_points: {len(df)} rows over {df['walk_id'].nunique()} walks and {df['point_id'].nunique()} points",
+    )
+
+
+def _sensor_matched_part(name: str, package_dir: Path) -> PartResult:
+    slugs = regime_slugs(package_dir)
+    measures = [*P12_BASE_MEASURES, *(f"{st}_{sl}" for sl in slugs for st in P12_REGIME_MEASURE_STEMS)]
+    cols = [f"{m}_tau{t}s" for m in measures for t in P12_TAUS_S]
+    df = _read_table(package_dir, "p12_walk_points")
+    if df is None:
+        return PartResult(name, "pending", evidence="p12_walk_points not found")
+    missing = [c for c in cols if c not in df.columns]
+    if missing or not slugs:
+        return PartResult(name, "pending", evidence=f"p12_walk_points missing sensor-matched column(s): {missing[:6]}")
+    return PartResult(
+        name, "delivered",
+        evidence=f"p12_walk_points has {len(cols)} sensor-matched columns ({len(measures)} measures x tau {list(P12_TAUS_S)} s)",
+    )
+
+
+def _walk_script_part(name: str, package_dir: Path) -> PartResult:
+    p = package_dir / "OM2" / "aggregate_to_segments.py"
+    if not p.exists():
+        return PartResult(name, "pending", evidence="missing file(s): OM2/aggregate_to_segments.py")
+    text = p.read_text(encoding="utf-8")
+    if "--by" not in text or "--tau" not in text:
+        return PartResult(name, "pending", evidence="OM2/aggregate_to_segments.py lacks --by or --tau")
+    return PartResult(name, "delivered", evidence="OM2/aggregate_to_segments.py accepts --by (e.g. walk_id) and --tau")
 
 
 # ------------------------------------------------------------------ SPEC --
@@ -665,16 +729,13 @@ SPEC: list[dict] = [
     {
         "id": "P-05",
         "title": "Shade lookup",
-        "requirement": "Shaded or sunlit per point per 5 minutes for each campaign date, split into "
-                       "building and tree shade, plus a short join example using Octopus timestamps.",
+        "requirement": "Shaded or sunlit per point per 5 minutes for each walk date (daylight, Rio local time, "
+                       "with a UTC twin), split into building and tree shade, plus a short join example using Octopus timestamps.",
         "parts": [
             {"name": "building_shade_table", "check": lambda pd_: _building_shade_table_part("building_shade_table", pd_)},
             {"name": "tree_shade_column_reserved", "check": lambda pd_: _tree_shade_part("tree_shade_column_reserved", pd_)},
             {"name": "join_example_script_shipped_in_package", "check": lambda pd_: _file_exists_part(
                 "join_example_script_shipped_in_package", pd_, ["OM2/join_shade_example.py"],
-            )},
-            {"name": "campaign_timestamp_confirmed", "check": lambda pd_: _pending_part(
-                "campaign_timestamp_confirmed", pd_, "timestamp", ["OCTOPUS_CSV", "OCTOPUS_TZ"],
             )},
         ],
     },
@@ -735,34 +796,47 @@ SPEC: list[dict] = [
     },
     {
         "id": "P-10",
-        "title": "Sun exposure robust to campaign date and device clock",
-        "requirement": "Added 2026-10-01 (PI: stop chasing the exact campaign date; the device clock may log UTC or Rio local "
-                       "time). Per point and local time of day, whether the point is always sunlit, always shaded or "
-                       "date-dependent over the campaign season; direct-sun dose for 1, 2 and 3 h windows (campaign dates and the "
-                       "season envelope); annual sun hours; and how much the UTC-vs-local clock question changes the exact-date "
-                       "shade. Geometry-derived proxies, not measured sunlight.",
+        "title": "Sun exposure over the campaign season",
+        "requirement": "Added 2026-10-01, reworded for v0.3.0. Per point and Rio local time of day, whether the point is "
+                       "always sunlit, always shaded or date-dependent over the campaign season; direct-sun dose for 1, 2 and 3 h "
+                       "windows (walk dates and the season envelope); annual sun hours. Geometry-derived proxies, not measured sunlight.",
         "parts": [
             {"name": "sun_envelope", "check": lambda pd_: _sun_envelope_part("sun_envelope", pd_)},
             {"name": "sun_dose", "check": lambda pd_: _sun_dose_part("sun_dose", pd_)},
             {"name": "annual_sun_hours", "check": lambda pd_: _columns_part("annual_sun_hours", pd_, ["annual_sun_hours"])},
-            {"name": "clock_agreement", "check": lambda pd_: _clock_agreement_part("clock_agreement", pd_)},
         ],
     },
     {
         "id": "P-11",
-        "title": "Derived ventilation indices with time-matched wind",
-        "requirement": "Added 2026-10-01. Observed SBGL (airport, 10 m) wind for the campaign window, and ventilation indices "
-                       "derived from building geometry at the prevailing wind: windward frontal-area density, canyon-wind "
-                       "alignment, upwind shelter angle, Macdonald z0 and zd, open-space fraction. All are PROXIES (geometry), "
-                       "none is measured or simulated air temperature or air movement; SBGL is not wind at the route.",
+        "title": "Two wind regimes and ventilation indices",
+        "requirement": "Reworded for v0.3.0. The airport (SBGL, 10 m) wind of the campaign season and of the 2015-2024 climatology "
+                       "split into two regimes, with their share by local hour; and ventilation indices derived from building geometry "
+                       "at each campaign regime's mean direction: windward frontal-area density, canyon-wind alignment, upwind shelter "
+                       "angle, Macdonald z0 (per regime), zd and open-space fraction. All are PROXIES (geometry), none is measured or "
+                       "simulated air temperature or air movement; SBGL is not wind at the route.",
         "parts": [
-            {"name": "observed_wind", "check": lambda pd_: _wind_observed_part("observed_wind", pd_)},
-            {"name": "windward_lambda_f", "check": lambda pd_: _columns_part("windward_lambda_f", pd_, [P11_INDEX_COLUMNS["windward_lambda_f"]])},
-            {"name": "canyon_alignment", "check": lambda pd_: _columns_part("canyon_alignment", pd_, [P11_INDEX_COLUMNS["canyon_alignment"]])},
-            {"name": "upwind_shelter", "check": lambda pd_: _columns_part("upwind_shelter", pd_, [P11_INDEX_COLUMNS["upwind_shelter"]])},
-            {"name": "roughness_z0_zd", "check": lambda pd_: _columns_part("roughness_z0_zd", pd_, P11_ROUGHNESS_COLUMNS)},
-            {"name": "open_space_fraction", "check": lambda pd_: _columns_part("open_space_fraction", pd_, [P11_INDEX_COLUMNS["open_space_fraction"]])},
+            {"name": "wind_regimes", "check": lambda pd_: _wind_regimes_part("wind_regimes", pd_)},
+            {"name": "windward_lambda_f", "check": lambda pd_: _regime_columns_part("windward_lambda_f", pd_, "windward_lambda_f")},
+            {"name": "canyon_alignment", "check": lambda pd_: _regime_columns_part("canyon_alignment", pd_, "canyon_alignment")},
+            {"name": "upwind_shelter", "check": lambda pd_: _regime_columns_part("upwind_shelter", pd_, "upwind_shelter")},
+            {"name": "roughness_z0_zd", "check": lambda pd_: _columns_part(
+                "roughness_z0_zd", pd_, [P11_STATIC_COLUMNS["roughness_zd"]] + [f"{P11_REGIME_STEMS['roughness_z0']}_{sl}" for sl in regime_slugs(pd_)])},
+            {"name": "open_space_fraction", "check": lambda pd_: _columns_part("open_space_fraction", pd_, [P11_STATIC_COLUMNS["open_space_fraction"]])},
             {"name": "labelled_proxy_in_dictionary", "check": lambda pd_: _p11_labelled_proxy_part("labelled_proxy_in_dictionary", pd_)},
+        ],
+    },
+    {
+        "id": "P-12",
+        "title": "Walks, arrival times and sensor-matched values",
+        "requirement": "Added for v0.3.0. One row per logger walk (timing, coverage, wind regime tag); one row per walk and route point "
+                       "(arrival time, shaded at arrival, clear-sky direct dose in the 1 h and 3 h before arrival) with sensor-matched "
+                       "values of the form, shade, dose and ventilation measures at four sensor time constants; a segment script that "
+                       "aggregates per walk.",
+        "parts": [
+            {"name": "walks_table", "check": lambda pd_: _walks_part("walks_table", pd_)},
+            {"name": "walk_points_table", "check": lambda pd_: _walk_points_part("walk_points_table", pd_)},
+            {"name": "sensor_matched_columns", "check": lambda pd_: _sensor_matched_part("sensor_matched_columns", pd_)},
+            {"name": "segment_script_by_walk", "check": lambda pd_: _walk_script_part("segment_script_by_walk", pd_)},
         ],
     },
 ]
@@ -832,14 +906,17 @@ def conformance_rows(conf: dict) -> list[dict]:
     ]
 
 
-def write_conformance(package_dir: Path | str, conf: dict | None = None) -> dict:
-    """Write p00_spec_conformance.json + .csv at package_dir's root.
-    Returns the conformance dict written."""
+def write_conformance(package_dir: Path | str, conf: dict | None = None, out_dir: Path | str | None = None) -> dict:
+    """Write p00_spec_conformance.json + .csv into ``out_dir`` (default: the
+    package's internal directory, never the shipped folder). Returns the
+    conformance dict written."""
     package_dir = Path(package_dir)
+    out_dir = Path(out_dir) if out_dir else internal_dir_for(package_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
     if conf is None:
         conf = conformance(package_dir)
-    (package_dir / "p00_spec_conformance.json").write_text(json.dumps(conf, indent=2), encoding="utf-8")
-    pd.DataFrame(conformance_rows(conf)).to_csv(package_dir / "p00_spec_conformance.csv", index=False)
+    (out_dir / "p00_spec_conformance.json").write_text(json.dumps(conf, indent=2), encoding="utf-8")
+    pd.DataFrame(conformance_rows(conf)).to_csv(out_dir / "p00_spec_conformance.csv", index=False)
     return conf
 
 
@@ -860,11 +937,10 @@ def render_conformance_markdown(conf: dict) -> str:
     id | requirement | status | evidence | pending on, rendered straight
     from conformance()'s own result (never re-derived by hand)."""
     lines = [
-        "## Conformance to the package spec (P-01…P-11)",
+        "## Conformance to the package spec (P-01…P-12)",
         "",
         f"Computed by `src/om_package/spec.py` against this build "
-        f"({conf.get('version', '?')}); see `p00_spec_conformance.json`/`.csv` "
-        "at the package root for the per-part detail.",
+        f"({conf.get('version', '?')}), part by part.",
         "",
         "A part marked *descoped* is a deliberate cut by PI decision, not a gap. "
         "*delivered (scoped)* means every other part of the item is delivered.",

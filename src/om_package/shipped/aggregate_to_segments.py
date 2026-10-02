@@ -30,6 +30,11 @@ Run (from inside the package directory):
 If the input holds sensor-matched columns named ``<col>_tau<tau>s``, add
 ``--tau 30`` (repeatable, or ``--tau 10,30``) to keep only those time
 constants; without ``--tau`` every column is aggregated as before.
+
+For ``p12_walk_points`` (one row per walk and point) add ``--by walk_id`` to
+get one row per walk and segment:
+    python OM2/aggregate_to_segments.py --points p12_walk_points.parquet \\
+        --by walk_id --segment-m 20 --tau 30 --out segments_by_walk.parquet
 """
 from __future__ import annotations
 
@@ -45,7 +50,7 @@ DEFAULT_SEGMENT_M = 10.0
 #: columns that describe identity/position, never averaged — kept in sync
 #: with src/om_package/segments.py's _ID_COLS by hand (this file has no
 #: repo import to share it from).
-_ID_COLS = {"point_id", "route_id", "seq", "distance_along_m", "height_m", "geometry", "x", "y"}
+_ID_COLS = {"point_id", "route_id", "seq", "distance_along_m", "height_m", "geometry", "x", "y", "walk_id"}
 
 
 _TAU_COL = re.compile(r"_tau([0-9.]+)s$")
@@ -66,12 +71,15 @@ def select_taus(points_df: pd.DataFrame, taus) -> pd.DataFrame:
 
 
 def aggregate_to_segments(
-    points_df: pd.DataFrame, segment_length_m: float, distance_col: str = "distance_along_m"
+    points_df: pd.DataFrame, segment_length_m: float, distance_col: str = "distance_along_m",
+    by: str | None = None,
 ) -> pd.DataFrame:
     """Mean-aggregate numeric point variables into fixed-length segments.
 
     Returns one row per segment: segment_id, start/end distance_along_m,
-    n_points, mean of every other numeric column (NaNs excluded).
+    n_points, mean of every other numeric column (NaNs excluded). With
+    ``by`` (e.g. "walk_id" for p12_walk_points) one row per ``by`` value and
+    segment.
     """
     if segment_length_m <= 0:
         raise ValueError("segment_length_m must be > 0")
@@ -81,10 +89,10 @@ def aggregate_to_segments(
     numeric_cols = [
         c
         for c in df.columns
-        if c not in _ID_COLS and c != "segment_id" and pd.api.types.is_numeric_dtype(df[c])
+        if c not in _ID_COLS and c not in {"segment_id", by} and pd.api.types.is_numeric_dtype(df[c])
     ]
 
-    grouped = df.groupby("segment_id", sort=True)
+    grouped = df.groupby([by, "segment_id"] if by else "segment_id", sort=True)
     agg = grouped[numeric_cols].mean(numeric_only=True)
     agg["n_points"] = grouped.size()
     agg["segment_start_m"] = grouped[distance_col].min()
@@ -93,7 +101,7 @@ def aggregate_to_segments(
         agg["route_id"] = grouped["route_id"].first()
 
     agg = agg.reset_index()
-    cols = ["segment_id", "route_id", "segment_start_m", "segment_end_m", "n_points"] + numeric_cols
+    cols = [*([by] if by else []), "segment_id", "route_id", "segment_start_m", "segment_end_m", "n_points"] + numeric_cols
     cols = [c for c in cols if c in agg.columns]
     return agg[cols]
 
@@ -109,6 +117,7 @@ def main() -> int:
         "--tau", action="append", default=None, metavar="SECONDS",
         help="keep only sensor-matched <col>_tau<tau>s columns for these tau (s); repeatable or comma list",
     )
+    ap.add_argument("--by", default=None, metavar="COLUMN", help="group segments within this column too (e.g. walk_id)")
     ap.add_argument("--out", required=True, help="output path (.parquet or .csv)")
     args = ap.parse_args()
 
@@ -118,7 +127,7 @@ def main() -> int:
     if args.tau:
         df = select_taus(df, [float(t) for chunk in args.tau for t in chunk.split(",") if t.strip()])
 
-    segments = aggregate_to_segments(df, args.segment_m)
+    segments = aggregate_to_segments(df, args.segment_m, by=args.by)
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
