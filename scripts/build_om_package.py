@@ -69,20 +69,22 @@ import pandas as pd
 from src.om_package.buffers import BUFFER_RADII_M, compute_buffer_variables
 from src.om_package.dictionary import dictionary_dataframe
 from src.om_package.figures import (
-    build_map_form,
-    build_map_shade,
-    build_profiles,
-    build_shade_calendar,
-    build_sun_dose,
-    build_sun_envelope,
+    build_fig_form,
+    load_shade_frame,
+    build_fig_route,
+    build_fig_shade_calendar,
+    build_fig_shade_map,
+    build_fig_sun_dose,
+    build_fig_svf_sensor,
 )
+from src.om_package.vent_figures import build_fig_shelter_maps, build_fig_vent_profiles, build_fig_wind
 from src.om_package.formvars import compute_form_variables
 from src.om_package.io_utils import Paths, hash_tree, write_table
 from src.om_package.neighbourhoods import communities_crossed, join_communities
 from src.om_package.package_docs import USE_TERMS, VERSION, render_changelog, render_readme
 from src.om_package import p10_p11, walk_tables
 from src.om_package.walks import load_walks
-from src.om_package.wind_regimes import season_regimes, tag_walks, load_campaign
+from src.om_package.wind_regimes import season_regimes, tag_walks, load_campaign, load_climatology
 from src.om_package.provenance import read_om_decisions, read_wind_source_manifest
 from src.om_package.report_pdf import render_markdown_pdf, render_readme_pdf, report_css
 from src.om_package.quality import write_quality_report
@@ -498,32 +500,26 @@ def main() -> int:
         print(f"[build_om_package] WARNING: could not load Maré territory ({exc}); figures will ship without community outlines")
         subunits = None
 
-    tz_label = "Rio local time (UTC-3)"
-    map_form_path = out_dir / "OM2" / "map_form.png"
-    build_map_form(om2_df, buildings, subunits, map_form_path, route_id="OM2", version=args.version)
-    print(f"[build_om_package] F1 map (form/SVF): {map_form_path}")
-
-    map_shade_path = out_dir / "OM2" / "map_shade.png"
-    build_map_shade(om2_df, shade_fig, buildings, subunits, map_shade_path, route_id="OM2", version=args.version, tz=tz_label)
-    print(f"[build_om_package] F2 map (shade): {map_shade_path}")
-
-    profiles_path = out_dir / "OM2" / "profiles.png"
-    build_profiles(om2_df, shade_fig, profiles_path, dictionary_df=dict_df, route_id="OM2", version=args.version)
-    print(f"[build_om_package] F3 profiles: {profiles_path}")
-
-    shade_calendar_path = out_dir / "OM2" / "shade_calendar.png"
-    build_shade_calendar(om2_df, shade_fig, calendar_windows, shade_calendar_path, route_id="OM2", version=args.version)
-    print(f"[build_om_package] F4 shade calendar: {shade_calendar_path}")
-
-    window = (args.window_start, args.window_end)
-    sun_envelope_path = out_dir / "OM2" / "sun_envelope.png"
-    build_sun_envelope(om2_df, sun["envelope"], buildings, subunits, sun_envelope_path, route_id="OM2",
-                       version=args.version, window=window, geometry_label=args.geometry_epoch)
-    sun_dose_path = out_dir / "OM2" / "sun_dose.png"
-    build_sun_dose(om2_df, sun["envelope"], sun["dose"], sun_dose_path, route_id="OM2", version=args.version,
-                   geometry_label=args.geometry_epoch)
-    print(f"[build_om_package] F5/F6 sun figures: {sun_envelope_path}, {sun_dose_path}")
+    fig_dir = out_dir / "OM2"
+    for stale in ("map_form.png", "map_shade.png", "profiles.png", "shade_calendar.png", "sun_envelope.png", "sun_dose.png"):
+        (fig_dir / stale).unlink(missing_ok=True)
     del shade_fig
+    shade_full = load_shade_frame(out_dir / "p05_building_shade.parquet")
+    route_total_m = float(om2_df["distance_along_m"].max())
+    facts: dict = {"route_length_m": route_total_m, "n_points": int(len(om2_df))}
+    build_fig_route(om2_df, buildings, fig_dir / "fig_route.png")
+    build_fig_form(om2_df, fig_dir / "fig_form.png")
+    build_fig_shade_map(om2_df, shade_full, buildings, fig_dir / "fig_shade_map.png")
+    _, facts["shade_calendar"] = build_fig_shade_calendar(shade_full, fig_dir / "fig_shade_calendar.png")
+    _, facts["sun_dose"] = build_fig_sun_dose(walks_tbl, p12, route_total_m, fig_dir / "fig_sun_dose.png")
+    _, facts["wind"] = build_fig_wind(season, load_campaign(paths.root), load_climatology(paths.root), by_hour_tbl,
+                                      fig_dir / "fig_wind.png")
+    build_fig_vent_profiles(om2_df, regimes, fig_dir / "fig_vent_profiles.png")
+    _, facts["shelter_maps"] = build_fig_shelter_maps(om2_df, regimes, buildings, fig_dir / "fig_shelter_maps.png")
+    _, facts["svf_sensor"] = build_fig_svf_sensor(om2_df, walks_tbl, p12, fig_dir / "fig_svf_sensor.png")
+    (fig_dir / "figure_facts.json").write_text(json.dumps(facts, indent=2, default=float))
+    print(f"[build_om_package] figures written to {fig_dir} (representative walk for the sensor figure: {facts['svf_sensor']['walk_id']})")
+    del shade_full
 
     # The aggregation script and the shade join example travel INSIDE the
     # package, so a recipient with only this directory can re-aggregate (also
@@ -664,8 +660,14 @@ def main() -> int:
     # self-hash that could never verify. See io_utils.hash_tree's
     # ``exclude`` docstring.
     # report.md/.pdf land before the hash pass so they ship in the manifest.
-    report_md, report_pdf = write_report_stub(out_dir, args.version)
-    print(f"[build_om_package] wrote {report_md} and {report_pdf}")
+    try:
+        from src.om_package.report import write_report
+
+        write_report(out_dir)
+        print(f"[build_om_package] wrote {out_dir / 'report.md'} and {out_dir / 'report.pdf'}")
+    except Exception as exc:  # the report is prose on top of the finished data; its failure must not stop the build
+        print(f"[build_om_package] WARNING: report not written ({type(exc).__name__}: {exc}); writing the placeholder")
+        write_report_stub(out_dir, args.version)
     # Disclosure greplist (PI decides each hit — never auto-removed). Written
     # before hashing: written after, the manifest carried the previous
     # build's hash of this file.

@@ -41,8 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pandas as pd  # noqa: E402
 
 import hubkit  # noqa: E402
-from src.om_package.figures import _DOSE_SLOT_QUANTILES  # noqa: E402
-from src.om_package.report import SEGMENT_M, count_word
+from src.om_package.figures import SEGMENT_LENGTH_M as SEGMENT_M  # noqa: E402
 from src.om_package.routes import ROUTE_FLAG_MAX_STREET_DIST_M  # noqa: E402
 from src.om_package.spec import internal_dir_for  # noqa: E402
 
@@ -374,19 +373,19 @@ def render_page(root: Path) -> str:
     # --- figure gallery: every figure, caption says what to look at ---------
     n_dates = p05.get("n_campaign_dates") or 0
     gallery_spec = [
-        ("map_form.png", "Route and sky view",
-         "The OM2 route over the Maré buildings, coloured by sky view (0 = no sky, 1 = open). Dark stretches are enclosed."),
-        ("profiles.png", "Street form along the route",
-         "Building height, height-to-width, sky view, plan density, a ventilation proxy and shade; "
-         f"grey = every metre, blue = {SEGMENT_M} m means."),
-        ("map_shade.png", "Building shade on the campaign dates",
-         f"Share of daylight each point spends in building shade over the {n_dates} campaign dates."),
-        ("shade_calendar.png", "Shade by date and time",
-         "One panel per campaign date: distance along the route against time of day (Rio local time)."),
-        ("sun_envelope.png", "Does the date matter?",
-         "Always shaded, date-dependent or always sunny by time of day (Rio local time), and where the date matters most."),
-        ("sun_dose.png", "Direct sun dose",
-         f"Clear-sky direct sun over the past hour along the route at {count_word(len(_DOSE_SLOT_QUANTILES))} times of day; band = season range, lines = campaign dates."),
+        ("fig_route.png", "The route", "The OM2 route over the Maré buildings, with distance marks every 250 m and the neighbourhoods it crosses."),
+        ("fig_form.png", "Street form along the route",
+         f"Building height, height-to-width ratio, sky view factor and plan area density; grey = every metre, black = {SEGMENT_M} m means."),
+        ("fig_shade_map.png", "Building shade on the walk dates",
+         f"Share of daylight each point spends in building shade over the {n_dates} walk dates."),
+        ("fig_shade_calendar.png", "Shade by date and time of day",
+         "Share of route points in building shade, one row per walk date, by time of day (Rio local time)."),
+        ("fig_sun_dose.png", "Direct sun before each walk",
+         "Clear-sky direct sun in the 1 and 3 hours before each walk reached each point, one row per walk."),
+        ("fig_wind.png", "Wind regimes", "Wind direction at Galeão airport for the campaign season and 2015 to 2024, and each regime by hour of day."),
+        ("fig_vent_profiles.png", "Ventilation along the route", "Windward frontal area density, canyon alignment and upwind shelter angle for both wind regimes."),
+        ("fig_shelter_maps.png", "Upwind shelter angle maps", "Upwind shelter angle per point for each wind regime, on one colour scale."),
+        ("fig_svf_sensor.png", "Sensor-matched sky view factor", "Sky view factor at 1 m and as a slow sensor on one walk would see it."),
     ]
     tiles = []
     for name, title, caption in gallery_spec:
