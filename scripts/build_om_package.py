@@ -78,6 +78,10 @@ from src.om_package.figures import (
     build_fig_svf_sensor,
 )
 from src.om_package import fig_style as fs_style
+from src.om_package import route_flags
+from src.om_package.fig_flags import build_fig_flags
+from src.om_package.formvars import compute_street_orientation_deg
+from src.om_package.vent_schematic import build_fig_vent_schematic
 from src.om_package.vent_figures import build_fig_shelter_maps, build_fig_vent_profiles, build_fig_wind
 from src.om_package.formvars import compute_form_variables
 from src.om_package.io_utils import Paths, hash_tree, write_table
@@ -231,31 +235,41 @@ def write_disclosure_hits(out_dir: Path, internal_dir: Path) -> Path:
     return out_path
 
 
-def build_one_route(om: str, paths: Paths, out_dir: Path, radii=BUFFER_RADII_M, extras_fn=None) -> dict:
+def build_one_route(om: str, paths: Paths, out_dir: Path, radii=BUFFER_RADII_M, extras_fn=None, repair=None) -> dict:
     """Build one route's P-02/P-03/P-04/P-06/P-07 outputs under out_dir.
     out_dir is either the shared package root (for OM2) or the internal
     build directory (for OM1/OM3/OM4) — output_files are reported relative
     to whichever out_dir was passed. ``extras_fn(points_gdf)`` (OM2 only)
     returns (extra_columns keyed by point_id, p07 extras): it runs on the
     fully joined table so its columns are written and quality-checked with
-    every other variable."""
+    every other variable. ``repair`` = (classification, buildings) from
+    route_flags.classify_route: every measure is then computed at the repaired
+    position, and the table keeps the traced position in geometry, x and y."""
     route_json = paths.route_json(om)
     points = densify_route(route_json)
     points["route_geometry_flag"] = compute_route_geometry_flag(points, paths).to_numpy()
     length_m = route_length_m(route_json)
 
-    form = compute_form_variables(points, paths)
-    vent = compute_ventilation_proxies(points, form["street_orientation_deg"].to_numpy(), paths)
+    meas = points if repair is None else route_flags.repaired_points(points, repair[0])
+    form = compute_form_variables(meas, paths)
+    if repair is not None:
+        form["street_orientation_deg"] = compute_street_orientation_deg(points)
+    vent = compute_ventilation_proxies(meas, form["street_orientation_deg"].to_numpy(), paths)
     nbhd = join_communities(points, paths)
 
-    joined = points.merge(form, on="point_id").merge(vent, on="point_id").merge(nbhd, on="point_id")
+    joined = meas.merge(form, on="point_id").merge(vent, on="point_id").merge(nbhd, on="point_id")
 
-    buf = compute_buffer_variables(points, paths, radii=radii)
+    buf = compute_buffer_variables(meas, paths, radii=radii)
     joined_with_buf = joined.merge(buf, on="point_id")
     quality_extra = None
     if extras_fn is not None:
         extra_cols, quality_extra = extras_fn(joined_with_buf)
         joined_with_buf = joined_with_buf.merge(extra_cols, on="point_id", how="left")
+    repair_facts = None
+    if repair is not None:
+        joined_with_buf, repair_facts = route_flags.apply_to_table(
+            joined_with_buf, repair[0], repair[1], points, compute_form_variables(points, paths))
+        joined_with_buf["geometry"] = points.geometry.to_numpy()
 
     route_dir = out_dir / om.replace("OM_", "OM")
     written = write_table(joined_with_buf, route_dir, "points", geo=True)
@@ -267,6 +281,7 @@ def build_one_route(om: str, paths: Paths, out_dir: Path, radii=BUFFER_RADII_M, 
 
     return {
         "route_id": om,
+        "repair_facts": repair_facts,
         "length_m": length_m,
         "n_points": len(points),
         "communities_crossed": communities,
@@ -352,6 +367,12 @@ def main() -> int:
         print(f"[build_om_package] {len(walks_df)} walks on {len(walk_dates)} dates; campaign regimes: "
               + ", ".join(f"{g['name']} {g['mean_direction_deg']:.1f} deg" for g in regimes))
         ctx.update(walks=walks_df, fixes=fixes, walk_dates=walk_dates, season=season, regimes=regimes)
+        print("[build_om_package] route repair: classifying points, GPS consensus, medial axis ...")
+        route_pts = densify_route(paths.route_json("OM_2"))
+        rep_res, rep_fixes, rep_buildings = route_flags.classify_route(route_pts, paths, matched_dir)
+        ctx["repair"] = (rep_res, rep_buildings)
+        ctx["repair_fixes"] = rep_fixes
+        print("[build_om_package] route repair classes: " + str({c: int((rep_res['point_class'] == c).sum()) for c in route_flags.CLASSES}))
 
     def om2_extras(points_gdf):
         """P-10/P-11 inputs and the new point columns, from ONE horizon
@@ -387,8 +408,10 @@ def main() -> int:
     for om in routes:
         route_out_dir = route_output_dir(om, out_dir, internal_dir)
         print(f"[build_om_package] {om} -> {route_out_dir} ...")
-        result = build_one_route(om, paths, route_out_dir, extras_fn=om2_extras if om == "OM_2" else None)
+        result = build_one_route(om, paths, route_out_dir, extras_fn=om2_extras if om == "OM_2" else None,
+                                 repair=ctx.get("repair") if om == "OM_2" else None)
         if om == "OM_2":
+            ctx["repair_facts"] = result.pop("repair_facts")
             manifest["routes"].append(result)
             om2_df = pd.read_parquet(route_out_dir / "OM2" / "points.parquet")
         else:
@@ -403,7 +426,7 @@ def main() -> int:
     # om2_gdf is needed for the nodata floor (README Known limits, manifest
     # p05_shade): a property of the OM2 points against the extended DTM.
     om2_gdf = gpd.GeoDataFrame(
-        om2_df[["point_id"]], geometry=gpd.points_from_xy(om2_df["x"], om2_df["y"]), crs=CRS
+        om2_df[["point_id"]], geometry=gpd.points_from_xy(om2_df["x_repaired"], om2_df["y_repaired"]), crs=CRS
     )
     print("[build_om_package] P-05: measuring the nodata floor (shade.nodata_floor_m) ...")
     nodata_floor = compute_nodata_floor_m(om2_gdf, paths)
@@ -497,6 +520,9 @@ def main() -> int:
     build_fig_vent_profiles(om2_df, regimes, fig_dir / "fig_vent_profiles.png")
     _, facts["shelter_maps"] = build_fig_shelter_maps(om2_df, regimes, buildings, fig_dir / "fig_shelter_maps.png")
     _, facts["svf_sensor"] = build_fig_svf_sensor(om2_df, walks_tbl, p12, fig_dir / "fig_svf_sensor.png")
+    build_fig_vent_schematic(fig_dir / "fig_vent_schematic.png")
+    build_fig_flags(ctx["repair"][0], buildings, ctx["repair_fixes"], fig_dir / "fig_flags.png")
+    facts["flags"] = ctx["repair_facts"]
     (fig_dir / "figure_facts.json").write_text(json.dumps(facts, indent=2, default=float))
     print(f"[build_om_package] figures written to {fig_dir} (representative walk for the sensor figure: {facts['svf_sensor']['walk_id']})")
     del shade_full

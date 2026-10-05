@@ -22,11 +22,11 @@ _BASE: dict[str, dict] = {
         "status": "computed",
     },
     "route_geometry_flag": {
-        "definition": "True where the route is defective at this point: it falls inside a building footprint or lies far from the street network.",
+        "definition": "True where the route trace does not follow a mapped street at this point: true for every point whose point_class is not street.",
         "unit": "bool",
         "source": "data/maré/raw/buildings_mare.shp, data/maré/raw/street_mare.shp",
         "method": f"within(buildings_mare) OR distance-to-nearest(street_mare centreline) > {ROUTE_FLAG_MAX_STREET_DIST_M:.0f} m (src/om_package/routes.py compute_route_geometry_flag)",
-        "limits": "Only catches defects visible against these two layers. A point that is on a street but not on the path the team walked is not caught.",
+        "limits": "Only catches defects visible against these two layers. Use point_class to tell the cases apart.",
         "status": "computed",
     },
     "route_id": {
@@ -53,12 +53,12 @@ _BASE: dict[str, dict] = {
         "status": "computed",
     },
     "x": {
-        "definition": "Point easting.",
+        "definition": "Point easting on the route trace (before any repair).",
         "unit": "m, EPSG:31983 (SIRGAS 2000 / UTM 23S)", "source": "this package", "method": "geometry.x, flattened for the non-geo (parquet/csv) table export", "limits": "-",
         "status": "computed",
     },
     "y": {
-        "definition": "Point northing.",
+        "definition": "Point northing on the route trace (before any repair).",
         "unit": "m, EPSG:31983 (SIRGAS 2000 / UTM 23S)", "source": "this package", "method": "geometry.y, flattened for the non-geo (parquet/csv) table export", "limits": "-",
         "status": "computed",
     },
@@ -69,10 +69,10 @@ _BASE: dict[str, dict] = {
         "status": "computed",
     },
     "building_height_m": {
-        "definition": "Canyon building height flanking the street at this point (airborne).",
-        "unit": "m", "source": "outputs/maré/morphometrics/canyon/hw_streets.gpkg column H",
-        "method": "nearest-neighbour join (<=20 m) to the canyon cross-section sample; H comes from buildings_mare 'altura' + mare_dtm via src/urban_morphology.py's projected-width canyon method",
-        "limits": "NaN beyond 20 m of any canyon sample (e.g. very short spur segments).",
+        "definition": "Height of the buildings flanking the street at this point: the mean of the two facades hit by the width rays (one facade if the other side hit nothing).",
+        "unit": "m", "source": "buildings_mare 'altura'; point at the repaired position (x_repaired, y_repaired)",
+        "method": "src/om_package/route_repair.py street_width_m rays; where no ray hits a building (inside a footprint) the value of building_height_layer_m is kept",
+        "limits": "2019 footprints and heights. The same value as the street layer where both exist is not guaranteed; building_height_layer_m keeps the street-layer value.",
         "status": "computed",
     },
     "building_height_join_dist_m": {
@@ -81,23 +81,24 @@ _BASE: dict[str, dict] = {
         "status": "computed",
     },
     "street_width_m": {
-        "definition": "Canyon street width at this point (building face to building face).",
-        "unit": "m", "source": "outputs/maré/morphometrics/canyon/hw_streets.gpkg column W",
-        "method": "nearest-neighbour join (<=20 m), scripts/brisa_ventilation/02_hw_canyon_proxy.py flanking-building cross-section (search radius = its SEARCH_RADIUS)",
-        "limits": "NaN beyond 20 m of any canyon sample.",
+        "definition": "Street width at this point, from building face to building face.",
+        "unit": "m", "source": "buildings_mare footprints; point at the repaired position",
+        "method": "two rays perpendicular to the route direction, left and right, to the nearest footprint edge, each capped at 40 m (src/om_package/route_repair.py street_width_m); the width is the sum of the two distances",
+        "limits": "Empty inside a building footprint (covered passages and unresolved points). Where a side meets no building within 40 m the width is capped and street_width_capped is true. Measured from the footprints, so it exists in becos, where the street layer has none.",
         "status": "computed",
     },
     "height_width_ratio": {
-        "definition": "Height-to-width ratio of the street canyon at this point: building height divided by street width.",
-        "unit": "-", "source": "outputs/maré/morphometrics/canyon/hw_streets.gpkg column HW",
-        "method": "nearest-neighbour join (<=20 m)", "limits": "NaN beyond 20 m of any canyon sample.",
+        "definition": "Height-to-width ratio of the street at this point: building_height_m divided by street_width_m (face to face).",
+        "unit": "-", "source": "buildings_mare footprints; point at the repaired position",
+        "method": "building_height_m / street_width_m from the same two rays",
+        "limits": "Empty where street_width_m is empty, and for unresolved points (a point inside a building has no street). The street layer's own ratio is no longer used.",
         "status": "computed",
     },
     "sky_view_factor": {
         "definition": "Fraction of the sky hemisphere visible at this point (airborne).",
         "unit": "fraction [0,1]", "source": "outputs/maré/svf_v2/svf_streets.gpkg column svf",
-        "method": "nearest-neighbour join (<=15 m); ray-cast at 1.5 m pedestrian height against a buildings+DTM mesh (src/svf_v2, 145-patch Tregenza sky)",
-        "limits": "Computed from 2019 buildings and terrain only. NaN beyond 15 m of any sky view sample.",
+        "method": "nearest-neighbour join (<=15 m) at the repaired position (x_repaired, y_repaired); ray-cast at 1.5 m pedestrian height against a buildings+DTM mesh (src/svf_v2, 145-patch Tregenza sky)",
+        "limits": "Computed from 2019 buildings and terrain only. NaN beyond 15 m of any sky view sample, and for unresolved points (inside a building).",
         "status": "computed",
     },
     "sky_view_factor_join_dist_m": {
@@ -109,7 +110,7 @@ _BASE: dict[str, dict] = {
         "definition": "Building footprint area fraction of the 10 m grid cell nearest this point.",
         "unit": "fraction [0,1]", "source": "outputs/maré/features/features_grid.parquet column lambda_p",
         "method": "nearest-neighbour join (<=12 m) to grid cell centroid; lambda_p from src/urban_morphology.py",
-        "limits": "10 m-cell resolution, not a point-native measurement; NaN beyond 12 m of any grid cell centroid. Some points with plan_density_lambda_p equal to 1.0 are route_geometry_flag defects (the route cuts through a building) rather than fully built cells.",
+        "limits": "10 m-cell resolution, not a point-native measurement; NaN beyond 12 m of any grid cell centroid, and for unresolved points. Points with plan_density_lambda_p equal to 1.0 are mostly covered passages or unresolved points in the traced route.",
         "status": "computed",
     },
     "plan_density_join_dist_m": {
@@ -568,6 +569,52 @@ def _matched_rows(regimes: list[dict], taus=DEFAULT_TAUS_S) -> dict[str, dict]:
                 "tau is the 63 % response time (tau = t90 / ln 10). Empty where no point within 5 tau has a value. One value per walk and point; segment with aggregate_to_segments.py --by walk_id.")
     return out
 
+_V031 = {
+    "point_class": {
+        "definition": "What the street map says about the point: street (on a mapped street), projected (inside a building outline by at most 4 m, moved to the nearest open ground), beco (open ground more than 10 m from a mapped street: an alley missing from the map), covered_passage (deeper inside a building outline, with GPS fixes from at least 10 walks within 8 m: a passage under a building) or unresolved (deeper inside a building outline with no GPS support).",
+        "unit": "category", "source": "buildings_mare, street_mare, GPS fixes of the walks",
+        "method": "src/om_package/route_repair.py classify_points, applied in the order street, projected, beco, covered_passage, unresolved; the build keeps beco, covered_passage and unresolved points at their traced position",
+        "limits": "Footprints are 2019 and the route trace has its own offset. route_geometry_flag is true for every class except street.",
+        "status": "computed",
+    },
+    "x_repaired": {
+        "definition": "Easting of the position at which the measures of this point are computed.",
+        "unit": "m, EPSG:31983 (SIRGAS 2000 / UTM 23S)", "source": "this package",
+        "method": "projected points: nearest open ground, set back 0.5 m from the wall; all other points: equal to x",
+        "limits": "Open ground is the space outside every footprint grown by 0.5 m.",
+        "status": "computed",
+    },
+    "y_repaired": {
+        "definition": "Northing of the position at which the measures of this point are computed.",
+        "unit": "m, EPSG:31983 (SIRGAS 2000 / UTM 23S)", "source": "this package",
+        "method": "as x_repaired", "limits": "-",
+        "status": "computed",
+    },
+    "shift_m": {
+        "definition": "Distance between the traced position (x, y) and the repaired position (x_repaired, y_repaired).",
+        "unit": "m", "source": "this package", "method": "Euclidean distance", "limits": "Zero except for projected points.",
+        "status": "computed",
+    },
+    "street_width_layer_m": {
+        "definition": "Street width from the street layer's canyon sample (building face to building face), kept for comparison with street_width_m.",
+        "unit": "m", "source": "outputs/maré/morphometrics/canyon/hw_streets.gpkg column W",
+        "method": "nearest-neighbour join (<=20 m) at the repaired position",
+        "limits": "NaN beyond 20 m of any canyon sample, which includes most becos.",
+        "status": "computed",
+    },
+    "building_height_layer_m": {
+        "definition": "Building height from the street layer's canyon sample, kept for comparison with building_height_m.",
+        "unit": "m", "source": "outputs/maré/morphometrics/canyon/hw_streets.gpkg column H",
+        "method": "nearest-neighbour join (<=20 m) at the repaired position", "limits": "NaN beyond 20 m of any canyon sample.",
+        "status": "computed",
+    },
+    "street_width_capped": {
+        "definition": "True where a width ray met no building within 40 m on one side, so street_width_m is a lower bound of the open width.",
+        "unit": "bool", "source": "this package", "method": "ray length reached the 40 m cap on either side", "limits": "-",
+        "status": "computed",
+    },
+}
+
 
 def full_dictionary(radii=BUFFER_RADII_M, regimes: list[dict] | None = None) -> dict[str, dict]:
     """regimes: [{slug, name}] of the campaign-season wind regimes (rows for
@@ -575,6 +622,7 @@ def full_dictionary(radii=BUFFER_RADII_M, regimes: list[dict] | None = None) -> 
     regimes = regimes or []
     d = dict(_BASE)
     d.update(_V030)
+    d.update(_V031)
     d.update(_regime_rows(regimes))
     d.update(_matched_rows(regimes))
     for template_id, template in _BUFFER_TEMPLATES.items():
