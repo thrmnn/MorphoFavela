@@ -134,6 +134,59 @@ def _column_rows(package_dir: Path, f: dict) -> list[str]:
     return out
 
 
+def _route_repair_lines(f: dict) -> list[str]:
+    from . import route_repair as rr
+
+    fl, c = f["flag"], f["flag_counts"]
+    hw = fl["street_points_width"]
+    pj = fl["projected"]
+    return [
+        "Each point gets one class, in this order (distances in metres, EPSG:31983):\n",
+        f"- `street`: not inside a building outline and at most {rr.STREET_MAX_M:g} m from a mapped street centre "
+        f"line ({c['street']:,} points).",
+        f"- `projected`: inside an outline and at most {rr.PROJECT_MAX_M:g} m from open ground ({c['projected']:,} points). "
+        f"The point moves to the nearest open ground, where open ground is the space outside every outline grown "
+        f"by {rr.SETBACK_M:g} m, so gaps narrower than {2 * rr.SETBACK_M:g} m do not count as walkable. The "
+        f"{rr.PROJECT_MAX_M:g} m limit is the size of the offset between the trace and the 2019 outlines; "
+        "a point deeper inside an outline is not explained by an offset. "
+        f"Median move {pj['shift_median_m']:.1f} m, largest {pj['shift_max_m']:.1f} m.",
+        f"- `beco`: in open ground and more than {rr.STREET_MAX_M:g} m from any mapped street, so an alley missing from "
+        f"the street map ({c['beco']:,} points). The position is kept.",
+        f"- `covered_passage`: inside an outline, deeper than {rr.PROJECT_MAX_M:g} m from open ground, and at least "
+        f"{rr.COVERED_MIN_WALKS} walks have a GPS fix within {rr.GPS_NEAR_M:g} m ({c['covered_passage']:,} points). Position and "
+        "measures are kept: the shade under a building is real.",
+        f"- `unresolved`: anything else, deep inside an outline with no GPS support ({c['unresolved']:,} points). The "
+        "position is kept, and sky view factor, height-to-width ratio and plan area density are left empty.",
+        "",
+        "GPS evidence. Every GPS fix of every walk is used, except fixes at 0 latitude and 0 longitude (no fix) and "
+        f"fixes of a standing walker (closer than {rr.DWELL_STEP_M:g} m to the previous or next fix, 5 s apart). A fix goes to its nearest route "
+        f"point if that lies within {rr.CONSENSUS_CORRIDOR_M:g} m. A route point collects the fixes assigned within "
+        f"{rr.CONSENSUS_WINDOW_M:g} m of it along the route; its consensus position is the median of their coordinates, "
+        f"smoothed by a running median over {2 * rr.SMOOTH_HALF_PTS + 1} points. It counts where at least "
+        f"{rr.CONSENSUS_MIN_WALKS} walks contribute and the position lies in open ground.\n",
+        f"Medial axis. The free space between outlines within {rr.MEDIAL_RADIUS_M:g} m of the route is drawn on a "
+        f"{rr.MEDIAL_CELL_M:g} m grid and thinned to its centre line; cells with less than "
+        f"{rr.MEDIAL_MIN_CLEARANCE_M:g} m of clearance are dropped. For the {fl['n_with_gps_consensus']:,} points with a "
+        f"GPS consensus, the median distance from the consensus to the nearest medial axis cell is "
+        f"{fl['gps_medial_gap_median_m']:.1f} m, and {100 * fl['gps_medial_share_within_5m']:.0f}% are within 5 m. "
+        f"Where the route trace of a beco lies more than {rr.BECO_MOVE_MIN_M:g} m from the consensus, the consensus "
+        f"or the medial axis (when within {rr.MEDIAL_MATCH_M:g} m of the consensus) names a walked line; "
+        f"{fl['beco_gps_suggested_moved']['n']:,} becos qualify, with moves of a median of "
+        f"{fl['beco_gps_suggested_moved']['median_m']:.0f} m. This package does not apply them, because GPS fixes in a narrow alley scatter too widely to "
+        "define a line. They are evidence only.\n",
+        f"Street width. Two rays leave each point at the repaired position, perpendicular to the route direction (a "
+        f"{2 * 3 + 1}-point central difference), to the nearest outline on each side, capped at {rr.WIDTH_CAP_M:g} m a side. "
+        "`street_width_m` is the sum, building height the mean height of the two outlines hit, and the "
+        "height-to-width ratio their quotient. A point inside an outline has no width. The street layer's width and "
+        "height stay as `street_width_layer_m` and `building_height_layer_m`. On the "
+        f"{hw['n']:,} street points with both, the median width is {hw['facade_median_m']:.1f} m against "
+        f"{hw['layer_median_m']:.1f} m from the street layer.\n",
+        "Sky view factor, plan area density and the street layer values come from the same nearest-sample joins "
+        "as for every other point, at the repaired position. The shade, sun dose and upwind shelter angle come from the "
+        "horizon march at the repaired position.\n",
+    ]
+
+
 def render_readme(package_dir) -> str:
     """README.md, every number from report.compute_facts over the built
     package, so the README and the report state the same values."""
@@ -141,6 +194,7 @@ def render_readme(package_dir) -> str:
 
     import pyproj
 
+    from . import vent_context
     from .report import (AUTHOR, PROJECT_FORM, _day, _join, _n, compute_facts, file_table,
                          opening_paragraph)
     from .sensor_match import DEFAULT_TAUS_S
@@ -199,15 +253,19 @@ def render_readme(package_dir) -> str:
         f"The route is the walk dataset's OM2 route: {_n(f['length_m'])} m, sampled every {f['spacing_m']:g} m "
         f"along its centre line into {_n(f['n_points'])} points at {f['height_m']:g} m above the ground. "
         "`point_id` is `OM2-` plus the distance from the route start in metres, zero-padded. Some points fall "
-        "inside building outlines or far from a street centre line, because some alleys cannot be mapped; "
-        f"`route_geometry_flag` marks the {_n(f['n_flagged'])} points ({flag_pct:.1f}%) that lie inside a "
-        f"building outline or more than {f['flag_dist_m']:g} m from a street centre line.\n",
+        "inside building outlines or far from a street centre line, because some alleys cannot be mapped. "
+        f"`point_class` sorts the points (see Route repair below), and `route_geometry_flag` is true for the "
+        f"{_n(f['n_flagged'])} points ({flag_pct:.1f}%) of any class but `street`. `x` and `y` keep the traced "
+        "position; the measures of a projected point are computed at `x_repaired`, `y_repaired`.\n",
+        "### Route repair\n",
+        *_route_repair_lines(f),
         "### Street form\n",
-        "Building height, street width and their ratio come from cross-sections of the flanking buildings at "
-        "street samples; sky view factor is ray-cast from 1.5 m above street samples over 145 sky patches "
+        "Building height, street width and their ratio come from the building footprints at the repaired "
+        "position of each point (see Route repair); sky view factor is ray-cast from 1.5 m above street samples over 145 sky patches "
         "against the 2019 buildings and terrain; plan density is the building share of the 10 m grid cell. Each "
         "point takes the nearest sample within a maximum distance and stays empty beyond it, never a guessed "
-        "value; `*_join_dist_m` gives that distance. The height-to-width ratio is computed per point; the "
+        "value; `*_join_dist_m` gives that distance. Building height, street width and the height-to-width ratio "
+        "are the exception: they come from rays, not from a join. The height-to-width ratio is computed per point; the "
         f"median of the point ratios is {f['hw_median_of_ratios']:.2f}, and the ratio of the median height to "
         f"the median width is {f['hw_ratio_of_medians']:.2f}. Buffer columns give plan density, building count "
         f"and mean building height within {_join([str(r) for r in radii])} m of each point.\n",
@@ -255,17 +313,9 @@ def render_readme(package_dir) -> str:
         *[f"| {per} | {g['name']} | {g['dir']:.0f}° | {100 * g['share']:.1f}% | {g['speed']:.1f} m/s |"
           for per, regs in (("campaign season", camp), (f"{y0} to {y1}", clim)) for g in regs.values()],
         "",
-        "### Ventilation measures\n",
-        "Each measure is computed at the mean direction of each campaign-season regime, and its columns end "
-        f"in the regime name (`_{r1['slug']}`, `_{r2['slug']}`). None is a measured or simulated wind. Frontal "
-        "area density facing the wind is interpolated between the eight compass columns of the 10 m grid cell. "
-        "Canyon alignment is the angle between the street axis and the wind, from 0° (along) to 90° (across). "
-        "Upwind shelter angle is the horizon angle in the direction the wind comes from. Open space fraction "
-        f"is the unbuilt share of the {DEFAULT_BUFFER_M} m buffer.\n",
-        "Roughness length and displacement height follow Macdonald et al. (1998), from the plan density and "
-        f"mean building height of the {DEFAULT_BUFFER_M} m buffer and the frontal area density facing the wind. "
-        "The method was calibrated on regular arrays of blocks, sparser than Maré. Along most of the route the "
-        f"displacement height approaches the roof height (median {f['zd_median']:.1f} m) and the roughness "
+        vent_context.readme_subsection(f, "###"),
+        "The Macdonald method was calibrated on regular arrays of blocks, sparser than Maré. Along most of the route "
+        f"the displacement height approaches the roof height (median {f['zd_median']:.1f} m) and the roughness "
         f"length falls towards zero (medians {z0_med}): read these values as outside the calibrated range. "
         "They are in the data only.\n",
         "### Sensor-matched values\n",
@@ -288,7 +338,7 @@ def render_readme(package_dir) -> str:
         "Loggers record UTC; Rio local time is UTC-3 with no daylight saving. Join logger readings to "
         "`p12_walk_points` by `walk_id` and the nearest `t_arrival_utc`, or to the shade table by `point_id` "
         "and `timestamp_utc` floored to the shade step (`OM2/join_shade_example.py`). Run each analysis with "
-        "and without the points flagged by `route_geometry_flag`, and down-weight or drop rows whose "
+        "and without the points that `point_class` marks as not on a street, and down-weight or drop rows whose "
         "`arrival_source` is `gap_interpolated`.\n",
         "## Known limits\n",
         "- Street form, sun, shade and ventilation come from 2019 building and terrain geometry.\n"
@@ -298,6 +348,9 @@ def render_readme(package_dir) -> str:
         "mean means no building in the buffer.\n",
         "## Columns\n",
         *_column_rows(package_dir, f),
+        "## References\n",
+        *[f"- {r}" for r in vent_context.references_used().values()],
+        "",
         "## Manifest\n",
         "`manifest.json` records the package version, the coordinate system, the use terms, the decisions "
         "behind this release, the wind source, summary values and a SHA-256 checksum for every other file. "
