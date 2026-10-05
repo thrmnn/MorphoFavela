@@ -6,7 +6,7 @@ fixed logger sees only the time axis, so subtracting its trend removes the
 common temporal drift and leaves the spatial signal.
 
 Files are named <I|O>_<device>_<YYYYMMDD>_<hh>durhrs.csv (I indoor, O outdoor)
-with columns Timestamp (UTC), Latitude, Longitude, Temperature, Humidity, PM*.
+with columns Timestamp (Rio local time, see load_loggers), Latitude, Longitude, Temperature, Humidity, PM*.
 Loading reduces each device to one-minute means: walks last about 27 minutes,
 so finer time resolution adds size and no information.
 
@@ -80,10 +80,10 @@ def load_loggers(folder: Path, tz: str = "UTC") -> tuple[pd.DataFrame, pd.DataFr
     off the occasional wild fix) plus the 5th to 95th percentile spread in
     metres, and the number of dropped junk rows in attrs["n_dropped"].
 
-    tz is the clock the Timestamp column is written in. The settled fact is UTC,
-    but the logger diurnal cycle peaks at 13:00 on that clock and the drift match
-    with the walks is best when logger time is shifted 3 h, which points to
-    America/Sao_Paulo. Unresolved; confirm with the logger owner before use.
+    tz is the clock the Timestamp column is written in. The fixed loggers write
+    Rio local time (America/Sao_Paulo): cross-correlation with Galeão airport
+    temperature peaks at a 3 h shift and their daily peak (13:00 file clock)
+    matches the airport's 16:00 UTC peak. The walk files, unlike these, are UTC.
     """
     paths = sorted(Path(folder).glob("[IO]_*_*durhrs.csv"))
     if not paths:

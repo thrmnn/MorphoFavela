@@ -25,6 +25,7 @@ from src.om_package.figures import SEGMENT_LENGTH_M
 from src.om_package.report_pdf import render_markdown_pdf, report_css
 from src.om_package.routes import ROUTE_FLAG_MAX_STREET_DIST_M
 from src.om_package.sensor_match import DEFAULT_TAUS_S, TRUNCATION_TAUS
+from src.om_package import temp_pairing
 from src.om_package.shade import daylight_rows, daylight_shade_fraction_pct
 from src.om_package.walks import GAP_FLAG_S, PARTIAL_COVERAGE
 from src.om_package.wind_obs import CLIM_YEAR_END, CLIM_YEAR_START
@@ -43,6 +44,7 @@ _SOURCES = {
     "walks": "walks collected by residents of Maré, cleaned and structured by Cassiano and Vincent (Octopus team)",
     "geometry": "buildings and terrain 2019",
     "airport": "Galeão airport hourly weather reports",
+    "loggers": "outdoor fixed temperature loggers (Octopus team)",
 }
 #: Each caption names only the sources its figure draws on.
 FIGURE_SOURCES = {
@@ -55,6 +57,8 @@ FIGURE_SOURCES = {
     "fig_shelter_maps.png": ("geometry", "airport"),
     "fig_vent_profiles.png": ("geometry", "airport"),
     "fig_svf_sensor.png": ("walks", "geometry"),
+    "fig_temp_profile.png": ("walks", "loggers"),
+    "fig_temp_tau.png": ("walks", "loggers", "geometry"),
 }
 
 
@@ -82,6 +86,8 @@ FIGURES = [
     "fig_shelter_maps.png",
     "fig_vent_profiles.png",
     "fig_svf_sensor.png",
+    "fig_temp_profile.png",
+    "fig_temp_tau.png",
 ]
 FIGURE_DPI = 200
 _FIG_NO = {name: i + 1 for i, name in enumerate(FIGURES)}
@@ -121,6 +127,13 @@ def file_roles(f: dict) -> dict:
         "OM2/aggregate_to_segments": "Script: means over segments of any length",
         "OM2/join_shade_example": "Script: joins logger readings to the shade table",
         "manifest.json": "Version, sources and a checksum for every file",
+        "p13_temperature_pairing_readings": "One row per walk temperature reading: logger background, anomaly",
+        "p13_temperature_pairing_tau_scan": "Variance explained by sensor-matched measures, per time constant",
+        "p13_temperature_pairing_events": "Sharp sun and shade changes along each walk",
+        "p13_temperature_pairing_event_response": "Mean temperature change around the sun and shade changes",
+        "p13_temperature_pairing_coefficients": "Associations of the anomaly with street measures",
+        "p13_temperature_pairing_segment_profile": "Mean anomaly and street measures per 20 m segment",
+        "p13_temperature_pairing_warmup": "Readings against minutes since the walk started",
     }
 
 
@@ -506,7 +519,7 @@ def _file_groups(package_dir: Path) -> list[tuple[str, list[str]]]:
         if not p.is_file() or p.name.startswith("_"):
             continue
         rel = p.relative_to(package_dir).as_posix()
-        if rel.endswith(".png") or rel == "OM2/figure_facts.json":
+        if rel.endswith(".png") or rel in ("OM2/figure_facts.json", "OM2/temp_facts.json"):
             continue
         stem, ext = (rel, "") if rel == "manifest.json" else rel.rsplit(".", 1)
         groups.setdefault(stem, []).append(ext)
@@ -763,6 +776,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
 
     # 9 ------------------------------------------------------------------
     rep, sp = f["rep_walk"], f["rep_spread"]
+    tf = json.loads((package_dir / "OM2" / "temp_facts.json").read_text(encoding="utf-8"))
     t_lo, t_hi = f["fig_taus"]
     taus = _join([f"{t}" for t in f["taus"]])
     flag_share = f["n_flagged"] / f["n_points"]
@@ -793,17 +807,17 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"({pct('gap_share', f['gap_share'])} of walk points). Down-weight or drop the interpolated rows. "
         f"In `p02b_walks`, {f['n_partial']} of the {f['n_walks']} walks are marked `partial`: their GPS covers "
         f"less than {pct('partial_rule', f['partial_coverage'])} of the route.\n",
-        "**One question for the team.** What is the time constant of the air temperature sensor as mounted, "
-        "with its housing, and is the value you have the 63% or the 90% response time? With it we can pick "
-        "the matching τ and the segment length.\n",
+        temp_pairing.team_question(tf),
     ]
 
     # 9b -----------------------------------------------------------------
-    out += [
-        "## Street measures and the walk temperature readings\n",
-        "PLACEHOLDER: first look at pairing the street measures with the walk temperature readings. "
-        "This section is replaced by the temperature pairing section.\n",
-    ]
+    out.append("## Street measures and the walk temperature readings\n")
+    captions = {k: v.format(seg=tf["segment_m"]) for k, v in temp_pairing.FIGURE_CAPTIONS.items()}
+    for para in temp_pairing.report_paragraphs(tf):
+        cited = [n for n in ("fig_temp_profile.png", "fig_temp_tau.png") if "{" + n[:-4] + "}" in para]
+        out.append(para.replace("{fig_temp_profile}", _fig("fig_temp_profile.png"))
+                   .replace("{fig_temp_tau}", _fig("fig_temp_tau.png")))
+        out += [_figure(package_dir, n, captions[n]) for n in cited]
 
     # 10 -----------------------------------------------------------------
     out.append(f"**Contact.** {AUTHOR}, {PROJECT_FORM}.\n")
