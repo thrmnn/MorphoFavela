@@ -142,3 +142,17 @@ def test_horizon_svf_limits():
     az = np.tile(np.arange(0, 360, 30.0), 2)
     assert np.allclose(rr.horizon_svf(np.zeros((1, len(az))), az), 1.0)
     assert np.allclose(rr.horizon_svf(np.full((1, len(az)), 90.0), az), 0.0)
+
+
+def test_figure_smoke(tmp_path):
+    from src.om_package.fig_flags import build_fig_flags
+
+    xy = [(i, 1.0) for i in range(0, 40)] + [(40 + i, 2.5) for i in range(20)]
+    boxes = [(30, 1.5, 60, 8.0)]
+    pts = _points(xy)
+    b = _buildings(boxes)
+    walks = [[(i + 0.3, 1.0 + 0.1 * k) for i in range(0, 60, 3)] for k in range(8)]
+    fx = _fixes(walks)
+    res = rr.classify_points(pts, b, STREETS, fx)
+    out = build_fig_flags(res, b, fx, tmp_path / "fig_flags.png", insets=[(30.0, 59.0)])
+    assert out.exists() and out.stat().st_size > 5000

@@ -26,7 +26,7 @@ Classes, applied in this order (all distances in metres, EPSG:31983):
 
 Line reconstruction (becos only; projected and street points are never
 re-routed by it):
-  1. GPS consensus. Every raw fix (all walks, 0/0 = no fix dropped) is assigned
+  1. GPS consensus. Every raw fix (all walks; 0/0 and standing fixes dropped) is assigned
      to its nearest route point if that is within CONSENSUS_CORRIDOR_M. A route
      point collects fixes assigned within CONSENSUS_WINDOW_M of it along the
      route; its consensus position is the coordinate-wise median of those fixes
@@ -69,6 +69,10 @@ STREET_MAX_M = 10.0
 PROJECT_MAX_M = 4.0
 SETBACK_M = 0.5
 GPS_NEAR_M = 8.0
+#: A fix closer than this to its previous or next fix (5 s apart, so slower than
+#: 0.4 m/s) is a walker standing still. Dwell clusters (the start of each walk,
+#: stops) are not the walked line and would pull the consensus into a blob.
+DWELL_STEP_M = 2.0
 COVERED_MIN_WALKS = 10
 CONSENSUS_CORRIDOR_M = 15.0
 CONSENSUS_WINDOW_M = 5.0
@@ -88,13 +92,18 @@ _TO_UTM = Transformer.from_crs(WGS84, UTM23S, always_xy=True)
 
 def load_gps_fixes(matched_dir: Path) -> pd.DataFrame:
     """Raw (unmatched) fixes of every walk: walk_id, x, y in EPSG:31983.
-    Latitude and Longitude of 0 mean no fix and are dropped."""
+    Latitude and Longitude of 0 mean no fix and are dropped, and so are fixes of
+    a standing walker (DWELL_STEP_M)."""
     frames = []
     for f in sorted(Path(matched_dir).glob("OM_2_*.csv")):
         d = pd.read_csv(f, usecols=["Latitude", "Longitude"])
         d = d[(d["Latitude"] != 0) & (d["Longitude"] != 0)].dropna()
         x, y = _TO_UTM.transform(d["Longitude"].to_numpy(), d["Latitude"].to_numpy())
-        frames.append(pd.DataFrame({"walk_id": f.stem, "x": x, "y": y}))
+        step = np.hypot(np.diff(x), np.diff(y))
+        prev = np.r_[np.inf, step]
+        nxt = np.r_[step, np.inf]
+        moving = np.minimum(prev, nxt) >= DWELL_STEP_M
+        frames.append(pd.DataFrame({"walk_id": f.stem, "x": x[moving], "y": y[moving]}))
     return pd.concat(frames, ignore_index=True)
 
 
