@@ -55,6 +55,10 @@ FULL_COVER = 0.999
 #: Warm-up: minute effects tested from 0 to WARMUP_MAX_MIN - 1; later minutes are the reference.
 WARMUP_MAX_MIN = 15
 WARMUP_TOL_C = 0.1
+#: Minutes left out at the start of every walk. The fitted settling window is not applied by default:
+#: once position along the route is allowed for, settling cannot be told apart from a cooler first
+#: stretch of route. The fitted evening window is run as a sensitivity check instead.
+START_DROP_MIN = 1
 WARMUP_DIST_BIN_M = 50.0
 #: Transition events: shade state constant at least this far on each side.
 EVENT_SIDE_M = 30
@@ -581,6 +585,25 @@ def segment_associations(df: pd.DataFrame, tau: int, n_boot: int, rng: np.random
 
 # run -------------------------------------------------------------------------
 
+#: Shipped column names (every one has a row in the data dictionary, dictionary.p13_rows).
+READINGS_RENAME = {"temperature": "temperature_c", "background": "background_c", "anomaly": "anomaly_c",
+                   "anomaly_detrend": "anomaly_detrend_c"}
+COEF_RENAME = {"term": "measure", "column": "matched_column", "unit": "per_unit", "lo": "effect_lo_c",
+               "hi": "effect_hi_c"}
+PROFILE_RENAME = {"anomaly_logger": "mean_anomaly_logger_c", "anomaly_detrend": "mean_anomaly_detrend_c",
+                  "logger_lo": "mean_anomaly_logger_lo_c", "logger_hi": "mean_anomaly_logger_hi_c",
+                  "anomaly_logger_warmup": "mean_anomaly_start_c", "n_walks_warmup": "n_walks_start",
+                  "distance_m": "segment_mid_m", "shade": "mean_shade_matched", "dose": "mean_dose_1h_matched_wh_m2",
+                  "svf": "mean_sky_view_factor_matched", "hw": "mean_height_width_ratio_matched"}
+WARMUP_RENAME = {"mean_c": "mean_start_departure_c", "lo": "mean_start_departure_lo_c",
+                 "hi": "mean_start_departure_hi_c", "fit_c": "fitted_start_departure_c",
+                 "adjusted_lo": "adjusted_effect_lo_c", "adjusted_hi": "adjusted_effect_hi_c"}
+P13_STEMS = ["p13_temperature_pairing_readings", "p13_temperature_pairing_tau_scan",
+             "p13_temperature_pairing_events", "p13_temperature_pairing_event_response",
+             "p13_temperature_pairing_coefficients", "p13_temperature_pairing_segment_profile",
+             "p13_temperature_pairing_warmup"]
+
+
 def run(package_dir: Path, matched_dir: Path, route_json: Path, logger_dir: Path, *, n_boot: int = N_BOOT,
         seed: int = SEED) -> dict:
     package_dir = Path(package_dir)
@@ -595,7 +618,8 @@ def run(package_dir: Path, matched_dir: Path, route_json: Path, logger_dir: Path
     r, f_read = readings_table(points, fixes, temps)
     r, f_cov = add_background(r, walks, minutes)
     f_warm, warm_curve = estimate_warmup(r, n_boot, rng)
-    r["warmup"] = r["minutes_since_start"] < r["period"].map({p: f_warm[p]["window_min"] for p in PERIODS})
+    r["warmup"] = r["minutes_since_start"] < START_DROP_MIN
+    f_warm["applied_window_min"] = START_DROP_MIN
     for p in PERIODS:
         f_warm[p]["n_dropped"] = int((r["warmup"] & (r["period"] == p)).sum())
         f_warm[p]["share_dropped"] = float(r.loc[r["period"] == p, "warmup"].mean())
@@ -629,9 +653,19 @@ def run(package_dir: Path, matched_dir: Path, route_json: Path, logger_dir: Path
                                                     for row in c.itertuples()}}
     seg_assoc, f_seg = segment_associations(df, tau, n_boot, rng)
 
+    w_cut = int(f_warm["evening"]["window_min"])
+    late_ev = df[(df["period"] == "evening") & (df["minutes_since_start"] >= w_cut)]
+    f_sens = {"window_min": int(w_cut), "n_dropped": int(((df["period"] == "evening") & (df["minutes_since_start"] < w_cut)).sum())}
+    for name, terms in (("shade_svf", ["shade", "svf"]), ("with_ratio", [*MEASURES, *EXTRA])):
+        c, f = association_model(late_ev, tau, terms)
+        coefs.append(c.assign(period="evening", model=f"{name}_evening_cut_{w_cut}min", tau_s=tau))
+        f_sens[name] = {"cv_r2": f["cv_r2"], "r2_within": f["r2_within"], "n_readings": f["n_readings"],
+                        "effects": {row.term: {"effect_c": row.effect_c, "lo": row.lo, "hi": row.hi}
+                                    for row in c.itertuples()}}
+
     out_cols = ["walk_id", "period", "t_utc", "t_local", "minutes_since_start", "distance_along_m", "point_id",
                 "temperature", "background", "anomaly", "anomaly_source", "anomaly_detrend"]
-    rd = df[out_cols].copy()
+    rd = df[out_cols].rename(columns=READINGS_RENAME)
     rd["t_utc"] = rd["t_utc"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     rd["t_local"] = rd["t_local"].map(lambda t: t.isoformat())
     rd.to_csv(package_dir / "p13_temperature_pairing_readings.csv", index=False, float_format="%.4f")
@@ -639,13 +673,15 @@ def run(package_dir: Path, matched_dir: Path, route_json: Path, logger_dir: Path
     ev_out = events.copy()
     ev_out["t_utc"] = ev_out["t_utc"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     ev_out["used"] = ev_out.index.isin(traces["event"].unique())
+    ev_out = ev_out.rename(columns={"distance_m": "event_distance_m", "t_utc": "event_t_utc", "direction": "event_direction"})
     ev_out.to_csv(package_dir / "p13_temperature_pairing_events.csv", index=False, float_format="%.2f")
-    ev_curve.to_csv(package_dir / "p13_temperature_pairing_event_response.csv", index=False, float_format="%.4f")
-    pd.concat(coefs, ignore_index=True).to_csv(package_dir / "p13_temperature_pairing_coefficients.csv",
+    ev_curve.rename(columns={"mean_c": "mean_change_c"}).to_csv(package_dir / "p13_temperature_pairing_event_response.csv", index=False, float_format="%.4f")
+    pd.concat(coefs, ignore_index=True).rename(columns=COEF_RENAME).to_csv(package_dir / "p13_temperature_pairing_coefficients.csv",
                                                index=False, float_format="%.5f")
     prof_out = seg_prof.merge(seg_assoc.drop(columns=["anomaly", "n"]), on=["period", "segment"], how="left")
+    prof_out = prof_out.rename(columns=PROFILE_RENAME)
     prof_out.to_csv(package_dir / "p13_temperature_pairing_segment_profile.csv", index=False, float_format="%.4f")
-    warm_curve.to_csv(package_dir / "p13_temperature_pairing_warmup.csv", index=False, float_format="%.4f")
+    warm_curve.rename(columns=WARMUP_RENAME).to_csv(package_dir / "p13_temperature_pairing_warmup.csv", index=False, float_format="%.4f")
 
     n_cov_read = int(df["anomaly_source"].eq("logger_background").sum())
     facts = {
@@ -666,6 +702,7 @@ def run(package_dir: Path, matched_dir: Path, route_json: Path, logger_dir: Path
         "n_events_found": int(len(events)),
         "n_events_sun_to_shade": int((events["direction"] == "sun_to_shade").sum()),
         "n_events_shade_to_sun": int((events["direction"] == "shade_to_sun").sum()),
+        "sensitivity_evening_cut": f_sens,
         "chosen_tau_s": tau, "scan_best_tau_s": tau_best, "models": f_model, "segments": f_seg, "units": UNITS,
         "n_boot": n_boot, "seed": seed,
     }
@@ -717,13 +754,65 @@ def _adjusted(w: dict) -> str:
     return f"{n} of the first {w['warmup_max_min']} minutes differ from the rest"
 
 
+def _excludes_zero(d: dict, lo: str = "lo", hi: str = "hi") -> bool:
+    return d[lo] > 0 or d[hi] < 0
+
+
+def _shade_lead(f: dict) -> str:
+    sh = [f["models"][f"{p}_shade_svf"]["effects"]["shade"] for p in PERIODS]
+    if all(_excludes_zero(e) and e["effect_c"] < 0 for e in sh):
+        return " and where the recent path was shaded"
+    return " (shade points the same way, within the noise)" if all(e["effect_c"] < 0 for e in sh) else ""
+
+
+def _gradient(f: dict) -> str:
+    """Logger-version slope per period, worded by whether its interval excludes zero."""
+    parts, clear = [], []
+    for p in PERIODS:
+        g = f["profile"][p]["logger"]
+        parts.append(f"{_c(g['slope_c_per_km'])} °C per km in the {p} "
+                     f"({_iv(g['slope_lo'], g['slope_hi'], ' °C per km')})")
+        if _excludes_zero(g, "slope_lo", "slope_hi"):
+            clear.append(p)
+    r = [f["profile"][p]["profile_r_logger_vs_detrend"] for p in PERIODS]
+    head = (f"The logger version and the per-walk detrended version correlate at {r[0]:.2f} in the morning and "
+            f"{r[1]:.2f} in the evening. From start to end of the route the logger version changes by "
+            f"{parts[0]} and {parts[1]}. ")
+    if not clear:
+        return head + ("Neither interval excludes a flat profile, so a per-walk time trend, which would hide a "
+                       "gradient, hides little here.")
+    word = " and ".join(clear)
+    tail = (f"The {word} rise is a gradient that a per-walk time trend would remove. ")
+    if "evening" in clear:
+        tail += ("Part of it may be the cooler start of the evening walks described above, which the data cannot "
+                 "separate from position along the route.")
+    return head + tail
+
+
 def _zero_note(f: dict, model: str, term: str) -> str:
     """Names the periods whose interval includes no difference."""
     inc = [p for p in PERIODS if f["models"][f"{p}_{model}"]["effects"][term]["lo"] <= 0
            <= f["models"][f"{p}_{model}"]["effects"][term]["hi"]]
     if not inc:
         return ""
-    return f"; the {' and '.join(inc)} interval includes no difference"
+    if len(inc) == len(PERIODS):
+        return "; both intervals include no difference"
+    return f"; the {inc[0]} interval includes no difference"
+
+
+def _sensitivity(f: dict) -> str:
+    """One sentence: the evening associations when the fitted start window is cut instead."""
+    c = f["sensitivity_evening_cut"]
+    sh, hw = c["shade_svf"]["effects"]["shade"], c["with_ratio"]["effects"]["hw"]
+    return (f"As a check, cutting the first {c['window_min']} minutes of each evening walk "
+            f"({_s(c['n_dropped'])} readings) gives an evening shade difference of {_c(sh['effect_c'])} °C "
+            f"({_iv(sh['lo'], sh['hi'])}) and {_c(hw['effect_c'])} °C per unit of height-to-width ratio "
+            f"({_iv(hw['lo'], hw['hi'])}), with {_pct_signed(c['with_ratio']['cv_r2'])} of the variation predicted "
+            "in walks left out.")
+
+
+def _pct_signed(x: float) -> str:
+    return _pct(x) if x >= 0 else "none"
 
 
 def team_question(facts: dict) -> str:
@@ -754,7 +843,7 @@ def report_paragraphs(facts: dict) -> list[str]:
     n_fall = f["n_walks"] - f["n_walks_covered_in_readings"]
     out = [
         "Street measures explain little of how the walk temperature readings vary along the route. Readings "
-        "are a little cooler where the recent path was shaded and where the street is deeper, but no "
+        f"are a little cooler where the street is deeper{_shade_lead(f)}, but no "
         f"combination of measures predicts more than {_pct(cv)} of the variation within a walk that was left "
         "out of the fit. This section is a first look, meant as input to Jingxue's analysis, which she leads. "
         "It describes associations; it does not test causes and it does not anticipate her conclusions.\n",
@@ -771,31 +860,23 @@ def report_paragraphs(facts: dict) -> list[str]:
         "trend per walk instead.\n",
 
         f"**Start of a walk.** Evening walks start {_c(-w['evening']['start_c'])} °C below their later level "
-        f"against the loggers ({_iv(-w['evening']['start_hi'], -w['evening']['start_lo'])} below) and take about "
-        f"{w['evening']['window_min']} minutes to settle. Morning walks show no such start (first minute "
-        f"{_c(w['morning']['start_c'])} °C, {_iv(w['morning']['start_lo'], w['morning']['start_hi'])}). We left "
-        f"out the first {w['evening']['window_min']} minutes of each evening walk and the "
-        f"{_minutes(w['morning']['window_min'])} of each morning walk: {_s(f['n_dropped_warmup'])} readings, {_pct(w['evening']['share_dropped'])} of the evening "
-        "readings. Every walk starts at 0 m, so the data cannot tell a sensor that is still settling from a "
-        "first stretch of route that is cooler in the afternoon. Once position along the route is allowed for, "
-        f"{_adjusted(w)} (intervals about ±{_c(w['adjusted_half_width_median_c'], 1)} °C). The cut is a precaution; it also means the evening "
-        f"results describe only the route beyond about {_s(pe['start_m'])} m.\n",
+        f"against the loggers ({_iv(-w['evening']['start_hi'], -w['evening']['start_lo'])} below) and come level "
+        f"after about {w['evening']['window_min']} minutes. Morning walks show no such start (first minute "
+        f"{_c(w['morning']['start_c'])} °C, {_iv(w['morning']['start_lo'], w['morning']['start_hi'])}). Every walk "
+        "starts at 0 m, so this could be a sensor that is still settling or a first stretch of route that is "
+        "cooler in the afternoon. Once position along the route is allowed for, "
+        f"{_adjusted(w)} (intervals about ±{_c(w['adjusted_half_width_median_c'], 1)} °C), so the data cannot "
+        f"tell the two apart. We therefore leave out only the {_minutes(w['applied_window_min'])} of every walk "
+        f"({_s(f['n_dropped_warmup'])} readings). {_sensitivity(f)}\n",
 
         "{fig_temp_profile} shows the mean anomaly along the route for the morning and the evening walks: "
         "against the logger background (coloured, with the 95% interval from resampling walks) and with each "
         "walk's time trend removed instead (grey). Hatched stretches are the points left out; dotted lines are "
         "the first minutes of a walk, left out of everything else.\n",
 
-        "**Along the route.** The two versions follow each other closely (correlation "
-        f"{pm['profile_r_logger_vs_detrend']:.2f} in the morning, {pe['profile_r_logger_vs_detrend']:.2f} in the "
-        "evening), and the logger version shows no clear gradient from start to end: "
-        f"{_c(pm['logger']['slope_c_per_km'])} °C per km in the morning "
-        f"({_iv(pm['logger']['slope_lo'], pm['logger']['slope_hi'], ' °C per km')}) and "
-        f"{_c(pe['logger']['slope_c_per_km'])} °C per km in the evening "
-        f"({_iv(pe['logger']['slope_lo'], pe['logger']['slope_hi'], ' °C per km')}). So a per-walk time trend, "
-        "which would hide such a gradient, hides little here, within those intervals. The differences between "
-        f"stretches are larger: the {f['segment_m']} m means span {_c(pm['profile_range_logger_c'], 1)} °C in "
-        f"the morning and {_c(pe['profile_range_logger_c'], 1)} °C in the evening.\n",
+        f"**Along the route.** {_gradient(f)} The differences between stretches are larger: the "
+        f"{f['segment_m']} m means span {_c(pm['profile_range_logger_c'], 1)} °C in the morning and "
+        f"{_c(pe['profile_range_logger_c'], 1)} °C in the evening.\n",
 
         "{fig_temp_tau} shows the two ways we tried to estimate the sensor's effective time constant τ.\n",
 
@@ -824,7 +905,7 @@ def report_paragraphs(facts: dict) -> list[str]:
         "evening, and each 0.1 of sky view factor with "
         f"{_eff(f, 'morning_with_ratio', 'svf')} and {_eff(f, 'evening_with_ratio', 'svf')}. These models explain "
         f"{_pct(mw['r2_within'])} (morning) and {_pct(ew['r2_within'])} (evening) of the within-walk variation, and "
-        f"{_pct(mw['cv_r2'])} and {_pct(ew['cv_r2'])} of it in walks left out. Averaged over walks in "
+        f"{_pct_signed(mw['cv_r2'])} and {_pct_signed(ew['cv_r2'])} of it in walks left out. Averaged over walks in "
         f"{f['segment_m']} m segments, the anomaly correlates with shade at {segm['shade']['r']:.2f} "
         f"(morning, {_iv(segm['shade']['lo'], segm['shade']['hi'], '')}) and {sege['shade']['r']:.2f} "
         f"(evening, {_iv(sege['shade']['lo'], sege['shade']['hi'], '')}), and with height-to-width ratio at "
@@ -893,14 +974,15 @@ time detrend instead (`anomaly_source` = `walk_detrend`). The detrended anomaly 
 comparison; because every walk runs from 0 m to the end, a time detrend also removes any along-route gradient.
 
 **Start of a walk.** Per period, the temperature minus background minus the walk's mean after
-{w['warmup_max_min']} minutes, averaged by minute since start, is fitted with amplitude × exp(-t / T). The window is the
-time until the fitted departure falls below {w['warmup_tol_c']:g} °C, capped at {w['warmup_max_min']} minutes:
-{w['morning']['window_min']} minute(s) in the morning, {w['evening']['window_min']} minutes in the evening
-(walk bootstrap {w['evening']['window_lo']:.0f} to {w['evening']['window_hi']:.0f}). Readings inside the window are
-left out of all models ({_s(f['n_dropped_warmup'])} readings); walk offsets and trends are fitted without them.
-Check: a two-way model with walk offsets, {w['warmup_dist_bin_m']:g} m distance bins per period and minute
-effects finds no minute effect whose interval excludes zero (largest {w['adjusted_max_abs_effect_c']:.2f} °C),
-so the data cannot separate settling from position along the route.
+{w['warmup_max_min']} minutes, averaged by minute since start, is fitted with amplitude × exp(-t / T). The fitted
+window is the time until the departure falls below {w['warmup_tol_c']:g} °C, capped at {w['warmup_max_min']}
+minutes: {w['morning']['window_min']} minute(s) in the morning, {w['evening']['window_min']} minutes in the evening
+(walk bootstrap {w['evening']['window_lo']:.0f} to {w['evening']['window_hi']:.0f}). A two-way model with walk
+offsets, {w['warmup_dist_bin_m']:g} m distance bins per period and minute effects finds no minute effect whose
+interval excludes zero (largest {w['adjusted_max_abs_effect_c']:.2f} °C), so settling cannot be separated from
+position along the route. By default only the first {w['applied_window_min']} minute of every walk is left out
+({_s(f['n_dropped_warmup'])} readings); walk offsets and trends are fitted without it. The fitted evening window
+is run as a sensitivity check (coefficient table, models ending `_evening_cut_<n>min`).
 
 **Time constant, scan.** For τ in {taus} s, sensor-matched shade at arrival, 1 hour sun dose and sky view
 factor are recomputed per walk with `sensor_match.sensor_matched` from the arrival times in

@@ -93,8 +93,10 @@ def _column_rows(package_dir: Path, f: dict) -> list[str]:
     live = d[~d["status"].astype(str).str.startswith("RETIRED")].set_index("id")
     out: list[str] = []
     missing: list[str] = []
+    from .temp_pairing import P13_STEMS
+
     groups = dict(_file_groups(package_dir))
-    for stem in FILE_ORDER:
+    for stem in [*FILE_ORDER, *P13_STEMS]:
         exts = groups.get(stem)
         cols = _columns_of(package_dir, stem, exts) if exts else []
         if not cols:

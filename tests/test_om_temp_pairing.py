@@ -170,3 +170,18 @@ def test_report_numbers_come_from_facts(facts):
     bumped = json.loads(json.dumps(facts))
     bumped["models"]["evening_with_ratio"]["effects"]["hw"]["effect_c"] = 9.87
     assert "9.87" in "\n".join(tp.report_paragraphs(bumped)).replace("−", "-")
+
+
+def test_every_shipped_p13_column_has_a_dictionary_row():
+    from src.om_package.dictionary import full_dictionary
+
+    shipped = {
+        "readings": ["walk_id", "period", "t_utc", "t_local", "minutes_since_start", "distance_along_m", "point_id",
+                     *tp.READINGS_RENAME.values(), "anomaly_source"],
+        "coefficients": [*tp.COEF_RENAME.values(), "effect_c", "period", "model", "tau_s"],
+        "profile": [*tp.PROFILE_RENAME.values(), "segment", "n_walks", "n_readings", "period"],
+        "warmup": [*tp.WARMUP_RENAME.values(), "period", "minute", "n_readings", "adjusted_effect_c"],
+    }
+    d = full_dictionary()
+    missing = [c for cols in shipped.values() for c in cols if c not in d]
+    assert not missing

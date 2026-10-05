@@ -78,8 +78,8 @@ def build_fig_temp_tau(package_dir: Path, out_path: Path | None = None) -> Path:
         late = ~used & (resp["n_events"] >= 5)
         ax2.axhline(0, color=fs.POINT_GREY, lw=0.6)
         ax2.axvline(0, color=fs.POINT_GREY, lw=0.6)
-        ax2.plot(resp.loc[used, "bin_s"], resp.loc[used, "mean_c"], color=fs.LINE_DARK, lw=0, marker="o", ms=3)
-        ax2.plot(resp.loc[late, "bin_s"], resp.loc[late, "mean_c"], color=fs.POINT_GREY, lw=0, marker="o", ms=3,
+        ax2.plot(resp.loc[used, "bin_s"], resp.loc[used, "mean_change_c"], color=fs.LINE_DARK, lw=0, marker="o", ms=3)
+        ax2.plot(resp.loc[late, "bin_s"], resp.loc[late, "mean_change_c"], color=fs.POINT_GREY, lw=0, marker="o", ms=3,
                  mfc="white")
         t = np.linspace(resp.loc[used, "bin_s"].min(), resp.loc[used, "bin_s"].max(), 200)
         fit = np.where(t < 0, 0.0, ev["amp_c"] * (1 - np.exp(-np.clip(t, 0, None) / ev["tau_s"])))
@@ -125,22 +125,22 @@ def build_fig_temp_profile(package_dir: Path, out_path: Path | None = None) -> P
         lims = []
         for ax, per in zip(axes, ("morning", "evening")):
             c = PERIOD_COLOURS[per]
-            s = seg[seg["period"] == per].sort_values("distance_m")
+            s = seg[seg["period"] == per].sort_values("segment_mid_m")
             ok = s["n_readings"] >= 30
             m = s.where(ok)
             ax.axhline(0, color=fs.POINT_GREY, lw=0.6, zorder=1)
-            ax.fill_between(m["distance_m"], m["logger_lo"], m["logger_hi"], color=c, alpha=0.2, lw=0, zorder=2)
-            ax.plot(m["distance_m"], m["anomaly_detrend"], color=DETREND_GREY, lw=0.9, zorder=3)
-            ax.plot(m["distance_m"], m["anomaly_logger"], color=c, lw=1.5, zorder=4)
-            w = s.where(s["n_walks_warmup"] >= 5)
-            ax.plot(w["distance_m"], w["anomaly_logger_warmup"], color=c, lw=0.9, ls=(0, (1, 1.2)), zorder=4)
+            ax.fill_between(m["segment_mid_m"], m["mean_anomaly_logger_lo_c"], m["mean_anomaly_logger_hi_c"], color=c, alpha=0.2, lw=0, zorder=2)
+            ax.plot(m["segment_mid_m"], m["mean_anomaly_detrend_c"], color=DETREND_GREY, lw=0.9, zorder=3)
+            ax.plot(m["segment_mid_m"], m["mean_anomaly_logger_c"], color=c, lw=1.5, zorder=4)
+            w = s.where(s["n_walks_start"] >= 5)
+            ax.plot(w["segment_mid_m"], w["mean_anomaly_start_c"], color=c, lw=0.9, ls=(0, (1, 1.2)), zorder=4)
             ax.text(0.005, 0.96, per, transform=ax.transAxes, ha="left", va="top", fontsize=fs.FONT_PT,
                     color="black", path_effects=fs.HALO)
             ax.set_ylabel("anomaly (°C)")
             ax.spines["bottom"].set_visible(False)
             ax.tick_params(axis="x", length=0, labelbottom=False)
-            lims += [np.nanmin(np.r_[m["logger_lo"], w["anomaly_logger_warmup"]]),
-                     np.nanmax(np.r_[m["logger_hi"], w["anomaly_logger_warmup"]])]
+            lims += [np.nanmin(np.r_[m["mean_anomaly_logger_lo_c"], w["mean_anomaly_start_c"]]),
+                     np.nanmax(np.r_[m["mean_anomaly_logger_hi_c"], w["mean_anomaly_start_c"]])]
         lo, hi = np.nanmin(lims), np.nanmax(lims)
         for ax in axes:
             ax.set_ylim(np.floor(lo * 4) / 4, np.ceil(hi * 4) / 4)
