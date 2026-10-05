@@ -54,6 +54,11 @@ def report_css(version: str, footer: str = USE_TERMS) -> str:
     return _page_css(version, footer) + """
 body { font-size: 9.4pt; line-height: 1.36; color: #1d1d1f; }
 h1 { font-size: 17pt; line-height: 1.2; margin: 0 0 8pt 0; color: #111; }
+.titleblock { margin: 0 0 14pt 0; padding-bottom: 8pt; border-bottom: 0.8pt solid #333; }
+.titleblock h1 { font-size: 21pt; line-height: 1.18; margin: 0 0 6pt 0; }
+.titleblock .subtitle { font-size: 12pt; line-height: 1.3; color: #333; margin: 0 0 12pt 0; }
+.titleblock .byline { font-size: 9.6pt; color: #111; margin: 0 0 3pt 0; }
+.titleblock .issue { font-size: 9pt; color: #555; margin: 0; }
 h2 { font-size: 12.5pt; color: #111; margin: 12pt 0 5pt 0; padding-bottom: 2pt;
      border-bottom: 0.6pt solid #b9b9b9; break-after: avoid; }
 p { margin: 0 0 5pt 0; orphans: 3; widows: 3; }

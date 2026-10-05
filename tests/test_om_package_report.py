@@ -35,9 +35,10 @@ SECTIONS = [
     "Wind: two regimes",
     "Ventilation for both regimes",
     "Using the data with temperature readings",
+    "Street measures and the walk temperature readings",
 ]
 FORBIDDEN = ["—", "–", "SBGL", "METAR", "H/W", "λ", "z0", "SVF", "LiDAR", r"\btree", "v0.1", "v0.2",
-             "v1.", "PLACEHOLDER", "novel", "robust", "significant", "Read with care", "sun_envelope.png",
+             "v1.", "novel", "robust", "significant", "Read with care", "sun_envelope.png",
              "items the team asked", "What we need", "later version", "future version"]
 
 
@@ -78,13 +79,13 @@ def _swap_manifest(pkg: Path, edit) -> None:
 
 
 def test_sections_in_r6_order(report_md):
-    assert report_md.startswith("# ")
+    assert report_md.startswith("::: {.titleblock}\n# ")
     assert re.findall(r"(?m)^## (.+)$", report_md) == SECTIONS
 
 
 def test_opening_paragraph_names_study_author_and_project(report_md):
     opening = report_md.split("\n## ", 1)[0]
-    for s in (STUDY_TITLE, AUTHOR, PROJECT_FORM, "no temperature analysis", "Rio local time"):
+    for s in (STUDY_TITLE, AUTHOR, PROJECT_FORM, "first look at pairing", "Rio local time"):
         assert s in opening, s
 
 

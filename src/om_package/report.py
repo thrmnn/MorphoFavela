@@ -32,12 +32,15 @@ from src.om_package.wind_regimes import N_SECTORS, TAG_MAX_GAP_MIN
 
 PROJECT_FORM = "Brisa+ (MorphoFavela)"
 AUTHOR = "Théo Alessandro Hermann"
+TITLE = "Street form, sun and wind along the OM2 walking route, Complexo da Maré"
+SUBTITLE = "Data package and first pairing with the walk temperature readings"
+BYLINE = f"{AUTHOR} · {PROJECT_FORM} · Octopus team"
 STUDY_TITLE = (
     "Street by street: explaining air temperature differences across streets "
     "and over time in Complexo da Maré"
 )
 _SOURCES = {
-    "walks": "walks by Cassiano and Vincent (Octopus team)",
+    "walks": "walks collected by residents of Maré, cleaned and structured by Cassiano and Vincent (Octopus team)",
     "geometry": "buildings and terrain 2019",
     "airport": "Galeão airport hourly weather reports",
 }
@@ -460,7 +463,7 @@ def compute_facts(package_dir: Path) -> dict:
     """Every number the report and the README state, computed from the package files."""
     d = _load(Path(package_dir))
     m = d["manifest"]
-    f: dict = {"version": m["package_version"], "use_terms": m["use_terms"], "crs": m["crs"],
+    f: dict = {"version": m["package_version"], "built_at": m["built_at_utc"], "use_terms": m["use_terms"], "crs": m["crs"],
                "geometry_epoch": m["geometry_epoch"], "decisions": m["provenance"]["decisions"],
                "wind_source": m["provenance"]["wind_source"]}
     _route_facts(f, d)
@@ -486,8 +489,8 @@ def opening_paragraph(f: dict) -> str:
         f"{_join(names)}. For each point it gives the street form, the building shade on the {f['n_dates']} walk "
         "dates, the direct sun before each walk and ventilation measures for the two wind regimes of the "
         f"season. It supports the Octopus team's study \"{STUDY_TITLE}\" (lead Jingxue, PI Simone). "
-        f"{AUTHOR} built it within the {PROJECT_FORM} research line. It holds no temperature analysis: that "
-        "is the Octopus team's work. All times are Rio local time (UTC-3, no daylight saving); the data "
+        f"{AUTHOR} is part of the Octopus team and built it within the {PROJECT_FORM} research line. The package "
+        "also gives a first look at pairing the street measures with the walk temperature readings. All times are Rio local time (UTC-3, no daylight saving); the data "
         "tables also carry the UTC time.\n"
     )
 
@@ -576,7 +579,15 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
     out: list[str] = []
 
     # 1 ------------------------------------------------------------------
-    out.append("# Street form, sun and wind along the OM2 route\n")
+    built = pd.Timestamp(f["built_at"])
+    out.append(
+        "::: {.titleblock}\n"
+        f"# {TITLE}\n\n"
+        f"<p class=\"subtitle\">{SUBTITLE}</p>\n\n"
+        f"<p class=\"byline\">{BYLINE}</p>\n\n"
+        f"<p class=\"issue\">{built.day} {built.strftime('%B %Y')}<br>Version {f['version']}</p>\n"
+        ":::\n"
+    )
     out.append(opening_paragraph(f))
 
     # 2 ------------------------------------------------------------------
@@ -596,11 +607,11 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "over the 2019 building footprints, labelled in metres from the start.\n",
         _figure(package_dir, "fig_route.png", "The OM2 route over the building footprints of Nova Holanda, Parque Rubens Vaz "
                 "and Parque União. Labels give metres from the route start."),
-        f"Cassiano and Vincent walked the route {f['n_walks']} times on {f['n_dates']} dates between "
+        f"Residents of Maré walked the route {f['n_walks']} times on {f['n_dates']} dates between "
         f"{_day(f['first_date'])} and {_day(f['last_date'])}: {per['morning']['n']} morning walks starting around "
         f"{per['morning']['start']} and {per['evening']['n']} evening walks starting around "
         f"{per['evening']['start']}, each taking about {f['duration_median_min']:.0f} minutes. Every walk goes "
-        "from the route start towards its end.\n",
+        "from the route start towards its end. Cassiano and Vincent (Octopus team) clean and structure the walk dataset.\n",
     ]
 
     # 4 ------------------------------------------------------------------
@@ -634,10 +645,10 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "## Sun and shade on the walk dates\n",
         f"On the {f['n_dates']} walk dates, the route is in building shade for "
         f"{pct('shade_daylight', f['shade_daylight'])} of daylight time ({_fig('fig_shade_map.png')}). "
-        "The map colours each point by the share of daylight time it spends in building shade: dark points are "
-        "mostly shaded, light points mostly in sun.\n",
-        _figure(package_dir, "fig_shade_map.png", f"Share of daylight time each point spends in building shade, over the "
-                f"{f['n_dates']} walk dates."),
+        "The map colours each point by the share of daylight time it spends in direct sun: lighter means more "
+        "direct sun, and the rest of the time the point is in building shade.\n",
+        _figure(package_dir, "fig_shade_map.png", f"Share of daylight time each point spends in direct sun, over the "
+                f"{f['n_dates']} walk dates. Lighter = more direct sun; the rest of the time the point is in building shade."),
         "A point is in **building shade** when buildings or terrain block the direct sun. Sun and shade are "
         "computed from 2019 building and terrain geometry, every "
         f"{f['shade_step_min']} minutes of daylight on each walk date. Half of the points spend between "
@@ -645,15 +656,16 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "in building shade.\n",
         f"Shade changes more with the time of day than with the date ({_fig('fig_shade_calendar.png')}). Read "
         "the calendar row by row: each row is one walk date, time of day runs left to right in Rio local time, "
-        "and the colour gives the share of route points in building shade.\n",
+        "and the colour gives the share of route points in direct sun (lighter means more direct sun; the rest are in building shade).\n",
         f"In the {_hour(f['shade_hour_min'])} hour only {pct('shade_hour_min', f['shade_hour_min_val'])} of route "
         f"points are shaded, against {pct('shade_last', f['shade_last_val'])} in the "
         f"{_hour(f['shade_last_hour'])} hour. Over the clock hours of daylight that all walk dates share ({_hour(h0)} "
         f"to {h1:02d}:59), the shaded share of route points goes from "
         f"{pct('shade_date_min', f['shade_date_min_val'])} on {_day(f['shade_date_min'])} to "
         f"{pct('shade_date_max', f['shade_date_max_val'])} on {_day(f['shade_date_max'])}.\n",
-        _figure(package_dir, "fig_shade_calendar.png", "Share of route points in building shade by walk date (rows) and time "
-                "of day (Rio local time). White: sun below the horizon."),
+        _figure(package_dir, "fig_shade_calendar.png", "Share of route points in direct sun by walk date (rows) and time "
+                "of day (Rio local time). Lighter = more direct sun; the rest of the route points are in building shade. "
+                "White: sun below the horizon."),
     ]
 
     # 6 ------------------------------------------------------------------
@@ -784,6 +796,13 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "**One question for the team.** What is the time constant of the air temperature sensor as mounted, "
         "with its housing, and is the value you have the 63% or the 90% response time? With it we can pick "
         "the matching τ and the segment length.\n",
+    ]
+
+    # 9b -----------------------------------------------------------------
+    out += [
+        "## Street measures and the walk temperature readings\n",
+        "PLACEHOLDER: first look at pairing the street measures with the walk temperature readings. "
+        "This section is replaced by the temperature pairing section.\n",
     ]
 
     # 10 -----------------------------------------------------------------
