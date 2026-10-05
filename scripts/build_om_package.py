@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Build the "Maré morphology, OM2" data package — Octopus LRP #2
 ("Street by street: explaining air temperature differences across streets
-and over time in Complexo da Maré", lead Jingxue, PI Simone). Théo (PI) is
-a SUPPORT contributor here, supplying street-form variables only — this
-script and everything under src/om_package/ never compute or state a
-temperature conclusion; that is the Octopus team's analysis, not ours.
+and over time in Complexo da Maré", lead Jingxue, PI Simone). Théo is part
+of the Octopus team. The package gives street form, sun and wind measures and
+a first look at pairing them with the walk temperature readings; the
+temperature analysis itself is led by Jingxue.
 
 Release scope (PI ruling 2026-09-24): the SHARED package path
 (outputs/_packages/mare_om2/<version>/) contains OM2 only. OM1/OM3/OM4
@@ -82,7 +82,7 @@ from src.om_package.vent_figures import build_fig_shelter_maps, build_fig_vent_p
 from src.om_package.formvars import compute_form_variables
 from src.om_package.io_utils import Paths, hash_tree, write_table
 from src.om_package.neighbourhoods import communities_crossed, join_communities
-from src.om_package.package_docs import USE_TERMS, VERSION, render_changelog, render_readme
+from src.om_package.package_docs import DATA_CREDIT, USE_TERMS, VERSION, render_changelog, render_readme
 from src.om_package import p10_p11, walk_tables
 from src.om_package.walks import load_walks
 from src.om_package.wind_regimes import season_regimes, tag_walks, load_campaign, load_climatology
@@ -332,6 +332,7 @@ def main() -> int:
         "package_version": args.version,
         "built_at_utc": datetime.now(timezone.utc).isoformat(),
         "crs": CRS,
+        "data_credit": DATA_CREDIT,
         "use_terms": USE_TERMS,
         "release_scope": "OM2 only. OM1/OM3/OM4 are built by the same code path into an internal directory outside this package.",
         "routes": [],

@@ -15,7 +15,7 @@ from .vent_indices import DEFAULT_BUFFER_M
 
 #: The one place the package version is set; the build default and every
 #: rendered heading read it.
-VERSION = "v0.3.0"
+VERSION = "v0.3.1"
 #: read from the clock at import time, never typed — this is the date this
 #: version is BUILT, not the date any source data was fetched (the
 #: "fetched" date in the README is computed at build time from the route
@@ -28,6 +28,12 @@ VERSION_DATE = date.today().isoformat()
 #: (``om_use_terms``) and its date travel in manifest.json's
 #: ``provenance.decisions``, not as a prose interview code (audit fix,
 #: 2026-09-27 — see src/om_package/provenance.py).
+#: Who did what with the walk data; reused in the manifest, README and report.
+DATA_CREDIT = (
+    "The walks were collected by residents of Maré. Cassiano and Vincent (Octopus team) clean and structure "
+    "the dataset."
+)
+
 USE_TERMS = "Internal draft for the Octopus team. Please do not share or cite."
 
 
@@ -159,7 +165,8 @@ def render_readme(package_dir) -> str:
     z0_med = _join([f"{v:.3f} m" for v in f["z0_median"].values()])
     lines = [
         f"> **{USE_TERMS}**\n",
-        f"# Octopus OM2 data package {f['version']}\n",
+        "# Street form, sun and wind along the OM2 walking route, Complexo da Maré\n",
+        f"{AUTHOR} · {PROJECT_FORM} · Octopus team · Octopus OM2 data package {f['version']}\n",
         opening_paragraph(f),
         "The report (`report.pdf`) presents each measure with figures. This README gives the method, the "
         "sources and every column.\n",
@@ -170,7 +177,7 @@ def render_readme(package_dir) -> str:
         "## Sources and dates\n",
         "| Source | Date | Used for |",
         "|---|---|---|",
-        f"| Walk dataset by Cassiano and Vincent (Octopus team): matched GPS tracks, one CSV per walk, and the OM2 "
+        f"| Walk dataset: walks collected by residents of Maré, cleaned and structured by Cassiano and Vincent (Octopus team); matched GPS tracks, one CSV per walk, and the OM2 "
         f"route file | {f['n_walks']} walks on {f['n_dates']} dates, {_day(f['first_date'])} to "
         f"{_day(f['last_date'])}; the dataset's pre-release manifest records a SHA-256 checksum per file | route "
         "points, walk timing, arrival times, walk dates |",
