@@ -22,7 +22,7 @@ def test_loader_drops_junk_and_locates(tmp_path):
         ["2026-01-1 10:01:05", -22.855, -43.24, 99.0, 50],
         ["2026-01-1 10:02:05", 0.0, 0.0, 31.0, 50],
     ])
-    m, loc = fl.load_loggers(tmp_path)
+    m, loc = fl.load_loggers(tmp_path, tz="UTC")
     assert list(m["device"].unique()) == ["O_3"] and (m["kind"] == "outdoor").all()
     assert m["t_utc"].min() >= fl.MIN_VALID_TIME
     assert m.loc[m["t_utc"] == pd.Timestamp("2026-01-01 10:00", tz="UTC"), "temperature"].item() == 31.0
@@ -62,4 +62,10 @@ def test_indoor_not_used_for_outdoor_and_coverage():
 def test_tz_shifts_to_utc(tmp_path):
     _csv(tmp_path / "O_3_20260101_01durhrs.csv", [["2026-01-01 10:00:05", -22.855, -43.24, 30.0, 50]])
     m, _ = fl.load_loggers(tmp_path, tz="America/Sao_Paulo")
+    assert m["t_utc"].item() == pd.Timestamp("2026-01-01 13:00", tz="UTC")
+
+
+def test_default_clock_is_rio_local_time(tmp_path):
+    _csv(tmp_path / "O_3_20260101_01durhrs.csv", [["2026-01-01 10:00:05", -22.855, -43.24, 30.0, 50]])
+    m, _ = fl.load_loggers(tmp_path)
     assert m["t_utc"].item() == pd.Timestamp("2026-01-01 13:00", tz="UTC")

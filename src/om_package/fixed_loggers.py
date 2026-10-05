@@ -6,7 +6,7 @@ fixed logger sees only the time axis, so subtracting its trend removes the
 common temporal drift and leaves the spatial signal.
 
 Files are named <I|O>_<device>_<YYYYMMDD>_<hh>durhrs.csv (I indoor, O outdoor)
-with columns Timestamp (UTC), Latitude, Longitude, Temperature, Humidity, PM*.
+with columns Timestamp (Rio local time, see load_loggers), Latitude, Longitude, Temperature, Humidity, PM*.
 Loading reduces each device to one-minute means: walks last about 27 minutes,
 so finer time resolution adds size and no information.
 
@@ -71,7 +71,7 @@ def _read_one(path: Path, tz: str) -> tuple[pd.DataFrame, pd.DataFrame, int]:
     return g[COLUMNS], fix[["Latitude", "Longitude"]].assign(device=device, kind=kind), n_raw - len(raw)
 
 
-def load_loggers(folder: Path, tz: str = "UTC") -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_loggers(folder: Path, tz: str = "America/Sao_Paulo") -> tuple[pd.DataFrame, pd.DataFrame]:
     """(minutes, locations).
 
     minutes: one row per device and UTC minute, columns COLUMNS, junk dropped
@@ -80,10 +80,14 @@ def load_loggers(folder: Path, tz: str = "UTC") -> tuple[pd.DataFrame, pd.DataFr
     off the occasional wild fix) plus the 5th to 95th percentile spread in
     metres, and the number of dropped junk rows in attrs["n_dropped"].
 
-    tz is the clock the Timestamp column is written in. The settled fact is UTC,
-    but the logger diurnal cycle peaks at 13:00 on that clock and the drift match
-    with the walks is best when logger time is shifted 3 h, which points to
-    America/Sao_Paulo. Unresolved; confirm with the logger owner before use.
+    tz is the clock the Timestamp column is written in. The default is
+    America/Sao_Paulo (UTC-3, no daylight saving) because these files are on
+    Rio local time, unlike the walk files, which are UTC. Evidence: against
+    Galeão airport hourly temperature, the logger series correlates best with the
+    airport series shifted by 3 h (outdoor O_3 r 0.50 to 0.69, O_4 0.54 to 0.76),
+    and the diurnal peak on the file clock is at 13:00 where the airport's is at
+    16:00 UTC. The walk files need no shift (walk mean against the airport,
+    r 0.93 at zero shift).
     """
     paths = sorted(Path(folder).glob("[IO]_*_*durhrs.csv"))
     if not paths:

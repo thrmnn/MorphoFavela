@@ -156,7 +156,7 @@ def internal_routes_status(root: Path, version: str) -> str:
 def route_fetch_date_label(paths: Paths) -> str:
     """Date label for the README's route-JSON 'Date / vintage' cell.
     Prefers a routes manifest.json's own recorded fetch date if one
-    exists (same pattern as data/maré/octopus/csv/manifest.json); falls
+    exists; falls
     back to the route JSON files' own mtimes (audit fix, 2026-09-27: this
     used to be a hand-typed constant, ROUTE_FETCH_DATE, that silently
     drifted every release since nothing re-checked it)."""
