@@ -204,9 +204,9 @@ def test_no_dictionary_row_is_orphaned_from_a_real_table():
     # every dictionary id belongs to either the points table, the buffer
     # template, the shade table, or the DESCOPED registry — this is a
     # structural check (dictionary.py's own composition), not a live-data one.
-    from src.om_package.dictionary import _BASE, _BUFFER_TEMPLATES, _MEASURE_NOTES, _SHADE_TABLE_ONLY, _V030, _V031
+    from src.om_package.dictionary import _BASE, _BUFFER_TEMPLATES, _MEASURE_NOTES, _SHADE_TABLE_ONLY, _V030, _V031, p13_rows
 
-    known_sources = set(_BASE) | {t.format(r=r) for t in _BUFFER_TEMPLATES for r in BUFFER_RADII_M} | set(_SHADE_TABLE_ONLY) | set(_V030) | set(_V031) | {f"{m}_tau{t}s" for m in _MEASURE_NOTES for t in (5, 10, 30, 60)}
+    known_sources = set(_BASE) | {t.format(r=r) for t in _BUFFER_TEMPLATES for r in BUFFER_RADII_M} | set(_SHADE_TABLE_ONLY) | set(_V030) | set(_V031) | {f"{m}_tau{t}s" for m in _MEASURE_NOTES for t in (5, 10, 30, 60)} | set(p13_rows())
     assert set(full_dictionary()) == known_sources
 
 

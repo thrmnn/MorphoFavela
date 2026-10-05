@@ -93,8 +93,10 @@ def _column_rows(package_dir: Path, f: dict) -> list[str]:
     live = d[~d["status"].astype(str).str.startswith("RETIRED")].set_index("id")
     out: list[str] = []
     missing: list[str] = []
+    from .temp_pairing import P13_STEMS
+
     groups = dict(_file_groups(package_dir))
-    for stem in FILE_ORDER:
+    for stem in [*FILE_ORDER, *P13_STEMS]:
         exts = groups.get(stem)
         cols = _columns_of(package_dir, stem, exts) if exts else []
         if not cols:
@@ -200,6 +202,10 @@ def render_readme(package_dir) -> str:
     from .sensor_match import DEFAULT_TAUS_S
     from .walk_dose import WALK_DOSE_HOURS, WALK_DOSE_STEP_MIN
     from .wind_regimes import N_SECTORS
+
+    import json
+
+    from . import temp_pairing
 
     package_dir = Path(package_dir)
     f = compute_facts(package_dir)
@@ -334,6 +340,7 @@ def render_readme(package_dir) -> str:
         "```\npython OM2/aggregate_to_segments.py --points p12_walk_points.parquet \\\n"
         "    --by walk_id --segment-m 20 --tau 30 --out segments_by_walk.parquet\n```\n",
         "A segment ends at the point a reading was taken; a sensor reading describes the route behind the walker.\n",
+        temp_pairing.readme_subsection(json.loads((package_dir / "OM2" / "temp_facts.json").read_text(encoding="utf-8"))),
         "## Using the data\n",
         "Loggers record UTC; Rio local time is UTC-3 with no daylight saving. Join logger readings to "
         "`p12_walk_points` by `walk_id` and the nearest `t_arrival_utc`, or to the shade table by `point_id` "

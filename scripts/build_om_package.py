@@ -487,6 +487,13 @@ def main() -> int:
         f"horizon {len(ctx['horizon_tab'])} rows, regimes {len(regimes_tbl)} rows, by-hour {len(by_hour_tbl)} rows"
     )
 
+    # P-13: temperature pairing, on the rebuilt points (repaired positions, facade width, height).
+    from src.om_package import fig_temp, temp_pairing
+
+    t13 = time.time()
+    temp_pairing.run(out_dir, matched_dir, paths.route_json("OM_2"), paths.root / "data" / "maré" / "octopus" / "fixed_loggers")
+    print(f"[build_om_package] P-13: temperature pairing written ({time.time() - t13:.0f} s)")
+
     # P-08: data dictionary (package-wide, not per-route). OM2/shared only.
     dict_df = dictionary_dataframe(regimes=regimes)
     write_table(dict_df, out_dir, "p08_data_dictionary")
@@ -523,6 +530,7 @@ def main() -> int:
     build_fig_vent_schematic(fig_dir / "fig_vent_schematic.png")
     build_fig_flags(ctx["repair"][0], buildings, ctx["repair_fixes"], fig_dir / "fig_flags.png")
     facts["flags"] = ctx["repair_facts"]
+    fig_temp.build_all(out_dir)
     (fig_dir / "figure_facts.json").write_text(json.dumps(facts, indent=2, default=float))
     print(f"[build_om_package] figures written to {fig_dir} (representative walk for the sensor figure: {facts['svf_sensor']['walk_id']})")
     del shade_full

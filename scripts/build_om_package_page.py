@@ -386,6 +386,10 @@ def render_page(root: Path) -> str:
         ("fig_vent_profiles.png", "Ventilation along the route", "Windward frontal area density, canyon alignment and upwind shelter angle for both wind regimes."),
         ("fig_shelter_maps.png", "Upwind shelter angle maps", "Upwind shelter angle per point for each wind regime, on one colour scale."),
         ("fig_svf_sensor.png", "Sensor-matched sky view factor", "Sky view factor at 1 m and as a slow sensor on one walk would see it."),
+        ("fig_vent_schematic.png", "How the ventilation measures are drawn", "Schematic of windward frontal area density, canyon alignment and upwind shelter angle."),
+        ("fig_flags.png", "Flagged points", "Route points inside building outlines or away from a mapped street, by class, with the repaired positions."),
+        ("fig_temp_tau.png", "Sensor-matched measures and temperature", "Variance of the walk temperature anomaly explained by each street measure, by sensor time constant."),
+        ("fig_temp_profile.png", "Temperature anomaly along the route", "Mean walk temperature anomaly per segment against sun, shade and street form."),
     ]
     tiles = []
     for name, title, caption in gallery_spec:
@@ -425,6 +429,13 @@ def render_page(root: Path) -> str:
         ("p05_building_shade.parquet", f"building shade per point and {_shade_step_min(version_dir)}-min step, campaign dates"),
         ("p02b_walks.csv", "one row per logger walk: timing, coverage, wind regime"),
         ("p12_walk_points.parquet", "arrival time, shade, dose and sensor-matched values per walk and point"),
+        ("p13_temperature_pairing_readings.csv", "one row per walk temperature reading: logger background and anomaly"),
+        ("p13_temperature_pairing_segment_profile.csv", "mean anomaly and street measures per 20 m segment"),
+        ("p13_temperature_pairing_tau_scan.csv", "variance explained per sensor time constant"),
+        ("p13_temperature_pairing_events.csv", "sharp sun and shade changes along each walk"),
+        ("p13_temperature_pairing_event_response.csv", "mean temperature change around those changes"),
+        ("p13_temperature_pairing_coefficients.csv", "associations of the anomaly with street measures"),
+        ("p13_temperature_pairing_warmup.csv", "readings against minutes since the walk started"),
         ("p10_sun_envelope.parquet", "sun class per point and local time of day over the season"),
         ("p10_sun_envelope.csv", "sun envelope (CSV)"),
         ("p10_sun_dose.parquet", f"clear-sky direct-sun dose, {'/'.join(map(str, p10['dose_hours']))} h"),

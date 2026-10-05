@@ -477,7 +477,7 @@ _V030 = {
     "walk_id": _row("Identifier of one logger walk of OM2, OM2_<date>_<period> (duration appended only if two walks share both).", "-",
                     "file names of the walk dataset (data/maré/octopus/prerelease_v020/matched/)", "src/om_package/walks.py _walk_ids",
                     "The walks were collected by residents of Maré and the dataset is cleaned and structured by Cassiano and Vincent (Octopus team); the date in the id is the UTC date of the file name."),
-    "period": _row("In p02b_walks: part of the day of the walk (morning or evening). In p11_wind_regimes and p11_regime_by_hour: the wind record the row describes (campaign = the campaign-season window; climatology = 2015-2024).", "category",
+    "period": _row("In p02b_walks and the p13_temperature_pairing tables: part of the day of the walk (morning or evening). In p11_wind_regimes and p11_regime_by_hour: the wind record the row describes (campaign = the campaign-season window; climatology = 2015-2024).", "category",
                    "walk file names; src/om_package/wind_regimes.py", "as named", "-"),
     "start_local": _row("Rio local time of the first logged row of the walk, with the -03:00 offset.", "ISO 8601, America/Sao_Paulo", "walk file", "first timestamp converted from UTC (loggers record UTC)", "-"),
     "start_utc": _row("The same instant as start_local, in UTC.", "ISO 8601, UTC", "walk file", "first logged timestamp", "-"),
@@ -616,6 +616,79 @@ _V031 = {
 }
 
 
+_TP = "p13 temperature pairing (src/om_package/temp_pairing.py)"
+_WALKT = "walk files (Temperature column)"
+_LOGT = "outdoor fixed loggers of the Octopus team (src/om_package/fixed_loggers.py)"
+_BOOT = "95% interval from resampling walks with replacement"
+
+
+def p13_rows() -> dict[str, dict]:
+    """Columns of the p13_temperature_pairing_* tables (first look at the walk temperature readings)."""
+    r = _row
+    return {
+        # readings
+        "t_utc": r("Time of the walk temperature reading, in universal time.", "ISO 8601, UTC", _WALKT, "timestamp_utc of the matched GPS fix", "-"),
+        "t_local": r("The same instant as t_utc, in Rio local time with the -03:00 offset.", "ISO 8601, America/Sao_Paulo", _WALKT, "t_utc converted", "-"),
+        "minutes_since_start": r("Minutes from the walk's first logged row to the reading.", "min", _WALKT, "t_utc - start_utc of p02b_walks", "Use it to leave out any start window, for example the first 15 evening minutes."),
+        "temperature_c": r("Air temperature recorded by the walk sensor at the reading.", "°C", _WALKT, "as recorded; one reading every 5 s", "Sensor response time unknown; see the report's time constant section."),
+        "background_c": r("Background temperature of the outdoor fixed loggers in Maré at the time of the reading.", "°C", _LOGT, "offset-corrected median of the outdoor loggers per minute, read on the Rio local clock, interpolated linearly; empty when no logger minute lies within 10 min", "Common outdoor level, not any one logger's absolute scale."),
+        "anomaly_c": r("Reading minus logger background minus the walk's mean of that difference; for walks without logger cover, the reading minus a straight time trend fitted per walk.", "°C", _TP, "see anomaly_source", "Within-walk quantity: walk means are zero by construction."),
+        "anomaly_source": r("How anomaly_c was formed: logger_background or walk_detrend (walk not fully covered by the loggers).", "category", _TP, "full cover = a logger minute within every minute of the walk", "-"),
+        "anomaly_detrend_c": r("Reading minus a straight time trend fitted per walk, for every walk (comparison with anomaly_c).", "°C", _TP, "least squares on time, start minute left out of the fit", "Every walk runs from 0 m to the end, so this also removes any along-route gradient."),
+        # tau scan
+        "tau_s": r("Time constant of the sensor-matched measures (0 = the 1 m value, no smoothing).", "s", _TP, "sensor_match.sensor_matched", "-"),
+        "r2_within": r("Share of the within-walk variation of anomaly_c explained by the model, in the fitted walks.", "fraction", _TP, "least squares after removing each walk's mean", "In-sample; see cv_r2."),
+        "cv_r2": r("Share of the within-walk variation of anomaly_c predicted in walks left out of the fit, one walk at a time.", "fraction (negative = worse than the walk mean)", _TP, "leave one walk out", "-"),
+        "r2_lo": r("Lower end of the interval of r2_within.", "fraction", _TP, _BOOT, "-"),
+        "r2_hi": r("Upper end of the interval of r2_within.", "fraction", _TP, _BOOT, "-"),
+        "share_boot_best": r("Share of walk resamples in which this time constant explains the most variation.", "fraction", _TP, "walk bootstrap", "-"),
+        # events
+        "event_distance_m": r("Distance along the route of the first point after a sun and shade change.", "m", _TP, "shaded_at_arrival changes, stable at least 30 m on each side, GPS arrival times, walking pace", "-"),
+        "event_t_utc": r("Time the walk reached event_distance_m.", "ISO 8601, UTC", "p12_walk_points", "t_arrival_utc", "-"),
+        "event_direction": r("sun_to_shade or shade_to_sun.", "category", _TP, "-", "-"),
+        "before_m": r("Length of the stable stretch before the change.", "m", _TP, "-", "-"),
+        "after_m": r("Length of the stable stretch after the change.", "m", _TP, "-", "-"),
+        "before_s": r("Walking time along the stable stretch before the change.", "s", _TP, "-", "-"),
+        "after_s": r("Walking time along the stable stretch after the change.", "s", _TP, "-", "-"),
+        "used": r("True when the event has readings on both sides and enters the mean response.", "bool", _TP, "at least 2 readings before and 4 after", "-"),
+        "bin_s": r("Centre of a 5 s bin of time from the change.", "s", _TP, "-", "-"),
+        "mean_change_c": r("Mean change of anomaly_c from its level before the change, signed so a change into shade should read negative.", "°C", _TP, "per event bin means, then mean over events", "Later bins hold only the longest stretches."),
+        "n_events": r("Number of events contributing to the bin.", "count", _TP, "-", "-"),
+        # coefficients
+        "measure": r("Street measure of the model term: shade, dose (1 h sun dose), svf (sky view factor) or hw (height-to-width ratio).", "category", _TP, "-", "-"),
+        "matched_column": r("Sensor-matched column used for the term.", "-", _TP, "-", "-"),
+        "per_unit": r("Change of the measure the effect refers to: shade 1 (fully sunlit to fully shaded recent path), dose 100 Wh/m2, svf 0.1, hw 1.", "unit of the measure", _TP, "-", "-"),
+        "effect_c": r("Change of anomaly_c that goes with per_unit of the measure, others held fixed.", "°C", _TP, "least squares with walk fixed effects", "Association, not cause. Shade and dose are nearly collinear."),
+        "effect_lo_c": r("Lower end of the 95% interval of effect_c.", "°C", _TP, "standard errors clustered by walk", "Ignores spatial correlation between walks, so likely too narrow."),
+        "effect_hi_c": r("Upper end of the 95% interval of effect_c.", "°C", _TP, "standard errors clustered by walk", "As effect_lo_c."),
+        "model": r("Model name: main (shade, dose, svf), shade_svf, with_ratio (adds hw), main_scan_tau (at the scan's best tau) or a sensitivity run with the evening start window cut.", "category", _TP, "-", "-"),
+        # segment profile
+        "segment": r("Index of the 20 m segment along the route (0 = first 20 m).", "-", _TP, "floor(distance_along_m / 20)", "-"),
+        "segment_mid_m": r("Distance along the route of the segment's middle.", "m", _TP, "-", "-"),
+        "mean_anomaly_logger_c": r("Mean of the per-walk segment means of the logger-background anomaly, walks with logger cover.", "°C", _TP, "-", "-"),
+        "mean_anomaly_logger_lo_c": r("Lower end of the interval of mean_anomaly_logger_c.", "°C", _TP, _BOOT, "-"),
+        "mean_anomaly_logger_hi_c": r("Upper end of the interval of mean_anomaly_logger_c.", "°C", _TP, _BOOT, "-"),
+        "mean_anomaly_detrend_c": r("As mean_anomaly_logger_c, with the per-walk time trend removed instead.", "°C", _TP, "-", "-"),
+        "mean_anomaly_start_c": r("As mean_anomaly_logger_c, for readings in the start window left out of the analysis.", "°C", _TP, "-", "-"),
+        "n_walks": r("Number of walks with readings in the segment.", "count", _TP, "-", "-"),
+        "n_walks_start": r("Number of walks with start-window readings in the segment.", "count", _TP, "-", "-"),
+        "n_readings": r("Number of readings in the segment (in p13_temperature_pairing_warmup: in that minute).", "count", _TP, "-", "-"),
+        "mean_shade_matched": r("Segment mean of sensor-matched shade at arrival, at the association time constant, averaged over walks.", "fraction", _TP, "-", "-"),
+        "mean_dose_1h_matched_wh_m2": r("Segment mean of sensor-matched 1 h sun dose, averaged over walks.", "Wh/m2", _TP, "-", "Clear-sky upper bound."),
+        "mean_sky_view_factor_matched": r("Segment mean of sensor-matched sky view factor, averaged over walks.", "fraction", _TP, "-", "-"),
+        "mean_height_width_ratio_matched": r("Segment mean of sensor-matched height-to-width ratio, averaged over walks.", "-", _TP, "-", "-"),
+        # warm-up
+        "minute": r("Whole minutes since the walk started.", "min", _TP, "floor(minutes_since_start)", "-"),
+        "mean_start_departure_c": r("Mean of reading minus logger background minus the walk's mean after 15 minutes, per minute since start.", "°C", _TP, "-", "No allowance for position along the route."),
+        "mean_start_departure_lo_c": r("Lower end of the interval of mean_start_departure_c.", "°C", _TP, _BOOT, "-"),
+        "mean_start_departure_hi_c": r("Upper end of the interval of mean_start_departure_c.", "°C", _TP, _BOOT, "-"),
+        "fitted_start_departure_c": r("Exponential settling curve fitted to mean_start_departure_c.", "°C", _TP, "amplitude × exp(-t / T), least squares weighted by readings", "-"),
+        "adjusted_effect_c": r("Minute effect after walk offsets and position along the route (50 m bins per period) are allowed for.", "°C", _TP, "least squares two-way model, pooled periods", "Weakly identified: time and position move together."),
+        "adjusted_effect_lo_c": r("Lower end of the interval of adjusted_effect_c.", "°C", _TP, _BOOT, "-"),
+        "adjusted_effect_hi_c": r("Upper end of the interval of adjusted_effect_c.", "°C", _TP, _BOOT, "-"),
+    }
+
+
 def full_dictionary(radii=BUFFER_RADII_M, regimes: list[dict] | None = None) -> dict[str, dict]:
     """regimes: [{slug, name}] of the campaign-season wind regimes (rows for
     the regime-named point columns); without them those rows are absent."""
@@ -625,6 +698,8 @@ def full_dictionary(radii=BUFFER_RADII_M, regimes: list[dict] | None = None) -> 
     d.update(_V031)
     d.update(_regime_rows(regimes))
     d.update(_matched_rows(regimes))
+    for k, v in p13_rows().items():
+        d.setdefault(k, v)
     for template_id, template in _BUFFER_TEMPLATES.items():
         for r in radii:
             col_id = template_id.format(r=r)

@@ -40,7 +40,7 @@ SECTIONS = [
     "References",
 ]
 FORBIDDEN = ["—", "–", "SBGL", "METAR", "H/W", "λ", "z0", "SVF", "LiDAR", r"\btree", "v0.1", "v0.2",
-             "v1.", "novel", "robust", "significant", "Read with care", "sun_envelope.png",
+             "v1.", "PLACEHOLDER", "TODO", "novel", "robust", "significant", "Read with care", "sun_envelope.png",
              "items the team asked", "What we need", "later version", "future version"]
 
 
