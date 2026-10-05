@@ -23,7 +23,7 @@ DPI = 200
 
 #: One colour scale per variable, reused wherever the variable is drawn as a colour.
 VAR_CMAP = {
-    "shade": "viridis",
+    "sun_share": "cividis",
     "sun_dose": "cividis",
     "shelter_angle": "magma_r",
 }

@@ -167,13 +167,13 @@ def build_fig_form(points: pd.DataFrame, out_path: Path) -> Path:
         return fs.save(fig, out_path)
 
 
-def _shade_norm():
+def _sun_share_norm():
     return matplotlib.colors.Normalize(vmin=0.0, vmax=1.0)
 
 
 def build_fig_shade_map(points: pd.DataFrame, shade_df: pd.DataFrame, buildings: gpd.GeoDataFrame | None,
                         out_path: Path) -> Path:
-    """Share of daylight time in building shade per point, over the walk dates."""
+    """Share of daylight time in direct sun (1 minus the building shade share) per point, over the walk dates."""
     from matplotlib.collections import LineCollection
 
     with fs.figure_style():
@@ -189,8 +189,8 @@ def build_fig_shade_map(points: pd.DataFrame, shade_df: pd.DataFrame, buildings:
         ax = fig.add_axes([0.005 * 6.3 / w_in, 0.005, map_in / w_in, 0.99])
         fs.draw_buildings(ax, buildings, extent)
         xy = o[["x", "y"]].to_numpy()
-        v = o["mean_shaded_fraction"].to_numpy(float)
-        lc = LineCollection(np.stack([xy[:-1], xy[1:]], axis=1), cmap=fs.VAR_CMAP["shade"], norm=_shade_norm(),
+        v = 1.0 - o["mean_shaded_fraction"].to_numpy(float)
+        lc = LineCollection(np.stack([xy[:-1], xy[1:]], axis=1), cmap=fs.VAR_CMAP["sun_share"], norm=_sun_share_norm(),
                             linewidths=2.6, zorder=4, capstyle="round")
         lc.set_array((v[:-1] + v[1:]) / 2)
         ax.add_collection(lc)
@@ -198,7 +198,7 @@ def build_fig_shade_map(points: pd.DataFrame, shade_df: pd.DataFrame, buildings:
         fs.north_arrow(ax)
         cax = fig.add_axes([(map_in + 0.3) / w_in, 0.25, 0.14 / w_in, 0.5])
         cb = fig.colorbar(lc, cax=cax)
-        cb.set_label("share of daylight time in building shade")
+        cb.set_label("share of daylight in direct sun")
         cb.set_ticks([0, 0.25, 0.5, 0.75, 1.0])
         return fs.save(fig, out_path)
 
@@ -226,10 +226,10 @@ def build_fig_shade_calendar(shade_df: pd.DataFrame, out_path: Path, bin_min: in
         fig = plt.figure(figsize=(fs.TEXT_WIDTH_IN, 5.4))
         ax = fig.add_axes([0.085, 0.085, 0.765, 0.905])
         cax = fig.add_axes([0.87, 0.085, 0.022, 0.905])
-        cmap = matplotlib.colormaps[fs.VAR_CMAP["shade"]].copy()
+        cmap = matplotlib.colormaps[fs.VAR_CMAP["sun_share"]].copy()
         cmap.set_bad("white")
-        mesh = ax.pcolormesh(edges_x, np.arange(n + 1), np.ma.masked_invalid(mat.to_numpy(float)), cmap=cmap,
-                             norm=_shade_norm(), shading="flat", rasterized=True)
+        mesh = ax.pcolormesh(edges_x, np.arange(n + 1), np.ma.masked_invalid(1.0 - mat.to_numpy(float)), cmap=cmap,
+                             norm=_sun_share_norm(), shading="flat", rasterized=True)
         ax.set_ylim(n, 0)
         ax.set_xlim(edges_x[0], edges_x[-1])
         lab = [f"{pd.Timestamp(d).day} {pd.Timestamp(d).strftime('%b')}" for d in dates]
@@ -243,7 +243,7 @@ def build_fig_shade_calendar(shade_df: pd.DataFrame, out_path: Path, bin_min: in
         for s in ("left", "bottom"):
             ax.spines[s].set_visible(False)
         cb = fig.colorbar(mesh, cax=cax)
-        cb.set_label("share of route points in building shade")
+        cb.set_label("share of route points in direct sun")
         cb.set_ticks([0, 0.25, 0.5, 0.75, 1.0])
         out = fs.save(fig, out_path)
     return out, {"n_dates": n, "bin_min": bin_min, "first_bin_local": f"{int(mins[0]) // 60:02d}:{int(mins[0]) % 60:02d}",
