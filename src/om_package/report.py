@@ -21,6 +21,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from src.om_package import vent_context
 from src.om_package.figures import SEGMENT_LENGTH_M
 from src.om_package.report_pdf import render_markdown_pdf, report_css
 from src.om_package.routes import ROUTE_FLAG_MAX_STREET_DIST_M
@@ -55,10 +56,14 @@ FIGURE_SOURCES = {
     "fig_shelter_maps.png": ("geometry", "airport"),
     "fig_vent_profiles.png": ("geometry", "airport"),
     "fig_svf_sensor.png": ("walks", "geometry"),
+    "fig_vent_schematic.png": (),
+    "fig_flags.png": ("walks", "geometry"),
 }
 
 
 def source_line(name: str) -> str:
+    if not FIGURE_SOURCES[name]:
+        return ""
     return "Data: " + "; ".join(_SOURCES[k] for k in FIGURE_SOURCES[name]) + "."
 SEGMENT_M = int(SEGMENT_LENGTH_M)
 #: The two time constants the sensor figure draws (fig_svf_sensor).
@@ -80,7 +85,9 @@ FIGURES = [
     "fig_sun_dose.png",
     "fig_wind.png",
     "fig_shelter_maps.png",
+    "fig_vent_schematic.png",
     "fig_vent_profiles.png",
+    "fig_flags.png",
     "fig_svf_sensor.png",
 ]
 FIGURE_DPI = 200
@@ -93,6 +100,12 @@ _UNCONFUSABLE: set[frozenset] = {
     # "of daylight time in building shade" (sun section) against "of that
     # hour's airport reports" (wind section): different sections and units.
     frozenset(("shade_pt_q75", "regime2_peak")),
+    # shaded share of route points in the last hour of daylight (sun section)
+    # against the share of the route a walk must cover to count as full (walk table).
+    frozenset(("shade_last", "partial_rule")),
+    # walk points without direct sun in the past hour (sun section) against
+    # points aligned with the wind (ventilation section).
+    frozenset(("dose_rows_zero_1h", "align1_along")),
 }
 
 #: Shipped file stems in table order. A data file not listed here stops the
@@ -268,6 +281,43 @@ def _route_facts(f: dict, d: dict) -> None:
     _require("manifest route_geometry_flagged_points", n_flag, om2["quality_summary"]["route_geometry_flagged_points"])
     f["n_flagged"] = n_flag
     f["flag_dist_m"] = ROUTE_FLAG_MAX_STREET_DIST_M
+
+
+CLASS_ORDER = ["street", "projected", "beco", "covered_passage", "unresolved"]
+#: Runs of one class closer than this (m) count as one stretch.
+FLAG_RUN_GAP_M = 5.0
+
+
+def _runs(points: pd.DataFrame, cls: str) -> list[dict]:
+    p = points[points["point_class"] == cls].sort_values("distance_along_m")
+    out: list[dict] = []
+    for _, r in p.iterrows():
+        d = float(r["distance_along_m"])
+        if out and d - out[-1]["end"] <= FLAG_RUN_GAP_M:
+            out[-1]["end"], out[-1]["n"] = d, out[-1]["n"] + 1
+            out[-1]["names"].append(r["neighbourhood"])
+        else:
+            out.append({"start": d, "end": d, "n": 1, "names": [r["neighbourhood"]]})
+    for o in out:
+        names = pd.Series(o.pop("names")).dropna()
+        o["neighbourhood"] = str(names.mode().iloc[0]) if len(names) else ""
+    return out
+
+
+def _flag_facts(f: dict, d: dict) -> None:
+    pts = d["points"]
+    fl = d["figure_facts"].get("flags")
+    if not fl:
+        raise ValueError("figure_facts.json has no flags facts")
+    counts = {c: int((pts["point_class"] == c).sum()) for c in CLASS_ORDER}
+    _require("flags counts", counts, fl["counts"])
+    _require("class counts sum", sum(counts.values()), len(pts))
+    _require("flag count", int(pts["route_geometry_flag"].sum()), len(pts) - counts["street"])
+    f["flag_counts"] = counts
+    f["flag"] = fl
+    f["flag_runs"] = {c: _runs(pts, c) for c in ("covered_passage", "unresolved")}
+    f["flag_beco_runs"] = _runs(pts, "beco")
+    f["flag_beco_length_m"] = counts["beco"] * f["spacing_m"]
 
 
 def _walk_facts(f: dict, d: dict) -> None:
@@ -469,6 +519,7 @@ def compute_facts(package_dir: Path) -> dict:
     _route_facts(f, d)
     _walk_facts(f, d)
     _form_facts(f, d["points"])
+    _flag_facts(f, d)
     _shade_facts(f, d)
     _dose_facts(f, d)
     _wind_facts(f, d)
@@ -555,12 +606,77 @@ def _figure_width_cm(path: Path) -> float:
 
 def _figure(package_dir: Path, name: str, caption: str) -> str:
     width = _figure_width_cm(package_dir / "OM2" / name)
-    cap = caption + " " + source_line(name)
+    cap = (caption + " " + source_line(name)).strip()
     return f"![Figure {_FIG_NO[name]}. {cap}](OM2/{name}){{width={width:.2f}cm}}\n"
 
 
 def _fig(name: str) -> str:
     return f"Figure {_FIG_NO[name]}"
+
+
+def _stretches(runs: list[dict], limit: int = 8) -> str:
+    runs = sorted(runs, key=lambda r: r["start"])
+    def one(r):
+        span = f"{_n(r['start'])} m" if r["end"] == r["start"] else f"{_n(r['start'])} to {_n(r['end'])} m"
+        return f"{span}{' in ' + r['neighbourhood'] if r['neighbourhood'] else ''}"
+    if len(runs) <= limit:
+        return _join([one(r) for r in runs])
+    top = sorted(runs, key=lambda r: -r["n"])[:limit]
+    return "the longest being " + _join([one(r) for r in sorted(top, key=lambda r: r["start"])])
+
+
+def _flag_section(package_dir: Path, f: dict, pct: "_Pcts") -> list[str]:
+    c, fl = f["flag_counts"], f["flag"]
+    n, nf = f["n_points"], f["n_flagged"]
+    proj, hw = fl["projected"], fl["street_points_width"]
+    cov, unr = f["flag_runs"]["covered_passage"], f["flag_runs"]["unresolved"]
+    moved = fl["beco_gps_suggested_moved"]
+    plural = lambda k, w: f"{k} {w}{'' if k == 1 else 's'}"
+    return [
+        "## Flagged points\n",
+        f"{_n(nf)} of the {_n(n)} points ({pct('flag_share', nf / n)}) do not lie on a mapped street, and in "
+        f"{_n(c['projected'])} of these cases the route trace only sits a few metres inside a building outline "
+        f"({_fig('fig_flags.png')}). The map colours every point by what the street map says about it; the "
+        "three close-ups show the GPS fixes of all walks (grey dots) over the building outlines, with a grey line "
+        "from each point that moved to its new position.\n",
+        _figure(package_dir, "fig_flags.png", "Route points by class (map) and three close-ups with the building "
+                "outlines and the GPS fixes of all walks. Colours give the class of each point at its repaired position."),
+        f"**Projected** ({_n(c['projected'])} points). The traced position lies inside a building outline by at most "
+        "4 m, which is within the precision of the route trace against the 2019 outlines. Each point moves to "
+        "the nearest open ground, set back 0.5 m from the wall: the median move is "
+        f"{proj['shift_median_m']:.1f} m and the largest {proj['shift_max_m']:.1f} m. Every measure of these points "
+        "is computed at the new position. At these points the median sky view factor goes from "
+        f"{proj['sky_view_factor_before_median']:.3f} to {proj['sky_view_factor_after_median']:.3f}, and the median "
+        f"height-to-width ratio from {proj['height_width_before_median']:.1f} to {proj['height_width_after_median']:.1f}. "
+        "The sky view factor is the value of the nearest valid sample of the airborne grid, as for every other point.\n",
+        f"**Alleys missing from the street map, becos** ({_n(c['beco'])} points, {_n(f['flag_beco_length_m'])} m of "
+        "the route). The point is in open ground more than 10 m from a mapped street. The position stays where the "
+        f"route trace puts it. The GPS fixes of the walks would move {_n(moved['n'])} of these points, by a median of "
+        f"{moved['median_m']:.0f} m and up to {moved['max_m']:.0f} m, but the fixes scatter too widely in an alley "
+        "to define the walked line, so no point is moved.\n",
+        f"**Covered passages** ({_n(c['covered_passage'])} points in {plural(len(cov), 'stretch')}"
+        f"{', ' + _stretches(cov) if cov else ''}). The point lies inside a building outline, deeper than 4 m "
+        f"from open ground, and the GPS fixes of at least {fl['covered_min_walks']} walks fall within "
+        f"{fl['gps_near_m']:g} m of it: people walk there. The passage runs under a building, so its shade is real. "
+        "Position and measures are kept. Residents who walked the route could confirm which becos are covered; we "
+        "propose to ask them through Cassiano and Vincent.\n",
+        f"**Unresolved** ({_n(c['unresolved'])} points in {plural(len(unr), 'stretch')}"
+        f"{', ' + _stretches(unr) if unr else ''}). The point lies deep inside a building outline and no walk "
+        "passes close by. The position is kept. Sky view factor, height-to-width ratio and plan area density mean "
+        "nothing inside a building, so they are left empty for these points; the shade, sun dose and ventilation "
+        "measures are still computed.\n",
+        f"**Street width.** `street_width_m` is now the width from building face to building face, measured from the "
+        "footprints on both sides of the route, so it also exists in becos, where the street layer has no street. "
+        f"At the {_n(hw['n'])} street points that have both values, the median width is {hw['facade_median_m']:.1f} m "
+        f"against {hw['layer_median_m']:.1f} m from the street layer, and the median height-to-width ratio goes from "
+        f"{hw['height_width_layer_median']:.2f} to {hw['height_width_facade_median']:.2f}. On "
+        f"{pct('width_capped', hw['capped_share'])} of street points one side is open for more than 40 m, and the "
+        "width is capped there (`street_width_capped`). The street layer's values stay in "
+        "`street_width_layer_m` and `building_height_layer_m`.\n",
+        "**Using the classes.** `point_class` holds the class of each point, and `route_geometry_flag` is true for "
+        "every class except `street`. Run each analysis three times: on all points, on `street` points only, and "
+        "on `street` and `projected` points. Where the results agree, the flagged points do not drive them.\n",
+    ]
 
 
 def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> str:
@@ -739,10 +855,14 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"the median upwind shelter angle is {more[1]['shelter'][1]:.0f}° against {less[1]['shelter'][1]:.0f}° "
         f"({_fig('fig_shelter_maps.png')} and {_fig('fig_vent_profiles.png')}). "
         "The maps show the shelter angle for each regime side by side, with an arrow for the wind; the "
-        "profiles overlay both regimes in their colours.\n",
+        "profiles overlay both regimes in their colours. "
+        f"{_fig('fig_vent_schematic.png')} draws the three measures.\n",
         _figure(package_dir, "fig_shelter_maps.png", f"Upwind shelter angle for the {r1['name']} wind (left) and the "
                 f"{r2['name']} wind (right). Dark: buildings rise steeply towards the wind."),
-        "Three measures describe how open a point is to each wind. They are computed from 2019 building and "
+        _figure(package_dir, "fig_vent_schematic.png", "The three ventilation measures. Left: wall area facing the wind "
+                "(frontal area density). Middle: the angle between the street and the wind (canyon alignment). "
+                "Right: the angle at which buildings stop blocking the view into the wind (upwind shelter angle)."),
+        f"Three measures describe how open a point is to each wind. They are computed from 2019 building and "
         "terrain geometry at each regime's mean direction; none is a measured or simulated wind. "
         "**Frontal area density** is the building wall area facing the wind per unit of ground area, in the "
         f"10 m grid cell of the point (median {v1['frontal_median']:.2f} for the {r1['name']} wind, "
@@ -756,6 +876,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"the wind. Half of the points lie between {v1['shelter'][0]:.0f}° and {v1['shelter'][2]:.0f}° for the "
         f"{r1['name']} wind and between {v2['shelter'][0]:.0f}° and {v2['shelter'][2]:.0f}° for the "
         f"{r2['name']} wind.\n",
+        *vent_context.report_paragraphs(f),
         _figure(package_dir, "fig_vent_profiles.png", f"Ventilation measures along the route for the two regimes (colours as "
                 f"in {_fig('fig_wind.png')}): frontal area density facing the wind, canyon alignment and upwind "
                 f"shelter angle, as {SEGMENT_M} m means."),
@@ -765,7 +886,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
     rep, sp = f["rep_walk"], f["rep_spread"]
     t_lo, t_hi = f["fig_taus"]
     taus = _join([f"{t}" for t in f["taus"]])
-    flag_share = f["n_flagged"] / f["n_points"]
+    out += _flag_section(package_dir, f, pct)
     out += [
         "## Using the data with temperature readings\n",
         "A sensor carried at walking speed reads the air it has just passed, so the package also gives each "
@@ -783,11 +904,6 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "`--by walk_id --tau 30`. Along the walk in the figure, the standard deviation of the sky view factor "
         f"drops from {sp['1m']:.2f} at 1 m to {sp[t_lo]:.2f} for τ = {t_lo} s and {sp[t_hi]:.2f} for "
         f"τ = {t_hi} s: the slower the sensor, the smoother the profile it sees.\n",
-        f"**Flagged points.** {_n(f['n_flagged'])} of the {_n(f['n_points'])} points "
-        f"({pct('flag_share', flag_share)}) have `route_geometry_flag` set: they fall inside a building outline "
-        f"or more than {f['flag_dist_m']:g} m from a street centre line, because some alleys cannot be mapped. "
-        "Their street form values describe the nearest mapped street, not the alley walked. Run each analysis "
-        "with and without them.\n",
         f"**Arrival times.** In `p12_walk_points`, `arrival_source` says how each arrival time was found: "
         f"`gps` between fixes less than {f['gap_flag_s']} s apart, `gap_interpolated` across a longer gap "
         f"({pct('gap_share', f['gap_share'])} of walk points). Down-weight or drop the interpolated rows. "
@@ -806,6 +922,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
     ]
 
     # 10 -----------------------------------------------------------------
+    out += ["## References\n", *[f"- {r}" for r in vent_context.references_used().values()], ""]
     out.append(f"**Contact.** {AUTHOR}, {PROJECT_FORM}.\n")
     pct.check()
     return "\n".join(out)

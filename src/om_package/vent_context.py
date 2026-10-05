@@ -134,7 +134,7 @@ def limits_paragraph() -> str:
     return (
         "**What they cannot capture.** They describe geometry, not wind: no wind was measured in the streets "
         "or simulated. The airport wind is a regional reference, and each measure uses the mean direction of "
-        "its regime, not the wind of the hour. They leave out air set in motion by heating, trees, and "
+        "its regime, not the wind of the hour. They leave out air set in motion by heating, vegetation and "
         "openings between and through buildings. Real street flow mixes channelling, vortices and corkscrews "
         "in three dimensions (Voordeckers et al., 2021).\n"
     )

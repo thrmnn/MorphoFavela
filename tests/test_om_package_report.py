@@ -34,8 +34,10 @@ SECTIONS = [
     "Direct sun before each walk",
     "Wind: two regimes",
     "Ventilation for both regimes",
+    "Flagged points",
     "Using the data with temperature readings",
     "Street measures and the walk temperature readings",
+    "References",
 ]
 FORBIDDEN = ["—", "–", "SBGL", "METAR", "H/W", "λ", "z0", "SVF", "LiDAR", r"\btree", "v0.1", "v0.2",
              "v1.", "novel", "robust", "significant", "Read with care", "sun_envelope.png",
