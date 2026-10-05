@@ -71,6 +71,10 @@ EVENT_BIN_S = 5
 EVENT_MIN_SHARE = 0.5
 #: The size of the response is summarised as the mean change in this window after the transition.
 EVENT_CHANGE_WINDOW_S = (20, 35)
+#: Bounds of the event fit for tau; an interval end at the upper bound is the bound, not a finding.
+TAU_FIT_BOUNDS_S = (1.0, 600.0)
+#: Logger clock check: hourly logger series against airport series shifted by whole hours in this range.
+CLOCK_LAGS_H = range(-6, 7)
 SEGMENT_M = 20
 SEGMENT_MIN_READINGS = 30
 #: Time constant for the association models. Fixed in advance rather than tuned on the response: neither
@@ -125,6 +129,24 @@ def readings_table(points: pd.DataFrame, fixes: pd.DataFrame, temps: pd.DataFram
     return r, {"n_fixes_on_route": int(len(fixes)), "n_matched_with_temperature": n_all,
                "n_dropped_off_street": n_all - len(r), "n_readings": len(r), "keep_basis": basis,
                "n_walks_readings": int(r["walk_id"].nunique())}
+
+
+def logger_clock_check(logger_dir: Path, airport: pd.DataFrame) -> dict:
+    """Per outdoor logger: correlation of its hourly temperature, with the file clock read as if it were UTC,
+    against Galeão airport hourly temperature moved by whole hours. A peak at 3 h says the file clock runs 3 h
+    behind universal time."""
+    minutes, _ = fl.load_loggers(logger_dir, tz="UTC")
+    ap = airport.set_index("valid_utc")["temperature_c"].resample("1h").mean()
+    out = {}
+    for dev, g in minutes[minutes["kind"] == "outdoor"].groupby("device"):
+        s = g.set_index("t_utc")["temperature"].resample("1h").mean()
+        rs = {}
+        for lag in CLOCK_LAGS_H:
+            both = pd.concat([s, ap.set_axis(ap.index - pd.Timedelta(hours=lag))], axis=1, join="inner").dropna()
+            rs[lag] = (float(both.iloc[:, 0].corr(both.iloc[:, 1])), int(len(both)))
+        best = max(rs, key=lambda k: rs[k][0])
+        out[str(dev)] = {"best_lag_h": int(best), "r_best": rs[best][0], "r_zero": rs[0][0], "n_hours": rs[best][1]}
+    return out
 
 
 # 2-3 -------------------------------------------------------------------------
@@ -228,7 +250,12 @@ def estimate_warmup(r: pd.DataFrame, n_boot: int, rng: np.random.Generator) -> t
         rows.append(pd.DataFrame({"period": per, "minute": curve.index, "mean_c": curve.to_numpy(),
                                   "lo": np.nanpercentile(bc, 2.5, axis=0), "hi": np.nanpercentile(bc, 97.5, axis=0),
                                   "n_readings": n.to_numpy(), "fit_c": _settle(curve.index.to_numpy(float) + 0.5, amp, tau)}))
-        facts[per] = {"start_c": float(curve.iloc[0]), "start_lo": float(np.nanpercentile(bc[:, 0], 2.5)),
+        lo_b, hi_b = np.nanpercentile(bc, 2.5, axis=0), np.nanpercentile(bc, 97.5, axis=0)
+        holds = (lo_b <= 0) & (hi_b >= 0)
+        tail = np.flatnonzero(~holds)
+        zero_from = int(curve.index[tail[-1] + 1]) if len(tail) and tail[-1] + 1 < len(curve) else (
+            int(curve.index[0]) if not len(tail) else WARMUP_MAX_MIN)
+        facts[per] = {"interval_zero_from_min": zero_from, "start_c": float(curve.iloc[0]), "start_lo": float(np.nanpercentile(bc[:, 0], 2.5)),
                       "start_hi": float(np.nanpercentile(bc[:, 0], 97.5)), "fit_amp_c": amp, "fit_tau_min": tau,
                       "window_min": win, "window_lo": float(np.percentile(wins, 2.5)),
                       "window_hi": float(np.percentile(wins, 97.5)), "n_walks": len(keys)}
@@ -484,7 +511,7 @@ def fit_approach(curve: pd.Series, n: pd.Series) -> tuple[float, float]:
     w = np.sqrt(n.reindex(curve.index).to_numpy(float)[ok])
     try:
         (amp, tau), _ = curve_fit(_approach, t, y, p0=(y[t > 0].mean(), 30.0), sigma=1 / w,
-                                  bounds=([-5.0, 1.0], [5.0, 600.0]), maxfev=10000)
+                                  bounds=([-5.0, TAU_FIT_BOUNDS_S[0]], [5.0, TAU_FIT_BOUNDS_S[1]]), maxfev=10000)
     except RuntimeError:
         return np.nan, np.nan
     return float(amp), float(tau)
@@ -509,7 +536,8 @@ def event_fit(traces: pd.DataFrame, n_boot: int, rng: np.random.Generator) -> tu
                           "n_events": per_event.notna().sum().to_numpy()})
     return {"tau_s": tau, "tau_lo": float(np.nanpercentile(taus, 2.5)), "tau_hi": float(np.nanpercentile(taus, 97.5)),
             "amp_c": amp, "amp_lo": float(np.nanpercentile(amps, 2.5)), "amp_hi": float(np.nanpercentile(amps, 97.5)),
-            "share_boot_at_bound": float(np.mean((taus <= 1.01) | (taus >= 599))),
+            "fit_bounds_s": list(TAU_FIT_BOUNDS_S),
+            "share_boot_at_bound": float(np.mean((taus <= TAU_FIT_BOUNDS_S[0] + 0.01) | (taus >= TAU_FIT_BOUNDS_S[1] - 1))),
             "change_c": float(late.mean()), "change_lo": float(np.percentile(change_boot, 2.5)),
             "change_hi": float(np.percentile(change_boot, 97.5)), "change_window_s": list(EVENT_CHANGE_WINDOW_S),
             "n_events": int(len(ev))}, curve
@@ -551,10 +579,13 @@ def association_model(df: pd.DataFrame, tau: int, terms: list[str]) -> tuple[pd.
         if len(e) > 2:
             lag1.append(np.corrcoef(e[:-1], e[1:])[0, 1])
     corr = sub[cols].corr()
+    within = dm[cols].corr()
     return pd.DataFrame(rows), {"r2_within": float(res.rsquared), "cv_r2": 1 - sse / sst, "n_readings": int(n),
                                 "n_walks": int(n_w), "resid_lag1_r_median": float(np.median(lag1)),
                                 "corr": {f"{a}|{b}": float(corr.iloc[i, j]) for i, a in enumerate(terms)
-                                         for j, b in enumerate(terms) if j > i}}
+                                         for j, b in enumerate(terms) if j > i},
+                                "corr_within_walk": {f"{a}|{b}": float(within.iloc[i, j]) for i, a in enumerate(terms)
+                                                     for j, b in enumerate(terms) if j > i}}
 
 
 def segment_associations(df: pd.DataFrame, tau: int, n_boot: int, rng: np.random.Generator) -> tuple[pd.DataFrame, dict]:
@@ -569,8 +600,9 @@ def segment_associations(df: pd.DataFrame, tau: int, n_boot: int, rng: np.random
 
         def seg_corr(t):
             g = t.groupby("segment").agg(anomaly=("anomaly", "mean"), n=("n", "sum"), **{k: (k, "mean") for k in cols})
-            g = g[g["n"] >= SEGMENT_MIN_READINGS]
-            return g, {k: float(g["anomaly"].corr(g[k])) for k in cols}
+            g = g.assign(in_correlation=g["n"] >= SEGMENT_MIN_READINGS)
+            used = g[g["in_correlation"]]
+            return g, {k: float(used["anomaly"].corr(used[k])) for k in cols}
 
         g, pt = seg_corr(ws)
         byw = {w: s for w, s in ws.groupby("walk_id")}
@@ -578,7 +610,8 @@ def segment_associations(df: pd.DataFrame, tau: int, n_boot: int, rng: np.random
         bs = [seg_corr(pd.concat([byw[kk[k]] for k in rng.choice(len(kk), len(kk))]))[1] for _ in range(n_boot)]
         facts[per] = {k: {"r": pt[k], "lo": float(np.nanpercentile([b[k] for b in bs], 2.5)),
                           "hi": float(np.nanpercentile([b[k] for b in bs], 97.5))} for k in cols}
-        facts[per]["n_segments"] = int(len(g))
+        facts[per]["n_segments"] = int(g["in_correlation"].sum())
+        facts[per]["n_segments_all"] = int(len(g))
         rows.append(g.reset_index().assign(period=per))
     return pd.concat(rows, ignore_index=True), facts
 
@@ -593,8 +626,10 @@ COEF_RENAME = {"term": "measure", "column": "matched_column", "unit": "per_unit"
 PROFILE_RENAME = {"anomaly_logger": "mean_anomaly_logger_c", "anomaly_detrend": "mean_anomaly_detrend_c",
                   "logger_lo": "mean_anomaly_logger_lo_c", "logger_hi": "mean_anomaly_logger_hi_c",
                   "anomaly_logger_warmup": "mean_anomaly_start_c", "n_walks_warmup": "n_walks_start",
-                  "distance_m": "segment_mid_m", "shade": "mean_shade_matched", "dose": "mean_dose_1h_matched_wh_m2",
+                  "shade": "mean_shade_matched", "dose": "mean_dose_1h_matched_wh_m2",
                   "svf": "mean_sky_view_factor_matched", "hw": "mean_height_width_ratio_matched"}
+SEGMENT_ASSOC_RENAME = {"anomaly": "segment_mean_anomaly_c", "n": "segment_n_readings",
+                        "in_correlation": "in_segment_correlation"}
 WARMUP_RENAME = {"mean_c": "mean_start_departure_c", "lo": "mean_start_departure_lo_c",
                  "hi": "mean_start_departure_hi_c", "fit_c": "fitted_start_departure_c",
                  "adjusted_lo": "adjusted_effect_lo_c", "adjusted_hi": "adjusted_effect_hi_c"}
@@ -605,7 +640,7 @@ P13_STEMS = ["p13_temperature_pairing_readings", "p13_temperature_pairing_tau_sc
 
 
 def run(package_dir: Path, matched_dir: Path, route_json: Path, logger_dir: Path, *, n_boot: int = N_BOOT,
-        seed: int = SEED) -> dict:
+        seed: int = SEED, airport_temperature: pd.DataFrame | None = None) -> dict:
     package_dir = Path(package_dir)
     rng = np.random.default_rng(seed)
     points = pd.read_parquet(package_dir / "OM2" / "points.parquet").drop(columns="geometry", errors="ignore")
@@ -613,6 +648,8 @@ def run(package_dir: Path, matched_dir: Path, route_json: Path, logger_dir: Path
     walks, fixes = load_walks(matched_dir, route_json)
     temps = load_temperature(matched_dir)
     minutes, _ = fl.load_loggers(logger_dir, tz=LOGGER_TZ)
+    clock = None if airport_temperature is None else logger_clock_check(logger_dir, airport_temperature)
+    outdoor = sorted(minutes.loc[minutes["kind"] == "outdoor", "device"].unique())
     route_m = float(points["distance_along_m"].max())
 
     r, f_read = readings_table(points, fixes, temps)
@@ -637,15 +674,15 @@ def run(package_dir: Path, matched_dir: Path, route_json: Path, logger_dir: Path
     for per in PERIODS:
         tp = traces[traces["period"] == per]
         f_event_per[per] = event_fit(tp, n_boot, rng)[0] if tp["event"].nunique() >= 10 else None
-    tau_best = int(scan.groupby("tau_s")["r2_within"].sum().idxmax())
     tau = ASSOC_TAU_S
 
     coefs, f_model = [], {}
     specs = (("main", tau, list(MEASURES)), ("shade_svf", tau, ["shade", "svf"]),
-             ("with_ratio", tau, [*MEASURES, *EXTRA]), ("main_scan_tau", tau_best, list(MEASURES)))
+             ("with_ratio", tau, [*MEASURES, *EXTRA]), ("main_scan_tau", None, list(MEASURES)))
     for per in PERIODS:
         q = df[df["period"] == per]
         for name, t, terms in specs:
+            t = f_scan[per]["best_tau_s"] if t is None else t
             c, f = association_model(q, t, terms)
             coefs.append(c.assign(period=per, model=name, tau_s=t))
             f_model[f"{per}_{name}"] = {**f, "tau_s": t,
@@ -656,6 +693,7 @@ def run(package_dir: Path, matched_dir: Path, route_json: Path, logger_dir: Path
     w_cut = int(f_warm["evening"]["window_min"])
     late_ev = df[(df["period"] == "evening") & (df["minutes_since_start"] >= w_cut)]
     f_sens = {"window_min": int(w_cut), "n_dropped": int(((df["period"] == "evening") & (df["minutes_since_start"] < w_cut)).sum())}
+    f_sens["n_dropped_with_first_minute"] = f_sens["n_dropped"] + f_warm["evening"]["n_dropped"]
     for name, terms in (("shade_svf", ["shade", "svf"]), ("with_ratio", [*MEASURES, *EXTRA])):
         c, f = association_model(late_ev, tau, terms)
         coefs.append(c.assign(period="evening", model=f"{name}_evening_cut_{w_cut}min", tau_s=tau))
@@ -678,8 +716,10 @@ def run(package_dir: Path, matched_dir: Path, route_json: Path, logger_dir: Path
     ev_curve.rename(columns={"mean_c": "mean_change_c"}).to_csv(package_dir / "p13_temperature_pairing_event_response.csv", index=False, float_format="%.4f")
     pd.concat(coefs, ignore_index=True).rename(columns=COEF_RENAME).to_csv(package_dir / "p13_temperature_pairing_coefficients.csv",
                                                index=False, float_format="%.5f")
-    prof_out = seg_prof.merge(seg_assoc.drop(columns=["anomaly", "n"]), on=["period", "segment"], how="left")
-    prof_out = prof_out.rename(columns=PROFILE_RENAME)
+    prof_out = seg_prof.merge(seg_assoc, on=["period", "segment"], how="outer").sort_values(["period", "segment"])
+    prof_out["segment_mid_m"] = (prof_out["segment"] + 0.5) * SEGMENT_M
+    prof_out["in_correlation"] = prof_out["in_correlation"].fillna(False).astype(bool)
+    prof_out = prof_out.drop(columns="distance_m").rename(columns={**PROFILE_RENAME, **SEGMENT_ASSOC_RENAME})
     prof_out.to_csv(package_dir / "p13_temperature_pairing_segment_profile.csv", index=False, float_format="%.4f")
     warm_curve.rename(columns=WARMUP_RENAME).to_csv(package_dir / "p13_temperature_pairing_warmup.csv", index=False, float_format="%.4f")
 
@@ -693,6 +733,7 @@ def run(package_dir: Path, matched_dir: Path, route_json: Path, logger_dir: Path
         "anomaly_sd_c": float(df["anomaly"].std()),
         "reading_interval_s": float(r.groupby("walk_id")["t_utc"].diff().dt.total_seconds().median()),
         "logger_tz": LOGGER_TZ, "full_cover_share": FULL_COVER,
+        "outdoor_loggers": outdoor, "n_outdoor_loggers": len(outdoor), "logger_clock_check": clock,
         "route_m": route_m, "segment_m": SEGMENT_M,
         "segment_min_readings": SEGMENT_MIN_READINGS,
         "profile": f_prof,
@@ -703,7 +744,7 @@ def run(package_dir: Path, matched_dir: Path, route_json: Path, logger_dir: Path
         "n_events_sun_to_shade": int((events["direction"] == "sun_to_shade").sum()),
         "n_events_shade_to_sun": int((events["direction"] == "shade_to_sun").sum()),
         "sensitivity_evening_cut": f_sens,
-        "chosen_tau_s": tau, "scan_best_tau_s": tau_best, "models": f_model, "segments": f_seg, "units": UNITS,
+        "chosen_tau_s": tau, "models": f_model, "segments": f_seg, "units": UNITS,
         "n_boot": n_boot, "seed": seed,
     }
     (package_dir / "OM2").mkdir(exist_ok=True)
@@ -734,8 +775,27 @@ def _s(x: float, nd: int = 0) -> str:
     return f"{x:,.{nd}f}"
 
 
-def _tau_upper(ev: dict, xmax: float = 300.0) -> str:
-    return f"beyond {xmax:g} s" if ev["tau_hi"] > xmax else f"{ev['tau_hi']:.0f} s"
+def _tau_range(ev: dict) -> str:
+    """The event interval; an upper end at the fit bound is named as the bound."""
+    top = ev["fit_bounds_s"][1]
+    if ev["tau_hi"] >= top - 1:
+        return f"from {ev['tau_lo']:.0f} s up to the {top:g} s limit of the fit"
+    return f"from {ev['tau_lo']:.0f} s to {ev['tau_hi']:.0f} s"
+
+
+def _both(a: float, b: float, nd: int = 2) -> str:
+    """Morning and evening values; one phrase when they round alike."""
+    x, y = _c(a, nd), _c(b, nd)
+    return f"{x} in both periods" if x == y else f"{x} in the morning and {y} in the evening"
+
+
+def _clock_evidence(f: dict) -> str:
+    c = f.get("logger_clock_check")
+    if not c:
+        return ""
+    parts = [f"{d} {v['r_best']:.2f} at a {v['best_lag_h']} hour shift against {v['r_zero']:.2f} with none"
+             for d, v in c.items()]
+    return "; ".join(parts)
 
 
 def _eff(facts: dict, model: str, term: str, unit: str = " °C") -> str:
@@ -805,7 +865,8 @@ def _sensitivity(f: dict) -> str:
     c = f["sensitivity_evening_cut"]
     sh, hw = c["shade_svf"]["effects"]["shade"], c["with_ratio"]["effects"]["hw"]
     return (f"As a check, cutting the first {c['window_min']} minutes of each evening walk "
-            f"({_s(c['n_dropped'])} readings) gives an evening shade difference of {_c(sh['effect_c'])} °C "
+            f"({_s(c['n_dropped'])} readings, in addition to the first minute; {_s(c['n_dropped_with_first_minute'])} "
+            f"evening readings in all) gives an evening shade difference of {_c(sh['effect_c'])} °C "
             f"({_iv(sh['lo'], sh['hi'])}) and {_c(hw['effect_c'])} °C per unit of height-to-width ratio "
             f"({_iv(hw['lo'], hw['hi'])}), with {_pct_signed(c['with_ratio']['cv_r2'])} of the variation predicted "
             "in walks left out.")
@@ -817,10 +878,13 @@ def _pct_signed(x: float) -> str:
 
 def team_question(facts: dict) -> str:
     ev = facts["events"]
+    sm, se = facts["tau_scan"]["morning"], facts["tau_scan"]["evening"]
     return ("**One question for the team.** What is the time constant of the air temperature sensor as mounted, "
             "with its housing, and is the value you have the 63% or the 90% response time? The walk readings "
-            f"bound it only loosely: the sun and shade changes put it between {ev['tau_lo']:.0f} s and "
-            f"{_tau_upper(ev)}. The specification would fix τ for the sensor-matched columns and the segment length.\n")
+            f"bound it only loosely: the sun and shade changes allow τ {_tau_range(ev)}, and the scan's intervals "
+            f"({sm['best_tau_lo']:.0f} to {sm['best_tau_hi']:.0f} s in the morning, {se['best_tau_lo']:.0f} to "
+            f"{se['best_tau_hi']:.0f} s in the evening) overlap it. The specification would fix τ for the "
+            "sensor-matched columns and the segment length.\n")
 
 
 def report_paragraphs(facts: dict) -> list[str]:
@@ -837,9 +901,13 @@ def report_paragraphs(facts: dict) -> list[str]:
     cv = _cv_max(f, mods)
     mw, ew = f["models"]["morning_with_ratio"], f["models"]["evening_with_ratio"]
     segm, sege = f["segments"]["morning"], f["segments"]["evening"]
-    shade_dose = min(f["models"]["morning_main"]["corr"]["shade|dose"], f["models"]["evening_main"]["corr"]["shade|dose"])
-    svf_hw = min(mw["corr"]["svf|hw"], ew["corr"]["svf|hw"])
-    lag1 = min(f["models"][m]["resid_lag1_r_median"] for m in mods)
+    mm, em = f["models"]["morning_main"], f["models"]["evening_main"]
+    shade_dose = _both(mm["corr_within_walk"]["shade|dose"], em["corr_within_walk"]["shade|dose"])
+    svf_hw = _both(mw["corr_within_walk"]["svf|hw"], ew["corr_within_walk"]["svf|hw"])
+    lag1 = _both(mm["resid_lag1_r_median"], em["resid_lag1_r_median"])
+    clock = _clock_evidence(f)
+    clock_text = (f"temperature follows Galeão airport temperature best with a 3 hour shift ({clock}), " if clock else
+                  "temperature follows Galeão airport temperature best with a 3 hour shift, ")
     n_fall = f["n_walks"] - f["n_walks_covered_in_readings"]
     out = [
         "Street measures explain little of how the walk temperature readings vary along the route. Readings "
@@ -852,8 +920,8 @@ def report_paragraphs(facts: dict) -> list[str]:
         f"We kept the {_s(f['n_readings'])} readings that fall on route points classed as street or projected; "
         f"{_s(f['n_dropped_off_street'])} readings on alleys missing from the street map, covered passages and "
         "unresolved points were left out. The walk timestamps are in universal time. The fixed loggers write Rio local time: their "
-        "temperature follows Galeão airport temperature best with a 3 hour shift, so we read them on that clock. "
-        "For each reading we subtract the background temperature of the two outdoor fixed loggers in Maré and "
+        f"{clock_text}so we read them on that clock. "
+        f"For each reading we subtract the background temperature of the {f['n_outdoor_loggers']} outdoor fixed loggers in Maré and "
         "then the walk's own mean difference from that background. What remains is the **anomaly**: how much "
         f"warmer or cooler than usual for that walk the reading is. {f['n_walks_covered_in_readings']} of the "
         f"{f['n_walks']} walks are fully covered by the loggers; for the other {n_fall} we remove a straight time "
@@ -861,7 +929,8 @@ def report_paragraphs(facts: dict) -> list[str]:
 
         f"**Start of a walk.** Evening walks start {_c(-w['evening']['start_c'])} °C below their later level "
         f"against the loggers ({_iv(-w['evening']['start_hi'], -w['evening']['start_lo'])} below) and come level "
-        f"after about {w['evening']['window_min']} minutes. Morning walks show no such start (first minute "
+        f"after about {w['evening']['interval_zero_from_min']} minutes (the fitted settling time is "
+        f"{_c(w['evening']['fit_tau_min'], 1)} minutes). Morning walks show no such start (first minute "
         f"{_c(w['morning']['start_c'])} °C, {_iv(w['morning']['start_lo'], w['morning']['start_hi'])}). Every walk "
         "starts at 0 m, so this could be a sensor that is still settling or a first stretch of route that is "
         "cooler in the afternoon. Once position along the route is allowed for, "
@@ -882,41 +951,43 @@ def report_paragraphs(facts: dict) -> list[str]:
 
         "**Time constant.** On the left, the share of the within-walk variation of the anomaly that "
         "sensor-matched shade, 1 hour sun dose and sky view factor explain together, for τ from 0 (the 1 m value) "
-        f"to {f['tau_scan_s'][-1]} s. Within the fitted walks the share rises with τ, to "
-        f"{_pct(sm['best_r2'])} in the morning (τ = {sm['best_tau_s']} s) and {_pct(se['best_r2'])} in the evening "
-        f"(τ = {se['best_tau_s']} s). Scored on walks left out of the fit, the share is below zero at every τ: the "
+        f"to {f['tau_scan_s'][-1]} s, the largest value tried. Within the fitted walks the share rises with τ, to "
+        f"{_pct(sm['best_r2'])} in the morning (best τ = {sm['best_tau_s']} s, interval {sm['best_tau_lo']:.0f} to "
+        f"{sm['best_tau_hi']:.0f} s) and {_pct(se['best_r2'])} in the evening (best τ = {se['best_tau_s']} s, interval "
+        f"{se['best_tau_lo']:.0f} to {se['best_tau_hi']:.0f} s). Scored on walks left out of the fit, the share is below zero at every τ: the "
         "gain does not carry over from one walk to the next. The rise with τ reflects broad patterns along the "
         "route, not the sensor's response. On the right, the readings are aligned on "
         f"{ev['n_events']} sharp changes between sun and shade, where the shade state stays the same for at least "
         f"{f['event_side_m']} m on each side. Between {ev['change_window_s'][0]} and {ev['change_window_s'][1]} s "
         f"after a change into shade, readings are {_c(-ev['change_c'])} °C lower than before it "
         f"({_iv(-ev['change_hi'], -ev['change_lo'])}), but the stretches end before the fall levels off, so the "
-        f"fit bounds τ only loosely: {ev['tau_lo']:.0f} s to {_tau_upper(ev)}. The two estimates do not agree, and "
-        "neither pins τ down.\n",
+        f"sun and shade changes bound τ only loosely: {_tau_range(ev)}. The scan intervals and this interval "
+        "overlap, and neither pins τ down.\n",
 
         f"**Associations.** We use τ = {tau} s, fixed in advance rather than tuned on the readings: it lies inside "
         "the interval from the sun and shade changes and is one of the shipped columns. Each model removes each "
         "walk's own level, and its intervals allow for readings within a walk being alike. A fully shaded recent "
         f"path, compared with a fully sunlit one, goes with {_eff(f, 'morning_shade_svf', 'shade')} in the morning "
         f"and {_eff(f, 'evening_shade_svf', 'shade')} in the evening{_zero_note(f, 'shade_svf', 'shade')}. Shade and the 1 hour sun dose carry nearly the "
-        f"same information (correlation {shade_dose:.2f}), so a model with both cannot separate them. With "
+        f"same information (correlation within a walk {shade_dose}), so a model with both cannot separate them. With "
         "height-to-width ratio added, each unit of the ratio goes with "
         f"{_eff(f, 'morning_with_ratio', 'hw')} in the morning and {_eff(f, 'evening_with_ratio', 'hw')} in the "
         "evening, and each 0.1 of sky view factor with "
         f"{_eff(f, 'morning_with_ratio', 'svf')} and {_eff(f, 'evening_with_ratio', 'svf')}. These models explain "
         f"{_pct(mw['r2_within'])} (morning) and {_pct(ew['r2_within'])} (evening) of the within-walk variation, and "
         f"{_pct_signed(mw['cv_r2'])} and {_pct_signed(ew['cv_r2'])} of it in walks left out. Averaged over walks in "
-        f"{f['segment_m']} m segments, the anomaly correlates with shade at {segm['shade']['r']:.2f} "
+        f"{f['segment_m']} m segments with at least {f['segment_min_readings']} readings ({segm['n_segments']} "
+        f"morning and {sege['n_segments']} evening segments), the anomaly correlates with shade at {segm['shade']['r']:.2f} "
         f"(morning, {_iv(segm['shade']['lo'], segm['shade']['hi'], '')}) and {sege['shade']['r']:.2f} "
         f"(evening, {_iv(sege['shade']['lo'], sege['shade']['hi'], '')}), and with height-to-width ratio at "
         f"{segm['hw']['r']:.2f} ({_iv(segm['hw']['lo'], segm['hw']['hi'], '')}) and {sege['hw']['r']:.2f} "
         f"({_iv(sege['hw']['lo'], sege['hw']['hi'], '')}).\n",
 
-        f"**Limits.** Successive readings are nearly alike (correlation {lag1:.2f} between readings "
+        f"**Limits.** Successive readings are nearly alike (correlation {lag1} between readings "
         f"{f['reading_interval_s']:.0f} s apart after the model), so the effective number of readings is far "
         "smaller than the count. Intervals treat walks as independent, but nearby stretches of route are not, "
         "so they are likely too narrow. The street measures move together: sky view factor and height-to-width "
-        f"ratio correlate at {svf_hw:.2f}, so their separate effects are not well defined. There are "
+        f"ratio correlate within a walk at {svf_hw}, so their separate effects are not well defined. There are "
         f"{sm['n_walks']} morning and {se['n_walks']} evening walks with usable readings, the sun measures assume a "
         "clear sky, and humidity, wind and traffic are not in these models.\n",
 
@@ -962,8 +1033,10 @@ Readings on points whose class is not street or projected are dropped ({_s(f['n_
 {_s(f['n_matched_with_temperature'])}; basis: `{f['keep_basis']}`), leaving {_s(f['n_readings'])} readings
 from {f['n_walks_readings']} walks.
 
-**Clocks.** Walk timestamps are UTC. The fixed loggers write Rio local time (their cross-correlation with
-Galeão airport temperature peaks at a 3 hour shift, and their daily peak matches the airport's), so they are
+**Clocks.** Walk timestamps are UTC. The fixed loggers write Rio local time (checked for each of the
+{f['n_outdoor_loggers']} outdoor loggers against Galeão airport hourly temperature, file clock read as UTC and
+the airport series moved by whole hours from {min(CLOCK_LAGS_H)} to {max(CLOCK_LAGS_H)}: {_clock_evidence(f) or 'check not run'}; airport series
+fetched by `wind_obs.fetch_sbgl_temperature` into `data/maré/octopus/wind/` with a manifest), so they are
 read with the America/Sao_Paulo clock. A walk counts as covered when the outdoor loggers have a minute within
 every minute of the walk ({f['n_walks_logger_full']} of {f['n_walks']} walks).
 
@@ -977,12 +1050,15 @@ comparison; because every walk runs from 0 m to the end, a time detrend also rem
 {w['warmup_max_min']} minutes, averaged by minute since start, is fitted with amplitude × exp(-t / T). The fitted
 window is the time until the departure falls below {w['warmup_tol_c']:g} °C, capped at {w['warmup_max_min']}
 minutes: {w['morning']['window_min']} minute(s) in the morning, {w['evening']['window_min']} minutes in the evening
-(walk bootstrap {w['evening']['window_lo']:.0f} to {w['evening']['window_hi']:.0f}). A two-way model with walk
+(walk bootstrap {w['evening']['window_lo']:.0f} to {w['evening']['window_hi']:.0f}; fitted settling time
+{w['evening']['fit_tau_min']:.1f} minutes). The walk bootstrap intervals of the per-minute departure include zero
+from minute {w['evening']['interval_zero_from_min']} in the evening and from minute {w['morning']['interval_zero_from_min']} in the morning. A two-way model with walk
 offsets, {w['warmup_dist_bin_m']:g} m distance bins per period and minute effects finds no minute effect whose
 interval excludes zero (largest {w['adjusted_max_abs_effect_c']:.2f} °C), so settling cannot be separated from
 position along the route. By default only the first {w['applied_window_min']} minute of every walk is left out
 ({_s(f['n_dropped_warmup'])} readings); walk offsets and trends are fitted without it. The fitted evening window
-is run as a sensitivity check (coefficient table, models ending `_evening_cut_<n>min`).
+is run as a sensitivity check (coefficient table, models ending `_evening_cut_<n>min`): it removes
+{_s(f['sensitivity_evening_cut']['n_dropped'])} readings in addition to the first minute, {_s(f['sensitivity_evening_cut']['n_dropped_with_first_minute'])} evening readings in all.
 
 **Time constant, scan.** For τ in {taus} s, sensor-matched shade at arrival, 1 hour sun dose and sky view
 factor are recomputed per walk with `sensor_match.sensor_matched` from the arrival times in
@@ -996,14 +1072,23 @@ factor are recomputed per walk with `sensor_match.sensor_matched` from the arriv
 on either side, are taken relative to their mean before the change and signed so that a change into shade
 should read negative. The mean response in 5 s bins (only bins with at least half of the events) is fitted with
 amplitude × (1 - exp(-t / τ)); events are bootstrapped. Result: τ = {ev['tau_s']:.0f} s, interval
-{ev['tau_lo']:.0f} to {ev['tau_hi']:.0f} s ({_pct(ev['share_boot_at_bound'])} of resamples at the fit limits of 1
-or 600 s), from {ev['n_events']} transitions.
+{ev['tau_lo']:.0f} to {ev['tau_hi']:.0f} s ({_pct(ev['share_boot_at_bound'])} of resamples at the fit limits of {ev['fit_bounds_s'][0]:g}
+or {ev['fit_bounds_s'][1]:g} s), from {ev['n_events']} transitions. The sun and shade changes therefore bound τ
+only loosely, {_tau_range(ev)}; the upper end is the fit limit, not the data. The scan stops at
+{f['tau_scan_s'][-1]} s. The scan intervals ({f['tau_scan']['morning']['best_tau_lo']:.0f} to
+{f['tau_scan']['morning']['best_tau_hi']:.0f} s in the morning, {f['tau_scan']['evening']['best_tau_lo']:.0f} to
+{f['tau_scan']['evening']['best_tau_hi']:.0f} s in the evening) and the event interval overlap; neither pins τ down.
 
 **Associations.** τ = {f['chosen_tau_s']} s, fixed in advance. Models per period: anomaly ~ shade + dose + sky
 view factor; shade + sky view factor; and the three plus height-to-width ratio; all with walk fixed effects and
 standard errors clustered by walk; leave-one-walk-out R² on demeaned data. The same three-term model at the
-scan's best τ ({f['scan_best_tau_s']} s) is in the coefficient table for comparison. Effects are given per
+scan's best τ of each period (morning {f['tau_scan']['morning']['best_tau_s']} s, evening
+{f['tau_scan']['evening']['best_tau_s']} s) is in the coefficient table for comparison. Effects are given per
 fully shaded against fully sunlit recent path, per 100 Wh/m² of dose, per 0.1 of sky view factor and per unit of
-height-to-width ratio. Segment level: per walk {f['segment_m']} m means, then means across walks; segments with
-fewer than {f['segment_min_readings']} readings are dropped; correlation intervals from a walk bootstrap.
+height-to-width ratio. Segment level: per walk {f['segment_m']} m means, then means across walks; segment
+correlations use the {f['segments']['morning']['n_segments']} morning and {f['segments']['evening']['n_segments']} evening segments
+with at least {f['segment_min_readings']} readings, flagged `in_segment_correlation` in
+`p13_temperature_pairing_segment_profile.csv`, which also holds the series they use (`segment_mean_anomaly_c` and
+the `mean_*_matched` columns); correlation intervals from a walk bootstrap. Correlations between measures
+quoted in the report are within a walk (walk means removed), as in the models.
 """

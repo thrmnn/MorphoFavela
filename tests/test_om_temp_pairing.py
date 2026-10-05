@@ -118,6 +118,29 @@ def test_association_model_effects_in_units():
     assert f["cv_r2"] > 0.9 and f["n_walks"] == 12
 
 
+def test_corr_computed_on_each_periods_own_frame():
+    rng = np.random.default_rng(5)
+    frames = {}
+    for per, mix in (("morning", 0.1), ("evening", 0.9)):
+        d = _assoc_frame(seed=len(per))
+        d["dose_tau30s"] = 600 * (mix * d["shade_tau30s"] + (1 - mix) * rng.uniform(0, 1, len(d)))
+        frames[per] = d
+    got = {per: tp.association_model(d, 30, ["shade", "dose", "svf"])[1] for per, d in frames.items()}
+    for per, d in frames.items():
+        assert abs(got[per]["corr"]["shade|dose"] - d["shade_tau30s"].corr(d["dose_tau30s"])) < 1e-12
+        dm = tp._demean(d, ["shade_tau30s", "dose_tau30s"])
+        assert abs(got[per]["corr_within_walk"]["shade|dose"] - dm["shade_tau30s"].corr(dm["dose_tau30s"])) < 1e-12
+    assert got["evening"]["corr"]["shade|dose"] - got["morning"]["corr"]["shade|dose"] > 0.3
+
+
+def test_period_wording_helpers():
+    assert tp._both(0.9923, 0.9866) == "0.99 in both periods"
+    assert tp._both(-0.9333, -0.9013) == "-0.93 in the morning and -0.90 in the evening"
+    ev = {"tau_lo": 14.3, "tau_hi": 599.99, "fit_bounds_s": [1.0, 600.0]}
+    assert tp._tau_range(ev) == "from 14 s up to the 600 s limit of the fit"
+    assert tp._tau_range({**ev, "tau_hi": 250.0}) == "from 14 s to 250 s"
+
+
 def test_moment_r2_and_cv_match_direct_fit():
     df = _assoc_frame(seed=1)
     cols = ["shade_tau30s", "svf_tau30s"]
@@ -179,7 +202,7 @@ def test_every_shipped_p13_column_has_a_dictionary_row():
         "readings": ["walk_id", "period", "t_utc", "t_local", "minutes_since_start", "distance_along_m", "point_id",
                      *tp.READINGS_RENAME.values(), "anomaly_source"],
         "coefficients": [*tp.COEF_RENAME.values(), "effect_c", "period", "model", "tau_s"],
-        "profile": [*tp.PROFILE_RENAME.values(), "segment", "n_walks", "n_readings", "period"],
+        "profile": [*tp.PROFILE_RENAME.values(), *tp.SEGMENT_ASSOC_RENAME.values(), "segment_mid_m", "segment", "n_walks", "n_readings", "period"],
         "warmup": [*tp.WARMUP_RENAME.values(), "period", "minute", "n_readings", "adjusted_effect_c"],
     }
     d = full_dictionary()

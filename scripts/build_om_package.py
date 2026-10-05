@@ -488,10 +488,14 @@ def main() -> int:
     )
 
     # P-13: temperature pairing, on the rebuilt points (repaired positions, facade width, height).
-    from src.om_package import fig_temp, temp_pairing
+    from src.om_package import fig_temp, temp_pairing, wind_obs
 
     t13 = time.time()
-    temp_pairing.run(out_dir, matched_dir, paths.route_json("OM_2"), paths.root / "data" / "maré" / "octopus" / "fixed_loggers")
+    if not wind_obs.temp_cache_paths(paths.root)[0].exists():
+        print("[build_om_package] SBGL temperature cache missing, fetching from the Iowa ASOS archive ...")
+        wind_obs.fetch_sbgl_temperature(paths.root, args.window_start, args.window_end)
+    temp_pairing.run(out_dir, matched_dir, paths.route_json("OM_2"), paths.root / "data" / "maré" / "octopus" / "fixed_loggers",
+                     airport_temperature=wind_obs.load_temperature_obs(paths.root))
     print(f"[build_om_package] P-13: temperature pairing written ({time.time() - t13:.0f} s)")
 
     # P-08: data dictionary (package-wide, not per-route). OM2/shared only.

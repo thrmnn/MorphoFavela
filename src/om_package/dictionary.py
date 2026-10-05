@@ -660,7 +660,7 @@ def p13_rows() -> dict[str, dict]:
         "effect_c": r("Change of anomaly_c that goes with per_unit of the measure, others held fixed.", "°C", _TP, "least squares with walk fixed effects", "Association, not cause. Shade and dose are nearly collinear."),
         "effect_lo_c": r("Lower end of the 95% interval of effect_c.", "°C", _TP, "standard errors clustered by walk", "Ignores spatial correlation between walks, so likely too narrow."),
         "effect_hi_c": r("Upper end of the 95% interval of effect_c.", "°C", _TP, "standard errors clustered by walk", "As effect_lo_c."),
-        "model": r("Model name: main (shade, dose, svf), shade_svf, with_ratio (adds hw), main_scan_tau (at the scan's best tau) or a sensitivity run with the evening start window cut.", "category", _TP, "-", "-"),
+        "model": r("Model name: main (shade, dose, svf), shade_svf, with_ratio (adds hw), main_scan_tau (at each period's best tau from the scan) or a sensitivity run with the evening start window cut.", "category", _TP, "-", "-"),
         # segment profile
         "segment": r("Index of the 20 m segment along the route (0 = first 20 m).", "-", _TP, "floor(distance_along_m / 20)", "-"),
         "segment_mid_m": r("Distance along the route of the segment's middle.", "m", _TP, "-", "-"),
@@ -672,6 +672,9 @@ def p13_rows() -> dict[str, dict]:
         "n_walks": r("Number of walks with readings in the segment.", "count", _TP, "-", "-"),
         "n_walks_start": r("Number of walks with start-window readings in the segment.", "count", _TP, "-", "-"),
         "n_readings": r("Number of readings in the segment (in p13_temperature_pairing_warmup: in that minute).", "count", _TP, "-", "-"),
+        "segment_mean_anomaly_c": r("Mean over walks of the per-walk segment means of anomaly_c (logger background or time trend, as in the readings table); the series the segment correlations use.", "°C", _TP, "-", "Differs from mean_anomaly_logger_c, which uses only walks with logger cover and leaves out the first minute."),
+        "segment_n_readings": r("Number of readings behind segment_mean_anomaly_c.", "count", _TP, "-", "-"),
+        "in_segment_correlation": r("True when the segment has at least 30 readings and enters the segment correlations.", "bool", _TP, "segment_n_readings >= 30", "-"),
         "mean_shade_matched": r("Segment mean of sensor-matched shade at arrival, at the association time constant, averaged over walks.", "fraction", _TP, "-", "-"),
         "mean_dose_1h_matched_wh_m2": r("Segment mean of sensor-matched 1 h sun dose, averaged over walks.", "Wh/m2", _TP, "-", "Clear-sky upper bound."),
         "mean_sky_view_factor_matched": r("Segment mean of sensor-matched sky view factor, averaged over walks.", "fraction", _TP, "-", "-"),

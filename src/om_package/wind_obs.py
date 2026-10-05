@@ -44,12 +44,12 @@ def cache_paths(root: Path | str = DEFAULT_ROOT) -> tuple[Path, Path]:
     return d / f"{CACHE_STEM}.csv", d / "manifest.json"
 
 
-def _request_url(start: str, end: str) -> str:
+def _request_url(start: str, end: str, data: tuple[str, ...] = ("drct", "sknt")) -> str:
     s = datetime.fromisoformat(start)
     e = datetime.fromisoformat(end) + pd.Timedelta(days=1)  # end date inclusive
     return (
-        f"{ASOS_URL}?station={STATION}&data=drct&data=sknt"
-        f"&year1={s.year}&month1={s.month}&day1={s.day}"
+        f"{ASOS_URL}?station={STATION}" + "".join(f"&data={d}" for d in data)
+        + f"&year1={s.year}&month1={s.month}&day1={s.day}"
         f"&year2={e.year}&month2={e.month}&day2={e.day}"
         "&tz=Etc/UTC&format=onlycomma&latlon=yes&missing=M&trace=T"
         "&report_type=3&report_type=4"
@@ -97,6 +97,45 @@ def fetch_sbgl(root: Path | str = DEFAULT_ROOT, start: str = WINDOW_START, end: 
     }
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
     return manifest
+
+
+TEMP_CACHE_STEM = "sbgl_tmpf_20251201_20260430"
+
+
+def temp_cache_paths(root: Path | str = DEFAULT_ROOT) -> tuple[Path, Path]:
+    d = Path(root) / wind_dir()
+    return d / f"{TEMP_CACHE_STEM}.csv", d / "manifest_temperature.json"
+
+
+def fetch_sbgl_temperature(root: Path | str = DEFAULT_ROOT, start: str = WINDOW_START, end: str = WINDOW_END,
+                           timeout_s: int = 120) -> dict:
+    """Galeão airport air temperature (degrees F as reported) for the window, cached with its own manifest.
+    Used only to check the fixed loggers' clock. Raises on any network or parse failure."""
+    import urllib.request
+
+    url = _request_url(start, end, data=("tmpf",))
+    with urllib.request.urlopen(url, timeout=timeout_s) as r:
+        raw = r.read()
+    if not raw.decode("utf-8").startswith("station,valid,lon,lat,tmpf"):
+        raise RuntimeError(f"unexpected ASOS response header: {raw[:80]!r}")
+    csv_path, manifest_path = temp_cache_paths(root)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    csv_path.write_bytes(raw)
+    df = pd.read_csv(csv_path, na_values=["M"])
+    manifest = {"station": STATION, "window_utc": [start, end], "url": url,
+                "fetched_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "sha256": hashlib.sha256(raw).hexdigest(), "csv": csv_path.name,
+                "n_obs": int(len(df)), "n_missing_temperature": int(df["tmpf"].isna().sum())}
+    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+    return manifest
+
+
+def load_temperature_obs(root: Path | str = DEFAULT_ROOT) -> pd.DataFrame:
+    """valid_utc (tz-aware) and temperature_c from the cached airport temperature."""
+    df = pd.read_csv(temp_cache_paths(root)[0], na_values=["M"])
+    out = pd.DataFrame({"valid_utc": pd.to_datetime(df["valid"], utc=True),
+                        "temperature_c": (pd.to_numeric(df["tmpf"], errors="coerce") - 32.0) * 5.0 / 9.0})
+    return out.dropna().sort_values("valid_utc").reset_index(drop=True)
 
 
 def load_obs(root: Path | str = DEFAULT_ROOT) -> pd.DataFrame:
