@@ -140,6 +140,7 @@ def file_roles(f: dict) -> dict:
         "OM2/aggregate_to_segments": "Script: means over segments of any length",
         "OM2/join_shade_example": "Script: joins logger readings to the shade table",
         "manifest.json": "Version, sources and a checksum for every file",
+        "OM2/temp_facts": "Every number of the temperature section, as data",
         "p13_temperature_pairing_readings": "One row per walk temperature reading: logger background, anomaly",
         "p13_temperature_pairing_tau_scan": "Variance explained by sensor-matched measures, per time constant",
         "p13_temperature_pairing_events": "Sharp sun and shade changes along each walk",
@@ -162,6 +163,13 @@ FILE_MAIN_COLUMNS = {
     "p11_wind_regimes": ["name", "mean_direction_deg", "share"],
     "p11_regime_by_hour": ["local_hour", "regime", "share"],
     "p08_data_dictionary": ["id", "definition", "unit"],
+    "p13_temperature_pairing_readings": ["walk_id", "t_local", "temperature_c", "anomaly_c"],
+    "p13_temperature_pairing_tau_scan": ["period", "tau_s", "r2_within"],
+    "p13_temperature_pairing_events": ["walk_id", "event_distance_m", "event_direction"],
+    "p13_temperature_pairing_event_response": ["bin_s", "mean_change_c", "n_events"],
+    "p13_temperature_pairing_coefficients": ["measure", "effect_c", "period", "model"],
+    "p13_temperature_pairing_segment_profile": ["segment", "period", "mean_anomaly_logger_c"],
+    "p13_temperature_pairing_warmup": ["period", "minute", "mean_start_departure_c"],
 }
 _NOT_DATA = {"report", "README"}
 
@@ -570,7 +578,7 @@ def _file_groups(package_dir: Path) -> list[tuple[str, list[str]]]:
         if not p.is_file() or p.name.startswith("_"):
             continue
         rel = p.relative_to(package_dir).as_posix()
-        if rel.endswith(".png") or rel in ("OM2/figure_facts.json", "OM2/temp_facts.json"):
+        if rel.endswith(".png") or rel == "OM2/figure_facts.json":
             continue
         stem, ext = (rel, "") if rel == "manifest.json" else rel.rsplit(".", 1)
         groups.setdefault(stem, []).append(ext)
@@ -734,13 +742,13 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "## The route\n",
         f"The route runs {_n(f['length_m'])} m through {stretches} ({_fig('fig_route.png')}). The map shows it "
         "over the 2019 building footprints, labelled in metres from the start.\n",
-        _figure(package_dir, "fig_route.png", "The OM2 route over the building footprints of Nova Holanda, Parque Rubens Vaz "
-                "and Parque União. Labels give metres from the route start."),
         f"Residents of Maré walked the route {f['n_walks']} times on {f['n_dates']} dates between "
         f"{_day(f['first_date'])} and {_day(f['last_date'])}: {per['morning']['n']} morning walks starting around "
         f"{per['morning']['start']} and {per['evening']['n']} evening walks starting around "
         f"{per['evening']['start']}, each taking about {f['duration_median_min']:.0f} minutes. Every walk goes "
         "from the route start towards its end. Cassiano and Vincent (Octopus team) clean and structure the walk dataset.\n",
+        _figure(package_dir, "fig_route.png", "The OM2 route over the building footprints of Nova Holanda, Parque Rubens Vaz "
+                "and Parque União. Labels give metres from the route start."),
     ]
 
     # 4 ------------------------------------------------------------------
@@ -845,9 +853,6 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "that fits two circular distributions and a uniform background confirms the "
         f"{r1['name']} direction (within {r1['mix_diff']:.0f}°) but not the {r2['name']} one. Over {y0} to {y1} "
         f"the two regimes point the same way ({clim[k1]['dir']:.0f}° and {clim[k2]['dir']:.0f}°).\n",
-        _figure(package_dir, "fig_wind.png", f"Wind at Galeão airport. Top: wind roses for the campaign season (left) and "
-                f"{y0} to {y1} (right), coloured by regime. Bottom: share of each regime by hour of day in Rio "
-                f"local time (solid: campaign season; dashed: {y0} to {y1})."),
         f"The {r2['name']} wind is most frequent at {_hour(peak2[0])}, with "
         f"{pct('regime2_peak', peak2[1])} of that hour's airport reports; the {r1['name']} wind peaks at "
         f"{_hour(peak1[0])}, with {pct('regime1_peak', peak1[1])}. Each walk carries the regime of the airport "
@@ -856,6 +861,9 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"{per['morning']['n']} morning walks had the {r2['name']} wind, and "
         f"{tbp['evening'].get(r1['name'], 0)} of the {per['evening']['n']} evening walks the {r1['name']} wind. "
         "The airport wind is a regional reference, not the wind in the streets.\n",
+        _figure(package_dir, "fig_wind.png", f"Wind at Galeão airport. Top: wind roses for the campaign season (left) and "
+                f"{y0} to {y1} (right), coloured by regime. Bottom: share of each regime by hour of day in Rio "
+                f"local time (solid: campaign season; dashed: {y0} to {y1})."),
     ]
 
     # 8 ------------------------------------------------------------------
@@ -936,8 +944,8 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         out += [_figure(package_dir, n, captions[n]) for n in cited]
 
     # 10 -----------------------------------------------------------------
-    out += ["## References\n", *[f"- {r}" for r in vent_context.references_used().values()], ""]
     out.append(f"**Contact.** {AUTHOR}, {PROJECT_FORM}.\n")
+    out += ["## References\n", *[f"- {r}" for r in vent_context.references_used().values()], ""]
     pct.check()
     return "\n".join(out)
 

@@ -157,7 +157,9 @@ def test_one_question_for_the_team(report_md):
 
 
 def test_contact_line(report_md):
-    assert report_md.rstrip().endswith(f"{AUTHOR}, {PROJECT_FORM}.")
+    contact = f"**Contact.** {AUTHOR}, {PROJECT_FORM}."
+    assert contact in report_md
+    assert report_md.index(contact) < report_md.index("## References")
 
 
 def test_percentage_collisions_are_detected():

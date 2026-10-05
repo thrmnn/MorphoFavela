@@ -435,7 +435,6 @@ _SHADE_TABLE_ONLY = {
 }
 
 
-RETIRED_IN = "v0.3.0"
 #: id -> what replaced it. A retired id keeps its row (ids are never reused).
 _RETIRED = {
     "windward_lambda_f_prevailing": "frontal_area_density_windward_<regime>",
@@ -709,7 +708,7 @@ def full_dictionary(radii=BUFFER_RADII_M, regimes: list[dict] | None = None) -> 
     for k, v in _SHADE_TABLE_ONLY.items():
         d.setdefault(k, v)
     for k, note in _RETIRED.items():
-        d[k] = {**d[k], "status": f"RETIRED ({RETIRED_IN}): replaced by {note}"}
+        d[k] = {**d[k], "status": f"RETIRED: replaced by {note}"}
     return d
 
 
