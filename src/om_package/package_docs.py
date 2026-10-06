@@ -3,7 +3,7 @@ hand-edited: rebuild via scripts/build_om_package.py.
 
 render_readme(package_dir) reads every number from the built package
 through report.compute_facts, the same facts the report uses, so the two
-documents agree. The column list comes from p08_data_dictionary and the
+documents agree. The column list comes from data_dictionary and the
 files actually shipped.
 """
 from __future__ import annotations
@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+from .layout import SCRIPTS, TABLES, table_path
 from .vent_indices import DEFAULT_BUFFER_M
 
 #: The one place the package version is set; the build default and every
@@ -49,19 +50,19 @@ def require_nodata_floor_m(p05_shade: dict) -> dict:
 
 #: Spec item(s) per shipped file, for the README file table.
 SPEC_ITEMS = {
-    "OM2/points": "P-02, P-03, P-04, P-06, P-10, P-11",
-    "p02b_walks": "P-12",
-    "p12_walk_points": "P-12",
-    "p05_building_shade": "P-05",
-    "p10_sun_dose": "P-10",
-    "p10_sun_envelope": "P-10",
-    "p10_horizon_profiles": "P-10",
-    "p11_wind_regimes": "P-11",
-    "p11_regime_by_hour": "P-11",
-    "p08_data_dictionary": "P-08",
-    "OM2/p07_quality_report": "P-07",
-    "OM2/aggregate_to_segments": "P-03",
-    "OM2/join_shade_example": "P-05",
+    TABLES["route_points"]: "P-02, P-03, P-04, P-06, P-10, P-11",
+    TABLES["walks"]: "P-12",
+    TABLES["walk_points"]: "P-12",
+    TABLES["building_shade"]: "P-05",
+    TABLES["sun_dose"]: "P-10",
+    TABLES["sun_envelope"]: "P-10",
+    TABLES["horizon_profiles"]: "P-10",
+    TABLES["wind_regimes"]: "P-11",
+    TABLES["wind_regime_by_hour"]: "P-11",
+    TABLES["data_dictionary"]: "P-08",
+    TABLES["quality_report"]: "P-07",
+    SCRIPTS["aggregate_to_segments"].removesuffix(".py"): "P-03",
+    SCRIPTS["join_shade_example"].removesuffix(".py"): "P-05",
     "manifest.json": "",
 }
 #: Columns with no data dictionary row, described here.
@@ -70,7 +71,7 @@ _STRUCTURAL_COLUMNS = {
 }
 #: The quality report's own columns (CSV form; the JSON adds summary blocks).
 _QUALITY_COLUMNS = {
-    "variable": ("text", "Column of `OM2/points`."), "present": ("bool", "The column exists in the points table."),
+    "variable": ("text", "Column of `data/route_points`."), "present": ("bool", "The column exists in the points table."),
     "coverage_fraction": ("fraction [0,1]", "Share of points with a value."),
     "n_valid": ("count", "Points with a value."), "n_total": ("count", "Points in the route."),
 }
@@ -83,7 +84,7 @@ _DICTIONARY_COLUMNS = {
 
 
 def _column_rows(package_dir: Path, f: dict) -> list[str]:
-    """One table per data file, one row per column, from p08_data_dictionary.
+    """One table per data file, one row per column, from data_dictionary.
     Sensor-matched columns (<measure>_tau<s>s) share one row per measure."""
     import re
 
@@ -112,9 +113,9 @@ def _column_rows(package_dir: Path, f: dict) -> list[str]:
                 name = f"`{base}_tau<{','.join(taus)}>s`"
                 unit = str(live.loc[c, "unit"]) if c in live.index else ""
                 definition = f"Sensor-matched `{base}` (see Methods, sensor-matched values)."
-            elif stem == "p08_data_dictionary" and c in _DICTIONARY_COLUMNS:
+            elif stem == TABLES["data_dictionary"] and c in _DICTIONARY_COLUMNS:
                 name, unit, definition = f"`{c}`", "text", _DICTIONARY_COLUMNS[c]
-            elif stem == "OM2/p07_quality_report" and c in _QUALITY_COLUMNS:
+            elif stem == TABLES["quality_report"] and c in _QUALITY_COLUMNS:
                 name, (unit, definition) = f"`{c}`", _QUALITY_COLUMNS[c]
             elif c in _STRUCTURAL_COLUMNS:
                 name, (unit, definition) = f"`{c}`", _STRUCTURAL_COLUMNS[c]
@@ -130,7 +131,7 @@ def _column_rows(package_dir: Path, f: dict) -> list[str]:
         label = stem if not exts[0] else f"{stem}.{'/'.join(sorted(exts, key=lambda e: e != 'parquet'))}"
         out += [f"### `{label}`\n", "| Column | Unit | Definition |", "|---|---|---|", *rows, ""]
     if missing:
-        raise ValueError(f"columns with no row in p08_data_dictionary: {missing}")
+        raise ValueError(f"columns with no row in data_dictionary: {missing}")
     return out
 
 
@@ -210,7 +211,7 @@ def render_readme(package_dir) -> str:
     ws = f["wind_source"]
     floor = require_nodata_floor_m({"nodata_floor_m": f["nodata_floor_m"]})
     radii = sorted({int(c.split("_")[-1][:-1]) for c in
-                    __import__("pyarrow.parquet", fromlist=["x"]).read_schema(package_dir / "OM2" / "points.parquet").names
+                    __import__("pyarrow.parquet", fromlist=["x"]).read_schema(table_path(package_dir, "route_points", "parquet")).names
                     if c.startswith("lambda_p_buffer_")})
     taus = _join([str(t) for t in DEFAULT_TAUS_S])
     walk_hours = _join([str(h) for h in WALK_DOSE_HOURS])
@@ -227,7 +228,7 @@ def render_readme(package_dir) -> str:
         "## Files in this package\n",
         file_table(package_dir, f, spec_items=SPEC_ITEMS),
         "Also shipped: `README.md` and `README.pdf` (this document, spec item P-01), `report.md` and "
-        "`report.pdf` (the report) and `OM2/fig_*.png` (the report figures).\n",
+        "`report.pdf` (the report) and the `figures/` folder (the report figures).\n",
         "## Sources and dates\n",
         "| Source | Date | Used for |",
         "|---|---|---|",
@@ -279,11 +280,11 @@ def render_readme(package_dir) -> str:
         f"(`timestamp_local`) with a UTC twin (`timestamp_utc`); the route is in building shade for "
         f"{100 * f['shade_daylight']:.1f}% of daylight time.\n",
         "The **direct sun dose** is the clear-sky direct beam energy on a horizontal surface, in Wh/m². It "
-        "assumes a clear sky, so it is an upper bound. `p12_walk_points` gives it for the "
+        "assumes a clear sky, so it is an upper bound. `walk_points` gives it for the "
         f"{walk_hours} hours before each walk reached each point, summed in {WALK_DOSE_STEP_MIN}-minute steps "
-        f"from the walk's GPS arrival times. `p10_sun_dose` gives it for the past {p10_hours} hours at "
+        f"from the walk's GPS arrival times. `sun_dose` gives it for the past {p10_hours} hours at "
         f"{f['p10_dose_slot_min']}-minute times of day, for each walk date and as the lowest, median and highest "
-        f"over the season {_day(f['p10_window'][0])} to {_day(f['p10_window'][1])}. `p10_sun_envelope` classes "
+        f"over the season {_day(f['p10_window'][0])} to {_day(f['p10_window'][1])}. `sun_envelope` classes "
         f"each point and {f['p10_envelope_slot_min']}-minute time of day over that season as always sunlit, "
         "always shaded or sunlit on some dates only. `annual_sun_hours` counts the hours per year with the sun "
         "above the point's horizon.\n",
@@ -326,18 +327,18 @@ def render_readme(package_dir) -> str:
         "the sensor time constant, the time to reach 63% of a step change; if only the 90% response time t90 "
         f"is known, τ = t90 / {f['ln10']:.3f}. Columns are given for τ = {taus} s.\n",
         "### Segment script\n",
-        "`OM2/aggregate_to_segments.py` (pandas and pyarrow only) averages points over segments of any "
+        "`scripts/aggregate_to_segments.py` (pandas and pyarrow only) averages points over segments of any "
         "length. Run it from inside the package directory:\n",
-        "```\npython OM2/aggregate_to_segments.py --points OM2/points.parquet \\\n"
-        "    --segment-m 20 --out OM2/segments_20m.parquet\n```\n",
+        "```\npython scripts/aggregate_to_segments.py --points data/route_points.parquet \\\n"
+        "    --segment-m 20 --out segments_20m.parquet\n```\n",
         "For one row per walk and segment, with one time constant:\n",
-        "```\npython OM2/aggregate_to_segments.py --points p12_walk_points.parquet \\\n"
+        "```\npython scripts/aggregate_to_segments.py --points data/walk_points.parquet \\\n"
         "    --by walk_id --segment-m 20 --tau 30 --out segments_by_walk.parquet\n```\n",
         "A segment ends at the point a reading was taken; a sensor reading describes the route behind the walker.\n",
         "## Using the data\n",
         "The walk loggers record UTC; Rio local time is UTC-3 with no daylight saving. Join logger readings to "
-        "`p12_walk_points` by `walk_id` and the nearest `t_arrival_utc`, or to the shade table by `point_id` "
-        "and `timestamp_utc` floored to the shade step (`OM2/join_shade_example.py`). Run each analysis with "
+        "`walk_points` by `walk_id` and the nearest `t_arrival_utc`, or to the shade table by `point_id` "
+        "and `timestamp_utc` floored to the shade step (`scripts/join_shade_example.py`). Run each analysis with "
         "and without the points that `point_class` marks as not on a street, and down-weight or drop rows whose "
         "`arrival_source` is `gap_interpolated`.\n",
         "## Known limits\n",
@@ -712,6 +713,11 @@ CURRENT_ENTRY_TEMPLATE = """\
 First version for the whole Octopus team. Same data and method as v0.3.1,
 without the temperature pairing first look (held for a later version: no p13
 tables, no temperature figures).
+
+- **Layout**: files grouped in `data/`, `figures/` and `scripts/`; the `OM2/`
+  folder and the spec-item prefixes (p02b, p05, p10, p11, p12) are gone from
+  file names, and figures are numbered in report order. The README file table
+  keeps a Spec item column.
 
 - **Report**: chapter outline on the first page, every chapter on a new page,
   tables kept whole; building and terrain source named "IPP 2019 dataset";

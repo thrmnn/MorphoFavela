@@ -71,7 +71,7 @@ def _inset(ax, res, buildings, fixes, span, pad=10.0):
 
 def build_fig_flags(result: pd.DataFrame, buildings, fixes: pd.DataFrame, out_path, insets=None):
     """result: the route_repair table; buildings: footprints (GeoDataFrame);
-    fixes: raw GPS fixes (x, y). Writes fig_flags.png at text width."""
+    fixes: raw GPS fixes (x, y). Writes the flagged-points figure at text width."""
     insets = insets or pick_insets(result)
     letters = "abc"[: len(insets)]
     ext = fs.route_extent(result.rename(columns={"x_original": "x", "y_original": "y"}), margin_m=40.0)

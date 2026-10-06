@@ -39,7 +39,7 @@ REGIME_COLUMN_STEMS = {
     "upwind_shelter_angle_deg": "upwind_shelter_deg_proxy",
     "z0_macdonald_m": "z0_m_proxy",
 }
-#: the stems that get sensor-matched columns in p12_walk_points (z0 does not)
+#: the stems that get sensor-matched columns in walk_points (z0 does not)
 REGIME_MEASURE_STEMS = ["frontal_area_density_windward", "canyon_alignment_deg", "upwind_shelter_angle_deg"]
 REGIME_INDEPENDENT_COLUMNS = {
     "zd_macdonald_m": "zd_m_proxy",
@@ -161,7 +161,7 @@ def _mixture_columns(result: dict) -> list[dict]:
 
 
 def wind_regimes_table(season: dict) -> pd.DataFrame:
-    """p11_wind_regimes: one row per period (campaign season, 2015-2024
+    """wind_regimes: one row per period (campaign season, 2015-2024
     climatology) and regime, with the von Mises mixture check beside it."""
     rows = []
     for period in ("campaign", "climatology"):
@@ -177,7 +177,7 @@ def wind_regimes_table(season: dict) -> pd.DataFrame:
 
 
 def regime_by_hour_table(season: dict, root) -> pd.DataFrame:
-    """p11_regime_by_hour: share of each regime and of calm by Rio local
+    """wind_regime_by_hour: share of each regime and of calm by Rio local
     hour, per period; each period's own regimes classify its own reports."""
     obs = {"campaign": load_campaign(root), "climatology": load_climatology(root)}
     frames = []

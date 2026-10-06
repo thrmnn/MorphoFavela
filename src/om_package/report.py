@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 from src.om_package import vent_context
+from src.om_package.layout import FIG, FIGURE_FACTS, FIGURES_DIR, SCRIPTS, TABLES, table, table_path
 from src.om_package.figures import SEGMENT_LENGTH_M
 from src.om_package.report_pdf import render_markdown_pdf, report_css
 from src.om_package.routes import ROUTE_FLAG_MAX_STREET_DIST_M
@@ -49,17 +50,17 @@ _SOURCES = {
 }
 #: Each caption names only the sources its figure draws on.
 FIGURE_SOURCES = {
-    "fig_route.png": ("walks", "geometry"),
-    "fig_form.png": ("geometry",),
-    "fig_shade_map.png": ("walks", "geometry"),
-    "fig_shade_calendar.png": ("walks", "geometry"),
-    "fig_sun_dose.png": ("walks", "geometry"),
-    "fig_wind.png": ("airport",),
-    "fig_shelter_maps.png": ("geometry", "airport"),
-    "fig_vent_profiles.png": ("geometry", "airport"),
-    "fig_svf_sensor.png": ("walks", "geometry"),
-    "fig_vent_schematic.png": (),
-    "fig_flags.png": ("walks", "geometry"),
+    FIG["route"]: ("walks", "geometry"),
+    FIG["form"]: ("geometry",),
+    FIG["shade_map"]: ("walks", "geometry"),
+    FIG["shade_calendar"]: ("walks", "geometry"),
+    FIG["sun_dose"]: ("walks", "geometry"),
+    FIG["wind"]: ("airport",),
+    FIG["shelter_maps"]: ("geometry", "airport"),
+    FIG["vent_profiles"]: ("geometry", "airport"),
+    FIG["svf_sensor"]: ("walks", "geometry"),
+    FIG["vent_schematic"]: (),
+    FIG["flags"]: ("walks", "geometry"),
 }
 
 
@@ -68,9 +69,9 @@ def source_line(name: str) -> str:
         return ""
     return "Data: " + "; ".join(_SOURCES[k] for k in FIGURE_SOURCES[name]) + "."
 SEGMENT_M = int(SEGMENT_LENGTH_M)
-#: The two time constants the sensor figure draws (fig_svf_sensor).
+#: The two time constants the sensor figure draws (figure 11).
 FIGURE_TAUS_S = (10, 30)
-#: Dose below this (Wh/m2) is drawn as zero in fig_sun_dose; used when figure_facts.json is absent.
+#: Dose below this (Wh/m2) is drawn as zero in the sun dose figure; used when figure_facts.json is absent.
 DOSE_ZERO_BELOW = 0.1
 #: Canyon alignment within this many degrees of 0 counts as "along the wind", of 90 as "across".
 ALIGN_BAND_DEG = 30.0
@@ -80,17 +81,17 @@ FULL_COVERAGE = 0.95
 #: Figures in report order. Each prints at 100 % of its designed size
 #: (src/om_package/figures.py, vent_figures.py), 200 dpi.
 FIGURES = [
-    "fig_route.png",
-    "fig_form.png",
-    "fig_shade_map.png",
-    "fig_shade_calendar.png",
-    "fig_sun_dose.png",
-    "fig_wind.png",
-    "fig_vent_schematic.png",
-    "fig_shelter_maps.png",
-    "fig_vent_profiles.png",
-    "fig_flags.png",
-    "fig_svf_sensor.png",
+    FIG["route"],
+    FIG["form"],
+    FIG["shade_map"],
+    FIG["shade_calendar"],
+    FIG["sun_dose"],
+    FIG["wind"],
+    FIG["vent_schematic"],
+    FIG["shelter_maps"],
+    FIG["vent_profiles"],
+    FIG["flags"],
+    FIG["svf_sensor"],
 ]
 FIGURE_DPI = 200
 _FIG_NO = {name: i + 1 for i, name in enumerate(FIGURES)}
@@ -112,45 +113,42 @@ _UNCONFUSABLE: set[frozenset] = {
 
 #: Shipped file stems in table order. A data file not listed here stops the
 #: render, so a new file cannot ship undescribed.
-FILE_ORDER = ["OM2/points", "p02b_walks", "p12_walk_points", "p05_building_shade", "p10_sun_dose",
-              "p10_sun_envelope", "p10_horizon_profiles", "p11_wind_regimes", "p11_regime_by_hour",
-              "p08_data_dictionary", "OM2/p07_quality_report", "OM2/aggregate_to_segments",
-              "OM2/join_shade_example", "manifest.json"]
+FILE_ORDER = [*TABLES.values(), *(s.removesuffix(".py") for s in SCRIPTS.values()), "manifest.json"]
 
 
 def file_roles(f: dict) -> dict:
     """What each shipped file holds, worded from the facts."""
     hours = _join([str(h) for h in f["p10_dose_hours"]])
     return {
-        "OM2/points": f"One row per {f['spacing_m']:g} m point: street form, sun hours, ventilation",
-        "p02b_walks": "One row per walk: times, route coverage, wind regime",
-        "p12_walk_points": "One row per walk and point: arrival time, shade, sun dose, sensor-matched values",
-        "p05_building_shade": f"Building shade per point every {f['shade_step_min']} minutes on each walk date",
-        "p10_sun_dose": f"Clear-sky direct sun dose over the past {hours} hours",
-        "p10_sun_envelope": "Per point and time of day: sunlit on all, some or no dates of the season",
-        "p10_horizon_profiles": "Horizon angle per point and compass direction",
-        "p11_wind_regimes": "The two wind regimes, campaign season and long term",
-        "p11_regime_by_hour": "Share of each wind regime by hour of day",
-        "p08_data_dictionary": "Definition and unit of every column",
-        "OM2/p07_quality_report": "Coverage of every point column, flagged points",
-        "OM2/aggregate_to_segments": "Script: means over segments of any length",
-        "OM2/join_shade_example": "Script: joins walk logger readings to the shade table",
+        TABLES["route_points"]: f"One row per {f['spacing_m']:g} m point: street form, sun hours, ventilation",
+        TABLES["walks"]: "One row per walk: times, route coverage, wind regime",
+        TABLES["walk_points"]: "One row per walk and point: arrival time, shade, sun dose, sensor-matched values",
+        TABLES["building_shade"]: f"Building shade per point every {f['shade_step_min']} minutes on each walk date",
+        TABLES["sun_dose"]: f"Clear-sky direct sun dose over the past {hours} hours",
+        TABLES["sun_envelope"]: "Per point and time of day: sunlit on all, some or no dates of the season",
+        TABLES["horizon_profiles"]: "Horizon angle per point and compass direction",
+        TABLES["wind_regimes"]: "The two wind regimes, campaign season and long term",
+        TABLES["wind_regime_by_hour"]: "Share of each wind regime by hour of day",
+        TABLES["data_dictionary"]: "Definition and unit of every column",
+        TABLES["quality_report"]: "Coverage of every point column, flagged points",
+        SCRIPTS["aggregate_to_segments"].removesuffix(".py"): "Script: means over segments of any length",
+        SCRIPTS["join_shade_example"].removesuffix(".py"): "Script: joins walk logger readings to the shade table",
         "manifest.json": "Version, sources and a checksum for every file",
     }
 
 
 #: Main columns named in the file table (only those present in the file are printed).
 FILE_MAIN_COLUMNS = {
-    "OM2/points": ["point_id", "distance_along_m", "sky_view_factor"],
-    "p02b_walks": ["walk_id", "start_local", "wind_regime"],
-    "p12_walk_points": ["walk_id", "point_id", "t_arrival_local"],
-    "p05_building_shade": ["point_id", "timestamp_local", "shaded"],
-    "p10_sun_dose": ["point_id", "scope", "local_slot"],
-    "p10_sun_envelope": ["point_id", "local_slot", "class"],
-    "p10_horizon_profiles": ["point_id", "azimuth_deg", "horizon_deg"],
-    "p11_wind_regimes": ["name", "mean_direction_deg", "share"],
-    "p11_regime_by_hour": ["local_hour", "regime", "share"],
-    "p08_data_dictionary": ["id", "definition", "unit"],
+    TABLES["route_points"]: ["point_id", "distance_along_m", "sky_view_factor"],
+    TABLES["walks"]: ["walk_id", "start_local", "wind_regime"],
+    TABLES["walk_points"]: ["walk_id", "point_id", "t_arrival_local"],
+    TABLES["building_shade"]: ["point_id", "timestamp_local", "shaded"],
+    TABLES["sun_dose"]: ["point_id", "scope", "local_slot"],
+    TABLES["sun_envelope"]: ["point_id", "local_slot", "class"],
+    TABLES["horizon_profiles"]: ["point_id", "azimuth_deg", "horizon_deg"],
+    TABLES["wind_regimes"]: ["name", "mean_direction_deg", "share"],
+    TABLES["wind_regime_by_hour"]: ["local_hour", "regime", "share"],
+    TABLES["data_dictionary"]: ["id", "definition", "unit"],
 }
 _NOT_DATA = {"report", "README"}
 
@@ -248,19 +246,19 @@ def _load(package_dir: Path) -> dict:
     def js(rel):
         return json.loads((package_dir / rel).read_text(encoding="utf-8"))
 
-    ff = package_dir / "OM2" / "figure_facts.json"
+    ff = package_dir / FIGURE_FACTS
     return dict(
         manifest=js("manifest.json"),
-        quality=js("OM2/p07_quality_report.json"),
-        figure_facts=js("OM2/figure_facts.json") if ff.exists() else {},
-        points=pd.read_parquet(package_dir / "OM2" / "points.parquet"),
-        shade=pd.read_parquet(package_dir / "p05_building_shade.parquet",
+        quality=js(table("quality_report", "json")),
+        figure_facts=js(FIGURE_FACTS) if ff.exists() else {},
+        points=pd.read_parquet(table_path(package_dir, "route_points", "parquet")),
+        shade=pd.read_parquet(table_path(package_dir, "building_shade", "parquet"),
                               columns=["point_id", "timestamp_local", "date", "sun_altitude_deg", "shaded"]),
-        walks=pd.read_parquet(package_dir / "p02b_walks.parquet"),
-        p12=pd.read_parquet(package_dir / "p12_walk_points.parquet"),
-        regimes=pd.read_csv(package_dir / "p11_wind_regimes.csv"),
-        by_hour=pd.read_csv(package_dir / "p11_regime_by_hour.csv"),
-        dictionary=pd.read_parquet(package_dir / "p08_data_dictionary.parquet"),
+        walks=pd.read_parquet(table_path(package_dir, "walks", "parquet")),
+        p12=pd.read_parquet(table_path(package_dir, "walk_points", "parquet")),
+        regimes=pd.read_csv(table_path(package_dir, "wind_regimes", "csv")),
+        by_hour=pd.read_csv(table_path(package_dir, "wind_regime_by_hour", "csv")),
+        dictionary=pd.read_parquet(table_path(package_dir, "data_dictionary", "parquet")),
     )
 
 
@@ -503,7 +501,7 @@ def _sensor_facts(f: dict, d: dict) -> None:
     p12, w, pts = d["p12"], d["walks"], d["points"]
     for tau in DEFAULT_TAUS_S:
         if f"sky_view_factor_tau{tau}s" not in p12.columns:
-            raise ValueError(f"p12_walk_points lacks sky_view_factor_tau{tau}s")
+            raise ValueError(f"walk_points lacks sky_view_factor_tau{tau}s")
     f["taus"] = list(DEFAULT_TAUS_S)
     f["fig_taus"] = list(FIGURE_TAUS_S)
     f["truncation_taus"] = TRUNCATION_TAUS
@@ -511,7 +509,7 @@ def _sensor_facts(f: dict, d: dict) -> None:
     rep = _representative_walk(w)
     fig = d["figure_facts"].get("svf_sensor")
     if fig:
-        _require("fig_svf_sensor walk_id", str(rep["walk_id"]), fig["walk_id"])
+        _require("sensor-matched figure walk_id", str(rep["walk_id"]), fig["walk_id"])
     one = p12[p12["walk_id"] == rep["walk_id"]].merge(pts[["point_id", "sky_view_factor"]], on="point_id")
     f["rep_walk"] = {"walk_id": str(rep["walk_id"]), "date": str(rep["date"]), "period": str(rep["period"]),
                      "start": str(rep["start_local"])[11:16], "duration_min": float(rep["duration_min"]),
@@ -573,7 +571,7 @@ def _file_groups(package_dir: Path) -> list[tuple[str, list[str]]]:
         if not p.is_file() or p.name.startswith("_"):
             continue
         rel = p.relative_to(package_dir).as_posix()
-        if rel.endswith(".png") or rel == "OM2/figure_facts.json":
+        if rel.startswith(f"{FIGURES_DIR}/"):
             continue
         stem, ext = (rel, "") if rel == "manifest.json" else rel.rsplit(".", 1)
         groups.setdefault(stem, []).append(ext)
@@ -621,9 +619,9 @@ def _figure_width_cm(path: Path) -> float:
 
 
 def _figure(package_dir: Path, name: str, caption: str) -> str:
-    width = _figure_width_cm(package_dir / "OM2" / name)
+    width = _figure_width_cm(package_dir / FIGURES_DIR / name)
     cap = (caption + " " + source_line(name)).strip()
-    return f"![Figure {_FIG_NO[name]}. {cap}](OM2/{name}){{width={width:.2f}cm}}\n"
+    return f"![Figure {_FIG_NO[name]}. {cap}]({FIGURES_DIR}/{name}){{width={width:.2f}cm}}\n"
 
 
 def _fig(name: str) -> str:
@@ -652,10 +650,10 @@ def _flag_section(package_dir: Path, f: dict, pct: "_Pcts") -> list[str]:
         "## Flagged points\n",
         f"{_n(nf)} of the {_n(n)} points ({pct('flag_share', nf / n)}) do not lie on a mapped street, and in "
         f"{_n(c['projected'])} of these cases the route trace only sits a few metres inside a building outline "
-        f"({_fig('fig_flags.png')}). The map colours every point by what the street map says about it; the "
+        f"({_fig(FIG['flags'])}). The map colours every point by what the street map says about it; the "
         "three close-ups show the GPS fixes of all walks (grey dots) over the building outlines, with a grey line "
         "from each point that moved to its new position.\n",
-        _figure(package_dir, "fig_flags.png", "Route points by class (map) and three close-ups with the building "
+        _figure(package_dir, FIG["flags"], "Route points by class (map) and three close-ups with the building "
                 "outlines and the GPS fixes of all walks. Colours give the class of each point at its repaired position."),
         f"**Projected** ({_n(c['projected'])} points). The traced position lies inside a building outline by at most "
         f"4 m, which is within the precision of the route trace against the building outlines of the {GEOMETRY}. Each point moves to "
@@ -736,7 +734,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
     stretches = _join([f"{name} ({_n(a)} to {_n(b)} m)" for name, a, b in f["stretches"]])
     out += [
         "## The route\n",
-        f"The route runs {_n(f['length_m'])} m through {stretches} ({_fig('fig_route.png')}); the short gaps between "
+        f"The route runs {_n(f['length_m'])} m through {stretches} ({_fig(FIG['route'])}); the short gaps between "
         "these stretches lie outside the neighbourhood boundaries. The map shows it "
         f"over the building footprints of the {GEOMETRY}, labelled in metres from the start.\n",
         f"The route was walked {f['n_walks']} times on {f['n_dates']} dates between "
@@ -744,7 +742,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"{per['morning']['start']} and {per['evening']['n']} evening walks starting around "
         f"{per['evening']['start']}, each taking about {f['duration_median_min']:.0f} minutes. Every walk goes "
         "from the route start towards its end.\n",
-        _figure(package_dir, "fig_route.png", "The OM2 route over the building footprints of Nova Holanda, Parque Rubens Vaz "
+        _figure(package_dir, FIG["route"], "The OM2 route over the building footprints of Nova Holanda, Parque Rubens Vaz "
                 "and Parque União. Labels give metres from the route start."),
     ]
 
@@ -753,11 +751,11 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "## Street form\n",
         f"The street is narrow and enclosed: the median of the point height-to-width ratios is "
         f"{f['hw_median_of_ratios']:.1f}, and the median sky view factor is {f['svf_median']:.2f} "
-        f"({_fig('fig_form.png')}). "
+        f"({_fig(FIG['form'])}). "
         f"Read the four profiles from the top: grey lines are the 1 m values, dark lines the {SEGMENT_M} m means. "
         "Where the height-to-width ratio rises and the sky view factor drops together, the street is a deep "
         "canyon.\n",
-        _figure(package_dir, "fig_form.png", f"Street form along the route: 1 m values (grey) and {SEGMENT_M} m means (dark). "
+        _figure(package_dir, FIG["form"], f"Street form along the route: 1 m values (grey) and {SEGMENT_M} m means (dark). "
                 "The band on top names the neighbourhood of each stretch."),
         "Four measures describe the street form. "
         f"**Building height** is the height of the buildings flanking the street (median {f['bh_median']:.1f} m). "
@@ -779,16 +777,16 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "## Sun and shade\n",
         "### Building shade on the walk dates\n",
         f"On the {f['n_dates']} walk dates, the route is in building shade for "
-        f"{pct('shade_daylight', f['shade_daylight'])} of daylight time ({_fig('fig_shade_map.png')}). "
+        f"{pct('shade_daylight', f['shade_daylight'])} of daylight time ({_fig(FIG['shade_map'])}). "
         "The map colours each point by the share of daylight time it spends in direct sun: lighter means more "
         "direct sun, and the rest of the time the point is in building shade.\n",
-        _figure(package_dir, "fig_shade_map.png", f"Share of daylight time each point spends in direct sun, over the "
+        _figure(package_dir, FIG["shade_map"], f"Share of daylight time each point spends in direct sun, over the "
                 f"{f['n_dates']} walk dates. Lighter = more direct sun; the rest of the time the point is in building shade."),
         "A point is in **building shade** when buildings or terrain block the direct sun. Sun and shade are "
         f"computed every {f['shade_step_min']} minutes of daylight on each walk date. Half of the points spend between "
         f"{pct('shade_pt_q25', f['shade_pt_q25'])} and {pct('shade_pt_q75', f['shade_pt_q75'])} of daylight time "
         "in building shade.\n",
-        f"Shade changes more with the time of day than with the date ({_fig('fig_shade_calendar.png')}). Read "
+        f"Shade changes more with the time of day than with the date ({_fig(FIG['shade_calendar'])}). Read "
         "the calendar row by row: each row is one walk date, time of day runs left to right in Rio local time, "
         "and the colour gives the share of route points in direct sun (lighter means more direct sun; the rest are in building shade).\n",
         f"In the {_hour(f['shade_hour_min'])} hour only {pct('shade_hour_min', f['shade_hour_min_val'])} of route "
@@ -797,7 +795,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"to {h1:02d}:59), the shaded share of route points goes from "
         f"{pct('shade_date_min', f['shade_date_min_val'])} on {_day(f['shade_date_min'])} to "
         f"{pct('shade_date_max', f['shade_date_max_val'])} on {_day(f['shade_date_max'])}.\n",
-        _figure(package_dir, "fig_shade_calendar.png", "Share of route points in direct sun by walk date (rows) and time "
+        _figure(package_dir, FIG["shade_calendar"], "Share of route points in direct sun by walk date (rows) and time "
                 "of day (Rio local time). Lighter = more direct sun; the rest of the route points are in building shade. "
                 "White: sun below the horizon."),
     ]
@@ -807,11 +805,11 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
     out += [
         "### Direct sun before each walk\n",
         "Morning walkers reach streets that have had direct sun in the past hour; evening walkers reach many "
-        f"that have had none ({_fig('fig_sun_dose.png')}). "
+        f"that have had none ({_fig(FIG['sun_dose'])}). "
         "Each row is one walk, labelled by date and start time, mornings above evenings. One colour scale serves both "
         "panels: lighter means more direct sun, the darkest colour means no direct sun at all, and white marks points "
         "the walk did not reach.\n",
-        _figure(package_dir, "fig_sun_dose.png", "Clear-sky direct sun dose in the hour (left) and the three hours (right) "
+        _figure(package_dir, FIG["sun_dose"], "Clear-sky direct sun dose in the hour (left) and the three hours (right) "
                 f"before each walk reached each point, in {SEGMENT_M} m means along the route. Lighter = more direct sun; "
                 "darkest: no direct sun; white: not reached by the walk."),
         "The **direct sun dose** is the direct sunlight energy that reached a horizontal surface at the point "
@@ -840,7 +838,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         "## Wind and ventilation\n",
         "### Two wind regimes\n",
         f"Two winds alternate at Galeão airport: an {r1['name']} wind most of the afternoon and a {r2['name']} "
-        f"wind most of the morning ({_fig('fig_wind.png')}). "
+        f"wind most of the morning ({_fig(FIG['wind'])}). "
         "The roses show how often the wind comes from each direction, coloured by regime, with a line at each "
         "regime's mean direction; the lower panel gives each regime's share of the reports by hour of day.\n",
         f"The regimes come from the Galeão airport hourly weather reports of the campaign season "
@@ -862,7 +860,7 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"{per['morning']['n']} morning walks had the {r2['name']} wind, and "
         f"{tbp['evening'].get(r1['name'], 0)} of the {per['evening']['n']} evening walks the {r1['name']} wind. "
         "The airport wind is a regional reference, not the wind in the streets.\n",
-        _figure(package_dir, "fig_wind.png", f"Wind at Galeão airport. Top: wind roses for the campaign season (left) and "
+        _figure(package_dir, FIG["wind"], f"Wind at Galeão airport. Top: wind roses for the campaign season (left) and "
                 f"{y0} to {y1} (right), coloured by regime. Bottom: share of each regime by hour of day in Rio "
                 f"local time (solid: campaign season; dashed: {y0} to {y1})."),
     ]
@@ -877,24 +875,24 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
     band = f["align_band_deg"]
     out += [
         "### Ventilation measures\n",
-        f"Three measures describe how open a point is to each wind ({_fig('fig_vent_schematic.png')}). They are "
+        f"Three measures describe how open a point is to each wind ({_fig(FIG['vent_schematic'])}). They are "
         "computed at each regime's mean direction; none is a measured or simulated wind. "
         "**Frontal area density** is the building wall area facing the wind per unit of ground area, in the "
         "10 m grid cell of the point. **Canyon alignment** is the angle between the street and the wind: 0° means "
         "the wind blows along the street, 90° across it. **Upwind shelter angle** is how high buildings and "
         "terrain rise above the horizon when you look into the wind.\n",
-        _figure(package_dir, "fig_vent_schematic.png", "Top: the three ventilation measures, (a) frontal area density, "
+        _figure(package_dir, FIG["vent_schematic"], "Top: the three ventilation measures, (a) frontal area density, "
                 "(b) canyon alignment and (c) upwind shelter angle. Bottom: the three flow regimes when the wind blows "
                 "across a street, by height-to-width ratio (Oke, 1988)."),
         *vent_context.report_paragraphs(f),
         "### Ventilation along the route\n",
         f"The median upwind shelter angle is similar for the two winds ({more[1]['shelter'][1]:.0f}° for the "
         f"{more[0]['name']} wind, {less[1]['shelter'][1]:.0f}° for the {less[0]['name']} wind), but it varies more "
-        f"along the route for the {wide[0]['name']} wind ({_fig('fig_shelter_maps.png')}). The {slant[0]['name']} "
+        f"along the route for the {wide[0]['name']} wind ({_fig(FIG['shelter_maps'])}). The {slant[0]['name']} "
         f"wind meets most streets at a slant, while the {square[0]['name']} wind runs along or across most of them "
-        f"({_fig('fig_vent_profiles.png')}). The maps show the shelter angle for each regime side by side, with an "
+        f"({_fig(FIG['vent_profiles'])}). The maps show the shelter angle for each regime side by side, with an "
         f"arrow for the wind; the profiles overlay both regimes in their colours.\n",
-        _figure(package_dir, "fig_shelter_maps.png", f"Upwind shelter angle for the {r1['name']} wind (left) and the "
+        _figure(package_dir, FIG["shelter_maps"], f"Upwind shelter angle for the {r1['name']} wind (left) and the "
                 f"{r2['name']} wind (right). Dark: buildings rise steeply towards the wind."),
         f"The median frontal area density is {v1['frontal_median']:.2f} for the {r1['name']} wind and "
         f"{v2['frontal_median']:.2f} for the {r2['name']} wind. For the {r1['name']} wind, "
@@ -905,8 +903,8 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"Half of the points have an upwind shelter angle between {v1['shelter'][0]:.0f}° and "
         f"{v1['shelter'][2]:.0f}° for the {r1['name']} wind and between {v2['shelter'][0]:.0f}° and "
         f"{v2['shelter'][2]:.0f}° for the {r2['name']} wind.\n",
-        _figure(package_dir, "fig_vent_profiles.png", f"Ventilation measures along the route for the two regimes (colours as "
-                f"in {_fig('fig_wind.png')}): frontal area density facing the wind, canyon alignment and upwind "
+        _figure(package_dir, FIG["vent_profiles"], f"Ventilation measures along the route for the two regimes (colours as "
+                f"in {_fig(FIG['wind'])}): frontal area density facing the wind, canyon alignment and upwind "
                 f"shelter angle, as {SEGMENT_M} m means."),
     ]
 
@@ -918,8 +916,8 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
     out += [
         "## Using the data with temperature readings\n",
         "A sensor carried at walking speed reads the air it has just passed, so the package also gives each "
-        f"measure as the sensor would see it ({_fig('fig_svf_sensor.png')}).\n",
-        _figure(package_dir, "fig_svf_sensor.png", f"Sky view factor along one full walk ({_day(rep['date'])}, "
+        f"measure as the sensor would see it ({_fig(FIG['svf_sensor'])}).\n",
+        _figure(package_dir, FIG["svf_sensor"], f"Sky view factor along one full walk ({_day(rep['date'])}, "
                 f"{rep['period']}, starting at {rep['start']}): 1 m values (grey) and sensor-matched values for "
                 f"τ = {t_lo} s and τ = {t_hi} s (coloured)."),
         "A **sensor-matched** value at a point is a weighted mean of the measure over the points the walk had "
@@ -927,15 +925,15 @@ def render_report_markdown(package_dir: Path, *, _pct: _Pcts | None = None) -> s
         f"was there, from the walk's GPS timestamps, and τ is the sensor's time constant. Points more than "
         f"{f['truncation_taus']:g}τ back are left out, and the weights are scaled to sum to one. The columns end "
         f"in `_tau5s`, `_tau10s`, `_tau30s` and `_tau60s`, for τ = {taus} s, one row per walk and point in "
-        f"`p12_walk_points`. τ is the time to reach 63% of a step change; if only the 90% response time t90 is "
+        f"`walk_points`. τ is the time to reach 63% of a step change; if only the 90% response time t90 is "
         f"known, τ = t90 / {f['ln10']:.3f}. The segment script averages these rows per walk, for example "
         "`--by walk_id --tau 30`. Along the walk in the figure, the standard deviation of the sky view factor "
         f"drops from {sp['1m']:.2f} at 1 m to {sp[t_lo]:.2f} for τ = {t_lo} s and {sp[t_hi]:.2f} for "
         f"τ = {t_hi} s: the slower the sensor, the smoother the profile it sees.\n",
-        f"**Arrival times.** In `p12_walk_points`, `arrival_source` says how each arrival time was found: "
+        f"**Arrival times.** In `walk_points`, `arrival_source` says how each arrival time was found: "
         f"`gps` between fixes less than {f['gap_flag_s']} s apart, `gap_interpolated` across a longer gap "
         f"({pct('gap_share', f['gap_share'])} of walk points). Down-weight or drop the interpolated rows. "
-        f"In `p02b_walks`, {f['n_partial']} of the {f['n_walks']} walks are marked `partial`: their GPS covers "
+        f"In `walks`, {f['n_partial']} of the {f['n_walks']} walks are marked `partial`: their GPS covers "
         f"less than {pct('partial_rule', f['partial_coverage'])} of the route.\n",
         "**One question for the team.** What is the time constant of the air temperature sensor as mounted, "
         "with its housing, and is the value you have the 63% or the 90% response time? It sets τ for the "

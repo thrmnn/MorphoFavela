@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""P-03 — re-aggregate this package's OM2 point table to any segment
+"""Re-aggregate this package's OM2 point table to any segment
 length you choose (any of the four buffer radii — 5, 10, 20, 50 m — are
-already columns on ``OM2/points.*``; this script only groups points into
+already columns on ``data/route_points.*``; this script only groups points into
 segments, it does not recompute buffers).
 
 Standalone: pandas + pyarrow only, no Brisa+ (MorphoFavela) import — this file
@@ -24,16 +24,16 @@ is L ~ walking speed x k x the sensor's response time constant (k = 3 gives
 from any sensor; see the README, "Using the data".
 
 Run (from inside the package directory):
-    python OM2/aggregate_to_segments.py --points OM2/points.parquet \\
-        --segment-m 20 --out OM2/segments_20m.parquet
+    python scripts/aggregate_to_segments.py --points data/route_points.parquet \\
+        --segment-m 20 --out segments_20m.parquet
 
 If the input holds sensor-matched columns named ``<col>_tau<tau>s``, add
 ``--tau 30`` (repeatable, or ``--tau 10,30``) to keep only those time
 constants; without ``--tau`` every column is aggregated as before.
 
-For ``p12_walk_points`` (one row per walk and point) add ``--by walk_id`` to
+For ``walk_points`` (one row per walk and point) add ``--by walk_id`` to
 get one row per walk and segment:
-    python OM2/aggregate_to_segments.py --points p12_walk_points.parquet \\
+    python scripts/aggregate_to_segments.py --points data/walk_points.parquet \\
         --by walk_id --segment-m 20 --tau 30 --out segments_by_walk.parquet
 """
 from __future__ import annotations
@@ -78,7 +78,7 @@ def aggregate_to_segments(
 
     Returns one row per segment: segment_id, start/end distance_along_m,
     n_points, mean of every other numeric column (NaNs excluded). With
-    ``by`` (e.g. "walk_id" for p12_walk_points) one row per ``by`` value and
+    ``by`` (e.g. "walk_id" for walk_points) one row per ``by`` value and
     segment.
     """
     if segment_length_m <= 0:
@@ -108,7 +108,7 @@ def aggregate_to_segments(
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--points", required=True, help="path to a points parquet/csv (this package's OM2/points.*)")
+    ap.add_argument("--points", required=True, help="path to a points parquet/csv (this package's data/route_points.*)")
     ap.add_argument(
         "--segment-m", "--segment-length-m", dest="segment_m", type=float, default=DEFAULT_SEGMENT_M,
         help=f"segment length in metres (default {DEFAULT_SEGMENT_M:g}, a placeholder, not sensor-derived)",

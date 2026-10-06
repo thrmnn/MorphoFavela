@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P-05 — join example: match this package's ``p05_building_shade`` table
+"""Join example: match this package's ``building_shade`` table
 (``point_id``, ``timestamp_utc`` and ``timestamp_local`` at 5-minute steps, on
 the walk dates, daylight only) against a real Octopus device CSV, by
 ``point_id`` and the device ``Timestamp`` (UTC) floored to 5 minutes.
@@ -21,7 +21,7 @@ is the firmware's no-fix sentinel and is dropped before joining, when those
 columns are present.
 
 Run (from inside the package directory):
-    python OM2/join_shade_example.py --shade p05_building_shade.parquet \\
+    python scripts/join_shade_example.py --shade data/building_shade.parquet \\
         --device path/to/octopus_log_with_point_id.csv --out joined_example.csv
 """
 from __future__ import annotations
@@ -76,7 +76,7 @@ def join_shade_to_device(shade_df: pd.DataFrame, device_df: pd.DataFrame) -> pd.
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--shade", required=True, help="path to this package's p05_building_shade.parquet/.csv")
+    ap.add_argument("--shade", required=True, help="path to this package's data/building_shade.parquet")
     ap.add_argument("--device", required=True, help="path to an Octopus device CSV carrying a point_id column")
     ap.add_argument("--out", required=True, help="output path (.parquet or .csv)")
     args = ap.parse_args()

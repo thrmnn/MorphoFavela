@@ -24,7 +24,7 @@ def aggregate_to_segments(
 
     Returns one row per segment: segment_id, start/end distance_along_m,
     n_points, mean of every other numeric column (NaNs excluded). With
-    ``by`` (e.g. "walk_id" for p12_walk_points) one row per ``by`` value and
+    ``by`` (e.g. "walk_id" for walk_points) one row per ``by`` value and
     segment.
     """
     if segment_length_m <= 0:

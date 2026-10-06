@@ -1,8 +1,8 @@
 """OM2 report figures, part 1: route, street form, shade and sun dose.
 
-Filenames are the contract with the report text (written under OM2/):
-fig_route, fig_form, fig_shade_map, fig_shade_calendar, fig_sun_dose,
-fig_svf_sensor. The ventilation and wind figures are in vent_figures.py.
+Filenames are the contract with the report text (src/om_package/layout.py
+FIG, written under figures/): route, form, shade_map, shade_calendar,
+sun_dose, svf_sensor. The ventilation and wind figures are in vent_figures.py.
 Every figure is drawn at print width and styled by fig_style.
 """
 from __future__ import annotations

@@ -12,6 +12,8 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
+from . import layout
+
 DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
 UTM23S = "EPSG:31983"
 
@@ -108,6 +110,12 @@ def write_table(df: pd.DataFrame, out_dir: Path, stem: str, geo: bool = False) -
         df.to_csv(csv, index=False)
         written.append(csv)
     return written
+
+
+def write_package_table(df: pd.DataFrame, package_dir: Path, key: str, geo: bool = False) -> list[Path]:
+    """write_table for a table of the shipped layout (src/om_package/layout.py)."""
+    rel = Path(layout.stem(key))
+    return write_table(df, Path(package_dir) / rel.parent, rel.name, geo=geo)
 
 
 def read_gpkg(path: Path) -> gpd.GeoDataFrame:

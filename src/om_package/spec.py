@@ -11,7 +11,7 @@ below is the verbatim requirement text; each item's ``parts`` are
 mechanical predicates over ``package_dir`` (a built
 ``outputs/_packages/mare_om2/<version>/`` directory): does a named file
 exist, are named columns present with coverage read from
-``p07_quality_report.json``, does the data dictionary have the right rows
+``quality_report.json``, does the data dictionary have the right rows
 and columns, does the README have the right headings, does the changelog
 have a dated entry for this version.
 
@@ -41,9 +41,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from .layout import SCRIPTS, table, table_path
+
 #: stated minimum non-null coverage for a numeric P-04/P-06 column to
 #: count as "delivered" — the threshold is fixed here; the ACTUAL coverage
-#: compared against it is always read from p07_quality_report.json, never
+#: compared against it is always read from quality_report.json, never
 #: recomputed or guessed by this module.
 MIN_COVERAGE_FRACTION = 0.95
 
@@ -86,10 +88,10 @@ class PartResult:
 # ------------------------------------------------------------- file reads --
 
 def _points_df(package_dir: Path) -> pd.DataFrame | None:
-    pq = package_dir / "OM2" / "points.parquet"
+    pq = table_path(package_dir, "route_points", "parquet")
     if pq.exists():
         return pd.read_parquet(pq)
-    csv = package_dir / "OM2" / "points.csv"
+    csv = table_path(package_dir, "route_points", "csv")
     if csv.exists():
         return pd.read_csv(csv)
     return None
@@ -98,17 +100,17 @@ def _points_df(package_dir: Path) -> pd.DataFrame | None:
 def _shade_df(package_dir: Path, columns: list[str] | None = None) -> pd.DataFrame | None:
     """The shade table is parquet only (millions of rows); read only the
     columns a check needs."""
-    pq = package_dir / "p05_building_shade.parquet"
+    pq = table_path(package_dir, "building_shade", "parquet")
     return pd.read_parquet(pq, columns=columns) if pq.exists() else None
 
 
 def _quality_report(package_dir: Path) -> dict:
-    p = package_dir / "OM2" / "p07_quality_report.json"
+    p = table_path(package_dir, "quality_report", "json")
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
 
 
 def _dictionary_df(package_dir: Path) -> pd.DataFrame | None:
-    p = package_dir / "p08_data_dictionary.csv"
+    p = table_path(package_dir, "data_dictionary", "csv")
     return pd.read_csv(p) if p.exists() else None
 
 
@@ -176,12 +178,12 @@ def _previous_version_dir(package_dir: Path) -> Path | None:
 def _columns_part(name: str, package_dir: Path, cols: list[str], require_coverage: bool = True) -> PartResult:
     df = _points_df(package_dir)
     if df is None:
-        return PartResult(name, "pending", evidence="OM2/points table not found")
+        return PartResult(name, "pending", evidence="data/route_points table not found")
     missing = [c for c in cols if c not in df.columns]
     if missing:
-        return PartResult(name, "pending", evidence=f"OM2/points missing column(s): {', '.join(missing)}")
+        return PartResult(name, "pending", evidence=f"data/route_points missing column(s): {', '.join(missing)}")
     if not require_coverage:
-        return PartResult(name, "delivered", evidence=f"OM2/points has column(s): {', '.join(cols)}")
+        return PartResult(name, "delivered", evidence=f"data/route_points has column(s): {', '.join(cols)}")
     q = _quality_report(package_dir)
     qcols = q.get("columns", {})
     low = {}
@@ -194,11 +196,11 @@ def _columns_part(name: str, package_dir: Path, cols: list[str], require_coverag
     if low:
         return PartResult(
             name, "pending",
-            evidence=f"p07_quality_report.json coverage below {MIN_COVERAGE_FRACTION:.0%}: "
+            evidence=f"quality_report.json coverage below {MIN_COVERAGE_FRACTION:.0%}: "
                      + ", ".join(f"{c}={low[c]}" for c in low),
         )
     evidence = (
-        f"OM2/points columns {', '.join(cols)} present; p07_quality_report.json coverage >= "
+        f"data/route_points columns {', '.join(cols)} present; quality_report.json coverage >= "
         f"{MIN_COVERAGE_FRACTION:.0%}: " + ", ".join(f"{c}={covs[c]:.3f}" for c in cols)
     )
     return PartResult(name, "delivered", evidence=evidence)
@@ -232,15 +234,15 @@ def _descoped_part(name: str, evidence: str) -> PartResult:
 def _dictionary_rows_part(name: str, package_dir: Path, ids: list[str]) -> PartResult:
     df = _dictionary_df(package_dir)
     if df is None:
-        return PartResult(name, "pending", evidence="p08_data_dictionary.csv not found")
+        return PartResult(name, "pending", evidence="data_dictionary.csv not found")
     missing_cols = [c for c in _DICT_REQUIRED_COLS if c not in df.columns]
     if missing_cols:
-        return PartResult(name, "pending", evidence=f"p08_data_dictionary.csv missing column(s): {missing_cols}")
+        return PartResult(name, "pending", evidence=f"data_dictionary.csv missing column(s): {missing_cols}")
     present_ids = set(df["id"])
     missing_ids = [i for i in ids if i not in present_ids]
     if missing_ids:
-        return PartResult(name, "pending", evidence=f"p08_data_dictionary.csv missing row(s) for: {missing_ids}")
-    return PartResult(name, "delivered", evidence=f"p08_data_dictionary.csv has rows for {', '.join(ids)}")
+        return PartResult(name, "pending", evidence=f"data_dictionary.csv missing row(s) for: {missing_ids}")
+    return PartResult(name, "delivered", evidence=f"data_dictionary.csv has rows for {', '.join(ids)}")
 
 
 def _readme_heading_part(name: str, package_dir: Path, heading: str) -> PartResult:
@@ -269,28 +271,28 @@ def _changelog_entry_part(name: str, package_dir: Path) -> PartResult:
 def _dictionary_required_columns_part(name: str, package_dir: Path) -> PartResult:
     df = _dictionary_df(package_dir)
     if df is None:
-        return PartResult(name, "pending", evidence="p08_data_dictionary.csv not found")
+        return PartResult(name, "pending", evidence="data_dictionary.csv not found")
     missing = [c for c in _DICT_REQUIRED_COLS if c not in df.columns]
     if missing:
-        return PartResult(name, "pending", evidence=f"p08_data_dictionary.csv missing column(s): {missing}")
+        return PartResult(name, "pending", evidence=f"data_dictionary.csv missing column(s): {missing}")
     if len(df) == 0:
-        return PartResult(name, "pending", evidence="p08_data_dictionary.csv has the required columns but 0 rows")
+        return PartResult(name, "pending", evidence="data_dictionary.csv has the required columns but 0 rows")
     return PartResult(name, "delivered", evidence=f"{len(df)} rows, columns {_DICT_REQUIRED_COLS}")
 
 
 def _ids_never_reused_part(name: str, package_dir: Path) -> PartResult:
     df = _dictionary_df(package_dir)
     if df is None or "id" not in df.columns:
-        return PartResult(name, "pending", evidence="p08_data_dictionary.csv not found")
+        return PartResult(name, "pending", evidence="data_dictionary.csv not found")
     ids = df["id"].tolist()
     if len(set(ids)) != len(ids):
         dupes = sorted({i for i in ids if ids.count(i) > 1})
-        return PartResult(name, "pending", evidence=f"duplicate id(s) within p08_data_dictionary.csv: {dupes}")
+        return PartResult(name, "pending", evidence=f"duplicate id(s) within data_dictionary.csv: {dupes}")
     prev_dir = _previous_version_dir(package_dir)
     if prev_dir is None:
         return PartResult(
             name, "delivered",
-            evidence=f"{len(ids)} unique ids in p08_data_dictionary.csv (no prior version directory to compare against)",
+            evidence=f"{len(ids)} unique ids in data_dictionary.csv (no prior version directory to compare against)",
         )
     prev_df = _dictionary_df(prev_dir)
     if prev_df is None or "id" not in prev_df.columns:
@@ -310,7 +312,7 @@ def _ids_never_reused_part(name: str, package_dir: Path) -> PartResult:
 def _point_id_unique_part(name: str, package_dir: Path) -> PartResult:
     df = _points_df(package_dir)
     if df is None or "point_id" not in df.columns:
-        return PartResult(name, "pending", evidence="OM2/points table missing or has no point_id column")
+        return PartResult(name, "pending", evidence="data/route_points table missing or has no point_id column")
     ok_pattern = df["point_id"].astype(str).str.match(r"^OM2-\d{6}$").all()
     if df["point_id"].is_unique and ok_pattern:
         return PartResult(name, "delivered", evidence=f"{len(df)} point_id values, unique, matching OM2-###### pattern")
@@ -322,14 +324,14 @@ def _point_id_unique_part(name: str, package_dir: Path) -> PartResult:
 def _no_segments_imposed_part(name: str, package_dir: Path) -> PartResult:
     df = _points_df(package_dir)
     if df is None:
-        return PartResult(name, "pending", evidence="OM2/points table missing")
+        return PartResult(name, "pending", evidence="data/route_points table missing")
     if "segment_id" in df.columns:
         return PartResult(
             name, "pending",
-            evidence="OM2/points table carries a segment_id column — segments belong only in "
+            evidence="data/route_points table carries a segment_id column — segments belong only in "
                      "aggregate_to_segments.py's output, not the point table itself",
         )
-    return PartResult(name, "delivered", evidence="OM2/points table has no segment_id column")
+    return PartResult(name, "delivered", evidence="data/route_points table has no segment_id column")
 
 
 def _buffer_columns_part(name: str, package_dir: Path) -> PartResult:
@@ -340,24 +342,24 @@ def _buffer_columns_part(name: str, package_dir: Path) -> PartResult:
 
 
 def _building_shade_table_part(name: str, package_dir: Path) -> PartResult:
-    df = _shade_df(package_dir, ["timestamp_local", "date"]) if (package_dir / "p05_building_shade.parquet").exists() else None
+    df = _shade_df(package_dir, ["timestamp_local", "date"]) if table_path(package_dir, "building_shade", "parquet").exists() else None
     if df is None:
-        return PartResult(name, "pending", evidence="p05_building_shade table not found")
+        return PartResult(name, "pending", evidence="building_shade table not found")
     import pyarrow.parquet as pq
 
-    have = set(pq.read_schema(package_dir / "p05_building_shade.parquet").names)
+    have = set(pq.read_schema(table_path(package_dir, "building_shade", "parquet")).names)
     required = {"point_id", "timestamp_local", "timestamp_utc", "date", "sun_altitude_deg", "sun_azimuth_deg", "shaded"}
     missing = required - have
     if missing:
-        return PartResult(name, "pending", evidence=f"p05_building_shade missing column(s): {sorted(missing)}")
+        return PartResult(name, "pending", evidence=f"building_shade missing column(s): {sorted(missing)}")
     if len(df) == 0:
         return PartResult(
             name, "pending",
-            evidence="p05_building_shade has the correct schema but 0 rows",
+            evidence="building_shade has the correct schema but 0 rows",
         )
     local = pd.DatetimeIndex(df["timestamp_local"])
     offsets = {str(o) for o in (local.tz_localize(None) - local.tz_convert("UTC").tz_localize(None)).unique()}
-    return PartResult(name, "delivered", evidence=f"p05_building_shade: {len(df)} rows over {df['date'].nunique()} walk dates, "
+    return PartResult(name, "delivered", evidence=f"building_shade: {len(df)} rows over {df['date'].nunique()} walk dates, "
                                                   f"local-time offset(s) {sorted(offsets)}, schema {sorted(required)}")
 
 
@@ -372,7 +374,7 @@ _VENTILATION_IDS = [
 def _ventilation_labelled_proxy_part(name: str, package_dir: Path) -> PartResult:
     df = _dictionary_df(package_dir)
     if df is None:
-        return PartResult(name, "pending", evidence="p08_data_dictionary.csv not found")
+        return PartResult(name, "pending", evidence="data_dictionary.csv not found")
     missing, unlabelled = [], []
     for vid in _VENTILATION_IDS:
         hit = df[df["id"] == vid] if "id" in df.columns else df.iloc[0:0]
@@ -383,21 +385,21 @@ def _ventilation_labelled_proxy_part(name: str, package_dir: Path) -> PartResult
         if "PROXY" not in text:
             unlabelled.append(vid)
     if missing:
-        return PartResult(name, "pending", evidence=f"p08_data_dictionary.csv missing row(s): {missing}")
+        return PartResult(name, "pending", evidence=f"data_dictionary.csv missing row(s): {missing}")
     if unlabelled:
         return PartResult(name, "pending", evidence=f"dictionary row(s) not labelled PROXY: {unlabelled}")
     return PartResult(name, "delivered", evidence=f"all {len(_VENTILATION_IDS)} ventilation dictionary rows contain 'PROXY'")
 
 
 def _coverage_mask_part(name: str, package_dir: Path) -> PartResult:
-    j = package_dir / "OM2" / "p07_quality_report.json"
-    c = package_dir / "OM2" / "p07_quality_report.csv"
+    j = table_path(package_dir, "quality_report", "json")
+    c = table_path(package_dir, "quality_report", "csv")
     missing = [p.name for p in (j, c) if not p.exists()]
     if missing:
         return PartResult(name, "pending", evidence=f"missing: {missing}")
     q = _quality_report(package_dir)
     n_cols = len(q.get("columns", {}))
-    return PartResult(name, "delivered", evidence=f"p07_quality_report.json/.csv present, {n_cols} columns, n_points={q.get('n_points')}")
+    return PartResult(name, "delivered", evidence=f"quality_report.json/.csv present, {n_cols} columns, n_points={q.get('n_points')}")
 
 
 def _known_gaps_part(name: str, package_dir: Path) -> PartResult:
@@ -405,12 +407,12 @@ def _known_gaps_part(name: str, package_dir: Path) -> PartResult:
     pending_items = q.get("pending_items")
     descoped_items = q.get("descoped_items")
     if pending_items is None or descoped_items is None:
-        return PartResult(name, "pending", evidence="p07_quality_report.json lacks pending_items/descoped_items")
+        return PartResult(name, "pending", evidence="quality_report.json lacks pending_items/descoped_items")
     flagged = q.get("route_geometry_flagged_points")
     if not pending_items and not descoped_items and flagged is None:
-        return PartResult(name, "pending", evidence="p07_quality_report.json lists no known gaps")
+        return PartResult(name, "pending", evidence="quality_report.json lists no known gaps")
     if not pending_items and not descoped_items:
-        return PartResult(name, "delivered", evidence=f"p07_quality_report.json counts {flagged} flagged route points and per-column missing point ids")
+        return PartResult(name, "delivered", evidence=f"quality_report.json counts {flagged} flagged route points and per-column missing point ids")
     return PartResult(
         name, "delivered",
         evidence=f"pending_items: {pending_items}; descoped_items ({q.get('descoped_by')}): {descoped_items}",
@@ -420,9 +422,9 @@ def _known_gaps_part(name: str, package_dir: Path) -> PartResult:
 # ------------------------------------------------- P-10 / P-11 helpers --
 
 P10_COLUMNS = {
-    "p10_sun_envelope": ["point_id", "local_slot", "class", "sunlit_day_share", "n_days_sun_up"],
-    "p10_sun_dose": ["point_id", "scope", "local_slot", "dose_1h_wh_m2", "dose_2h_wh_m2", "dose_3h_wh_m2"],
-    "p10_horizon_profiles": ["point_id", "azimuth_deg", "horizon_deg"],
+    "sun_envelope": ["point_id", "local_slot", "class", "sunlit_day_share", "n_days_sun_up"],
+    "sun_dose": ["point_id", "scope", "local_slot", "dose_1h_wh_m2", "dose_2h_wh_m2", "dose_3h_wh_m2"],
+    "horizon_profiles": ["point_id", "azimuth_deg", "horizon_deg"],
 }
 P10_CLASSES = {"always_sunlit", "always_shaded", "date_dependent", "night"}
 P11_REGIME_COLUMNS = ["period", "regime_key", "name", "column_slug", "mean_direction_deg", "share", "mean_speed_ms",
@@ -449,10 +451,10 @@ P11_PROXY_STATIC_IDS = ["zd_macdonald_m", "open_space_fraction"]
 
 
 def _read_table(package_dir: Path, stem: str) -> pd.DataFrame | None:
-    pq = package_dir / f"{stem}.parquet"
+    pq = table_path(package_dir, stem, "parquet")
     if pq.exists():
         return pd.read_parquet(pq)
-    csv = package_dir / f"{stem}.csv"
+    csv = table_path(package_dir, stem, "csv")
     return pd.read_csv(csv) if csv.exists() else None
 
 
@@ -470,63 +472,63 @@ def _table_with_columns(name: str, package_dir: Path, stem: str, cols: list[str]
 
 
 def _both_formats_part(name: str, package_dir: Path, stems: list[str]) -> PartResult | None:
-    missing = [f"{s}.{ext}" for s in stems for ext in ("parquet", "csv") if not (package_dir / f"{s}.{ext}").exists()]
+    missing = [table(s, ext) for s in stems for ext in ("parquet", "csv") if not table_path(package_dir, s, ext).exists()]
     return PartResult(name, "pending", evidence=f"missing file(s): {', '.join(missing)}") if missing else None
 
 
 def _sun_envelope_part(name: str, package_dir: Path) -> PartResult:
-    bad = _both_formats_part(name, package_dir, ["p10_sun_envelope"])
+    bad = _both_formats_part(name, package_dir, ["sun_envelope"])
     if bad:
         return bad
-    if not (package_dir / "p10_horizon_profiles.parquet").exists():
-        return PartResult(name, "pending", evidence="missing file(s): p10_horizon_profiles.parquet")
-    env, bad = _table_with_columns(name, package_dir, "p10_sun_envelope", P10_COLUMNS["p10_sun_envelope"])
+    if not table_path(package_dir, "horizon_profiles", "parquet").exists():
+        return PartResult(name, "pending", evidence="missing file(s): horizon_profiles.parquet")
+    env, bad = _table_with_columns(name, package_dir, "sun_envelope", P10_COLUMNS["sun_envelope"])
     if bad:
         return bad
-    hor, bad = _table_with_columns(name, package_dir, "p10_horizon_profiles", P10_COLUMNS["p10_horizon_profiles"])
+    hor, bad = _table_with_columns(name, package_dir, "horizon_profiles", P10_COLUMNS["horizon_profiles"])
     if bad:
         return bad
     unknown = sorted(set(env["class"].unique()) - P10_CLASSES)
     if unknown:
-        return PartResult(name, "pending", evidence=f"p10_sun_envelope has unknown class value(s): {unknown}")
+        return PartResult(name, "pending", evidence=f"sun_envelope has unknown class value(s): {unknown}")
     pts = _points_df(package_dir)
     if pts is None:
-        return PartResult(name, "pending", evidence="OM2/points table not found")
+        return PartResult(name, "pending", evidence="data/route_points table not found")
     ids = set(pts["point_id"])
     if set(env["point_id"]) != ids or set(hor["point_id"]) != ids:
-        return PartResult(name, "pending", evidence="p10_sun_envelope / p10_horizon_profiles do not cover exactly the OM2 point_ids")
+        return PartResult(name, "pending", evidence="sun_envelope / horizon_profiles do not cover exactly the OM2 point_ids")
     day = env[env["class"] != "night"]
     share = float((day["class"] == "date_dependent").mean()) if len(day) else float("nan")
     return PartResult(
         name, "delivered",
-        evidence=f"p10_sun_envelope: {len(env)} rows over {len(ids)} points, {env['local_slot'].nunique()} local slots; "
-                 f"date_dependent share of daylight point-slots {share:.3f}; p10_horizon_profiles: {len(hor)} rows",
+        evidence=f"sun_envelope: {len(env)} rows over {len(ids)} points, {env['local_slot'].nunique()} local slots; "
+                 f"date_dependent share of daylight point-slots {share:.3f}; horizon_profiles: {len(hor)} rows",
     )
 
 
 def _sun_dose_part(name: str, package_dir: Path) -> PartResult:
-    if not (package_dir / "p10_sun_dose.parquet").exists():
-        return PartResult(name, "pending", evidence="missing file(s): p10_sun_dose.parquet")
-    dose, bad = _table_with_columns(name, package_dir, "p10_sun_dose", P10_COLUMNS["p10_sun_dose"])
+    if not table_path(package_dir, "sun_dose", "parquet").exists():
+        return PartResult(name, "pending", evidence="missing file(s): sun_dose.parquet")
+    dose, bad = _table_with_columns(name, package_dir, "sun_dose", P10_COLUMNS["sun_dose"])
     if bad:
         return bad
     scopes = set(dose["scope"].astype(str).unique())
     env_scopes = {"envelope_min", "envelope_median", "envelope_max"}
     dates = sorted(scopes - env_scopes)
     if not env_scopes <= scopes or not dates:
-        return PartResult(name, "pending", evidence=f"p10_sun_dose scopes {sorted(scopes)} lack the envelope statistics or a campaign date")
-    dcols = [c for c in P10_COLUMNS["p10_sun_dose"] if c.startswith("dose_")]
+        return PartResult(name, "pending", evidence=f"sun_dose scopes {sorted(scopes)} lack the envelope statistics or a campaign date")
+    dcols = [c for c in P10_COLUMNS["sun_dose"] if c.startswith("dose_")]
     if (dose[dcols] < 0).any().any():
-        return PartResult(name, "pending", evidence="p10_sun_dose has negative dose values")
+        return PartResult(name, "pending", evidence="sun_dose has negative dose values")
     return PartResult(
         name, "delivered",
-        evidence=f"p10_sun_dose: {len(dose)} rows; scopes = {len(dates)} campaign date(s) + {sorted(env_scopes)}; columns {dcols}",
+        evidence=f"sun_dose: {len(dose)} rows; scopes = {len(dates)} campaign date(s) + {sorted(env_scopes)}; columns {dcols}",
     )
 
 
 def regime_slugs(package_dir: Path) -> list[str]:
-    """Slugs of the campaign-season regimes, read off p11_wind_regimes.csv."""
-    p = package_dir / "p11_wind_regimes.csv"
+    """Slugs of the campaign-season regimes, read off wind_regimes.csv."""
+    p = table_path(package_dir, "wind_regimes", "csv")
     if not p.exists():
         return []
     df = pd.read_csv(p)
@@ -534,17 +536,17 @@ def regime_slugs(package_dir: Path) -> list[str]:
 
 
 def _wind_regimes_part(name: str, package_dir: Path) -> PartResult:
-    missing = [f for f in ("p11_wind_regimes.csv", "p11_regime_by_hour.csv") if not (package_dir / f).exists()]
+    missing = [table(k, "csv") for k in ("wind_regimes", "wind_regime_by_hour") if not table_path(package_dir, k, "csv").exists()]
     if missing:
         return PartResult(name, "pending", evidence=f"missing file(s): {', '.join(missing)}")
-    reg = pd.read_csv(package_dir / "p11_wind_regimes.csv")
-    hour = pd.read_csv(package_dir / "p11_regime_by_hour.csv")
-    for tab, cols, stem in ((reg, P11_REGIME_COLUMNS, "p11_wind_regimes"), (hour, P11_HOUR_COLUMNS, "p11_regime_by_hour")):
+    reg = pd.read_csv(table_path(package_dir, "wind_regimes", "csv"))
+    hour = pd.read_csv(table_path(package_dir, "wind_regime_by_hour", "csv"))
+    for tab, cols, stem in ((reg, P11_REGIME_COLUMNS, "wind_regimes"), (hour, P11_HOUR_COLUMNS, "wind_regime_by_hour")):
         gone = [c for c in cols if c not in tab.columns]
         if gone:
             return PartResult(name, "pending", evidence=f"{stem} missing column(s): {gone}")
     if set(reg["period"]) != {"campaign", "climatology"} or reg.groupby("period").size().ne(2).any():
-        return PartResult(name, "pending", evidence="p11_wind_regimes needs two regimes for each of campaign and climatology")
+        return PartResult(name, "pending", evidence="wind_regimes needs two regimes for each of campaign and climatology")
     mp = package_dir / "manifest.json"
     src = (json.loads(mp.read_text(encoding="utf-8")).get("provenance", {}).get("wind_source") if mp.exists() else None) or {}
     if not src.get("sha256") or not src.get("url"):
@@ -553,7 +555,7 @@ def _wind_regimes_part(name: str, package_dir: Path) -> PartResult:
     desc = ", ".join(f"{r['name']} {r['mean_direction_deg']:.0f} deg ({r['share']:.2f})" for _, r in camp.iterrows())
     return PartResult(
         name, "delivered",
-        evidence=f"p11_wind_regimes: campaign regimes {desc}; p11_regime_by_hour: {len(hour)} rows; "
+        evidence=f"wind_regimes: campaign regimes {desc}; wind_regime_by_hour: {len(hour)} rows; "
                  f"source sha256 in manifest.json provenance.wind_source ({src.get('station')}, 10 m)",
     )
 
@@ -561,14 +563,14 @@ def _wind_regimes_part(name: str, package_dir: Path) -> PartResult:
 def _regime_columns_part(name: str, package_dir: Path, key: str) -> PartResult:
     slugs = regime_slugs(package_dir)
     if not slugs:
-        return PartResult(name, "pending", evidence="p11_wind_regimes.csv not found or has no campaign regimes")
+        return PartResult(name, "pending", evidence="wind_regimes.csv not found or has no campaign regimes")
     return _columns_part(name, package_dir, [f"{P11_REGIME_STEMS[key]}_{sl}" for sl in slugs])
 
 
 def _p11_labelled_proxy_part(name: str, package_dir: Path) -> PartResult:
     df = _dictionary_df(package_dir)
     if df is None:
-        return PartResult(name, "pending", evidence="p08_data_dictionary.csv not found")
+        return PartResult(name, "pending", evidence="data_dictionary.csv not found")
     ids = [*P11_PROXY_STATIC_IDS, *(f"{stem}_{sl}" for sl in regime_slugs(package_dir) for stem in P11_REGIME_STEMS.values())]
     missing, unlabelled = [], []
     for vid in ids:
@@ -578,7 +580,7 @@ def _p11_labelled_proxy_part(name: str, package_dir: Path) -> PartResult:
         elif "PROXY" not in " ".join(str(hit.iloc[0].get(c, "")) for c in ("definition", "limits")).upper():
             unlabelled.append(vid)
     if missing:
-        return PartResult(name, "pending", evidence=f"p08_data_dictionary.csv missing row(s): {missing}")
+        return PartResult(name, "pending", evidence=f"data_dictionary.csv missing row(s): {missing}")
     if unlabelled:
         return PartResult(name, "pending", evidence=f"dictionary row(s) not labelled PROXY: {unlabelled}")
     return PartResult(name, "delivered", evidence=f"all {len(ids)} P-11 index dictionary rows contain 'PROXY'")
@@ -587,44 +589,44 @@ def _p11_labelled_proxy_part(name: str, package_dir: Path) -> PartResult:
 # ------------------------------------------------------------- P-12 --
 
 def _walks_part(name: str, package_dir: Path) -> PartResult:
-    bad = _both_formats_part(name, package_dir, ["p02b_walks"])
+    bad = _both_formats_part(name, package_dir, ["walks"])
     if bad:
         return bad
-    df, bad = _table_with_columns(name, package_dir, "p02b_walks", P12_WALK_COLUMNS)
+    df, bad = _table_with_columns(name, package_dir, "walks", P12_WALK_COLUMNS)
     if bad:
         return bad
     if not df["walk_id"].is_unique:
-        return PartResult(name, "pending", evidence="p02b_walks has duplicate walk_id values")
+        return PartResult(name, "pending", evidence="walks has duplicate walk_id values")
     for c in ("start_local", "end_local"):
         if not df[c].astype(str).str.match(_ISO_LOCAL).all():
-            return PartResult(name, "pending", evidence=f"p02b_walks.{c} is not Rio local ISO time with a -03:00 offset")
+            return PartResult(name, "pending", evidence=f"walks.{c} is not Rio local ISO time with a -03:00 offset")
     tagged = df["wind_regime"].value_counts().to_dict()
     return PartResult(
         name, "delivered",
-        evidence=f"p02b_walks: {len(df)} walks on {df['date'].nunique()} dates, {int(df['partial'].sum())} partial; "
+        evidence=f"walks: {len(df)} walks on {df['date'].nunique()} dates, {int(df['partial'].sum())} partial; "
                  f"wind regime tags {tagged}",
     )
 
 
 def _walk_points_part(name: str, package_dir: Path) -> PartResult:
-    bad = _both_formats_part(name, package_dir, ["p12_walk_points"])
+    bad = _both_formats_part(name, package_dir, ["walk_points"])
     if bad:
         return bad
-    df, bad = _table_with_columns(name, package_dir, "p12_walk_points", P12_POINT_COLUMNS)
+    df, bad = _table_with_columns(name, package_dir, "walk_points", P12_POINT_COLUMNS)
     if bad:
         return bad
     if (df["arrival_source"] == "outside_walk").any():
-        return PartResult(name, "pending", evidence="p12_walk_points still holds outside_walk rows")
+        return PartResult(name, "pending", evidence="walk_points still holds outside_walk rows")
     if df.duplicated(["walk_id", "point_id"]).any():
-        return PartResult(name, "pending", evidence="p12_walk_points has duplicate (walk_id, point_id) rows")
+        return PartResult(name, "pending", evidence="walk_points has duplicate (walk_id, point_id) rows")
     if not df["t_arrival_local"].astype(str).str.match(_ISO_LOCAL).all():
-        return PartResult(name, "pending", evidence="p12_walk_points.t_arrival_local is not Rio local ISO time with a -03:00 offset")
-    walks = _read_table(package_dir, "p02b_walks")
+        return PartResult(name, "pending", evidence="walk_points.t_arrival_local is not Rio local ISO time with a -03:00 offset")
+    walks = _read_table(package_dir, "walks")
     if walks is not None and not set(df["walk_id"]) <= set(walks["walk_id"]):
-        return PartResult(name, "pending", evidence="p12_walk_points holds walk_id values absent from p02b_walks")
+        return PartResult(name, "pending", evidence="walk_points holds walk_id values absent from walks")
     return PartResult(
         name, "delivered",
-        evidence=f"p12_walk_points: {len(df)} rows over {df['walk_id'].nunique()} walks and {df['point_id'].nunique()} points",
+        evidence=f"walk_points: {len(df)} rows over {df['walk_id'].nunique()} walks and {df['point_id'].nunique()} points",
     )
 
 
@@ -632,26 +634,26 @@ def _sensor_matched_part(name: str, package_dir: Path) -> PartResult:
     slugs = regime_slugs(package_dir)
     measures = [*P12_BASE_MEASURES, *(f"{st}_{sl}" for sl in slugs for st in P12_REGIME_MEASURE_STEMS)]
     cols = [f"{m}_tau{t}s" for m in measures for t in P12_TAUS_S]
-    df = _read_table(package_dir, "p12_walk_points")
+    df = _read_table(package_dir, "walk_points")
     if df is None:
-        return PartResult(name, "pending", evidence="p12_walk_points not found")
+        return PartResult(name, "pending", evidence="walk_points not found")
     missing = [c for c in cols if c not in df.columns]
     if missing or not slugs:
-        return PartResult(name, "pending", evidence=f"p12_walk_points missing sensor-matched column(s): {missing[:6]}")
+        return PartResult(name, "pending", evidence=f"walk_points missing sensor-matched column(s): {missing[:6]}")
     return PartResult(
         name, "delivered",
-        evidence=f"p12_walk_points has {len(cols)} sensor-matched columns ({len(measures)} measures x tau {list(P12_TAUS_S)} s)",
+        evidence=f"walk_points has {len(cols)} sensor-matched columns ({len(measures)} measures x tau {list(P12_TAUS_S)} s)",
     )
 
 
 def _walk_script_part(name: str, package_dir: Path) -> PartResult:
-    p = package_dir / "OM2" / "aggregate_to_segments.py"
+    p = package_dir / SCRIPTS["aggregate_to_segments"]
     if not p.exists():
-        return PartResult(name, "pending", evidence="missing file(s): OM2/aggregate_to_segments.py")
+        return PartResult(name, "pending", evidence="missing file(s): scripts/aggregate_to_segments.py")
     text = p.read_text(encoding="utf-8")
     if "--by" not in text or "--tau" not in text:
-        return PartResult(name, "pending", evidence="OM2/aggregate_to_segments.py lacks --by or --tau")
-    return PartResult(name, "delivered", evidence="OM2/aggregate_to_segments.py accepts --by (e.g. walk_id) and --tau")
+        return PartResult(name, "pending", evidence="scripts/aggregate_to_segments.py lacks --by or --tau")
+    return PartResult(name, "delivered", evidence="scripts/aggregate_to_segments.py accepts --by (e.g. walk_id) and --tau")
 
 
 # ------------------------------------------------------------------ SPEC --
@@ -678,7 +680,7 @@ SPEC: list[dict] = [
                        "imposed, so Jingxue keeps control of segment length.",
         "parts": [
             {"name": "points_table_all_formats", "check": lambda pd_: _file_exists_part(
-                "points_table_all_formats", pd_, ["OM2/points.gpkg", "OM2/points.parquet", "OM2/points.csv"],
+                "points_table_all_formats", pd_, [table("route_points", e) for e in ("gpkg", "parquet", "csv")],
             )},
             {"name": "stable_point_id_unique", "check": lambda pd_: _point_id_unique_part("stable_point_id_unique", pd_)},
             {"name": "no_segments_imposed_on_points", "check": lambda pd_: _no_segments_imposed_part("no_segments_imposed_on_points", pd_)},
@@ -692,7 +694,7 @@ SPEC: list[dict] = [
         "parts": [
             {"name": "buffer_columns_5_10_20_50m", "check": lambda pd_: _buffer_columns_part("buffer_columns_5_10_20_50m", pd_)},
             {"name": "segment_script_shipped_in_package", "check": lambda pd_: _file_exists_part(
-                "segment_script_shipped_in_package", pd_, ["OM2/aggregate_to_segments.py"],
+                "segment_script_shipped_in_package", pd_, [SCRIPTS["aggregate_to_segments"]],
             )},
         ],
     },
@@ -718,7 +720,7 @@ SPEC: list[dict] = [
         "parts": [
             {"name": "building_shade_table", "check": lambda pd_: _building_shade_table_part("building_shade_table", pd_)},
             {"name": "join_example_script_shipped_in_package", "check": lambda pd_: _file_exists_part(
-                "join_example_script_shipped_in_package", pd_, ["OM2/join_shade_example.py"],
+                "join_example_script_shipped_in_package", pd_, [SCRIPTS["join_shade_example"]],
             )},
         ],
     },

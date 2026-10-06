@@ -207,7 +207,7 @@ def test_conformance_rows_and_markdown_render_without_error():
 
 def _copy_package(tmp_path: Path) -> Path:
     dest = tmp_path / "_packages" / "mare_om2" / VERSION
-    shutil.copytree(PACKAGE_DIR, dest, ignore=shutil.ignore_patterns("p10_sun_dose.csv", "p10_sun_envelope.csv", "p12_walk_points.csv"))
+    shutil.copytree(PACKAGE_DIR, dest, ignore=shutil.ignore_patterns("sun_dose.csv", "sun_envelope.csv", "walk_points.csv"))
     shutil.copytree(internal_dir_for(PACKAGE_DIR), internal_dir_for(dest))
     return dest
 
@@ -222,12 +222,12 @@ def test_sabotage_drop_ventilation_column_flips_p06_delivered_to_partial(tmp_pat
     p06_before = next(it for it in before["items"] if it["id"] == "P-06")
     assert p06_before["status"] == "delivered"
 
-    points_path = copy_dir / "OM2" / "points.parquet"
+    points_path = copy_dir / "data" / "route_points.parquet"
     df = pd.read_parquet(points_path)
     assert "ventilation_openness_proxy" in df.columns
     df = df.drop(columns=["ventilation_openness_proxy"])
     df.to_parquet(points_path, index=False)
-    (copy_dir / "OM2" / "points.csv").write_text(df.to_csv(index=False))
+    (copy_dir / "data" / "route_points.csv").write_text(df.to_csv(index=False))
 
     after = conformance(copy_dir)
     p06_after = next(it for it in after["items"] if it["id"] == "P-06")
@@ -244,7 +244,7 @@ def test_sabotage_drop_building_height_flips_p04_part_but_stays_partial(tmp_path
     assert before_part["status"] == "delivered"
     assert p04_before["status"] == "delivered"
 
-    points_path = copy_dir / "OM2" / "points.parquet"
+    points_path = copy_dir / "data" / "route_points.parquet"
     df = pd.read_parquet(points_path).drop(columns=["building_height_m"])
     df.to_parquet(points_path, index=False)
 
@@ -280,27 +280,27 @@ def test_sabotage_missing_changelog_entry_flips_p09_delivered_to_pending(tmp_pat
 
 @pytestmark_real
 def test_shipped_aggregate_to_segments_runs_from_inside_package(tmp_path):
-    script = PACKAGE_DIR / "OM2" / "aggregate_to_segments.py"
+    script = PACKAGE_DIR / "scripts" / "aggregate_to_segments.py"
     assert script.exists(), "P-03 script not shipped inside the built package"
     out = tmp_path / "segments_20m.parquet"
     result = subprocess.run(
-        [sys.executable, str(script), "--points", str(PACKAGE_DIR / "OM2" / "points.parquet"),
+        [sys.executable, str(script), "--points", str(PACKAGE_DIR / "data" / "route_points.parquet"),
          "--segment-m", "20", "--out", str(out)],
         capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr
     assert out.exists()
     segments = pd.read_parquet(out)
-    points = pd.read_parquet(PACKAGE_DIR / "OM2" / "points.parquet")
+    points = pd.read_parquet(PACKAGE_DIR / "data" / "route_points.parquet")
     assert int(segments["n_points"].sum()) == len(points)
 
 
 @pytestmark_real
 def test_shipped_join_shade_example_runs_from_inside_package(tmp_path):
-    script = PACKAGE_DIR / "OM2" / "join_shade_example.py"
+    script = PACKAGE_DIR / "scripts" / "join_shade_example.py"
     assert script.exists(), "P-05 join example not shipped inside the built package"
 
-    shade = pd.read_parquet(PACKAGE_DIR / "p05_building_shade.parquet")
+    shade = pd.read_parquet(PACKAGE_DIR / "data" / "building_shade.parquet")
     slice_ = shade.head(20).copy()
     shade_path = tmp_path / "shade_slice.parquet"
     slice_.to_parquet(shade_path, index=False)
@@ -417,7 +417,7 @@ def test_shipped_aggregate_to_segments_matches_library_function_on_built_package
     from src.om_package.segments import aggregate_to_segments as library_fn
 
     shipped = _load_shipped_module("aggregate_to_segments")
-    df = pd.read_parquet(PACKAGE_DIR / "OM2" / "points.parquet")
+    df = pd.read_parquet(PACKAGE_DIR / "data" / "route_points.parquet")
 
     lib_out = library_fn(df, 20.0)
     shipped_out = shipped.aggregate_to_segments(df, 20.0)
@@ -449,6 +449,6 @@ def test_real_package_has_no_descoped_parts():
 
 @pytestmark_real
 def test_no_descoped_id_appears_as_pending_in_built_package():
-    q = json.loads((PACKAGE_DIR / "OM2" / "p07_quality_report.json").read_text(encoding="utf-8"))
+    q = json.loads((PACKAGE_DIR / "data" / "quality_report.json").read_text(encoding="utf-8"))
     assert q["pending_items"] == []
     assert q["descoped_items"] == []

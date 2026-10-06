@@ -5,9 +5,9 @@ one segment.
 
 Run:
     python scripts/aggregate_om_points.py \\
-        --points outputs/_packages/mare_om2/v0.1/OM2/points.parquet \\
+        --points outputs/_packages/mare_om2/v1.0.0/data/route_points.parquet \\
         --segment-length-m 20 \\
-        --out outputs/_packages/mare_om2/v0.1/OM2/segments_20m.parquet
+        --out outputs/_packages/mare_om2/v1.0.0/segments_20m.parquet
 """
 from __future__ import annotations
 

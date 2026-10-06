@@ -1,5 +1,5 @@
-"""Shipped walk tables for OM2: p02b_walks (one row per logger walk) and
-p12_walk_points (one row per walk and route point the walk reached).
+"""Shipped walk tables for OM2: walks (one row per logger walk) and
+walk_points (one row per walk and route point the walk reached).
 
 Times: loggers record UTC; Rio local time is America/Sao_Paulo (UTC-3, no
 DST). Shipped time columns are ISO 8601 strings, ``*_local`` with the -03:00
@@ -41,7 +41,7 @@ def iso_utc(t) -> pd.Series:
 
 
 def walks_table(walks: pd.DataFrame, tags: pd.DataFrame) -> pd.DataFrame:
-    """p02b_walks: walk timing and coverage plus the airport-wind regime tag."""
+    """walks: walk timing and coverage plus the airport-wind regime tag."""
     w = walks.merge(tags, on="walk_id", how="left")
     out = pd.DataFrame({
         "walk_id": w["walk_id"],
@@ -94,7 +94,7 @@ def walk_points_table(points: pd.DataFrame, fixes: pd.DataFrame, walks: pd.DataF
                       horizons: pd.DataFrame, horizon_deg: np.ndarray, azimuths_deg: np.ndarray, *,
                       regime_measures: list[str], lat: float, lon: float,
                       taus=DEFAULT_TAUS_S) -> pd.DataFrame:
-    """p12_walk_points. One row per (walk, point) with an arrival time
+    """walk_points. One row per (walk, point) with an arrival time
     (outside_walk rows are dropped): arrival time, whether the point was
     shaded then, the clear-sky direct dose in the 1 h and 3 h before arrival,
     and for each measure its sensor-matched value at every tau in ``taus``.

@@ -1,7 +1,7 @@
 """OM2 report figures, part 2: wind regimes and ventilation.
 
-Filenames are the contract with the report text (written under OM2/):
-fig_wind, fig_vent_profiles, fig_shelter_maps. Regime colours come from
+Filenames are the contract with the report text (src/om_package/layout.py
+FIG, written under figures/): wind, vent_profiles, shelter_maps. Regime colours come from
 wind_regimes.REGIME_COLOURS; every ventilation measure is a geometry-derived
 proxy, the wind is airport (Galeao) reports.
 """

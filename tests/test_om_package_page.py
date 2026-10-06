@@ -130,7 +130,7 @@ def test_render_page_contains_expected_links_and_numbers():
     assert M.OPS_LINK in html_str
     assert M.PAPER_LINK in html_str
     version = M.latest_version(PACKAGE_ROOT)
-    quality = M.load_json(PACKAGE_ROOT / version / "OM2" / "p07_quality_report.json")
+    quality = M.load_json(PACKAGE_ROOT / version / "data" / "quality_report.json")
     assert f'<strong>{quality["route_geometry_flagged_points"]}</strong>' in html_str
     for item in quality["pending_items"]:
         assert item in html_str
@@ -188,8 +188,8 @@ def test_deck_links_are_the_only_unresolved_exception():
 def test_gallery_shows_every_figure_and_spec_table_is_behind_a_toggle():
     version = M.latest_version(PACKAGE_ROOT)
     page = M.render_page(DEFAULT_ROOT)
-    for png in (PACKAGE_ROOT / version / "OM2").glob("*.png"):
-        assert re.search(rf'<figure class="tile"><a href="{re.escape(version)}/OM2/{re.escape(png.name)}"[^>]*zoom\(', page), png.name
+    for png in (PACKAGE_ROOT / version / "figures").glob("*.png"):
+        assert re.search(rf'<figure class="tile"><a href="{re.escape(version)}/figures/{re.escape(png.name)}"[^>]*zoom\(', page), png.name
     assert f"What's new in {version}" in page
     spec = page.split('<section id="conformance">', 1)[1].split("</section>", 1)[0]
     assert spec.index("<details") < spec.index("<table")

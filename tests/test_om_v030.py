@@ -24,19 +24,19 @@ INTERNAL = internal_dir_for(PKG)
 real = pytest.mark.skipif(not PKG.is_dir(), reason=f"mare_om2 {VERSION} package not built at the default root")
 
 NEW_FILES = [
-    "p02b_walks.parquet", "p02b_walks.csv", "p05_building_shade.parquet",
-    "p10_sun_envelope.parquet", "p10_sun_envelope.csv", "p10_sun_dose.parquet",
-    "p10_horizon_profiles.parquet", "p11_wind_regimes.csv", "p11_regime_by_hour.csv",
-    "p12_walk_points.parquet", "p12_walk_points.csv",
+    "data/walks.parquet", "data/walks.csv", "data/building_shade.parquet",
+    "data/sun_envelope.parquet", "data/sun_envelope.csv", "data/sun_dose.parquet",
+    "data/horizon_profiles.parquet", "data/wind_regimes.csv", "data/wind_regime_by_hour.csv",
+    "data/walk_points.parquet", "data/walk_points.csv",
 ]
 REMOVED_FILES = ["p10_clock_agreement.parquet", "p10_clock_agreement.csv", "p11_wind_observed.csv",
-                 "p05b_campaign_windows.parquet", "p05b_campaign_windows.csv", "p05_building_shade.csv"]
+                 "p05b_campaign_windows.parquet", "p05b_campaign_windows.csv", "building_shade.csv"]
 INTERNAL_ONLY = ["CHANGELOG.md", "p00_spec_conformance.json", "p00_spec_conformance.csv", "p00_disclosure_hits.txt"]
 TAUS = (5, 10, 30, 60)
 
 
 def _slugs():
-    reg = pd.read_csv(PKG / "p11_wind_regimes.csv")
+    reg = pd.read_csv(PKG / "data" / "wind_regimes.csv")
     return reg.loc[reg["period"] == "campaign", "column_slug"].tolist()
 
 
@@ -44,6 +44,25 @@ def _slugs():
 @pytest.mark.parametrize("name", NEW_FILES)
 def test_new_file_present(name):
     assert (PKG / name).stat().st_size > 0
+
+
+@real
+def test_layout_has_no_om2_folder_and_no_spec_prefixed_names():
+    assert not (PKG / "OM2").exists()
+    leftovers = [p.relative_to(PKG).as_posix() for p in PKG.rglob("*")
+                 if re.match(r"p\d\d", p.name)]
+    assert not leftovers, leftovers
+
+
+@real
+def test_shipped_tree_matches_layout_module():
+    from src.om_package import layout
+    shipped = {p.relative_to(PKG).as_posix() for p in PKG.rglob("*") if p.is_file()}
+    expected = {f"figures/{n}" for n in layout.FIG.values()} | {layout.FIGURE_FACTS, *layout.SCRIPTS.values()}
+    assert expected <= shipped
+    top = {"report.md", "report.pdf", "README.md", "README.pdf", "manifest.json"}
+    assert {p for p in shipped if "/" not in p} == top
+    assert {p.split("/")[0] for p in shipped} == top | {"data", "figures", "scripts"}
 
 
 @real
@@ -60,7 +79,7 @@ def test_internal_files_are_written_beside_the_package(name):
 
 @real
 def test_regime_point_columns_named_by_regime_slug():
-    df = pd.read_parquet(PKG / "OM2" / "points.parquet")
+    df = pd.read_parquet(PKG / "data" / "route_points.parquet")
     assert len(_slugs()) == 2
     assert not [c for c in df.columns if "prevailing" in c]
     for sl in _slugs():
@@ -75,8 +94,8 @@ def test_regime_point_columns_named_by_regime_slug():
 
 @real
 def test_walks_table_local_time_and_tags():
-    w = pd.read_parquet(PKG / "p02b_walks.parquet")
-    names = set(pd.read_csv(PKG / "p11_wind_regimes.csv").query("period == 'campaign'")["name"])
+    w = pd.read_parquet(PKG / "data" / "walks.parquet")
+    names = set(pd.read_csv(PKG / "data" / "wind_regimes.csv").query("period == 'campaign'")["name"])
     assert w["walk_id"].is_unique and len(w) == 63
     assert w["start_local"].str.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}-03:00$").all()
     assert w["start_utc"].str.endswith("Z").all()
@@ -86,8 +105,8 @@ def test_walks_table_local_time_and_tags():
 
 @real
 def test_walk_points_shape_values_and_no_outside_rows():
-    p = pd.read_parquet(PKG / "p12_walk_points.parquet")
-    walks = pd.read_parquet(PKG / "p02b_walks.parquet")
+    p = pd.read_parquet(PKG / "data" / "walk_points.parquet")
+    walks = pd.read_parquet(PKG / "data" / "walks.parquet")
     assert (p["arrival_source"] != "outside_walk").all() and set(p["walk_id"]) <= set(walks["walk_id"])
     assert not p.duplicated(["walk_id", "point_id"]).any()
     assert p["t_arrival_local"].str.endswith("-03:00").all()
@@ -98,56 +117,56 @@ def test_walk_points_shape_values_and_no_outside_rows():
             assert f"{m}_tau{t}s" in p.columns
     sh = p["shaded_at_arrival_tau5s"].dropna()
     assert sh.between(-1e-9, 1 + 1e-9).all()
-    pts = pd.read_parquet(PKG / "OM2" / "points.parquet").set_index("point_id")
+    pts = pd.read_parquet(PKG / "data" / "route_points.parquet").set_index("point_id")
     assert set(p["point_id"]) <= set(pts.index)
 
 
 @real
 def test_shipped_aggregate_runs_by_walk_with_tau(tmp_path):
     out = tmp_path / "seg.parquet"
-    r = subprocess.run([sys.executable, str(PKG / "OM2" / "aggregate_to_segments.py"),
-                        "--points", str(PKG / "p12_walk_points.parquet"), "--by", "walk_id",
+    r = subprocess.run([sys.executable, str(PKG / "scripts" / "aggregate_to_segments.py"),
+                        "--points", str(PKG / "data" / "walk_points.parquet"), "--by", "walk_id",
                         "--segment-m", "20", "--tau", "30", "--out", str(out)], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     seg = pd.read_parquet(out)
-    p = pd.read_parquet(PKG / "p12_walk_points.parquet")
+    p = pd.read_parquet(PKG / "data" / "walk_points.parquet")
     assert int(seg["n_points"].sum()) == len(p) and seg["walk_id"].nunique() == p["walk_id"].nunique()
     assert not [c for c in seg.columns if c.endswith("_tau5s")] and "sky_view_factor_tau30s" in seg.columns
 
 
 @real
 def test_regime_tables():
-    reg = pd.read_csv(PKG / "p11_wind_regimes.csv")
+    reg = pd.read_csv(PKG / "data" / "wind_regimes.csv")
     assert set(reg["period"]) == {"campaign", "climatology"}
     assert reg.groupby("period")["share"].sum().round(6).eq(1.0).all()
-    hour = pd.read_csv(PKG / "p11_regime_by_hour.csv")
+    hour = pd.read_csv(PKG / "data" / "wind_regime_by_hour.csv")
     assert sorted(hour["local_hour"].unique()) == list(range(24))
     assert hour.groupby(["period", "local_hour"])["share"].sum().round(6).eq(1.0).all()
 
 
 @real
 def test_shade_is_local_daylight_only():
-    sh = pd.read_parquet(PKG / "p05_building_shade.parquet", columns=["timestamp_local", "timestamp_utc", "sun_altitude_deg", "date"])
+    sh = pd.read_parquet(PKG / "data" / "building_shade.parquet", columns=["timestamp_local", "timestamp_utc", "sun_altitude_deg", "date"])
     assert (sh["sun_altitude_deg"] > 0).all()
     assert str(sh["timestamp_local"].dt.tz) == "America/Sao_Paulo"
     assert (sh["timestamp_local"].dt.tz_convert("UTC") == sh["timestamp_utc"]).all()
-    walk_dates = set(pd.read_parquet(PKG / "p02b_walks.parquet")["date"].astype(str))
+    walk_dates = set(pd.read_parquet(PKG / "data" / "walks.parquet")["date"].astype(str))
     assert set(sh["date"].astype(str).unique()) == walk_dates
 
 
 @real
 def test_every_shipped_table_column_has_a_dictionary_row():
-    ids = set(pd.read_csv(PKG / "p08_data_dictionary.csv")["id"])
+    ids = set(pd.read_csv(PKG / "data" / "data_dictionary.csv")["id"])
     tables = {
-        "OM2/points": pd.read_parquet(PKG / "OM2" / "points.parquet"),
-        "p05_building_shade": pd.read_parquet(PKG / "p05_building_shade.parquet").head(10),
-        "p02b_walks": pd.read_parquet(PKG / "p02b_walks.parquet"),
-        "p10_sun_envelope": pd.read_parquet(PKG / "p10_sun_envelope.parquet").head(10),
-        "p10_sun_dose": pd.read_parquet(PKG / "p10_sun_dose.parquet").head(10),
-        "p10_horizon_profiles": pd.read_parquet(PKG / "p10_horizon_profiles.parquet").head(10),
-        "p11_wind_regimes": pd.read_csv(PKG / "p11_wind_regimes.csv"),
-        "p11_regime_by_hour": pd.read_csv(PKG / "p11_regime_by_hour.csv"),
-        "p12_walk_points": pd.read_parquet(PKG / "p12_walk_points.parquet").head(10),
+        "route_points": pd.read_parquet(PKG / "data" / "route_points.parquet"),
+        "building_shade": pd.read_parquet(PKG / "data" / "building_shade.parquet").head(10),
+        "walks": pd.read_parquet(PKG / "data" / "walks.parquet"),
+        "sun_envelope": pd.read_parquet(PKG / "data" / "sun_envelope.parquet").head(10),
+        "sun_dose": pd.read_parquet(PKG / "data" / "sun_dose.parquet").head(10),
+        "horizon_profiles": pd.read_parquet(PKG / "data" / "horizon_profiles.parquet").head(10),
+        "wind_regimes": pd.read_csv(PKG / "data" / "wind_regimes.csv"),
+        "wind_regime_by_hour": pd.read_csv(PKG / "data" / "wind_regime_by_hour.csv"),
+        "walk_points": pd.read_parquet(PKG / "data" / "walk_points.parquet").head(10),
     }
     for name, df in tables.items():
         missing = [c for c in df.columns if c not in ids and c != "geometry"]
@@ -156,7 +175,7 @@ def test_every_shipped_table_column_has_a_dictionary_row():
 
 @real
 def test_dictionary_rows_complete_ventilation_proxy_and_retired_rows_kept():
-    d = pd.read_csv(PKG / "p08_data_dictionary.csv").set_index("id")
+    d = pd.read_csv(PKG / "data" / "data_dictionary.csv").set_index("id")
     for col in ("definition", "unit", "source", "method", "limits", "status"):
         assert d[col].notna().all(), col
     for sl in _slugs():
@@ -179,7 +198,7 @@ def test_conformance_delivered_for_p10_p11_p12():
 
 @real
 def test_no_pending_items_in_conformance():
-    q = json.loads((PKG / "OM2" / "p07_quality_report.json").read_text())
+    q = json.loads((PKG / "data" / "quality_report.json").read_text())
     assert q["pending_items"] == []
     assert q["descoped_items"] == []
 
@@ -200,7 +219,7 @@ def test_manifest_hashes_verify_and_cover_only_shipped_files():
 
 @real
 def test_no_clock_sensitivity_left_in_shipped_text():
-    for name in ("README.md", "p08_data_dictionary.csv"):
+    for name in ("README.md", "data/data_dictionary.csv"):
         text = (PKG / name).read_text(encoding="utf-8")
         for needle in ("OCTOPUS_TZ", "UNRESOLVED", "device clock UNKNOWN", "clock_agreement"):
             hits = [ln for ln in text.splitlines() if needle in ln and "RETIRED" not in ln and "no longer" not in ln]
@@ -209,8 +228,8 @@ def test_no_clock_sensitivity_left_in_shipped_text():
 
 @real
 def test_sensible_sizes_and_route_count():
-    pts = pd.read_parquet(PKG / "OM2" / "points.parquet")
-    q = json.loads((PKG / "OM2" / "p07_quality_report.json").read_text())
+    pts = pd.read_parquet(PKG / "data" / "route_points.parquet")
+    q = json.loads((PKG / "data" / "quality_report.json").read_text())
     assert q["n_points"] == len(pts) and q["route_geometry_flagged_points"] == int(pts["route_geometry_flag"].sum())
 
 
@@ -224,8 +243,8 @@ def test_older_package_directories_untouched():
 @real
 def test_shipped_aggregate_default_segment_is_10m(tmp_path):
     out = tmp_path / "seg.parquet"
-    r = subprocess.run([sys.executable, str(PKG / "OM2" / "aggregate_to_segments.py"),
-                        "--points", str(PKG / "OM2" / "points.parquet"), "--out", str(out)],
+    r = subprocess.run([sys.executable, str(PKG / "scripts" / "aggregate_to_segments.py"),
+                        "--points", str(PKG / "data" / "route_points.parquet"), "--out", str(out)],
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     seg = pd.read_parquet(out)

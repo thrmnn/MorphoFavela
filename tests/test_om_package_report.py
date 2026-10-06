@@ -22,7 +22,7 @@ DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
 PACKAGE_DIR = DEFAULT_ROOT / "outputs" / "_packages" / "mare_om2" / VERSION
 
 pytestmark = pytest.mark.skipif(
-    not (PACKAGE_DIR / "p12_walk_points.parquet").is_file(),
+    not (PACKAGE_DIR / "data" / "walk_points.parquet").is_file(),
     reason=f"mare_om2 {VERSION} package not built at the default root",
 )
 
@@ -97,20 +97,20 @@ def test_project_named_only_in_parenthetical_form(report_md, readme_md):
 def test_no_forbidden_strings(report_md, readme_md, token):
     pat = token if token.startswith("\\b") else re.escape(token)
     from src.om_package.package_docs import VERSION
-    body = re.sub(r"\(OM2/fig_\w+\.png\)", "", report_md).replace(f"Version {VERSION}", "")
+    body = re.sub(r"\(figures/fig\w+\.png\)", "", report_md).replace(f"Version {VERSION}", "")
     assert not re.search(pat, body), token
     assert not re.search(pat, _prose(readme_md).replace(VERSION, "")), token
 
 
 def test_every_figure_embedded_once_in_order(report_md):
-    hits = re.findall(r"!\[Figure (\d+)\. [^\]]+\]\(OM2/(fig_\w+\.png)\)", report_md)
+    hits = re.findall(r"!\[Figure (\d+)\. [^\]]+\]\(figures/(fig\d+_\w+\.png)\)", report_md)
     assert [name for _n, name in hits] == [name for name in FIGURES]
     assert [int(n) for n, _name in hits] == list(range(1, len(FIGURES) + 1))
 
 
 def test_each_figure_cited_before_it_appears(report_md):
     for i, name in enumerate(FIGURES, start=1):
-        image = report_md.index(f"](OM2/{name})")
+        image = report_md.index(f"](figures/{name})")
         assert re.search(rf"Figure {i}\b(?!\.)", report_md[:image]), name
 
 
@@ -176,7 +176,7 @@ def test_file_table_lists_every_shipped_data_file(report_md):
     for f in PACKAGE_DIR.rglob("*"):
         rel = f.relative_to(PACKAGE_DIR).as_posix()
         if f.is_file() and not rel.endswith(".png") and not rel.startswith(("README", "report", "_")) \
-                and rel != "OM2/figure_facts.json":
+                and rel != "figures/figure_facts.json":
             assert f"`{rel.rsplit('.', 1)[0]}" in table or f"`{rel}`" in table, rel
 
 
@@ -231,9 +231,9 @@ def test_readme_lists_every_column_of_every_data_table(readme_md):
     import pandas as pd
 
     cols = readme_md.split("## Columns", 1)[1].split("## Manifest", 1)[0]
-    for col in pd.read_parquet(PACKAGE_DIR / "p02b_walks.parquet").columns:
+    for col in pd.read_parquet(PACKAGE_DIR / "data" / "walks.parquet").columns:
         assert f"`{col}`" in cols, col
-    for col in pd.read_parquet(PACKAGE_DIR / "OM2" / "points.parquet").columns:
+    for col in pd.read_parquet(PACKAGE_DIR / "data" / "route_points.parquet").columns:
         assert f"`{col}`" in cols, col
 
 

@@ -7,13 +7,14 @@ internal (name not starting with '_') and renders, from files already on
 disk (never recomputed, never guessed), in reading order (PI, 2026-10-01:
 "clear hierarchy"):
 
-  - header: version + build time; one action row (Download report (PDF)
-    primary; results slides, slide preview and technical README secondary);
+  - header: version + build time; one action row (Download full package
+    (ZIP) primary; report PDF, results slides, slide preview and technical
+    README secondary);
     use-terms callout with the team-release badge (independent of BRISA
     release_class)
   - what's new in this version, its numbers read from manifest.json
   - spec: status counts, the full conformance table behind a toggle
-  - figure gallery: every OM2/*.png with a caption, click to enlarge
+  - figure gallery: every figures/*.png with a caption, click to enlarge
   - files: data files and documents
   - for the PI and the technical reader: the open release decision (linked
     to brisaverse's /ops), what the team owes, quality, campaign windows,
@@ -41,6 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pandas as pd  # noqa: E402
 
 import hubkit  # noqa: E402
+from src.om_package import layout  # noqa: E402
 from src.om_package.figures import SEGMENT_LENGTH_M as SEGMENT_M  # noqa: E402
 from src.om_package.routes import ROUTE_FLAG_MAX_STREET_DIST_M  # noqa: E402
 from src.om_package.spec import internal_dir_for  # noqa: E402
@@ -141,7 +143,7 @@ def load_json(path: Path) -> dict | None:
 
 
 def load_dictionary_rows(version_dir: Path) -> list[dict]:
-    csv_path = version_dir / "p08_data_dictionary.csv"
+    csv_path = layout.table_path(version_dir, "data_dictionary", "csv")
     if not csv_path.exists():
         return []
     with csv_path.open(newline="", encoding="utf-8") as f:
@@ -225,7 +227,7 @@ def _shade_step_min(version_dir: Path) -> int:
     """Time step of the P-05 shade table, read from its timestamps."""
     import pyarrow.parquet as pq
 
-    t = pq.ParquetFile(version_dir / "p05_building_shade.parquet").read_row_group(0, columns=["timestamp_utc"]).to_pandas()["timestamp_utc"]
+    t = pq.ParquetFile(layout.table_path(version_dir, "building_shade", "parquet")).read_row_group(0, columns=["timestamp_utc"]).to_pandas()["timestamp_utc"]
     return int(pd.Series(sorted(t.unique())).diff().min() / pd.Timedelta(minutes=1))
 
 
@@ -256,7 +258,7 @@ def render_page(root: Path) -> str:
         raise SystemExit(f"no version directory under {package_root} — run scripts/build_om_package.py first")
     version_dir = package_root / version
     manifest = load_json(version_dir / "manifest.json") or {}
-    quality_path = version_dir / "OM2" / "p07_quality_report.json"
+    quality_path = layout.table_path(version_dir, "quality_report", "json")
     quality = load_json(quality_path) or {}
     q = quality_summary(quality)
     dict_rows = load_dictionary_rows(version_dir)
@@ -278,9 +280,14 @@ def render_page(root: Path) -> str:
 
     # --- one action row: the report first, everything else secondary -----
     actions = []
+    zip_path = package_zip_path(version_dir)
+    if zip_path.exists():
+        zip_mb = zip_path.stat().st_size / 1e6
+        actions.append(f'<span class="btn primary"><a href="{_rel_to(package_root, zip_path)}" '
+                       f'download="{html.escape(zip_path.name)}">Download full package (ZIP, {zip_mb:.0f} MB)</a></span>')
     if pdf_path.exists():
-        actions.append(f'<span class="btn primary"><a href="{pdf_rel}" download="{html.escape(pdf_download)}">'
-                       'Download report (PDF)</a></span>')
+        actions.append(f'<span class="btn{"" if zip_path.exists() else " primary"}"><a href="{pdf_rel}" '
+                       f'download="{html.escape(pdf_download)}">Download report (PDF)</a></span>')
     actions.append(f'<span class="btn"><a href="{DECK_PDF}">Results slides (PDF)</a></span>')
     actions.append(f'<span class="btn"><a href="{DECK_PREVIEW}" target="_blank" rel="noopener">View slides</a></span>')
     if readme_pdf_path.exists():
@@ -318,7 +325,7 @@ def render_page(root: Path) -> str:
         f"<strong>Walks</strong>: {manifest['walks']['n_walks']} logger walks on {manifest['walks']['n_dates']} dates, with an arrival "
         "time at every route point and sensor-matched values.",
     ]
-    n_figs = len(sorted((version_dir / "OM2").glob("*.png")))
+    n_figs = len(sorted((version_dir / layout.FIGURES_DIR).glob("*.png")))
     new_items.append(f"<strong>A shorter report</strong> with all {n_figs} figures and a README reorganised for scanning.")
     new_html = f"""
 <section id="new">
@@ -373,25 +380,25 @@ def render_page(root: Path) -> str:
     # --- figure gallery: every figure, caption says what to look at ---------
     n_dates = p05.get("n_campaign_dates") or 0
     gallery_spec = [
-        ("fig_route.png", "The route", "The OM2 route over the Maré buildings, with distance marks every 250 m and the neighbourhoods it crosses."),
-        ("fig_form.png", "Street form along the route",
+        (layout.FIG["route"], "The route", "The OM2 route over the Maré buildings, with distance marks every 250 m and the neighbourhoods it crosses."),
+        (layout.FIG["form"], "Street form along the route",
          f"Building height, height-to-width ratio, sky view factor and plan area density; grey = every metre, black = {SEGMENT_M} m means."),
-        ("fig_shade_map.png", "Building shade on the walk dates",
+        (layout.FIG["shade_map"], "Building shade on the walk dates",
          f"Share of daylight each point spends in direct sun over the {n_dates} walk dates (lighter = more sun)."),
-        ("fig_shade_calendar.png", "Shade by date and time of day",
+        (layout.FIG["shade_calendar"], "Shade by date and time of day",
          "Share of route points in direct sun, one row per walk date, by time of day (Rio local time)."),
-        ("fig_sun_dose.png", "Direct sun before each walk",
+        (layout.FIG["sun_dose"], "Direct sun before each walk",
          "Clear-sky direct sun in the 1 and 3 hours before each walk reached each point, one row per walk."),
-        ("fig_wind.png", "Wind regimes", "Wind direction at Galeão airport for the campaign season and 2015 to 2024, and each regime by hour of day."),
-        ("fig_vent_profiles.png", "Ventilation along the route", "Windward frontal area density, canyon alignment and upwind shelter angle for both wind regimes."),
-        ("fig_shelter_maps.png", "Upwind shelter angle maps", "Upwind shelter angle per point for each wind regime, on one colour scale."),
-        ("fig_svf_sensor.png", "Sensor-matched sky view factor", "Sky view factor at 1 m and as a slow sensor on one walk would see it."),
-        ("fig_vent_schematic.png", "How the ventilation measures are drawn", "Frontal area density, canyon alignment and upwind shelter angle, and the three flow regimes across a street."),
-        ("fig_flags.png", "Flagged points", "Route points inside building outlines or away from a mapped street, by class, with the repaired positions."),
+        (layout.FIG["wind"], "Wind regimes", "Wind direction at Galeão airport for the campaign season and 2015 to 2024, and each regime by hour of day."),
+        (layout.FIG["vent_profiles"], "Ventilation along the route", "Windward frontal area density, canyon alignment and upwind shelter angle for both wind regimes."),
+        (layout.FIG["shelter_maps"], "Upwind shelter angle maps", "Upwind shelter angle per point for each wind regime, on one colour scale."),
+        (layout.FIG["svf_sensor"], "Sensor-matched sky view factor", "Sky view factor at 1 m and as a slow sensor on one walk would see it."),
+        (layout.FIG["vent_schematic"], "How the ventilation measures are drawn", "Frontal area density, canyon alignment and upwind shelter angle, and the three flow regimes across a street."),
+        (layout.FIG["flags"], "Flagged points", "Route points inside building outlines or away from a mapped street, by class, with the repaired positions."),
     ]
     tiles = []
     for name, title, caption in gallery_spec:
-        path = version_dir / "OM2" / name
+        path = version_dir / layout.FIGURES_DIR / name
         if not path.exists():
             raise FileNotFoundError(f"gallery figure missing from {version_dir.name}: {path}")
         rel = _rel_to(package_root, path)
@@ -417,26 +424,25 @@ def render_page(root: Path) -> str:
     dash_version = "/morphofavela-dash/" + version_dir.relative_to(root).as_posix()
     readme_view = f"/doc?src={dash_version}/README.md"
     manifest_rel = _rel_to(package_root, version_dir / "manifest.json")
-    dict_rel = _rel_to(package_root, version_dir / "p08_data_dictionary.csv")
+    dict_rel = _rel_to(package_root, layout.table_path(version_dir, "data_dictionary", "csv"))
     panel_rel = _rel_to(package_root, package_root / PANEL_PAGE_NAME)
 
     data_files = [
-        ("OM2/points.parquet", "route points, one row per metre (GeoParquet)"),
-        ("OM2/points.gpkg", "route points (GeoPackage)"),
-        ("OM2/points.csv", "route points (CSV)"),
-        ("p05_building_shade.parquet", f"building shade per point and {_shade_step_min(version_dir)}-min step, campaign dates"),
-        ("p02b_walks.csv", "one row per logger walk: timing, coverage, wind regime"),
-        ("p12_walk_points.parquet", "arrival time, shade, dose and sensor-matched values per walk and point"),
-        ("p10_sun_envelope.parquet", "sun class per point and local time of day over the season"),
-        ("p10_sun_envelope.csv", "sun envelope (CSV)"),
-        ("p10_sun_dose.parquet", f"clear-sky direct-sun dose, {'/'.join(map(str, p10['dose_hours']))} h"),
-        ("p10_sun_dose.csv", "sun dose (CSV)"),
-        ("p10_horizon_profiles.parquet", "horizon angle per point and azimuth"),
-        ("p11_wind_regimes.csv", "the two wind regimes, campaign season and climatology"),
-        ("p11_regime_by_hour.csv", "regime share by local hour"),
-        ("p08_data_dictionary.csv", "data dictionary"),
-        ("OM2/aggregate_to_segments.py", "re-aggregate the points to any segment length"),
-        ("OM2/join_shade_example.py", "example join of device data to the shade table"),
+        (layout.table("route_points", "parquet"), "route points, one row per metre (GeoParquet)"),
+        (layout.table("route_points", "gpkg"), "route points (GeoPackage)"),
+        (layout.table("route_points", "csv"), "route points (CSV)"),
+        (layout.table("building_shade", "parquet"), f"building shade per point and {_shade_step_min(version_dir)}-min step, campaign dates"),
+        (layout.table("walks", "csv"), "one row per logger walk: timing, coverage, wind regime"),
+        (layout.table("walk_points", "parquet"), "arrival time, shade, dose and sensor-matched values per walk and point"),
+        (layout.table("sun_envelope", "parquet"), "sun class per point and local time of day over the season"),
+        (layout.table("sun_envelope", "csv"), "sun envelope (CSV)"),
+        (layout.table("sun_dose", "parquet"), f"clear-sky direct-sun dose, {'/'.join(map(str, p10['dose_hours']))} h"),
+        (layout.table("horizon_profiles", "parquet"), "horizon angle per point and azimuth"),
+        (layout.table("wind_regimes", "csv"), "the two wind regimes, campaign season and climatology"),
+        (layout.table("wind_regime_by_hour", "csv"), "regime share by local hour"),
+        (layout.table("data_dictionary", "csv"), "data dictionary"),
+        (layout.SCRIPTS["aggregate_to_segments"], "re-aggregate the points to any segment length"),
+        (layout.SCRIPTS["join_shade_example"], "example join of device data to the shade table"),
     ]
     data_files_html = "".join(
         f'<li><a href="{_rel_to(package_root, version_dir / label)}"><code>{html.escape(label)}</code></a>'
@@ -494,14 +500,14 @@ def render_page(root: Path) -> str:
   nearest street centreline).</p>
   <details><summary>{len(below_rows)} column(s) below 100% coverage; pending and descoped items</summary>
   {_table(["Column", "Coverage", "Valid / total"], below_rows) if below_rows else "<p class='sub'>None.</p>"}
-  <p>Pending items (from <code>p07_quality_report.json</code>):</p>
+  <p>Pending items (from <code>quality_report.json</code>):</p>
   <ul>{pending_html or "<li class='sub'>None.</li>"}</ul>
   <p>Descoped items (deliberate cut by decision <code>{html.escape(q["descoped_by"])}</code>, not gaps):</p>
   <ul>{descoped_html or "<li class='sub'>None.</li>"}</ul>
   </details>
 </section>"""
 
-    walks_csv = version_dir / "p02b_walks.csv"
+    walks_csv = layout.table_path(version_dir, "walks", "csv")
     windows_rows = []
     if walks_csv.exists():
         with walks_csv.open(newline="", encoding="utf-8") as fh:
@@ -592,6 +598,29 @@ def render_page(root: Path) -> str:
         body,
         provenance=prov,
     )
+
+
+def package_zip_path(version_dir: Path) -> Path:
+    """The whole version directory as one download, next to it (outside the
+    directory, so manifest.json never has to hash the archive of itself)."""
+    return version_dir.parent / f"octopus_om2_{version_dir.name}.zip"
+
+
+def write_package_zip(version_dir: Path) -> Path:
+    """Zip every shipped file of version_dir under a top folder
+    octopus_om2_<version>/; build temporaries (names starting with '_') stay out."""
+    import zipfile
+
+    out = package_zip_path(version_dir)
+    tmp = out.with_suffix(".zip.part")
+    top = out.stem
+    with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for f in sorted(version_dir.rglob("*")):
+            rel = f.relative_to(version_dir)
+            if f.is_file() and not any(part.startswith("_") for part in rel.parts):
+                zf.write(f, f"{top}/{rel.as_posix()}")
+    tmp.replace(out)
+    return out
 
 
 def build_panel_page(root: Path) -> Path | None:

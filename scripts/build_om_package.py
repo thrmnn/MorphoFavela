@@ -26,10 +26,10 @@ Builds, per requested route:
        src/om_package/shade.py) — OM2/shared package only
   P-10 sun exposure over the season: envelope, dose, horizon profiles,
        annual_sun_hours
-  P-11 two SBGL wind regimes (p11_wind_regimes, p11_regime_by_hour) and the
+  P-11 two SBGL wind regimes (wind_regimes, wind_regime_by_hour) and the
        ventilation point columns at each regime (all PROXIES from building
        geometry)
-  P-12 walks (p02b_walks) and per-walk point values (p12_walk_points)
+  P-12 walks (walks) and per-walk point values (walk_points)
   P-07 quality report (counts route_geometry_flag)
   P-08 data dictionary — OM2/shared package only
   contact sheet PNG (OM2 only)
@@ -85,7 +85,8 @@ from src.om_package.formvars import compute_street_orientation_deg
 from src.om_package.vent_schematic import build_fig_vent_schematic
 from src.om_package.vent_figures import build_fig_shelter_maps, build_fig_vent_profiles, build_fig_wind
 from src.om_package.formvars import compute_form_variables
-from src.om_package.io_utils import Paths, hash_tree, write_table
+from src.om_package import layout
+from src.om_package.io_utils import Paths, hash_tree, write_package_table, write_table
 from src.om_package.neighbourhoods import communities_crossed, join_communities
 from src.om_package.package_docs import DATA_CREDIT, USE_TERMS, VERSION, render_changelog, render_readme
 from src.om_package import p10_p11, walk_tables
@@ -106,7 +107,7 @@ from src.om_package.sun_envelope import ENVELOPE_SLOT_MIN, route_centroid_latlon
 from src.om_package.ventilation import compute_ventilation_proxies
 from src.om_package.wind_obs import WINDOW_END, WINDOW_START, cache_paths as wind_cache_paths, fetch_sbgl
 
-from build_om_package_page import build_page as build_om_package_page
+from build_om_package_page import build_page as build_om_package_page, write_package_zip
 
 ALL_ROUTES = ["OM_1", "OM_2", "OM_3", "OM_4"]
 CRS = "EPSG:31983"
@@ -212,9 +213,9 @@ def write_disclosure_hits(out_dir: Path, internal_dir: Path) -> Path:
     INTERNAL directory. Hits are reported, never stripped; disclosure is the
     PI's call, not this script's."""
     targets = [
-        (out_dir, "README.md"), (internal_dir, "CHANGELOG.md"), (out_dir, "p08_data_dictionary.csv"),
+        (out_dir, "README.md"), (internal_dir, "CHANGELOG.md"), (out_dir, layout.table("data_dictionary", "csv")),
         (out_dir, "report.md"), (internal_dir, "p00_spec_conformance.csv"),
-        (out_dir, "OM2/aggregate_to_segments.py"), (out_dir, "OM2/join_shade_example.py"),
+        (out_dir, layout.SCRIPTS["aggregate_to_segments"]), (out_dir, layout.SCRIPTS["join_shade_example"]),
     ]
     hits: list[str] = []
     for base, name in targets:
@@ -272,8 +273,12 @@ def build_one_route(om: str, paths: Paths, out_dir: Path, radii=BUFFER_RADII_M, 
             joined_with_buf, repair[0], repair[1], points, compute_form_variables(points, paths))
         joined_with_buf["geometry"] = points.geometry.to_numpy()
 
-    route_dir = out_dir / om.replace("OM_", "OM")
-    written = write_table(joined_with_buf, route_dir, "points", geo=True)
+    if om == "OM_2":
+        written = write_package_table(joined_with_buf, out_dir, "route_points", geo=True)
+        route_dir = out_dir / layout.DATA_DIR
+    else:
+        route_dir = out_dir / om.replace("OM_", "OM")
+        written = write_table(joined_with_buf, route_dir, layout.INTERNAL_POINTS_STEM, geo=True)
 
     variable_cols = [c for c in joined_with_buf.columns if c not in ("point_id", "route_id", "seq", "distance_along_m", "height_m", "geometry")]
     quality = write_quality_report(joined_with_buf, variable_cols, route_dir, extra=quality_extra)
@@ -321,7 +326,7 @@ def main() -> int:
     ap.add_argument("--geometry-epoch", default=DEFAULT_GEOMETRY_EPOCH, help="label of the geometry epoch, for README + manifest")
     ap.add_argument("--window-start", default=WINDOW_START, help="P-10 season window start (default: the SBGL cache window)")
     ap.add_argument("--window-end", default=WINDOW_END, help="P-10 season window end")
-    ap.add_argument("--dose-slot-min", type=int, default=p10_p11.DEFAULT_DOSE_SLOT_MIN, help="slot grid of p10_sun_dose, minutes")
+    ap.add_argument("--dose-slot-min", type=int, default=p10_p11.DEFAULT_DOSE_SLOT_MIN, help="slot grid of sun_dose, minutes")
     ap.add_argument("--device", default="cuda", help="torch device for the horizon march")
     ap.add_argument("--skip-page", action="store_true", help="do not rebuild the shared package page (index.html)")
     args = ap.parse_args()
@@ -339,6 +344,11 @@ def main() -> int:
     routes = ALL_ROUTES if route_sel == "ALL" else [f"OM_{route_sel[2:]}"]
 
     if "OM_2" in routes:
+        # A rebuild of a version must not leave files of an earlier layout behind.
+        for sub in (layout.DATA_DIR, layout.FIGURES_DIR, layout.SCRIPTS_DIR, "OM2"):
+            shutil.rmtree(out_dir / sub, ignore_errors=True)
+        for legacy in out_dir.glob("p[0-9][0-9]*"):
+            legacy.unlink()
         out_dir.mkdir(parents=True, exist_ok=True)
         pkg_internal_dir.mkdir(parents=True, exist_ok=True)
     if any(r != "OM_2" for r in routes):
@@ -377,7 +387,7 @@ def main() -> int:
 
     def om2_extras(points_gdf):
         """P-10/P-11 inputs and the new point columns, from ONE horizon
-        march that P-05 shade and p12 reuse below."""
+        march that the shade table and walk_points reuse below."""
         print(f"[build_om_package] P-10/P-11: horizon march on {args.device} ({len(points_gdf)} points) ...")
         horizon_deg, horizon_az, horizon_tab = p10_p11.horizon_arrays_and_table(points_gdf, paths, device=args.device)
         lat, lon = route_centroid_latlon(points_gdf)
@@ -414,7 +424,7 @@ def main() -> int:
         if om == "OM_2":
             ctx["repair_facts"] = result.pop("repair_facts")
             manifest["routes"].append(result)
-            om2_df = pd.read_parquet(route_out_dir / "OM2" / "points.parquet")
+            om2_df = pd.read_parquet(layout.table_path(route_out_dir, "route_points", "parquet"))
         else:
             print("  (internal-only, not part of the shared package)")
         print(f"  length_m={result['length_m']:.1f} n_points={result['n_points']} communities={result['communities_crossed']}")
@@ -450,7 +460,7 @@ def main() -> int:
     print(f"[build_om_package] P-05: shade on {len(walk_dates)} walk dates ...")
     shade_summary, shade_fig = compute_shade_local(
         om2_df["point_id"], walk_dates, SHADE_STEP_MIN, lat, lon, LOCAL_TZ, horizon_deg, horizon_az,
-        out_dir / "p05_building_shade.parquet",
+        layout.table_path(out_dir, "building_shade", "parquet"),
     )
     n_campaign_dates = shade_summary["n_dates"]
     n_shade_rows = shade_summary["n_rows"]
@@ -461,26 +471,26 @@ def main() -> int:
 
     # P-10 / P-11 package-root tables (computed in om2_extras above).
     sun = ctx["sun"]
-    write_table(sun["envelope"], out_dir, "p10_sun_envelope")
-    sun["dose"].to_parquet(out_dir / "p10_sun_dose.parquet", index=False)  # parquet only: the CSV was 234 MB
-    (out_dir / "p10_sun_dose.csv").unlink(missing_ok=True)
-    ctx["horizon_tab"].to_parquet(out_dir / "p10_horizon_profiles.parquet", index=False)
+    write_package_table(sun["envelope"], out_dir, "sun_envelope")
+    sun["dose"].to_parquet(layout.table_path(out_dir, "sun_dose", "parquet"), index=False)  # parquet only: the CSV was 234 MB
+    layout.table_path(out_dir, "sun_dose", "csv").unlink(missing_ok=True)
+    ctx["horizon_tab"].to_parquet(layout.table_path(out_dir, "horizon_profiles", "parquet"), index=False)
     regimes_tbl = p10_p11.wind_regimes_table(season)
-    regimes_tbl.to_csv(out_dir / "p11_wind_regimes.csv", index=False)
+    regimes_tbl.to_csv(layout.table_path(out_dir, "wind_regimes", "csv"), index=False)
     by_hour_tbl = p10_p11.regime_by_hour_table(season, paths.root)
-    by_hour_tbl.to_csv(out_dir / "p11_regime_by_hour.csv", index=False)
+    by_hour_tbl.to_csv(layout.table_path(out_dir, "wind_regime_by_hour", "csv"), index=False)
 
     # P-12: walks and per-walk point values.
     tags = tag_walks(walks_df, load_campaign(paths.root), season["campaign"])
     walks_tbl = walk_tables.walks_table(walks_df, tags)
-    write_table(walks_tbl, out_dir, "p02b_walks")
+    write_package_table(walks_tbl, out_dir, "walks")
     regime_measures = [f"{stem}_{g['slug']}" for g in regimes for stem in p10_p11.REGIME_MEASURE_STEMS]
     t12 = time.time()
     p12 = walk_tables.walk_points_table(
         om2_df, ctx["fixes"], walks_df, ctx["horizon_tab"], horizon_deg, horizon_az,
         regime_measures=regime_measures, lat=lat, lon=lon,
     )
-    write_table(p12, out_dir, "p12_walk_points")
+    write_package_table(p12, out_dir, "walk_points")
     print(f"[build_om_package] P-12: {len(walks_tbl)} walks, {len(p12)} walk-point rows ({time.time() - t12:.0f} s); "
           f"walks tagged: {walks_tbl['wind_regime'].value_counts().to_dict()}")
     print(
@@ -490,52 +500,49 @@ def main() -> int:
 
     # P-08: data dictionary (package-wide, not per-route). OM2/shared only.
     dict_df = dictionary_dataframe(regimes=regimes)
-    write_table(dict_df, out_dir, "p08_data_dictionary")
+    write_package_table(dict_df, out_dir, "data_dictionary")
 
     # Figures. The ventilation figures and the report figure list are the
     # report lane's to redo for two regimes.
-    (out_dir / "OM2" / "contact_sheet.png").unlink(missing_ok=True)
-    for stale in ("map_vent_shelter.png", "profiles_vent.png", "wind_rose_compare.png"):
-        (out_dir / "OM2" / stale).unlink(missing_ok=True)
     try:
         buildings = gpd.read_file(paths.buildings_mare)
     except Exception as exc:  # pragma: no cover - missing source is a build-config error, not a figure bug
         print(f"[build_om_package] WARNING: could not load buildings_mare ({exc}); figures will ship without the building base layer")
         buildings = None
 
-    fig_dir = out_dir / "OM2"
-    for stale in ("map_form.png", "map_shade.png", "profiles.png", "shade_calendar.png", "sun_envelope.png", "sun_dose.png"):
-        (fig_dir / stale).unlink(missing_ok=True)
+    fig_dir = out_dir / layout.FIGURES_DIR
+    fig_dir.mkdir(parents=True, exist_ok=True)
     del shade_fig
-    shade_full = load_shade_frame(out_dir / "p05_building_shade.parquet")
+    shade_full = load_shade_frame(layout.table_path(out_dir, "building_shade", "parquet"))
     route_total_m = float(om2_df["distance_along_m"].max())
     facts: dict = {"route_length_m": route_total_m, "n_points": int(len(om2_df)),
                    **fs_style.flag_facts(fs_style.flagged_spans(om2_df))}
-    build_fig_route(om2_df, buildings, fig_dir / "fig_route.png")
-    build_fig_form(om2_df, fig_dir / "fig_form.png")
-    build_fig_shade_map(om2_df, shade_full, buildings, fig_dir / "fig_shade_map.png")
-    _, facts["shade_calendar"] = build_fig_shade_calendar(shade_full, fig_dir / "fig_shade_calendar.png")
-    _, facts["sun_dose"] = build_fig_sun_dose(walks_tbl, p12, route_total_m, fig_dir / "fig_sun_dose.png")
+    build_fig_route(om2_df, buildings, fig_dir / layout.FIG["route"])
+    build_fig_form(om2_df, fig_dir / layout.FIG["form"])
+    build_fig_shade_map(om2_df, shade_full, buildings, fig_dir / layout.FIG["shade_map"])
+    _, facts["shade_calendar"] = build_fig_shade_calendar(shade_full, fig_dir / layout.FIG["shade_calendar"])
+    _, facts["sun_dose"] = build_fig_sun_dose(walks_tbl, p12, route_total_m, fig_dir / layout.FIG["sun_dose"])
     _, facts["wind"] = build_fig_wind(season, load_campaign(paths.root), load_climatology(paths.root), by_hour_tbl,
-                                      fig_dir / "fig_wind.png")
-    build_fig_vent_profiles(om2_df, regimes, fig_dir / "fig_vent_profiles.png")
-    _, facts["shelter_maps"] = build_fig_shelter_maps(om2_df, regimes, buildings, fig_dir / "fig_shelter_maps.png")
-    _, facts["svf_sensor"] = build_fig_svf_sensor(om2_df, walks_tbl, p12, fig_dir / "fig_svf_sensor.png")
-    build_fig_vent_schematic(fig_dir / "fig_vent_schematic.png",
+                                      fig_dir / layout.FIG["wind"])
+    build_fig_vent_profiles(om2_df, regimes, fig_dir / layout.FIG["vent_profiles"])
+    _, facts["shelter_maps"] = build_fig_shelter_maps(om2_df, regimes, buildings, fig_dir / layout.FIG["shelter_maps"])
+    _, facts["svf_sensor"] = build_fig_svf_sensor(om2_df, walks_tbl, p12, fig_dir / layout.FIG["svf_sensor"])
+    build_fig_vent_schematic(fig_dir / layout.FIG["vent_schematic"],
                              route_median_ratio=float(om2_df["height_width_ratio"].median()))
-    build_fig_flags(ctx["repair"][0], buildings, ctx["repair_fixes"], fig_dir / "fig_flags.png")
+    build_fig_flags(ctx["repair"][0], buildings, ctx["repair_fixes"], fig_dir / layout.FIG["flags"])
     facts["flags"] = ctx["repair_facts"]
-    (fig_dir / "figure_facts.json").write_text(json.dumps(facts, indent=2, default=float))
+    (out_dir / layout.FIGURE_FACTS).write_text(json.dumps(facts, indent=2, default=float))
     print(f"[build_om_package] figures written to {fig_dir} (representative walk for the sensor figure: {facts['svf_sensor']['walk_id']})")
     del shade_full
 
     # The aggregation script and the shade join example travel INSIDE the
     # package, so a recipient with only this directory can re-aggregate (also
-    # p12_walk_points per walk, --by walk_id) and exercise the join example.
+    # walk_points per walk, --by walk_id) and exercise the join example.
     shipped_dir = Path(__file__).resolve().parents[1] / "src" / "om_package" / "shipped"
-    for shipped_name in ("aggregate_to_segments.py", "join_shade_example.py"):
-        shutil.copyfile(shipped_dir / shipped_name, out_dir / "OM2" / shipped_name)
-    print(f"[build_om_package] shipped P-03/P-05 scripts into {out_dir / 'OM2'}")
+    for rel in layout.SCRIPTS.values():
+        (out_dir / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(shipped_dir / Path(rel).name, out_dir / rel)
+    print(f"[build_om_package] shipped scripts into {out_dir / layout.SCRIPTS_DIR}")
 
     n_om2_points = len(om2_df)
     n_route_geometry_flagged = int(om2_df["route_geometry_flag"].sum())
@@ -636,6 +643,9 @@ def main() -> int:
         f"[build_om_package] route_geometry_flag: {n_route_geometry_flagged}/{n_om2_points} OM2 points flagged; "
         f"lambda_p=1.0 explained by flag: {n_lambda_p_ones_flagged}/{n_lambda_p_ones} ({lambda_p_share_explained_pct}%)"
     )
+
+    zip_path = write_package_zip(out_dir)
+    print(f"[build_om_package] wrote {zip_path} ({zip_path.stat().st_size / 1e6:.0f} MB)")
 
     if args.skip_page:
         print("[build_om_package] --skip-page: shared package page (index.html) not rebuilt")

@@ -56,7 +56,7 @@ def coverage_report(df: pd.DataFrame, variable_cols: list[str], extra: dict | No
     return report
 
 
-def write_quality_report(df: pd.DataFrame, variable_cols: list[str], out_dir: Path, stem: str = "p07_quality_report",
+def write_quality_report(df: pd.DataFrame, variable_cols: list[str], out_dir: Path, stem: str = "quality_report",
                          extra: dict | None = None):
     report = coverage_report(df, variable_cols, extra)
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -283,7 +283,9 @@ def _octopus_contact_sheet() -> list[Path]:
     route overlaid on the favela buildings; contact_sheet.png was retired
     2026-09-27 in favour of src/om_package/figures.py's four figures."""
     pkg = _newest_om2_package()
-    return [pkg / "OM2" / "map_form.png"] if pkg else []
+    sys.path.insert(0, str(ROOT))
+    from src.om_package import layout
+    return [layout.fig_path(pkg, "form")] if pkg else []
 
 
 def _has_pandoc() -> bool:
@@ -345,7 +347,7 @@ def _render_csv_table(src: Path, dest: Path, title: str) -> bool:
 
 
 def _summarize_quality_report(src: Path) -> str:
-    """A short table from OM2/p07_quality_report.json: n_points plus per-column
+    """A short table from data/quality_report.json: n_points plus per-column
     coverage. Not a copy of the JSON — a PI-readable digest of it."""
     if not src.exists():
         return ""
@@ -363,7 +365,7 @@ def _summarize_quality_report(src: Path) -> str:
                     f'<td>{cov_s}</td></tr>')
     if not rows:
         return ""
-    return (f'<p>{n} OM2 points. Per-column coverage from p07_quality_report.json:</p>'
+    return (f'<p>{n} OM2 points. Per-column coverage from quality_report.json:</p>'
             '<table style="border-collapse:collapse;font-size:13px;margin-bottom:8px">'
             '<tr><th style="text-align:left;padding:2px 10px">column</th>'
             '<th style="text-align:left;padding:2px 10px">valid/total</th>'
@@ -390,14 +392,14 @@ def _octopus_extra(section_out: Path) -> str | None:
     for src, dest, title, label in docs:
         if _render_markdown_file(src, dest, title):
             links.append((f"{section_out.name}/{dest.name}", label))
-    if _render_csv_table(pkg / "p08_data_dictionary.csv", section_out / "data_dictionary.html",
+    if _render_csv_table(pkg / "data" / "data_dictionary.csv", section_out / "data_dictionary.html",
                           "OM2 data dictionary"):
-        links.append((f"{section_out.name}/data_dictionary.html", "data dictionary (p08)"))
+        links.append((f"{section_out.name}/data_dictionary.html", "data dictionary"))
 
     if links:
         parts.append('<p>' + " · ".join(f'<a href="{href}">{label}</a>' for href, label in links) + '</p>')
 
-    quality_html = _summarize_quality_report(pkg / "OM2" / "p07_quality_report.json")
+    quality_html = _summarize_quality_report(pkg / "data" / "quality_report.json")
     if quality_html:
         parts.append('<h3 style="font-size:15px;margin:18px 0 4px">P-07 quality report</h3>' + quality_html)
 
