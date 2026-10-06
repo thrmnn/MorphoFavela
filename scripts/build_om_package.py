@@ -2,9 +2,10 @@
 """Build the "Maré morphology, OM2" data package — Octopus LRP #2
 ("Street by street: explaining air temperature differences across streets
 and over time in Complexo da Maré", lead Jingxue, PI Simone). Théo is part
-of the Octopus team. The package gives street form, sun and wind measures and
-a first look at pairing them with the walk temperature readings; the
-temperature analysis itself is led by Jingxue.
+of the Octopus team. The package gives street form, sun and wind measures;
+the temperature analysis is led by Jingxue. The temperature pairing first
+look (src/om_package/temp_pairing.py, fig_temp.py) is kept out of the build
+since v1.0.0 (PI 2026-10-06: held for a later version).
 
 Release scope (PI ruling 2026-09-24): the SHARED package path
 (outputs/_packages/mare_om2/<version>/) contains OM2 only. OM1/OM3/OM4
@@ -487,17 +488,6 @@ def main() -> int:
         f"horizon {len(ctx['horizon_tab'])} rows, regimes {len(regimes_tbl)} rows, by-hour {len(by_hour_tbl)} rows"
     )
 
-    # P-13: temperature pairing, on the rebuilt points (repaired positions, facade width, height).
-    from src.om_package import fig_temp, temp_pairing, wind_obs
-
-    t13 = time.time()
-    if not wind_obs.temp_cache_paths(paths.root)[0].exists():
-        print("[build_om_package] SBGL temperature cache missing, fetching from the Iowa ASOS archive ...")
-        wind_obs.fetch_sbgl_temperature(paths.root, args.window_start, args.window_end)
-    temp_pairing.run(out_dir, matched_dir, paths.route_json("OM_2"), paths.root / "data" / "maré" / "octopus" / "fixed_loggers",
-                     airport_temperature=wind_obs.load_temperature_obs(paths.root))
-    print(f"[build_om_package] P-13: temperature pairing written ({time.time() - t13:.0f} s)")
-
     # P-08: data dictionary (package-wide, not per-route). OM2/shared only.
     dict_df = dictionary_dataframe(regimes=regimes)
     write_table(dict_df, out_dir, "p08_data_dictionary")
@@ -531,10 +521,10 @@ def main() -> int:
     build_fig_vent_profiles(om2_df, regimes, fig_dir / "fig_vent_profiles.png")
     _, facts["shelter_maps"] = build_fig_shelter_maps(om2_df, regimes, buildings, fig_dir / "fig_shelter_maps.png")
     _, facts["svf_sensor"] = build_fig_svf_sensor(om2_df, walks_tbl, p12, fig_dir / "fig_svf_sensor.png")
-    build_fig_vent_schematic(fig_dir / "fig_vent_schematic.png")
+    build_fig_vent_schematic(fig_dir / "fig_vent_schematic.png",
+                             route_median_ratio=float(om2_df["height_width_ratio"].median()))
     build_fig_flags(ctx["repair"][0], buildings, ctx["repair_fixes"], fig_dir / "fig_flags.png")
     facts["flags"] = ctx["repair_facts"]
-    fig_temp.build_all(out_dir)
     (fig_dir / "figure_facts.json").write_text(json.dumps(facts, indent=2, default=float))
     print(f"[build_om_package] figures written to {fig_dir} (representative walk for the sensor figure: {facts['svf_sensor']['walk_id']})")
     del shade_full

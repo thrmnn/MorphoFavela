@@ -89,8 +89,7 @@ def frontal_paragraph(f: dict) -> str:
         "across the wind times its height gives the wall area facing the wind, and the sum is divided by the "
         "ground area of the cell. A value of 0 means no building; a value of 1 means as much wall faces the "
         "wind as there is ground. Low values mean the buildings stand apart and the wind reaches the street; "
-        "high values mean they stand close, and less wind reaches the street (Ng et al., 2011). Along this "
-        f"route the median is {_regime_value(f, 'frontal_median', '.2f')}.\n"
+        "high values mean they stand close, and less wind reaches the street (Ng et al., 2011).\n"
     )
 
 
@@ -157,7 +156,7 @@ def readme_subsection(f: dict, heading: str = "###") -> str:
     band = f["align_band_deg"]
     parts = [
         f"{heading} Ventilation measures\n",
-        "Each ventilation measure is computed from 2019 building and terrain geometry for the mean direction of "
+        "Each ventilation measure is computed from the IPP 2019 dataset (building footprints, heights and terrain) for the mean direction of "
         f"each wind regime ({r1['name']}, {r1['dir']:.0f}°; {r2['name']}, {r2['dir']:.0f}°). None is a "
         "measured or simulated wind. They say how open a point is to a wind from that direction.\n",
         why_paragraph(),

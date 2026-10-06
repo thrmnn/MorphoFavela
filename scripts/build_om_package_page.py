@@ -48,7 +48,7 @@ from src.om_package.spec import internal_dir_for  # noqa: E402
 DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
 
 BRISA_HUB = "https://brisa.theoalessandro.com"
-OPS_DECISION_ID = "om_release_v0_3_1"
+OPS_DECISION_ID = "om_release_v1_0_0"
 OPS_LINK = f"{BRISA_HUB}/ops#dec-{OPS_DECISION_ID}"
 PAPER_LINK = f"{BRISA_HUB}/paper/x1"
 # The results deck lives on the hub origin that serves this page (under
@@ -377,19 +377,17 @@ def render_page(root: Path) -> str:
         ("fig_form.png", "Street form along the route",
          f"Building height, height-to-width ratio, sky view factor and plan area density; grey = every metre, black = {SEGMENT_M} m means."),
         ("fig_shade_map.png", "Building shade on the walk dates",
-         f"Share of daylight each point spends in building shade over the {n_dates} walk dates."),
+         f"Share of daylight each point spends in direct sun over the {n_dates} walk dates (lighter = more sun)."),
         ("fig_shade_calendar.png", "Shade by date and time of day",
-         "Share of route points in building shade, one row per walk date, by time of day (Rio local time)."),
+         "Share of route points in direct sun, one row per walk date, by time of day (Rio local time)."),
         ("fig_sun_dose.png", "Direct sun before each walk",
          "Clear-sky direct sun in the 1 and 3 hours before each walk reached each point, one row per walk."),
         ("fig_wind.png", "Wind regimes", "Wind direction at Galeão airport for the campaign season and 2015 to 2024, and each regime by hour of day."),
         ("fig_vent_profiles.png", "Ventilation along the route", "Windward frontal area density, canyon alignment and upwind shelter angle for both wind regimes."),
         ("fig_shelter_maps.png", "Upwind shelter angle maps", "Upwind shelter angle per point for each wind regime, on one colour scale."),
         ("fig_svf_sensor.png", "Sensor-matched sky view factor", "Sky view factor at 1 m and as a slow sensor on one walk would see it."),
-        ("fig_vent_schematic.png", "How the ventilation measures are drawn", "Schematic of windward frontal area density, canyon alignment and upwind shelter angle."),
+        ("fig_vent_schematic.png", "How the ventilation measures are drawn", "Frontal area density, canyon alignment and upwind shelter angle, and the three flow regimes across a street."),
         ("fig_flags.png", "Flagged points", "Route points inside building outlines or away from a mapped street, by class, with the repaired positions."),
-        ("fig_temp_tau.png", "Sensor-matched measures and temperature", "Variance of the walk temperature anomaly explained by each street measure, by sensor time constant."),
-        ("fig_temp_profile.png", "Temperature anomaly along the route", "Mean walk temperature anomaly per segment against sun, shade and street form."),
     ]
     tiles = []
     for name, title, caption in gallery_spec:
@@ -429,13 +427,6 @@ def render_page(root: Path) -> str:
         ("p05_building_shade.parquet", f"building shade per point and {_shade_step_min(version_dir)}-min step, campaign dates"),
         ("p02b_walks.csv", "one row per logger walk: timing, coverage, wind regime"),
         ("p12_walk_points.parquet", "arrival time, shade, dose and sensor-matched values per walk and point"),
-        ("p13_temperature_pairing_readings.csv", "one row per walk temperature reading: logger background and anomaly"),
-        ("p13_temperature_pairing_segment_profile.csv", "mean anomaly and street measures per 20 m segment"),
-        ("p13_temperature_pairing_tau_scan.csv", "variance explained per sensor time constant"),
-        ("p13_temperature_pairing_events.csv", "sharp sun and shade changes along each walk"),
-        ("p13_temperature_pairing_event_response.csv", "mean temperature change around those changes"),
-        ("p13_temperature_pairing_coefficients.csv", "associations of the anomaly with street measures"),
-        ("p13_temperature_pairing_warmup.csv", "readings against minutes since the walk started"),
         ("p10_sun_envelope.parquet", "sun class per point and local time of day over the season"),
         ("p10_sun_envelope.csv", "sun envelope (CSV)"),
         ("p10_sun_dose.parquet", f"clear-sky direct-sun dose, {'/'.join(map(str, p10['dose_hours']))} h"),

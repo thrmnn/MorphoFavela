@@ -476,7 +476,7 @@ _V030 = {
     "walk_id": _row("Identifier of one logger walk of OM2, OM2_<date>_<period> (duration appended only if two walks share both).", "-",
                     "file names of the walk dataset (data/maré/octopus/prerelease_v020/matched/)", "src/om_package/walks.py _walk_ids",
                     "The walks were collected by residents of Maré and the dataset is cleaned and structured by Cassiano and Vincent (Octopus team); the date in the id is the UTC date of the file name."),
-    "period": _row("In p02b_walks and the p13_temperature_pairing tables: part of the day of the walk (morning or evening). In p11_wind_regimes and p11_regime_by_hour: the wind record the row describes (campaign = the campaign-season window; climatology = 2015-2024).", "category",
+    "period": _row("In p02b_walks: part of the day of the walk (morning or evening). In p11_wind_regimes and p11_regime_by_hour: the wind record the row describes (campaign = the campaign-season window; climatology = 2015-2024).", "category",
                    "walk file names; src/om_package/wind_regimes.py", "as named", "-"),
     "start_local": _row("Rio local time of the first logged row of the walk, with the -03:00 offset.", "ISO 8601, America/Sao_Paulo", "walk file", "first timestamp converted from UTC (loggers record UTC)", "-"),
     "start_utc": _row("The same instant as start_local, in UTC.", "ISO 8601, UTC", "walk file", "first logged timestamp", "-"),
@@ -700,8 +700,6 @@ def full_dictionary(radii=BUFFER_RADII_M, regimes: list[dict] | None = None) -> 
     d.update(_V031)
     d.update(_regime_rows(regimes))
     d.update(_matched_rows(regimes))
-    for k, v in p13_rows().items():
-        d.setdefault(k, v)
     for template_id, template in _BUFFER_TEMPLATES.items():
         for r in radii:
             col_id = template_id.format(r=r)
@@ -712,6 +710,9 @@ def full_dictionary(radii=BUFFER_RADII_M, regimes: list[dict] | None = None) -> 
         d.setdefault(k, v)
     for k, note in _RETIRED.items():
         d[k] = {**d[k], "status": f"RETIRED: replaced by {note}"}
+    for k, v in p13_rows().items():
+        if k not in d:
+            d[k] = {**v, "status": "RETIRED: temperature pairing tables (p13) held for a later version, not shipped"}
     return d
 
 

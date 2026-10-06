@@ -15,7 +15,7 @@ from .vent_indices import DEFAULT_BUFFER_M
 
 #: The one place the package version is set; the build default and every
 #: rendered heading read it.
-VERSION = "v0.3.1"
+VERSION = "v1.0.0"
 #: read from the clock at import time, never typed — this is the date this
 #: version is BUILT, not the date any source data was fetched (the
 #: "fetched" date in the README is computed at build time from the route
@@ -30,7 +30,7 @@ VERSION_DATE = date.today().isoformat()
 #: 2026-09-27 — see src/om_package/provenance.py).
 #: Who did what with the walk data; reused in the manifest, README and report.
 DATA_CREDIT = (
-    "The walks were collected by residents of Maré. Cassiano and Vincent (Octopus team) clean and structure "
+    "The walks were collected by residents of Maré. Cassiano and Vincent (Octopus team) cleaned and structured "
     "the dataset."
 )
 
@@ -93,10 +93,8 @@ def _column_rows(package_dir: Path, f: dict) -> list[str]:
     live = d[~d["status"].astype(str).str.startswith("RETIRED")].set_index("id")
     out: list[str] = []
     missing: list[str] = []
-    from .temp_pairing import P13_STEMS
-
     groups = dict(_file_groups(package_dir))
-    for stem in [*FILE_ORDER, *P13_STEMS]:
+    for stem in FILE_ORDER:
         exts = groups.get(stem)
         cols = _columns_of(package_dir, stem, exts) if exts else []
         if not cols:
@@ -149,7 +147,7 @@ def _route_repair_lines(f: dict) -> list[str]:
         f"- `projected`: inside an outline and at most {rr.PROJECT_MAX_M:g} m from open ground ({c['projected']:,} points). "
         f"The point moves to the nearest open ground, where open ground is the space outside every outline grown "
         f"by {rr.SETBACK_M:g} m, so gaps narrower than {2 * rr.SETBACK_M:g} m do not count as walkable. The "
-        f"{rr.PROJECT_MAX_M:g} m limit is the size of the offset between the trace and the 2019 outlines; "
+        f"{rr.PROJECT_MAX_M:g} m limit is the size of the offset between the trace and the IPP 2019 outlines; "
         "a point deeper inside an outline is not explained by an offset. "
         f"Median move {pj['shift_median_m']:.1f} m, largest {pj['shift_max_m']:.1f} m.",
         f"- `beco`: in open ground and more than {rr.STREET_MAX_M:g} m from any mapped street, so an alley missing from "
@@ -197,15 +195,11 @@ def render_readme(package_dir) -> str:
     import pyproj
 
     from . import vent_context
-    from .report import (AUTHOR, PROJECT_FORM, _day, _join, _n, compute_facts, file_table,
+    from .report import (AUTHOR, GEOMETRY, PROJECT_FORM, _cited, _day, _join, _n, compute_facts, file_table,
                          opening_paragraph)
     from .sensor_match import DEFAULT_TAUS_S
     from .walk_dose import WALK_DOSE_HOURS, WALK_DOSE_STEP_MIN
     from .wind_regimes import N_SECTORS
-
-    import json
-
-    from . import temp_pairing
 
     package_dir = Path(package_dir)
     f = compute_facts(package_dir)
@@ -226,7 +220,7 @@ def render_readme(package_dir) -> str:
     lines = [
         f"> **{USE_TERMS}**\n",
         "# Street form, sun and wind along the OM2 walking route, Complexo da Maré\n",
-        f"{AUTHOR} · {PROJECT_FORM} · Octopus team · Octopus OM2 data package {f['version']}\n",
+        f"{AUTHOR} · Octopus team · Octopus OM2 data package {f['version']}\n",
         opening_paragraph(f),
         "The report (`report.pdf`) presents each measure with figures. This README gives the method, the "
         "sources and every column.\n",
@@ -237,11 +231,11 @@ def render_readme(package_dir) -> str:
         "## Sources and dates\n",
         "| Source | Date | Used for |",
         "|---|---|---|",
-        f"| Walk dataset: walks collected by residents of Maré, cleaned and structured by Cassiano and Vincent (Octopus team); matched GPS tracks, one CSV per walk, and the OM2 "
+        f"| Octopus walk dataset: matched GPS tracks, one CSV per walk, and the OM2 "
         f"route file | {f['n_walks']} walks on {f['n_dates']} dates, {_day(f['first_date'])} to "
         f"{_day(f['last_date'])}; the dataset's pre-release manifest records a SHA-256 checksum per file | route "
         "points, walk timing, arrival times, walk dates |",
-        f"| Building footprints with heights and the terrain model | {f['geometry_epoch']} | street form, shade, "
+        f"| {GEOMETRY} (Instituto Pereira Passos): building footprints with heights and the terrain model | {f['geometry_epoch']} | street form, shade, "
         "sun, ventilation, `route_geometry_flag` |",
         "| Street centre lines of Maré | same layer set | street form sampling, `route_geometry_flag` |",
         f"| Galeão airport hourly weather reports (Iowa Environmental Mesonet archive) | campaign season "
@@ -268,7 +262,7 @@ def render_readme(package_dir) -> str:
         "### Street form\n",
         "Building height, street width and their ratio come from the building footprints at the repaired "
         "position of each point (see Route repair); sky view factor is ray-cast from 1.5 m above street samples over 145 sky patches "
-        "against the 2019 buildings and terrain; plan density is the building share of the 10 m grid cell. Each "
+        f"against the buildings and terrain of the {GEOMETRY}; plan density is the building share of the 10 m grid cell. Each "
         "point takes the nearest sample within a maximum distance and stays empty beyond it, never a guessed "
         "value; `*_join_dist_m` gives that distance. Building height, street width and the height-to-width ratio "
         "are the exception: they come from rays, not from a join. The height-to-width ratio is computed per point; the "
@@ -276,7 +270,7 @@ def render_readme(package_dir) -> str:
         f"the median width is {f['hw_ratio_of_medians']:.2f}. Buffer columns give plan density, building count "
         f"and mean building height within {_join([str(r) for r in radii])} m of each point.\n",
         "### Shade and sun\n",
-        "Sun, shade and ventilation are computed from 2019 building and terrain geometry. For each point the "
+        f"Sun, shade and ventilation are computed from the {GEOMETRY}. For each point the "
         f"horizon (the angle of the highest building or terrain) is marched once in every direction up to "
         f"{f['shade_max_dist_m']:g} m, below the distance where the terrain data first run out "
         f"({floor['min']:.0f} m at the nearest point, {floor['median']:.0f} m at the median point). A point is in "
@@ -316,8 +310,8 @@ def render_readme(package_dir) -> str:
         "direction.\n",
         "| Period | Regime | Mean direction | Share of reports | Mean speed |",
         "|---|---|---|---|---|",
-        *[f"| {per} | {g['name']} | {g['dir']:.0f}° | {100 * g['share']:.1f}% | {g['speed']:.1f} m/s |"
-          for per, regs in (("campaign season", camp), (f"{y0} to {y1}", clim)) for g in regs.values()],
+        *[f"| {per} | {camp[k]['name']} | {g['dir']:.0f}° | {100 * g['share']:.1f}% | {g['speed']:.1f} m/s |"
+          for per, regs in (("campaign season", camp), (f"{y0} to {y1}", clim)) for k, g in regs.items()],
         "",
         vent_context.readme_subsection(f, "###"),
         "The Macdonald method was calibrated on regular arrays of blocks, sparser than Maré. Along most of the route "
@@ -340,15 +334,14 @@ def render_readme(package_dir) -> str:
         "```\npython OM2/aggregate_to_segments.py --points p12_walk_points.parquet \\\n"
         "    --by walk_id --segment-m 20 --tau 30 --out segments_by_walk.parquet\n```\n",
         "A segment ends at the point a reading was taken; a sensor reading describes the route behind the walker.\n",
-        temp_pairing.readme_subsection(json.loads((package_dir / "OM2" / "temp_facts.json").read_text(encoding="utf-8"))),
         "## Using the data\n",
-        "Loggers record UTC; Rio local time is UTC-3 with no daylight saving. Join logger readings to "
+        "The walk loggers record UTC; Rio local time is UTC-3 with no daylight saving. Join logger readings to "
         "`p12_walk_points` by `walk_id` and the nearest `t_arrival_utc`, or to the shade table by `point_id` "
         "and `timestamp_utc` floored to the shade step (`OM2/join_shade_example.py`). Run each analysis with "
         "and without the points that `point_class` marks as not on a street, and down-weight or drop rows whose "
         "`arrival_source` is `gap_interpolated`.\n",
         "## Known limits\n",
-        "- Street form, sun, shade and ventilation come from 2019 building and terrain geometry.\n"
+        f"- Street form, sun, shade and ventilation come from the {GEOMETRY}.\n"
         "- The sun dose assumes a clear sky, so it is an upper bound.\n"
         "- The airport wind is a regional reference, not the wind in the streets.\n"
         "- An empty value in a joined column means no source sample within the join distance; an empty buffer "
@@ -356,8 +349,7 @@ def render_readme(package_dir) -> str:
         "## Columns\n",
         *_column_rows(package_dir, f),
         "## References\n",
-        *[f"- {r}" for r in vent_context.references_used().values()],
-        "",
+        "{REFERENCES}",
         "## Manifest\n",
         "`manifest.json` records the package version, the coordinate system, the use terms, the decisions "
         "behind this release, the wind source, summary values and a SHA-256 checksum for every other file. "
@@ -365,12 +357,15 @@ def render_readme(package_dir) -> str:
         "## Use terms\n",
         f"{USE_TERMS}\n",
         "## How to cite\n",
-        f"Please do not cite this draft. The package was produced with the {PROJECT_FORM} pipeline by {AUTHOR}; "
-        "authorship is to be discussed with the lead author when the contribution list is drafted.\n",
+        f"Please do not cite this draft. {AUTHOR} made the analyses for this package, reusing computation "
+        f"pipelines from {PROJECT_FORM}; authorship is to be discussed with the lead author when the "
+        "contribution list is drafted.\n",
         "## Contact\n",
-        f"{AUTHOR}, {PROJECT_FORM}.\n",
+        f"{AUTHOR}, Octopus team.\n",
     ]
-    return "\n".join(lines)
+    body = "\n".join(lines)
+    refs = [f"- {r}" for r in vent_context.references_used().values() if _cited(r, body)]
+    return body.replace("{REFERENCES}", "\n".join(refs) + "\n")
 
 
 #: Frozen literal text — v0.1's shipped CHANGELOG entry, read verbatim
@@ -663,15 +658,20 @@ geometry for now; every geometry input is a build parameter, so moving to the
 """
 
 
-#: The newest entry: the only part of CHANGELOG.md rendered fresh on every build.
-CURRENT_ENTRY_TEMPLATE = """\
-# Changelog — mare_om2
+#: Frozen literal text of the v0.3.0 and v0.3.1 entries.
+V030_ENTRY = """\
+## v0.3.1 — 2026-10-05
 
-## {version} — {version_date}
+Credits (residents collected the walks; Cassiano and Vincent cleaned and
+structured them), sun-share colour scale, ventilation context with references,
+flagged-point classes with route repair and facade-to-facade street width, and
+a temperature pairing first look (p13 tables).
+
+## v0.3.0 — 2026-10-02
 
 Walk-level timing, two wind regimes, and every time in Rio local time. The OM2
-route is the new 1 m-spaced route ({n_om2_points} points); geometry stays on
-the 2019 epoch. {version} is a new directory; earlier versions are untouched.
+route is the new 1 m-spaced route (1,917 points); geometry stays on
+the 2019 epoch. v0.3.0 is a new directory; earlier versions are untouched.
 
 - **Time**: every shipped time column is Rio local time (ISO 8601 with the
   -03:00 offset, suffix `_local`); the loggers record UTC, and a `_utc` twin
@@ -701,8 +701,32 @@ the 2019 epoch. {version} is a new directory; earlier versions are untouched.
 """
 
 
+
+
+#: The newest entry: the only part of CHANGELOG.md rendered fresh on every build.
+CURRENT_ENTRY_TEMPLATE = """\
+# Changelog — mare_om2
+
+## {version} — {version_date}
+
+First version for the whole Octopus team. Same data and method as v0.3.1,
+without the temperature pairing first look (held for a later version: no p13
+tables, no temperature figures).
+
+- **Report**: chapter outline on the first page, every chapter on a new page,
+  tables kept whole; building and terrain source named "IPP 2019 dataset";
+  data credit stated once; the analyses described as new, reusing
+  Brisa+ (MorphoFavela) pipelines.
+- **Figures**: one blue to yellow sun scale with no grey (sun share and sun
+  dose), no direct sun drawn darker than the scale; ventilation schematic
+  redrawn with the three flow regimes.
+- **README**: same wording changes; references list only works cited.
+
+"""
+
+
 def render_changelog(n_om2_points: int, version: str = VERSION, version_date: str = VERSION_DATE) -> str:
     """Render CHANGELOG.md: only the newest entry is rendered; v0.1.3 and
     older are frozen literal text (see the constants above)."""
     current = CURRENT_ENTRY_TEMPLATE.format(version=version, version_date=version_date, n_om2_points=n_om2_points)
-    return current + V020_ENTRY + V013_ENTRY + V012_ENTRY + CHANGELOG_V011_ENTRY + CHANGELOG_V01_ENTRY
+    return current + V030_ENTRY + V020_ENTRY + V013_ENTRY + V012_ENTRY + CHANGELOG_V011_ENTRY + CHANGELOG_V01_ENTRY

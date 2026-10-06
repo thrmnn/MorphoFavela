@@ -24,7 +24,7 @@ ROUTE_TICK_M = 250.0
 #: Local slots used by the old dose figure; kept for the package page and report helpers.
 _DOSE_SLOT_QUANTILES = (0.25, 0.5, 0.75)
 
-#: Dose below this (Wh/m2, the rounding step of the table) counts as zero and is drawn grey.
+#: Dose below this (Wh/m2, the rounding step of the table) counts as zero and is drawn in fs.NO_SUN.
 DOSE_ZERO_BELOW = 0.1
 #: Rows closer than this to the walks' median duration are not preferred for the sensor figure; see pick_representative_walk.
 COVERAGE_FULL = 0.95
@@ -272,7 +272,7 @@ def dose_matrix(p12: pd.DataFrame, walk_ids: list[str], column: str, total_m: fl
 def build_fig_sun_dose(walks: pd.DataFrame, p12: pd.DataFrame, total_m: float, out_path: Path) -> tuple[Path, dict]:
     """R10: walks as rows (mornings above evenings), distance as columns, colour
     = clear-sky direct sun dose in the 1 h (left) and 3 h (right) before arrival;
-    one shared scale, zero grey, points outside a walk blank."""
+    one shared scale, no sun darker than the scale, points outside a walk blank."""
     with fs.figure_style():
         import matplotlib.pyplot as plt
 
@@ -283,7 +283,7 @@ def build_fig_sun_dose(walks: pd.DataFrame, p12: pd.DataFrame, total_m: float, o
         vmax = float(np.ceil(vmax / 250.0) * 250.0)
         norm = matplotlib.colors.Normalize(vmin=DOSE_ZERO_BELOW, vmax=vmax)
         cmap = matplotlib.colormaps[fs.VAR_CMAP["sun_dose"]].copy()
-        cmap.set_under(fs.ZERO_GREY)
+        cmap.set_under(fs.NO_SUN)
         cmap.set_bad("white")
 
         n_m = int((order["_grp"] == 0).sum())
@@ -326,12 +326,12 @@ def build_fig_sun_dose(walks: pd.DataFrame, p12: pd.DataFrame, total_m: float, o
         cb.set_ticklabels(["0", *[f"{t:,}" for t in ticks[1:]]])
         cb.set_label("clear-sky direct sun dose (Wh/m²)", labelpad=2)
         sw = fig.add_axes([left + 0.02, 0.39 / H, 0.03, 0.09 / H])
-        sw.set_facecolor(fs.ZERO_GREY)
+        sw.set_facecolor(fs.NO_SUN)
         sw.set_xticks([])
         sw.set_yticks([])
         for sp in sw.spines.values():
             sp.set_visible(True)
-        fig.text(left + 0.035, 0.30 / H, "zero", ha="center", va="top", fontsize=fs.FONT_PT)
+        fig.text(left + 0.035, 0.30 / H, "no sun", ha="center", va="top", fontsize=fs.FONT_PT)
         out = fs.save(fig, out_path)
     return out, {"colour_limits_wh_m2": [DOSE_ZERO_BELOW, vmax], "zero_drawn_below_wh_m2": DOSE_ZERO_BELOW,
                  "colour_scale_note": "one scale for both panels, upper limit set from the 99.5th percentile of the 3 hour doses; larger values take the top colour",

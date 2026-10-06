@@ -49,21 +49,26 @@ code {{ font-family: "DejaVu Sans Mono", monospace; font-size: 0.86em; backgroun
 
 def report_css(version: str, footer: str = USE_TERMS) -> str:
     """Report: readable body, figures at text width with their caption kept
-    on the same page. A figure's size class caps its height so the section
-    heading, the lead paragraph and the figure share a page."""
+    on the same page. Every chapter (h2) starts a new page, except one marked
+    .keep-on-page; tables never split across pages."""
     return _page_css(version, footer) + """
 body { font-size: 9.4pt; line-height: 1.36; color: #1d1d1f; }
 h1 { font-size: 17pt; line-height: 1.2; margin: 0 0 8pt 0; color: #111; }
-.titleblock { margin: 0 0 14pt 0; padding-bottom: 8pt; border-bottom: 0.8pt solid #333; }
-.titleblock h1 { font-size: 21pt; line-height: 1.18; margin: 0 0 6pt 0; }
-.titleblock .subtitle { font-size: 12pt; line-height: 1.3; color: #333; margin: 0 0 12pt 0; }
+.titleblock { margin: 0 0 10pt 0; padding-bottom: 6pt; border-bottom: 0.8pt solid #333; }
+.titleblock h1 { font-size: 20pt; line-height: 1.16; margin: 0 0 4pt 0; }
+.titleblock .subtitle { font-size: 12pt; line-height: 1.3; color: #333; margin: 0 0 8pt 0; }
 .titleblock .byline { font-size: 9.6pt; color: #111; margin: 0 0 3pt 0; }
 .titleblock .issue { font-size: 9pt; color: #555; margin: 0; }
-h2 { font-size: 12.5pt; color: #111; margin: 12pt 0 5pt 0; padding-bottom: 2pt;
-     border-bottom: 0.6pt solid #b9b9b9; break-after: avoid; }
+h2 { font-size: 12.5pt; color: #111; margin: 0 0 6pt 0; padding-bottom: 2pt;
+     border-bottom: 0.6pt solid #b9b9b9; break-before: page; break-after: avoid; }
+h2.keep-on-page { break-before: auto; margin-top: 14pt; }
+h3 { font-size: 10.4pt; color: #111; margin: 12pt 0 4pt 0; break-after: avoid; }
+ul { margin: 2pt 0 8pt 0; padding-left: 14pt; }
+li { margin: 0 0 3pt 0; }
 p { margin: 0 0 5pt 0; orphans: 3; widows: 3; }
 strong { color: #111; }
-table { border-collapse: collapse; width: 100%; font-size: 7.1pt; line-height: 1.22; margin: 4pt 0 8pt 0; }
+table { border-collapse: collapse; width: 100%; font-size: 7.1pt; line-height: 1.22; margin: 4pt 0 8pt 0;
+        break-inside: avoid; }
 th, td { border-bottom: 0.4pt solid #c8c8c8; padding: 1.3pt 5pt 1.3pt 0; text-align: left; vertical-align: top;
          overflow-wrap: anywhere; }
 th { border-bottom: 0.8pt solid #333; font-weight: bold; }

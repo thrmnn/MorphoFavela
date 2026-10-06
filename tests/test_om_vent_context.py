@@ -40,13 +40,13 @@ def test_no_forbidden_strings(facts):
 
 def test_numbers_come_from_facts(facts):
     report = "\n".join(vc.report_paragraphs(facts))
-    for s in ["1.23", "0.88", "1.9"]:
+    for s in ["1.9"]:
         assert s in report
     readme = vc.readme_subsection(facts)
     for s in ["1.23", "0.88", "21°", "64°", "11°", "71°", "8.6 m", "0.07 m", "0.05 m", "117°", "334°", "41%", "53%"]:
         assert s in readme, s
     facts["vent"]["reg1"]["frontal_median"] = 2.468
-    assert "2.47" in vc.frontal_paragraph(facts)
+    assert "2.47" in vc.readme_subsection(facts)
 
 
 def test_skimming_reading_follows_ratio(facts):

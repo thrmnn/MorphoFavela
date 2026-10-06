@@ -21,13 +21,22 @@ FONT_PT = 8.0
 FONT_PT_SMALL = 8.0
 DPI = 200
 
+#: Sun scale: dark blue (little sun) to yellow (much sun), lightness rising
+#: monotonically (CIELAB L 26 to 91) with no grey middle, so "lighter = more
+#: sun" reads at a glance.
+SUN_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list(
+    "om_sun", ["#183c7c", "#2a68ad", "#4c97c8", "#93c5d2", "#d3e09a", "#fde74c"])
+if "om_sun" not in matplotlib.colormaps:
+    matplotlib.colormaps.register(SUN_CMAP)
+
 #: One colour scale per variable, reused wherever the variable is drawn as a colour.
 VAR_CMAP = {
-    "sun_share": "cividis",
-    "sun_dose": "cividis",
+    "sun_share": "om_sun",
+    "sun_dose": "om_sun",
     "shelter_angle": "magma_r",
 }
-ZERO_GREY = "#d4d4d4"
+#: No direct sun at all: darker than the darkest scale colour (L 6 against 26).
+NO_SUN = "#0a1128"
 
 LINE_DARK = "#222222"
 POINT_GREY = "#b8b8b8"

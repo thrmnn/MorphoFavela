@@ -30,14 +30,11 @@ SECTIONS = [
     "What is in the package",
     "The route",
     "Street form",
-    "Sun and shade on the walk dates",
-    "Direct sun before each walk",
-    "Wind: two regimes",
-    "Ventilation for both regimes",
+    "Sun and shade",
+    "Wind and ventilation",
     "Flagged points",
     "Using the data with temperature readings",
-    "Street measures and the walk temperature readings",
-    "References",
+    "References {.keep-on-page}",
 ]
 FORBIDDEN = ["—", "–", "SBGL", "METAR", "H/W", "λ", "z0", "SVF", "LiDAR", r"\btree", "v0.1", "v0.2",
              "v1.", "PLACEHOLDER", "TODO", "novel", "robust", "significant", "Read with care", "sun_envelope.png",
@@ -87,7 +84,7 @@ def test_sections_in_r6_order(report_md):
 
 def test_opening_paragraph_names_study_author_and_project(report_md):
     opening = report_md.split("\n## ", 1)[0]
-    for s in (STUDY_TITLE, AUTHOR, PROJECT_FORM, "first look at pairing", "Rio local time"):
+    for s in (STUDY_TITLE, AUTHOR, PROJECT_FORM, "reuse computation pipelines", "IPP 2019 dataset", "Rio local time"):
         assert s in opening, s
 
 
@@ -99,8 +96,10 @@ def test_project_named_only_in_parenthetical_form(report_md, readme_md):
 @pytest.mark.parametrize("token", FORBIDDEN)
 def test_no_forbidden_strings(report_md, readme_md, token):
     pat = token if token.startswith("\\b") else re.escape(token)
-    assert not re.search(pat, re.sub(r"\(OM2/fig_\w+\.png\)", "", report_md)), token
-    assert not re.search(pat, _prose(readme_md)), token
+    from src.om_package.package_docs import VERSION
+    body = re.sub(r"\(OM2/fig_\w+\.png\)", "", report_md).replace(f"Version {VERSION}", "")
+    assert not re.search(pat, body), token
+    assert not re.search(pat, _prose(readme_md).replace(VERSION, "")), token
 
 
 def test_every_figure_embedded_once_in_order(report_md):
@@ -138,7 +137,7 @@ def test_no_direct_sun_statement_uses_the_dose_figure_cells(report_md, facts):
 
 
 def test_wind_section_states_regimes_tags_and_broad_arc(report_md, facts):
-    wind = report_md.split("## Wind: two regimes", 1)[1].split("\n## ", 1)[0]
+    wind = report_md.split("### Two wind regimes", 1)[1].split("\n### ", 1)[0]
     assert "16-sector wind rose" in wind
     assert "broad northern arc" in wind and "confirms the east-southeast direction" in wind
     for name, n in facts["walk_tags"].items():
@@ -148,7 +147,9 @@ def test_wind_section_states_regimes_tags_and_broad_arc(report_md, facts):
 
 def test_r8_statements_present(report_md):
     assert "assumes a clear sky, so it is an upper bound" in report_md
-    assert report_md.count("2019 building and terrain geometry") >= 3
+    opening = report_md.split("\n## ", 1)[0]
+    assert "Street form, sun, shade and ventilation are computed from" in opening
+    assert report_md.count("Cassiano and Vincent (Octopus team) cleaned and structured") == 1
 
 
 def test_one_question_for_the_team(report_md):
@@ -157,7 +158,7 @@ def test_one_question_for_the_team(report_md):
 
 
 def test_contact_line(report_md):
-    contact = f"**Contact.** {AUTHOR}, {PROJECT_FORM}."
+    contact = f"**Contact.** {AUTHOR}, Octopus team."
     assert contact in report_md
     assert report_md.index(contact) < report_md.index("## References")
 
@@ -171,7 +172,7 @@ def test_percentage_collisions_are_detected():
 
 
 def test_file_table_lists_every_shipped_data_file(report_md):
-    table = report_md.split("## What is in the package", 1)[1].split("\n\n", 2)[1]
+    table = report_md.split("## What is in the package", 1)[1].split("\n\n", 3)[2]
     for f in PACKAGE_DIR.rglob("*"):
         rel = f.relative_to(PACKAGE_DIR).as_posix()
         if f.is_file() and not rel.endswith(".png") and not rel.startswith(("README", "report", "_")) \
