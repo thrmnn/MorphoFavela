@@ -360,7 +360,9 @@ def evaluate_tile(
     out["irradiation_kwh_m2"] = irr
     out["visibility_packed"] = [row.tobytes() for row in packed]
 
-    for f in (tile_dtm, tile_fps, surface_tif, is_building_tif, meta_json):
+    building_id_tif = surface_tif.with_name(surface_tif.stem.replace("_surface", "_building_id") + ".tif")
+    ground_tif = surface_tif.with_name(surface_tif.stem.replace("_surface", "_ground") + ".tif")
+    for f in (tile_dtm, tile_fps, surface_tif, is_building_tif, building_id_tif, ground_tif, meta_json):
         try:
             Path(f).unlink(missing_ok=True)
         except Exception:

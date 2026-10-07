@@ -28,8 +28,16 @@ tool for ~3 M citywide cells against 2.36 M buildings on an 8 GB GPU.
   with `merge_alg=replace`, or an explicit max).
 - `surface = max(dtm, building_top)`; a second raster `is_building` (uint8) marks
   cells covered by any footprint. Observers are never placed on building cells.
+- DTM no-data (sea, Guanabara Bay, land outside the municipality; 54.7% of
+  `DTM_RJ.tif`) is set to 0 m in both the surface and the `_ground.tif`
+  terrain-only raster (`DTM_NODATA_FILL_M`, fixed 2026-10-07 after reviewer 2
+  M1: as NaN it blocked every ray that crossed it). For the Methods: "Terrain
+  no-data cells (sea, bay and land beyond the municipal boundary) were set to
+  sea level (0 m). This is exact over water and slightly understates
+  occlusion by terrain beyond the municipal boundary." The march also treats
+  any NaN sample as no obstruction, so a future NaN cannot latch the horizon.
 - Writes GeoTIFF(s) + a sidecar JSON with: cell_m, bounds, n_features, top rule,
-  git sha, md5 of inputs.
+  no-data fill value and filled-cell count, git sha, md5 of inputs.
 - Citywide inputs: `data/RJ/DTM_RJ.tif` + `data/RJ/buildings_RJ_2019_utm.gpkg`
   (NEVER the raw .shp). Site inputs: `data/<site>/dtm_extended_300m.tif` +
   `data/<site>/buildings_extended_300m.gpkg`.

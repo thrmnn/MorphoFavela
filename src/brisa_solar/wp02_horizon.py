@@ -231,6 +231,8 @@ def patch_visibility(
                 own_step = bid_t[step_row, step_col] == ob_chunk[:, None]
                 zs = torch.where(own_step, ground_t[step_row, step_col], zs)
             ang = torch.atan2(zs - z_obs[:, None], t)
+            # torch.maximum propagates NaN: one no-data sample would latch the horizon.
+            ang = torch.nan_to_num(ang, nan=float("-inf"))
             horizon = torch.maximum(horizon, ang)
 
         vis = alt[None, :] > horizon

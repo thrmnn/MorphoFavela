@@ -356,3 +356,87 @@ def test_cpu_crossreference_riodaspedras(sky, directions_weights):
         f"PROVISIONAL floor failed for best variant '{best_name}' at 1m: "
         f"r={best['r']:.4f}, median|delta|={best['median_abs_delta']:.4f} "
         f"(floor: r >= 0.95 and median|delta| <= 0.03) — measured numbers in {out_json}")
+
+
+# ---------------------------------------------------------------------------
+# 7. Terrain no-data (sea, bay, outside the municipality)
+# ---------------------------------------------------------------------------
+
+DTM_NODATA = 3.4e38   # data/RJ/DTM_RJ.tif's own nodata value
+
+
+def _write_dtm_with_nodata_half(path: Path, cell: float, size: int):
+    """Flat 0 m DTM whose western half is the DTM_RJ no-data value."""
+    transform, ox, oy = _flat_transform(cell, size)
+    arr = np.zeros((size, size), dtype="float32")
+    arr[:, : size // 2] = DTM_NODATA
+    with rasterio.open(
+        path, "w", driver="GTiff", height=size, width=size, count=1, dtype="float32",
+        crs="EPSG:31983", transform=transform, nodata=DTM_NODATA,
+    ) as dst:
+        dst.write(arr, 1)
+    return transform, ox, oy
+
+
+def _write_one_far_building(path: Path, ox: float, oy: float):
+    """One low building in the NE corner — build_surface needs a non-empty layer."""
+    from shapely.geometry import box
+
+    corner = box(-ox - 3, oy - 3, -ox - 1, oy - 1)
+    gpd.GeoDataFrame(
+        {"altura": [1.0], "base": [0.0], "topo": [np.nan]}, geometry=[corner], crs="EPSG:31983",
+    ).to_file(path, driver="GPKG")
+
+
+def test_nan_sample_does_not_latch_horizon(directions_weights):
+    """A NaN cell along a ray must not mark that patch invisible.
+
+    torch.maximum propagates NaN, so before the fix one NaN sample turned the
+    running horizon into NaN and `alt > NaN` blocked the patch: no-data acted
+    as an infinite wall.
+    """
+    directions, _weights = directions_weights
+    cell, size = 1.0, 80
+    transform, _ox, _oy = _flat_transform(cell, size)
+    surface = np.zeros((size, size), dtype="float32")
+    surface[:, : size // 2 - 5] = np.nan   # NaN region starts 5 m west of the observer
+    obs = np.array([[0.5, 0.5]])
+
+    vis, _ob = patch_visibility(
+        surface, transform, obs, directions=directions, device="cpu",
+        max_dist_m=30, step_m=cell,
+    )
+    west = directions[:, 0] < -0.5
+    assert west.any()
+    assert vis[0, west].all(), f"{int((~vis[0, west]).sum())} west-facing patches blocked by NaN"
+    assert vis[0].all()
+
+
+def test_build_surface_fills_dtm_nodata_at_sea_level(tmp_path, directions_weights):
+    """DTM no-data enters the obstruction surface (and the terrain-only ground
+    raster) as 0 m, so a flat plane with a no-data half-plane sees the full sky."""
+    directions, weights = directions_weights
+    cell, size = 1.0, 80
+    dtm_tif = tmp_path / "dtm.tif"
+    fps = tmp_path / "fps.gpkg"
+    _transform, ox, oy = _write_dtm_with_nodata_half(dtm_tif, cell, size)
+    _write_one_far_building(fps, ox, oy)
+
+    surface_tif = build_surface(dtm_tif, fps, cell, tmp_path / "t")
+    surface, transform, _crs, is_building = load_surface(
+        surface_tif, surface_tif.with_name("t_is_building.tif"))
+    with rasterio.open(tmp_path / "t_ground.tif") as src:
+        ground = src.read(1)
+
+    assert np.isfinite(surface).all() and np.isfinite(ground).all()
+    assert (surface[:, : size // 2] == 0.0).all() and (ground[:, : size // 2] == 0.0).all()
+    meta = json.loads((tmp_path / "t_meta.json").read_text())
+    assert meta["dtm_nodata_fill_m"] == 0.0
+    assert meta["n_dtm_nodata_cells_filled"] == size * (size // 2)
+
+    obs = np.array([[0.5, 0.5]])
+    vis, _ob = patch_visibility(
+        surface, transform, obs, directions=directions, is_building=is_building,
+        device="cpu", max_dist_m=30, step_m=cell,
+    )
+    assert svf_solid_angle(vis.astype(float), weights)[0] == pytest.approx(1.0)

@@ -23,6 +23,13 @@ from rasterio.warp import reproject
 
 from .constants import REPO_ROOT, load_params
 
+#: Elevation (m) given to DTM no-data cells (sea, Guanabara Bay, land outside
+#: the municipality) before horizon marching. Left as NaN they acted as an
+#: infinite wall (reviewer 2, M1, 2026-10-07). Sea level is exact for water and
+#: optimistic for outside-municipality land, so occlusion near the municipal
+#: edge is slightly understated.
+DTM_NODATA_FILL_M = 0.0
+
 
 def _git_sha() -> str:
     try:
@@ -79,6 +86,9 @@ def _read_and_resample(dtm_path: Path, cell_m: float):
 def build_surface(dtm_path, footprints_path, cell_m: float, out_path, all_touched: bool = False) -> Path:
     """Build `surface = max(dtm, building_top)` and an `is_building` mask.
 
+    DTM no-data cells take DTM_NODATA_FILL_M in both the surface and the
+    `_ground.tif` terrain-only raster, so neither ever carries NaN.
+
     `all_touched` (rasterio.features.rasterize) marks every cell a footprint
     polygon *touches*, not just cells whose centre falls inside it — lets
     thin building parts (a wall, an eave) survive rasterization at coarse
@@ -92,6 +102,8 @@ def build_surface(dtm_path, footprints_path, cell_m: float, out_path, all_touche
     out_path = Path(out_path)
 
     dtm, transform, crs = _read_and_resample(dtm_path, cell_m)
+    dtm_nodata = ~np.isfinite(dtm)
+    dtm = np.where(dtm_nodata, np.float32(DTM_NODATA_FILL_M), dtm).astype("float32")
 
     gdf = gpd.read_file(footprints_path)
     if gdf.crs is not None and crs is not None and str(gdf.crs) != str(crs):
@@ -182,6 +194,8 @@ def build_surface(dtm_path, footprints_path, cell_m: float, out_path, all_touche
         "n_features": int(len(gdf)),
         "n_features_rasterized": int(len(shapes)),
         "top_rule": f"{top_attr} when finite and > {base_attr}, else {base_attr} + {alt_attr}",
+        "dtm_nodata_fill_m": DTM_NODATA_FILL_M,
+        "n_dtm_nodata_cells_filled": int(dtm_nodata.sum()),
         "git_sha": _git_sha(),
         "md5_dtm": _md5(dtm_path),
         "md5_footprints": _md5(footprints_path),
