@@ -56,6 +56,10 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-root", default="/home/theo/SCL/SCR/MorphoFavela")
     ap.add_argument("--wp06-run-id", default="wp06_geometry_20260915T052604Z")
+    ap.add_argument(
+        "--in-name", default="per_patch_geometry.csv",
+        help="CSV under outputs/<site>/geometry_indicators/ — the wp06 run's --out-name",
+    )
     args = ap.parse_args()
 
     root = Path(args.data_root)
@@ -64,7 +68,7 @@ def main() -> int:
 
     inputs, frames, per_site, records = {}, [], {}, []
     for site in SITES:
-        path = root / "outputs" / site / "geometry_indicators" / "per_patch_geometry.csv"
+        path = root / "outputs" / site / "geometry_indicators" / args.in_name
         inputs[str(path.relative_to(root))] = _sha256(path)
         table = pd.read_csv(path, usecols=COLUMNS)
         frames.append(table)
