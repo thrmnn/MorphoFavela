@@ -1,0 +1,16 @@
+{
+ "_utc": "2026-10-07T21:01:28Z",
+ "git_sha": "d5b95a4",
+ "sky": {
+  "patches": 145
+ },
+ "source_runs": {
+  "wp05": "wp05_full_20261007T192903Z",
+  "wp04": "wp04_sites_20261007T201123Z",
+  "g3": "g3_domain_20261007T201820Z",
+  "wp06": "wp06_geometry_20261007T201840Z",
+  "wp02_crossref": "wp02_horizon_20260914T195630Z",
+  "cityhours": "cityhours_full_20261007T201156Z",
+  "terrain_split": "terrain_split_full_20261007T201819Z"
+ }
+}

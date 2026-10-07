@@ -1,0 +1,591 @@
+{
+ "_utc": "2026-10-07T21:00:38Z",
+ "status": "PROVISIONAL \u2014 g3_domain_sensitivity, HD-02 not yet PI-signed",
+ "sky_patches": 145,
+ "wp05_run_dir": "/home/theo/SCL/SCR/MorphoFavela/runs/wp05_full_20261007T192903Z",
+ "wp04_run_dir": "/home/theo/SCL/SCR/MorphoFavela/runs/wp04_sites_20261007T201123Z",
+ "grid": {
+  "fabric_coverage_threshold": [
+   0.05,
+   0.1,
+   0.2
+  ],
+  "fabric_footprint_distance_m": [
+   5.0,
+   10.0,
+   20.0
+  ]
+ },
+ "domain_build_s": 408.34989567101,
+ "added_cells_pass": {
+  "n_added_cells_total": 3780177,
+  "n_tiles": 336,
+  "wall_s": 2115.8220278019726,
+  "stopped_early": false,
+  "note": "ONE batched 1 m tile pass over the union of every looser grid cell's added cells (the loosest cell, 0.05/20m, minus the base 0.10/10m frame) \u2014 every tighter looser variant's own n_added_cells below is the subset of this union satisfying its own (threshold, distance); wall_s here is shared across all of them, not measured per variant separately."
+ },
+ "variants": [
+  {
+   "fabric_coverage_threshold": 0.05,
+   "fabric_footprint_distance_m": 5.0,
+   "is_wp05_base_frame": false,
+   "frame_cells": 5556648,
+   "n_added_cells": 154059,
+   "favela_share": 0.11779043768833297,
+   "citywide_svf_median": 0.6814599319738002,
+   "citywide_kwh_m2_median": 1269.5739049772408,
+   "study_favelas": {
+    "Vidigal": {
+     "n": 3862,
+     "svf_median": 0.5624186333450036,
+     "svf_percentile_of_citywide_median": 31.10501151053657,
+     "kwh_m2_median": 1010.84011186744,
+     "kwh_m2_percentile_of_citywide_median": 29.093709013059673
+    },
+    "Rocinha": {
+     "n": 8614,
+     "svf_median": 0.4339161737207512,
+     "svf_percentile_of_citywide_median": 15.806561797688103,
+     "kwh_m2_median": 789.8307616067336,
+     "kwh_m2_percentile_of_citywide_median": 16.148368584801485
+    },
+    "Complexo do Alem\u00e3o": {
+     "n": 24111,
+     "svf_median": 0.6022304273653315,
+     "svf_percentile_of_citywide_median": 37.09006760910535,
+     "kwh_m2_median": 1125.5200897672423,
+     "kwh_m2_percentile_of_citywide_median": 37.61306276733743
+    },
+    "Mar\u00e9": {
+     "n": 8804,
+     "svf_median": 0.3831714222994016,
+     "svf_percentile_of_citywide_median": 11.794412746677494,
+     "kwh_m2_median": 744.1684292967116,
+     "kwh_m2_percentile_of_citywide_median": 14.082554806422866
+    },
+    "Rio das Pedras": {
+     "n": 5257,
+     "svf_median": 0.3838788125798884,
+     "svf_percentile_of_citywide_median": 11.843507092765279,
+     "kwh_m2_median": 732.9108700174135,
+     "kwh_m2_percentile_of_citywide_median": 13.585303585902869
+    }
+   }
+  },
+  {
+   "fabric_coverage_threshold": 0.05,
+   "fabric_footprint_distance_m": 10.0,
+   "is_wp05_base_frame": false,
+   "frame_cells": 8746557,
+   "n_added_cells": 344501,
+   "favela_share": 0.09664591450098593,
+   "citywide_svf_median": 0.7799745415370857,
+   "citywide_kwh_m2_median": 1440.608446599105,
+   "study_favelas": {
+    "Vidigal": {
+     "n": 4955,
+     "svf_median": 0.6248541863589953,
+     "svf_percentile_of_citywide_median": 28.059080847469467,
+     "kwh_m2_median": 1126.4550346850922,
+     "kwh_m2_percentile_of_citywide_median": 26.10947942144549
+    },
+    "Rocinha": {
+     "n": 10654,
+     "svf_median": 0.5040943646216294,
+     "svf_percentile_of_citywide_median": 15.689819434092751,
+     "kwh_m2_median": 927.072596252429,
+     "kwh_m2_percentile_of_citywide_median": 15.982471731448157
+    },
+    "Complexo do Alem\u00e3o": {
+     "n": 30040,
+     "svf_median": 0.66726399022707,
+     "svf_percentile_of_citywide_median": 33.280786942793604,
+     "kwh_m2_median": 1242.6496537916244,
+     "kwh_m2_percentile_of_citywide_median": 33.66459510868105
+    },
+    "Mar\u00e9": {
+     "n": 9929,
+     "svf_median": 0.4157845917487694,
+     "svf_percentile_of_citywide_median": 9.491008862115686,
+     "kwh_m2_median": 804.5554721224781,
+     "kwh_m2_percentile_of_citywide_median": 11.275951211430966
+    },
+    "Rio das Pedras": {
+     "n": 6049,
+     "svf_median": 0.43082292803599337,
+     "svf_percentile_of_citywide_median": 10.363386415934864,
+     "kwh_m2_median": 815.8644031431749,
+     "kwh_m2_percentile_of_citywide_median": 11.669717581443761
+    }
+   }
+  },
+  {
+   "fabric_coverage_threshold": 0.05,
+   "fabric_footprint_distance_m": 20.0,
+   "is_wp05_base_frame": false,
+   "frame_cells": 12182233,
+   "n_added_cells": 3780177,
+   "favela_share": 0.07624464250519589,
+   "citywide_svf_median": 0.8508994863142154,
+   "citywide_kwh_m2_median": 1550.3151816719444,
+   "study_favelas": {
+    "Vidigal": {
+     "n": 5500,
+     "svf_median": 0.6544406512142407,
+     "svf_percentile_of_citywide_median": 23.49657078468291,
+     "kwh_m2_median": 1186.4792851691286,
+     "kwh_m2_percentile_of_citywide_median": 22.210025042206958
+    },
+    "Rocinha": {
+     "n": 11826,
+     "svf_median": 0.5446095958023165,
+     "svf_percentile_of_citywide_median": 14.21373240850015,
+     "kwh_m2_median": 1004.6413409419333,
+     "kwh_m2_percentile_of_citywide_median": 14.368884587907653
+    },
+    "Complexo do Alem\u00e3o": {
+     "n": 32771,
+     "svf_median": 0.6961687239414257,
+     "svf_percentile_of_citywide_median": 27.76375234326909,
+     "kwh_m2_median": 1296.7738202601595,
+     "kwh_m2_percentile_of_citywide_median": 28.253978560416634
+    },
+    "Mar\u00e9": {
+     "n": 10320,
+     "svf_median": 0.42675713115535807,
+     "svf_percentile_of_citywide_median": 7.361967218981939,
+     "kwh_m2_median": 829.2956146927256,
+     "kwh_m2_percentile_of_citywide_median": 8.849453133920521
+    },
+    "Rio das Pedras": {
+     "n": 6642,
+     "svf_median": 0.4678077750910096,
+     "svf_percentile_of_citywide_median": 9.337951424833198,
+     "kwh_m2_median": 890.7827776849995,
+     "kwh_m2_percentile_of_citywide_median": 10.583002311645165
+    }
+   }
+  },
+  {
+   "fabric_coverage_threshold": 0.1,
+   "fabric_footprint_distance_m": 5.0,
+   "is_wp05_base_frame": false,
+   "frame_cells": 5402589,
+   "n_added_cells": 0,
+   "favela_share": 0.11929317591991544,
+   "citywide_svf_median": 0.6762933611336188,
+   "citywide_kwh_m2_median": 1260.7588454879476,
+   "study_favelas": {
+    "Vidigal": {
+     "n": 3860,
+     "svf_median": 0.5621467299671322,
+     "svf_percentile_of_citywide_median": 31.763530411067727,
+     "kwh_m2_median": 1010.7928909530867,
+     "kwh_m2_percentile_of_citywide_median": 29.69102406272252
+    },
+    "Rocinha": {
+     "n": 8496,
+     "svf_median": 0.4282139651411756,
+     "svf_percentile_of_citywide_median": 15.707617218337354,
+     "kwh_m2_median": 782.9468756621832,
+     "kwh_m2_percentile_of_citywide_median": 16.20682232166837
+    },
+    "Complexo do Alem\u00e3o": {
+     "n": 23867,
+     "svf_median": 0.5988774383565982,
+     "svf_percentile_of_citywide_median": 37.327483175196186,
+     "kwh_m2_median": 1120.853205129166,
+     "kwh_m2_percentile_of_citywide_median": 37.94557572304686
+    },
+    "Mar\u00e9": {
+     "n": 8801,
+     "svf_median": 0.38316550508200753,
+     "svf_percentile_of_citywide_median": 12.108824121175976,
+     "kwh_m2_median": 743.9886706416547,
+     "kwh_m2_percentile_of_citywide_median": 14.418281679394822
+    },
+    "Rio das Pedras": {
+     "n": 5249,
+     "svf_median": 0.38308176160645124,
+     "svf_percentile_of_citywide_median": 12.104085652267829,
+     "kwh_m2_median": 732.6512585387488,
+     "kwh_m2_percentile_of_citywide_median": 13.907804202762785
+    }
+   }
+  },
+  {
+   "fabric_coverage_threshold": 0.1,
+   "fabric_footprint_distance_m": 10.0,
+   "is_wp05_base_frame": true,
+   "frame_cells": 8402056,
+   "n_added_cells": 0,
+   "favela_share": 0.09843531154755455,
+   "citywide_svf_median": 0.7722794676209415,
+   "citywide_kwh_m2_median": 1428.6951483506584,
+   "study_favelas": {
+    "Vidigal": {
+     "n": 4949,
+     "svf_median": 0.6246811444956931,
+     "svf_percentile_of_citywide_median": 28.9493845315956,
+     "kwh_m2_median": 1126.2420866116852,
+     "kwh_m2_percentile_of_citywide_median": 26.90968139226875
+    },
+    "Rocinha": {
+     "n": 10410,
+     "svf_median": 0.49605717315914716,
+     "svf_percentile_of_citywide_median": 15.553597833673093,
+     "kwh_m2_median": 911.1728872228439,
+     "kwh_m2_percentile_of_citywide_median": 15.83865901393659
+    },
+    "Complexo do Alem\u00e3o": {
+     "n": 29510,
+     "svf_median": 0.6617590429839104,
+     "svf_percentile_of_citywide_median": 33.59433690991824,
+     "kwh_m2_median": 1232.8079218146227,
+     "kwh_m2_percentile_of_citywide_median": 33.9421684406769
+    },
+    "Mar\u00e9": {
+     "n": 9924,
+     "svf_median": 0.41567292553751944,
+     "svf_percentile_of_citywide_median": 9.854718892613903,
+     "kwh_m2_median": 804.1799723778245,
+     "kwh_m2_percentile_of_citywide_median": 11.671262367211074
+    },
+    "Rio das Pedras": {
+     "n": 6039,
+     "svf_median": 0.430397680298255,
+     "svf_percentile_of_citywide_median": 10.737568280906483,
+     "kwh_m2_median": 814.7191450208437,
+     "kwh_m2_percentile_of_citywide_median": 12.049378152204651
+    }
+   }
+  },
+  {
+   "fabric_coverage_threshold": 0.1,
+   "fabric_footprint_distance_m": 20.0,
+   "is_wp05_base_frame": false,
+   "frame_cells": 11317913,
+   "n_added_cells": 2915857,
+   "favela_share": 0.07954204984611563,
+   "citywide_svf_median": 0.8373352544632584,
+   "citywide_kwh_m2_median": 1531.356091918107,
+   "study_favelas": {
+    "Vidigal": {
+     "n": 5484,
+     "svf_median": 0.6535192299833875,
+     "svf_percentile_of_citywide_median": 24.95832933156493,
+     "kwh_m2_median": 1185.5834574144935,
+     "kwh_m2_percentile_of_citywide_median": 23.601391882054582
+    },
+    "Rocinha": {
+     "n": 11370,
+     "svf_median": 0.5295046243119303,
+     "svf_percentile_of_citywide_median": 14.095876156673055,
+     "kwh_m2_median": 975.2560413044164,
+     "kwh_m2_percentile_of_citywide_median": 14.23493889730377
+    },
+    "Complexo do Alem\u00e3o": {
+     "n": 31832,
+     "svf_median": 0.6868268541812981,
+     "svf_percentile_of_citywide_median": 28.500970099346056,
+     "kwh_m2_median": 1280.0554326985912,
+     "kwh_m2_percentile_of_citywide_median": 28.994453306011454
+    },
+    "Mar\u00e9": {
+     "n": 10314,
+     "svf_median": 0.42666250392461647,
+     "svf_percentile_of_citywide_median": 7.902958787543252,
+     "kwh_m2_median": 829.095260181763,
+     "kwh_m2_percentile_of_citywide_median": 9.472347066106623
+    },
+    "Rio das Pedras": {
+     "n": 6632,
+     "svf_median": 0.46753368263144174,
+     "svf_percentile_of_citywide_median": 10.005479808865822,
+     "kwh_m2_median": 889.672473687451,
+     "kwh_m2_percentile_of_citywide_median": 11.288450441349037
+    }
+   }
+  },
+  {
+   "fabric_coverage_threshold": 0.2,
+   "fabric_footprint_distance_m": 5.0,
+   "is_wp05_base_frame": false,
+   "frame_cells": 4899492,
+   "n_added_cells": 0,
+   "favela_share": 0.121519945333108,
+   "citywide_svf_median": 0.6634621904998879,
+   "citywide_kwh_m2_median": 1239.1248636064756,
+   "study_favelas": {
+    "Vidigal": {
+     "n": 3714,
+     "svf_median": 0.5567852620737859,
+     "svf_percentile_of_citywide_median": 32.81854526959121,
+     "kwh_m2_median": 1000.4484667350057,
+     "kwh_m2_percentile_of_citywide_median": 30.526532138433943
+    },
+    "Rocinha": {
+     "n": 8197,
+     "svf_median": 0.41741122070056397,
+     "svf_percentile_of_citywide_median": 15.91740531467344,
+     "kwh_m2_median": 761.2134098799899,
+     "kwh_m2_percentile_of_citywide_median": 16.216181187763954
+    },
+    "Complexo do Alem\u00e3o": {
+     "n": 22810,
+     "svf_median": 0.5865391706352564,
+     "svf_percentile_of_citywide_median": 37.33713617656687,
+     "kwh_m2_median": 1099.9177134873937,
+     "kwh_m2_percentile_of_citywide_median": 38.03641275462844
+    },
+    "Mar\u00e9": {
+     "n": 8744,
+     "svf_median": 0.38187142289033604,
+     "svf_percentile_of_citywide_median": 12.992326551405737,
+     "kwh_m2_median": 740.0453682291543,
+     "kwh_m2_percentile_of_citywide_median": 15.211311703335774
+    },
+    "Rio das Pedras": {
+     "n": 5219,
+     "svf_median": 0.3819341991017345,
+     "svf_percentile_of_citywide_median": 12.99617388904809,
+     "kwh_m2_median": 730.3673961077109,
+     "kwh_m2_percentile_of_citywide_median": 14.76105073750503
+    }
+   }
+  },
+  {
+   "fabric_coverage_threshold": 0.2,
+   "fabric_footprint_distance_m": 10.0,
+   "is_wp05_base_frame": false,
+   "frame_cells": 7384163,
+   "n_added_cells": 0,
+   "favela_share": 0.10100223952261075,
+   "citywide_svf_median": 0.7541570995307174,
+   "citywide_kwh_m2_median": 1400.1067096822524,
+   "study_favelas": {
+    "Vidigal": {
+     "n": 4720,
+     "svf_median": 0.6179235238953977,
+     "svf_percentile_of_citywide_median": 30.42283871577591,
+     "kwh_m2_median": 1109.421239789569,
+     "kwh_m2_percentile_of_citywide_median": 27.895009901596158
+    },
+    "Rocinha": {
+     "n": 9889,
+     "svf_median": 0.4801256823468382,
+     "svf_percentile_of_citywide_median": 15.701197278554115,
+     "kwh_m2_median": 882.1543935326063,
+     "kwh_m2_percentile_of_citywide_median": 15.973719702558029
+    },
+    "Complexo do Alem\u00e3o": {
+     "n": 27521,
+     "svf_median": 0.6416952822658595,
+     "svf_percentile_of_citywide_median": 33.45120496392076,
+     "kwh_m2_median": 1196.7597387098297,
+     "kwh_m2_percentile_of_citywide_median": 33.664147175516035
+    },
+    "Mar\u00e9": {
+     "n": 9819,
+     "svf_median": 0.4124973813919592,
+     "svf_percentile_of_citywide_median": 10.760251364982057,
+     "kwh_m2_median": 799.4082098591908,
+     "kwh_m2_percentile_of_citywide_median": 12.623631141403568
+    },
+    "Rio das Pedras": {
+     "n": 5995,
+     "svf_median": 0.42733986996225215,
+     "svf_percentile_of_citywide_median": 11.717888676076083,
+     "kwh_m2_median": 809.5568967213177,
+     "kwh_m2_percentile_of_citywide_median": 13.009226638144364
+    }
+   }
+  },
+  {
+   "fabric_coverage_threshold": 0.2,
+   "fabric_footprint_distance_m": 20.0,
+   "is_wp05_base_frame": false,
+   "frame_cells": 9245387,
+   "n_added_cells": 1861224,
+   "favela_share": 0.08571939714367825,
+   "citywide_svf_median": 0.8061924612778203,
+   "citywide_kwh_m2_median": 1484.2392752662126,
+   "study_favelas": {
+    "Vidigal": {
+     "n": 5150,
+     "svf_median": 0.6420136800017023,
+     "svf_percentile_of_citywide_median": 27.50002785172757,
+     "kwh_m2_median": 1160.340089771143,
+     "kwh_m2_percentile_of_citywide_median": 25.61006910797785
+    },
+    "Rocinha": {
+     "n": 10610,
+     "svf_median": 0.5059797234638987,
+     "svf_percentile_of_citywide_median": 14.679212454816657,
+     "kwh_m2_median": 929.0918505733431,
+     "kwh_m2_percentile_of_citywide_median": 14.703624629234017
+    },
+    "Complexo do Alem\u00e3o": {
+     "n": 28786,
+     "svf_median": 0.6564594006223597,
+     "svf_percentile_of_citywide_median": 29.118499852953697,
+     "kwh_m2_median": 1224.8839713025768,
+     "kwh_m2_percentile_of_citywide_median": 29.467722659960046
+    },
+    "Mar\u00e9": {
+     "n": 10157,
+     "svf_median": 0.4226234790412366,
+     "svf_percentile_of_citywide_median": 9.222620967624179,
+     "kwh_m2_median": 818.6854352528243,
+     "kwh_m2_percentile_of_citywide_median": 10.8133007304075
+    },
+    "Rio das Pedras": {
+     "n": 6570,
+     "svf_median": 0.46338928406707275,
+     "svf_percentile_of_citywide_median": 11.619794823083122,
+     "kwh_m2_median": 882.0608345658077,
+     "kwh_m2_percentile_of_citywide_median": 12.95601795792864
+    }
+   }
+  }
+ ],
+ "wp04_polygon_interior": {
+  "fabric_coverage_threshold": null,
+  "fabric_footprint_distance_m": null,
+  "is_wp05_base_frame": false,
+  "frame_cells": null,
+  "frame_cells_note": "not computed citywide \u2014 WP-04 evaluated only the 5 study sites' all-polygon-interior ground surfaces (every non-building 1 m cell inside the favela's own Favelas_Limit_2019 polygon), not a citywide all-polygon-interior frame across all 1074 polygons.",
+  "n_added_cells": null,
+  "favela_share": null,
+  "citywide_svf_median": 0.7722794676209415,
+  "citywide_kwh_m2_median": 1428.6951483506584,
+  "citywide_note": "WP-04's percentile positions were computed (wp04_sites.py citywide_percentile) against WP-05's own citywide distribution (the 0.10/10 frame, same numbers as this table's base row) \u2014 only the per-favela NUMERATOR differs (all polygon-interior cells, not fabric-frame-filtered); the citywide denominator is shared with the base row, not independently computed.",
+  "study_favelas": {
+   "Vidigal": {
+    "n": 141239,
+    "svf_median": 0.6249634503903775,
+    "svf_percentile_of_citywide_median": 29.658685290000587,
+    "kwh_m2_median": 1137.9496171256903,
+    "kwh_m2_percentile_of_citywide_median": 28.300609328845457
+   },
+   "Rocinha": {
+    "n": 310710,
+    "svf_median": 0.5681386877259279,
+    "svf_percentile_of_citywide_median": 22.998804628595437,
+    "kwh_m2_median": 1056.625286499601,
+    "kwh_m2_percentile_of_citywide_median": 23.364267661555733
+   },
+   "Complexo do Alem\u00e3o": {
+    "n": 846016,
+    "svf_median": 0.7073944512973221,
+    "svf_percentile_of_citywide_median": 41.04071259993066,
+    "kwh_m2_median": 1315.244182339459,
+    "kwh_m2_percentile_of_citywide_median": 41.53274403522292
+   },
+   "Mar\u00e9": {
+    "n": 258178,
+    "svf_median": 0.4292536458387266,
+    "svf_percentile_of_citywide_median": 10.959432696722457,
+    "kwh_m2_median": 834.6154120107494,
+    "kwh_m2_percentile_of_citywide_median": 13.575936109318377
+   },
+   "Rio das Pedras": {
+    "n": 167661,
+    "svf_median": 0.4714667584462934,
+    "svf_percentile_of_citywide_median": 14.618713467198049,
+    "kwh_m2_median": 900.4685337807794,
+    "kwh_m2_percentile_of_citywide_median": 16.479375387048705
+   }
+  }
+ },
+ "spread_across_variants": {
+  "Vidigal": {
+   "svf_percentile_spread_max_minus_min": 9.321974484908303,
+   "kwh_m2_percentile_spread_max_minus_min": 8.316507096226985,
+   "n_variants_with_data": 10
+  },
+  "Rocinha": {
+   "svf_percentile_spread_max_minus_min": 8.902928471922381,
+   "kwh_m2_percentile_spread_max_minus_min": 9.129328764251962,
+   "n_variants_with_data": 10
+  },
+  "Complexo do Alem\u00e3o": {
+   "svf_percentile_spread_max_minus_min": 13.276960256661567,
+   "kwh_m2_percentile_spread_max_minus_min": 13.278765474806285,
+   "n_variants_with_data": 10
+  },
+  "Mar\u00e9": {
+   "svf_percentile_spread_max_minus_min": 5.630359332423798,
+   "kwh_m2_percentile_spread_max_minus_min": 6.3618585694152525,
+   "n_variants_with_data": 10
+  },
+  "Rio das Pedras": {
+   "svf_percentile_spread_max_minus_min": 5.2807620423648505,
+   "kwh_m2_percentile_spread_max_minus_min": 5.89637307540354,
+   "n_variants_with_data": 10
+  }
+ },
+ "card_draft": {
+  "id": "g3_domain",
+  "question": "Which analysis-domain definition (config/params.yaml `domain.fabric_coverage_threshold` / `fabric_footprint_distance_m`) should be locked for the headline citywide-percentile claim?",
+  "options": [
+   {
+    "variant": "tightest (0.20 / 5m)",
+    "fabric_coverage_threshold": 0.2,
+    "fabric_footprint_distance_m": 5.0,
+    "detail": {
+     "frame_cells": 4899492,
+     "favela_share": 0.121519945333108,
+     "citywide_svf_median": 0.6634621904998879,
+     "citywide_kwh_m2_median": 1239.1248636064756,
+     "study_favelas_svf_percentile": {
+      "Vidigal": 32.81854526959121,
+      "Rocinha": 15.91740531467344,
+      "Complexo do Alem\u00e3o": 37.33713617656687,
+      "Mar\u00e9": 12.992326551405737,
+      "Rio das Pedras": 12.99617388904809
+     }
+    }
+   },
+   {
+    "variant": "grid centre \u2014 current WP-05 default (0.10 / 10m)",
+    "fabric_coverage_threshold": 0.1,
+    "fabric_footprint_distance_m": 10.0,
+    "detail": {
+     "frame_cells": 8402056,
+     "favela_share": 0.09843531154755455,
+     "citywide_svf_median": 0.7722794676209415,
+     "citywide_kwh_m2_median": 1428.6951483506584,
+     "study_favelas_svf_percentile": {
+      "Vidigal": 28.9493845315956,
+      "Rocinha": 15.553597833673093,
+      "Complexo do Alem\u00e3o": 33.59433690991824,
+      "Mar\u00e9": 9.854718892613903,
+      "Rio das Pedras": 10.737568280906483
+     }
+    }
+   },
+   {
+    "variant": "loosest (0.05 / 20m)",
+    "fabric_coverage_threshold": 0.05,
+    "fabric_footprint_distance_m": 20.0,
+    "detail": {
+     "frame_cells": 12182233,
+     "favela_share": 0.07624464250519589,
+     "citywide_svf_median": 0.8508994863142154,
+     "citywide_kwh_m2_median": 1550.3151816719444,
+     "study_favelas_svf_percentile": {
+      "Vidigal": 23.49657078468291,
+      "Rocinha": 14.21373240850015,
+      "Complexo do Alem\u00e3o": 27.76375234326909,
+      "Mar\u00e9": 7.361967218981939,
+      "Rio das Pedras": 9.337951424833198
+     }
+    }
+   }
+  ],
+  "recommended": "grid centre \u2014 current WP-05 default (0.10 / 10m)",
+  "reason": "Closest to the sensitivity grid's centre and identical to the frame every other WP-05/WP-04 deliverable already reports against; the table shows no favela crossing a qualitatively different rank at the grid's edges, so there is no evidence to prefer a tighter or looser domain over the one already in use."
+ },
+ "git_sha": "7ece52d"
+}

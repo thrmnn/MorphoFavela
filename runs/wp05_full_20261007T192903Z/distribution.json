@@ -1,0 +1,590 @@
+{
+ "_utc": "2026-10-07T20:10:03Z",
+ "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+ "sky_model": "epw_weighted",
+ "sky_patches": 145,
+ "n_cells": 8402056,
+ "citywide": {
+  "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+  "svf": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 8402056,
+   "p1": 0.12337358431620309,
+   "p5": 0.3068088480216765,
+   "p10": 0.4181857221109546,
+   "p25": 0.5912242859244676,
+   "p50": 0.7722794676209415,
+   "p75": 0.8911430272152027,
+   "p90": 0.9446042923919603,
+   "p95": 0.963033548155187,
+   "p99": 0.9827085726191764
+  },
+  "kwh_m2": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 8402056,
+   "p1": 249.48966826425317,
+   "p5": 564.1175465352263,
+   "p10": 753.5093396864561,
+   "p25": 1093.7254530823689,
+   "p50": 1428.6951483506584,
+   "p75": 1608.6760104287696,
+   "p90": 1670.102291840128,
+   "p95": 1688.8932308948729,
+   "p99": 1704.3943003882396
+  }
+ },
+ "per_stratum": {
+  "0": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 1060666,
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 1060666,
+    "p1": 0.3136057077273924,
+    "p5": 0.4913241564487869,
+    "p10": 0.5753234012280601,
+    "p25": 0.734964297507203,
+    "p50": 0.884587897281045,
+    "p75": 0.9502654544422047,
+    "p90": 0.9748103201492221,
+    "p95": 0.9827085726191763,
+    "p99": 0.9913542863095882
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 1060666,
+    "p1": 531.062670703249,
+    "p5": 839.2546053175622,
+    "p10": 1023.9203889115669,
+    "p25": 1342.23448615994,
+    "p50": 1591.9550434507357,
+    "p75": 1673.9147433083194,
+    "p90": 1698.0771310266703,
+    "p95": 1703.8928576581843,
+    "p99": 1710.526451501247
+   }
+  },
+  "1": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 2651086,
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 2651086,
+    "p1": 0.16851266227007536,
+    "p5": 0.36403205448895815,
+    "p10": 0.46810763259984345,
+    "p25": 0.6279726335550988,
+    "p50": 0.7995654721224096,
+    "p75": 0.9039410456944019,
+    "p90": 0.9476813805364036,
+    "p95": 0.9625352406748818,
+    "p99": 0.9783857157739705
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 2651086,
+    "p1": 321.75490402862425,
+    "p5": 648.5590177370649,
+    "p10": 836.0071926413661,
+    "p25": 1160.3735347907134,
+    "p50": 1471.797204998529,
+    "p75": 1625.4517982788432,
+    "p90": 1673.9179447766892,
+    "p95": 1689.027390267534,
+    "p99": 1701.3282248317357
+   }
+  },
+  "2": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 2092651,
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 2092651,
+    "p1": 0.07460509083216703,
+    "p5": 0.22705575328005279,
+    "p10": 0.3272512863787372,
+    "p25": 0.506168371179214,
+    "p50": 0.6994265351891593,
+    "p75": 0.8439010811014281,
+    "p90": 0.910319744198887,
+    "p95": 0.9330766741380778,
+    "p99": 0.9599024898515639
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 2092651,
+    "p1": 161.9123552768944,
+    "p5": 433.37121356993634,
+    "p10": 610.7362615025626,
+    "p25": 944.159450671116,
+    "p50": 1308.2520186863946,
+    "p75": 1547.0849667590896,
+    "p90": 1636.2150259071714,
+    "p95": 1661.1657936563465,
+    "p99": 1687.7687586282113
+   }
+  },
+  "3": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 354391,
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 354391,
+    "p1": 0.3275569237841906,
+    "p5": 0.49799044646438445,
+    "p10": 0.5796069821045171,
+    "p25": 0.7292769042433747,
+    "p50": 0.8676797334366878,
+    "p75": 0.9380930220445615,
+    "p90": 0.9685482035419758,
+    "p95": 0.979133176994428,
+    "p99": 0.9899133340278532
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 354391,
+    "p1": 560.6176345629461,
+    "p5": 857.8744550759412,
+    "p10": 1035.8453408621665,
+    "p25": 1334.298562712942,
+    "p50": 1571.2560187444983,
+    "p75": 1661.563407894953,
+    "p90": 1693.1091130413945,
+    "p95": 1701.3704378256105,
+    "p99": 1709.759932612121
+   }
+  },
+  "4": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 805402,
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 805402,
+    "p1": 0.15795438619552504,
+    "p5": 0.3374764341218819,
+    "p10": 0.4390594907027806,
+    "p25": 0.595034573764955,
+    "p50": 0.7604053915381079,
+    "p75": 0.8748482147949889,
+    "p90": 0.9311374143760374,
+    "p95": 0.9513107463203319,
+    "p99": 0.9755038112104998
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 805402,
+    "p1": 304.7062440324935,
+    "p5": 608.7093296299524,
+    "p10": 787.2250838550426,
+    "p25": 1101.3900656777646,
+    "p50": 1411.1821656981044,
+    "p75": 1587.583484264631,
+    "p90": 1656.4118492453256,
+    "p95": 1677.8113869780595,
+    "p99": 1698.9404622776376
+   }
+  },
+  "5": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 507670,
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 507670,
+    "p1": 0.0758236364978874,
+    "p5": 0.20519845863709818,
+    "p10": 0.3000140178491787,
+    "p25": 0.4694514273256782,
+    "p50": 0.6488813596570782,
+    "p75": 0.7976386979600932,
+    "p90": 0.879019747645981,
+    "p95": 0.9101732375354314,
+    "p99": 0.9479305342765562
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 507670,
+    "p1": 164.08520287731793,
+    "p5": 395.24502230119396,
+    "p10": 562.731737704157,
+    "p25": 875.7110662337951,
+    "p50": 1223.0992962588655,
+    "p75": 1482.166017042692,
+    "p90": 1598.9204315077202,
+    "p95": 1636.4815730482592,
+    "p99": 1676.0115491185768
+   }
+  },
+  "6": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 277259,
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 277259,
+    "p1": 0.30696168482340097,
+    "p5": 0.47968439352445663,
+    "p10": 0.5671655925011405,
+    "p25": 0.7145158132005169,
+    "p50": 0.836945473432904,
+    "p75": 0.9083617322855464,
+    "p90": 0.9472370432152786,
+    "p95": 0.9644745004369224,
+    "p99": 0.985590477182647
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 277259,
+    "p1": 534.0839309522449,
+    "p5": 841.2458445506315,
+    "p10": 1023.8552331989023,
+    "p25": 1310.134619575923,
+    "p50": 1530.923317692899,
+    "p75": 1631.092086743848,
+    "p90": 1673.0117316132018,
+    "p95": 1689.9916891624682,
+    "p99": 1706.4844849679023
+   }
+  },
+  "7": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 454379,
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 454379,
+    "p1": 0.15375790932138983,
+    "p5": 0.3248145956630259,
+    "p10": 0.42445843091821234,
+    "p25": 0.5790521725713046,
+    "p50": 0.7368239886371691,
+    "p75": 0.8472321403167822,
+    "p90": 0.9099240837952787,
+    "p95": 0.936207732441701,
+    "p99": 0.9699891558237111
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 454379,
+    "p1": 293.5646782480671,
+    "p5": 584.3572607517525,
+    "p10": 758.0260716486603,
+    "p25": 1069.5283752389842,
+    "p50": 1368.5428879241063,
+    "p75": 1551.404079250232,
+    "p90": 1633.312118491105,
+    "p95": 1661.0219646694509,
+    "p99": 1694.6177969804933
+   }
+  },
+  "8": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "n": 198552,
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 198552,
+    "p1": 0.06605653202352045,
+    "p5": 0.17096377715464045,
+    "p10": 0.25449123012612496,
+    "p25": 0.4199032128010753,
+    "p50": 0.5974845378586051,
+    "p75": 0.7518546495829759,
+    "p90": 0.8461272572097226,
+    "p95": 0.8853721380603357,
+    "p99": 0.938342175784714
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 198552,
+    "p1": 146.78653125489723,
+    "p5": 332.4523797383137,
+    "p10": 481.17833362138214,
+    "p25": 774.3634366998629,
+    "p50": 1121.840635984409,
+    "p75": 1405.5543963028101,
+    "p90": 1553.2587112042731,
+    "p95": 1605.8523704787826,
+    "p99": 1664.1005860153136
+   }
+  }
+ },
+ "study_favelas": {
+  "Vidigal": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "match_method": "nome_exact_unique",
+   "matched_polygons": [
+    {
+     "objectid": 606,
+     "cod_favela": 45,
+     "nome": "Vidigal",
+     "complexo": "Isolada"
+    }
+   ],
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 4949,
+    "median": 0.6246811444956931,
+    "iqr": [
+     0.45267190328168594,
+     0.7541533962314977
+    ],
+    "citywide_percentile_position": 28.9493845315956
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 4949,
+    "median": 1126.2420866116852,
+    "iqr": [
+     802.4100159464507,
+     1372.2820672643722
+    ],
+    "citywide_percentile_position": 26.90968139226875
+   }
+  },
+  "Rocinha": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "match_method": "nome_exact_unique",
+   "matched_polygons": [
+    {
+     "objectid": 605,
+     "cod_favela": 43,
+     "nome": "Rocinha",
+     "complexo": "Isolada"
+    }
+   ],
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 10410,
+    "median": 0.49605717315914716,
+    "iqr": [
+     0.2891824971450828,
+     0.6728024465396198
+    ],
+    "citywide_percentile_position": 15.553597833673093
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 10410,
+    "median": 911.1728872228439,
+    "iqr": [
+     529.5051999951642,
+     1281.6231845794086
+    ],
+    "citywide_percentile_position": 15.83865901393659
+   }
+  },
+  "Complexo do Alem\u00e3o": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "match_method": "complexo_exact",
+   "matched_polygons": [
+    {
+     "objectid": 218,
+     "cod_favela": 861,
+     "nome": "Estrada do Itarar\u00e9",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 219,
+     "cod_favela": 860,
+     "nome": "Rua 1 pela Ademas",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 478,
+     "cod_favela": 580,
+     "nome": "Rua Armando Sodr\u00e9",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 495,
+     "cod_favela": 545,
+     "nome": "Vila Matinha",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 647,
+     "cod_favela": 87,
+     "nome": "Itarar\u00e9",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 649,
+     "cod_favela": 89,
+     "nome": "Joaquim de Queir\u00f3z",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 651,
+     "cod_favela": 91,
+     "nome": "Morro da Baiana",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 652,
+     "cod_favela": 92,
+     "nome": "Morro do Adeus",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 653,
+     "cod_favela": 93,
+     "nome": "Morro do Alem\u00e3o",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 655,
+     "cod_favela": 95,
+     "nome": "Morro do Pianc\u00f3",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 707,
+     "cod_favela": 147,
+     "nome": "Morro das Palmeiras",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 708,
+     "cod_favela": 148,
+     "nome": "Nova Bras\u00edlia (RA - Alem\u00e3o)",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 714,
+     "cod_favela": 154,
+     "nome": "Relic\u00e1rio",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 1000,
+     "cod_favela": 444,
+     "nome": "Mour\u00e3o Filho",
+     "complexo": "Complexo do Alem\u00e3o"
+    },
+    {
+     "objectid": 1036,
+     "cod_favela": 485,
+     "nome": "Parque Alvorada",
+     "complexo": "Complexo do Alem\u00e3o"
+    }
+   ],
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 29510,
+    "median": 0.6617590429839104,
+    "iqr": [
+     0.4749445779781897,
+     0.8117151391926181
+    ],
+    "citywide_percentile_position": 33.59433690991824
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 29510,
+    "median": 1232.8079218146227,
+    "iqr": [
+     874.7727216625312,
+     1495.368068425587
+    ],
+    "citywide_percentile_position": 33.9421684406769
+   }
+  },
+  "Mar\u00e9": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "match_method": "complexo_exact",
+   "matched_polygons": [
+    {
+     "objectid": 644,
+     "cod_favela": 84,
+     "nome": "Baixa do Sapateiro",
+     "complexo": "Mar\u00e9"
+    },
+    {
+     "objectid": 650,
+     "cod_favela": 90,
+     "nome": "Parque Mar\u00e9",
+     "complexo": "Mar\u00e9"
+    },
+    {
+     "objectid": 656,
+     "cod_favela": 96,
+     "nome": "Nova Holanda",
+     "complexo": "Mar\u00e9"
+    },
+    {
+     "objectid": 664,
+     "cod_favela": 104,
+     "nome": "Parque Rubens Vaz",
+     "complexo": "Mar\u00e9"
+    },
+    {
+     "objectid": 665,
+     "cod_favela": 105,
+     "nome": "Parque Uni\u00e3o",
+     "complexo": "Mar\u00e9"
+    },
+    {
+     "objectid": 668,
+     "cod_favela": 108,
+     "nome": "Timbau",
+     "complexo": "Mar\u00e9"
+    }
+   ],
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 9924,
+    "median": 0.41567292553751944,
+    "iqr": [
+     0.2672157697467844,
+     0.5818439345981923
+    ],
+    "citywide_percentile_position": 9.854718892613903
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 9924,
+    "median": 804.1799723778245,
+    "iqr": [
+     521.2205110966728,
+     1147.8814313903065
+    ],
+    "citywide_percentile_position": 11.671262367211074
+   }
+  },
+  "Rio das Pedras": {
+   "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+   "match_method": "complexo_exact",
+   "matched_polygons": [
+    {
+     "objectid": 471,
+     "cod_favela": 587,
+     "nome": "A.M. e Amigos de Rio das Pedras",
+     "complexo": "Rio das Pedras"
+    },
+    {
+     "objectid": 811,
+     "cod_favela": 256,
+     "nome": "Rio das Pedras",
+     "complexo": "Rio das Pedras"
+    }
+   ],
+   "svf": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 6039,
+    "median": 0.430397680298255,
+    "iqr": [
+     0.24849346759759194,
+     0.640907445190017
+    ],
+    "citywide_percentile_position": 10.737568280906483
+   },
+   "kwh_m2": {
+    "status": "PROVISIONAL \u2014 wp05_run_design untapped",
+    "n": 6039,
+    "median": 814.7191450208437,
+    "iqr": [
+     475.37900470487926,
+     1218.715849109444
+    ],
+    "citywide_percentile_position": 12.049378152204651
+   }
+  }
+ }
+}
