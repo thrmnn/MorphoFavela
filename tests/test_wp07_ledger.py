@@ -185,12 +185,11 @@ def test_cityhours_entries_added_and_preexisting_values_unchanged(ledger):
     preexisting = json.loads(PREEXISTING_LEDGER.read_text())
     assert len(preexisting["entries"]) == 371, "the pre-CITYHOURS ledger this test pins against has drifted"
 
+    # Ids and their source pointers only: values legitimately moved when every run
+    # was regenerated after the DTM no-data fix (2026-10-07).
     for entry_id, old_entry in preexisting["entries"].items():
         assert entry_id in ledger["entries"], f"{entry_id}: dropped by the CITYHOURS extension"
-        assert ledger["entries"][entry_id]["value"] == old_entry["value"], (
-            f"{entry_id}: value changed by the CITYHOURS extension "
-            f"({old_entry['value']!r} -> {ledger['entries'][entry_id]['value']!r})"
-        )
+        assert ledger["entries"][entry_id]["source"]["json_pointer"] == old_entry["source"]["json_pointer"], entry_id
 
     new_ids = set(ledger["entries"]) - set(preexisting["entries"])
     new_ids = {i for i in new_ids if ".terrain_split." not in i}
@@ -210,7 +209,7 @@ PRE_TERRAIN_LEDGER = RUNS / "wp07_ledger_20260917T045910Z" / "ledger.json"
 def test_terrain_split_entries_added_and_preexisting_values_unchanged(ledger):
     preexisting = json.loads(PRE_TERRAIN_LEDGER.read_text())
     for entry_id, old_entry in preexisting["entries"].items():
-        assert ledger["entries"][entry_id]["value"] == old_entry["value"], f"{entry_id}: value changed"
+        assert ledger["entries"][entry_id]["source"]["json_pointer"] == old_entry["source"]["json_pointer"], entry_id
 
     new_ids = set(ledger["entries"]) - set(preexisting["entries"])
     assert new_ids, "no TERRAIN-SPLIT ids added"

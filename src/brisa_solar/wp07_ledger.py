@@ -28,11 +28,11 @@ from .constants import P1_SKY_PATCHES, REPO_ROOT
 RUN_OF_RECORD = {
     "wp05": "wp05_full_20261007T192903Z",
     "wp04": "wp04_sites_20261007T201123Z",
-    "g3": "g3_domain_20260915T042927Z",
-    "wp06": "wp06_geometry_20260915T052604Z",
+    "g3": "g3_domain_20261007T201820Z",
+    "wp06": "wp06_geometry_20261007T201840Z",
     "wp02_crossref": "wp02_horizon_20260914T195630Z",
-    "cityhours": "cityhours_full_20260917T041544Z",
-    "terrain_split": "terrain_split_full_20260917T130045Z",
+    "cityhours": "cityhours_full_20261007T201156Z",
+    "terrain_split": "terrain_split_full_20261007T201819Z",
 }
 
 #: docs/cityhours_spec.md ids use "sun_h_winter"/"sun_h_equinox" (the same
