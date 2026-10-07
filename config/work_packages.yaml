@@ -45,6 +45,7 @@ work_packages:
   CFD: {title: CFD and terrain cross-checks, papers: [p3], families:
     {site_cfd: {script: scripts/analyze_cfd_results.py}, site_sampling_cfd: {script: scripts/run_pilot_sampling.py, script_confidence: low},
      site_solar: {script: src/solar/visualize.py}, terrain_split_full: {script: src/brisa_solar/terrain_split.py},
+     terrain_split_rerender: {script: src/brisa_solar/terrain_split.py}, p1_locator: {script: src/brisa_solar/p1_locator.py},
      comparative_health: {script: scripts/health/terrain_morphology_split.py},
      comparative_vidigal_vs_mingze: {script: scripts/compare_mingze_vidigal.py},
      comparative_mingze_facade: {script: scripts/compare_mingze_facade.py},

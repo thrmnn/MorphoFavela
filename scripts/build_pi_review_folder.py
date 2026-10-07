@@ -471,7 +471,7 @@ RECORDS: list[dict] = [
             "<a href=\"/morphofavela-dash/outputs/_hub/wp07_staged/review/_results_wp06.html\">WP06</a> and "
             "<a href=\"/morphofavela-dash/outputs/_hub/wp07_staged/review/_results_g3.html\">G3</a>."
         ),
-        resolve=lambda: _runs_newest_first("wp07_figures_*"),
+        resolve=lambda: _runs_newest_first("wp07_figures_*") + _runs_newest_first("p1_locator_*"),
     ),
     dict(
         order=5, slug="citywide_maps", title="Citywide maps (f5, f5b, f6)",
@@ -489,13 +489,13 @@ RECORDS: list[dict] = [
         order=7, slug="terrain_vs_buildings", title="Terrain versus buildings",
         blurb="How much of the sun lost to an open flat horizon is the hill, and how much is what was "
               "built on it. The maps put terrain-only beside terrain-with-buildings on one colour scale.",
-        resolve=lambda: _latest("terrain_split_*"),
+        resolve=lambda: _runs_newest_first("terrain_split_*"),
     ),
     dict(
         order=8, slug="method_schematics", title="How the method works",
         blurb="The obstruction surface built from terrain and building tops, the ray march that decides "
               "whether a sky patch is blocked, and the matrix step that turns visibility into irradiation.",
-        resolve=lambda: _latest("wp07_method_*"),
+        resolve=lambda: _runs_newest_first("wp07_method_*"),
     ),
     dict(
         order=9, slug="morphotypes", title="Morphotypes and morphotopes",
