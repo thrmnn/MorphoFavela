@@ -32,6 +32,7 @@ RUN_OF_RECORD = {
     "wp06": "wp06_geometry_20260915T052604Z",
     "wp02_crossref": "wp02_horizon_20260914T195630Z",
     "cityhours": "cityhours_full_20260917T041544Z",
+    "terrain_split": "terrain_split_full_20260917T130045Z",
 }
 
 #: docs/cityhours_spec.md ids use "sun_h_winter"/"sun_h_equinox" (the same
@@ -187,6 +188,27 @@ def _build_sites(entries: dict, repo_root: Path, run_id: str) -> None:
                  f"/ground/threshold_shares/{share_key}", run_id, run_utc, "fraction")
 
 
+def _build_terrain_split(entries: dict, repo_root: Path, run_id: str) -> None:
+    """site.<slug>.terrain_split.<day>.* — terrain vs buildings share of the
+    winter-solstice / equinox sun hours lost relative to open flat ground.
+    terrain_first is the run's headline attribution; buildings_first is the
+    run's own disclosed sensitivity (a subsample, non-additive with the
+    headline), so it is reviewer-defence-only."""
+    for slug in SITES:
+        summary, rel = _load(repo_root, run_id, f"{slug}/summary.json")
+        run_utc = summary["_utc"]
+        for label, day in CITYHOURS_LABELS.items():
+            base = f"site.{slug}.terrain_split.{day}"
+            for key in ("terrain_share", "buildings_share"):
+                _add(entries, summary, rel, f"{base}.terrain_first.{key}",
+                     f"/{label}/terrain_first/{key}", run_id, run_utc, "fraction")
+                _add(entries, summary, rel, f"{base}.buildings_first.{key}",
+                     f"/{label}/buildings_first_sensitivity/{key}", run_id, run_utc, "fraction",
+                     release_class="reviewer-defence-only")
+            _add(entries, summary, rel, f"{base}.terrain_first.total_loss_h_mean",
+                 f"/{label}/terrain_first/total_loss_h_mean", run_id, run_utc, "hours")
+
+
 def _build_cityhours(entries: dict, doc: dict, rel: str, run_id: str) -> None:
     """citywide.sun_h_*, citywide.share_ge_*h_*, favela.<slug>.sun_h_*.* —
     docs/cityhours_spec.md's "Ledger" section. Reads runs/cityhours_full_*/
@@ -305,6 +327,7 @@ def build_ledger(repo_root: Path) -> dict:
     _build_wp06(entries, wp06, wp06_rel, RUN_OF_RECORD["wp06"])
     _build_engine(entries, crossref, crossref_rel, RUN_OF_RECORD["wp02_crossref"])
     _build_cityhours(entries, cityhours, cityhours_rel, RUN_OF_RECORD["cityhours"])
+    _build_terrain_split(entries, repo_root, RUN_OF_RECORD["terrain_split"])
 
     derived = build_derived(g3)
 

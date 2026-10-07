@@ -193,11 +193,31 @@ def test_cityhours_entries_added_and_preexisting_values_unchanged(ledger):
         )
 
     new_ids = set(ledger["entries"]) - set(preexisting["entries"])
+    new_ids = {i for i in new_ids if ".terrain_split." not in i}
     assert len(new_ids) == 437 - 371, f"expected 66 new CITYHOURS ids, got {len(new_ids)}"
     for entry_id in new_ids:
         assert entry_id.startswith("citywide.sun_h_") or entry_id.startswith("citywide.share_ge_") or (
             entry_id.startswith("favela.") and ".sun_h_" in entry_id
         ), f"unexpected new id outside the CITYHOURS families: {entry_id}"
+
+
+# --- (i) TERRAIN-SPLIT extension: new ids added, every pre-existing value held ---
+
+PRE_TERRAIN_LEDGER = RUNS / "wp07_ledger_20260917T045910Z" / "ledger.json"
+
+
+@pytest.mark.skipif(not PRE_TERRAIN_LEDGER.exists(), reason="pre-TERRAIN-SPLIT ledger snapshot absent")
+def test_terrain_split_entries_added_and_preexisting_values_unchanged(ledger):
+    preexisting = json.loads(PRE_TERRAIN_LEDGER.read_text())
+    for entry_id, old_entry in preexisting["entries"].items():
+        assert ledger["entries"][entry_id]["value"] == old_entry["value"], f"{entry_id}: value changed"
+
+    new_ids = set(ledger["entries"]) - set(preexisting["entries"])
+    assert new_ids, "no TERRAIN-SPLIT ids added"
+    for entry_id in new_ids:
+        assert ".terrain_split." in entry_id, f"unexpected new id outside the TERRAIN-SPLIT family: {entry_id}"
+        e = ledger["entries"][entry_id]
+        assert (".buildings_first." in entry_id) == (e["release_class"] == "reviewer-defence-only"), entry_id
 
 
 def test_write_ledger_writes_json_md_manifest(tmp_path):

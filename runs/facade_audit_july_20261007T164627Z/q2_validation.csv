@@ -1,0 +1,5 @@
+site,buildings,pct_id_in_OBJECTID,pct_zmin_eq_base_0p05,pct_height_eq_altura_0p01,null_idminus1_pct_zmin_eq_base,pct_centroid_in_site_polygon,pct_centroid_only_in_other_site_polygon,pct_centroid_in_no_site_polygon,pct_centroid_in_mare_E_outline
+Rio das Pedras,10720,100.0,99.65485074626865,99.66417910447761,20.783582089552237,93.56343283582089,0.0,6.436567164179105,
+Rocinha,13764,100.0,100.0,100.0,1.7000871839581517,100.0,0.0,0.0,
+Complexo do Alemão,21720,100.0,100.0,100.0,1.0451197053406998,100.0,0.0,0.0,
+Maré,37169,100.0,99.9784766875622,99.9784766875622,12.470069143641206,43.92639027146278,0.0,56.07360972853722,94.64876644515591

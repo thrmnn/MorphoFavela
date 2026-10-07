@@ -1,0 +1,107 @@
+{
+ "_utc": "2026-09-17T13:06:21Z",
+ "run_of_record": "wp04_sites_20260914T230606Z",
+ "per_site": {
+  "vidigal": {
+   "n_matched": 141239,
+   "n_ours": 141239,
+   "n_record": 141239,
+   "winter_solstice": {
+    "corr": 1.0,
+    "max_abs_diff": 0.0,
+    "corr_min": 0.9999,
+    "max_abs_diff_max": 0.01,
+    "pass": true
+   },
+   "equinox": {
+    "corr": 1.0,
+    "max_abs_diff": 0.0,
+    "corr_min": 0.9999,
+    "max_abs_diff_max": 0.01,
+    "pass": true
+   },
+   "pass": true
+  },
+  "rocinha": {
+   "n_matched": 310710,
+   "n_ours": 310710,
+   "n_record": 310710,
+   "winter_solstice": {
+    "corr": 0.9999999999999999,
+    "max_abs_diff": 0.0,
+    "corr_min": 0.9999,
+    "max_abs_diff_max": 0.01,
+    "pass": true
+   },
+   "equinox": {
+    "corr": 0.9999999999999999,
+    "max_abs_diff": 0.0,
+    "corr_min": 0.9999,
+    "max_abs_diff_max": 0.01,
+    "pass": true
+   },
+   "pass": true
+  },
+  "complexo_do_alemao": {
+   "n_matched": 846016,
+   "n_ours": 846016,
+   "n_record": 846016,
+   "winter_solstice": {
+    "corr": 1.0,
+    "max_abs_diff": 0.0,
+    "corr_min": 0.9999,
+    "max_abs_diff_max": 0.01,
+    "pass": true
+   },
+   "equinox": {
+    "corr": 0.9999999999999999,
+    "max_abs_diff": 0.0,
+    "corr_min": 0.9999,
+    "max_abs_diff_max": 0.01,
+    "pass": true
+   },
+   "pass": true
+  },
+  "riodaspedras": {
+   "n_matched": 167661,
+   "n_ours": 167661,
+   "n_record": 167661,
+   "winter_solstice": {
+    "corr": 1.0,
+    "max_abs_diff": 0.0,
+    "corr_min": 0.9999,
+    "max_abs_diff_max": 0.01,
+    "pass": true
+   },
+   "equinox": {
+    "corr": 1.0,
+    "max_abs_diff": 0.0,
+    "corr_min": 0.9999,
+    "max_abs_diff_max": 0.01,
+    "pass": true
+   },
+   "pass": true
+  },
+  "mare": {
+   "n_matched": 258178,
+   "n_ours": 258178,
+   "n_record": 258178,
+   "winter_solstice": {
+    "corr": 0.9999999999999998,
+    "max_abs_diff": 0.0,
+    "corr_min": 0.9999,
+    "max_abs_diff_max": 0.01,
+    "pass": true
+   },
+   "equinox": {
+    "corr": 1.0,
+    "max_abs_diff": 0.0,
+    "corr_min": 0.9999,
+    "max_abs_diff_max": 0.01,
+    "pass": true
+   },
+   "pass": true
+  }
+ },
+ "pass": true
+}

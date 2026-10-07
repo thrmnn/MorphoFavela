@@ -1,0 +1,134 @@
+{
+ "_utc": "2026-09-17T13:06:21Z",
+ "git_sha": "9eb9b08",
+ "sky": {
+  "patches": 145
+ },
+ "cell_m": 1.0,
+ "cell_m_source": "runs/wp04_sites_20260914T230606Z/manifest.json#/cell_m",
+ "max_dist_m": 500.0,
+ "obs_height_m": 1.5,
+ "march_sampling": "nearest",
+ "device": "cuda",
+ "torch_version": "2.4.1+cu121",
+ "reference_days": {
+  "winter_solstice": "2026-06-21",
+  "equinox": "2026-03-20"
+ },
+ "attribution_choice_headline": "terrain_first",
+ "attribution_note": "terrain_first (headline, matches the old figure's convention): terrain_loss = open_flat - terrain_only; buildings_loss = terrain_only - real. buildings_first (sensitivity, never the figure): buildings_loss = open_flat - buildings_only (flat-elevation surface); terrain_loss = buildings_only - real. Both orderings sum to the same total (open_flat - real) but split it differently because terrain shading and building shading are not additive; buildings_first uses a fixed-size random subsample per site, not the full grid \u2014 see BLDG_SUBSAMPLE_N.",
+ "bldg_subsample_n": 20000,
+ "floor_provenance": "The 2h daylight floor is the ATHENS CHARTER (1943) Point 26 \u2014 NOT a WHO benchmark. Older docstrings in src/solar/ still say 'WHO \u22652h'; that attribution is wrong and must not propagate.",
+ "wp04_run_of_record": "wp04_sites_20260914T230606Z",
+ "sites": [
+  "vidigal",
+  "rocinha",
+  "complexo_do_alemao",
+  "riodaspedras",
+  "mare"
+ ],
+ "site_reports": [
+  {
+   "site_key": "vidigal",
+   "display_name": "Vidigal",
+   "match_method": "nome_exact_unique",
+   "n_ground": 141239,
+   "n_bldg_subsample": 20000,
+   "flat_reference_elevation_m": 0.0,
+   "flat_reference_elevation_method": "buildings-only surface: footprints' base_attr overridden to a fixed 0.0 m and top_attr dropped, so build_surface falls back to base + altura \u2014 each building's REAL physical height above one common flat plane, its true absolute site elevation discarded entirely. A genuine simplification (not a fabricated height \u2014 altura is read data), which is why this ordering stays a disclosed sensitivity number, never the figure headline. See write_flat_footprints.",
+   "h_flat": {
+    "winter_solstice": 10.666666666666666,
+    "equinox": 12.166666666666666
+   },
+   "timing_s": {
+    "build_s": 1.9006578089902177,
+    "real_engine_s": 10.13057723705424,
+    "terrain_engine_s": 9.76817660103552,
+    "build_bldg_s": 1.507136784028262,
+    "bldg_engine_s": 1.6776667879894376
+   }
+  },
+  {
+   "site_key": "rocinha",
+   "display_name": "Rocinha",
+   "match_method": "nome_exact_unique",
+   "n_ground": 310710,
+   "n_bldg_subsample": 20000,
+   "flat_reference_elevation_m": 0.0,
+   "flat_reference_elevation_method": "buildings-only surface: footprints' base_attr overridden to a fixed 0.0 m and top_attr dropped, so build_surface falls back to base + altura \u2014 each building's REAL physical height above one common flat plane, its true absolute site elevation discarded entirely. A genuine simplification (not a fabricated height \u2014 altura is read data), which is why this ordering stays a disclosed sensitivity number, never the figure headline. See write_flat_footprints.",
+   "h_flat": {
+    "winter_solstice": 10.666666666666666,
+    "equinox": 12.166666666666666
+   },
+   "timing_s": {
+    "build_s": 3.0732193660223857,
+    "real_engine_s": 21.19695120502729,
+    "terrain_engine_s": 21.232563704019412,
+    "build_bldg_s": 2.633117188990582,
+    "bldg_engine_s": 1.9732757459860295
+   }
+  },
+  {
+   "site_key": "complexo_do_alemao",
+   "display_name": "Complexo do Alem\u00e3o",
+   "match_method": "complexo_exact",
+   "n_ground": 846016,
+   "n_bldg_subsample": 20000,
+   "flat_reference_elevation_m": 0.0,
+   "flat_reference_elevation_method": "buildings-only surface: footprints' base_attr overridden to a fixed 0.0 m and top_attr dropped, so build_surface falls back to base + altura \u2014 each building's REAL physical height above one common flat plane, its true absolute site elevation discarded entirely. A genuine simplification (not a fabricated height \u2014 altura is read data), which is why this ordering stays a disclosed sensitivity number, never the figure headline. See write_flat_footprints.",
+   "h_flat": {
+    "winter_solstice": 10.666666666666666,
+    "equinox": 12.166666666666666
+   },
+   "timing_s": {
+    "build_s": 6.125489500002004,
+    "real_engine_s": 60.666073604952544,
+    "terrain_engine_s": 66.78665429598186,
+    "build_bldg_s": 5.475217883998994,
+    "bldg_engine_s": 2.000601057021413
+   }
+  },
+  {
+   "site_key": "riodaspedras",
+   "display_name": "Rio das Pedras",
+   "match_method": "complexo_exact",
+   "n_ground": 167661,
+   "n_bldg_subsample": 20000,
+   "flat_reference_elevation_m": 0.0,
+   "flat_reference_elevation_method": "buildings-only surface: footprints' base_attr overridden to a fixed 0.0 m and top_attr dropped, so build_surface falls back to base + altura \u2014 each building's REAL physical height above one common flat plane, its true absolute site elevation discarded entirely. A genuine simplification (not a fabricated height \u2014 altura is read data), which is why this ordering stays a disclosed sensitivity number, never the figure headline. See write_flat_footprints.",
+   "h_flat": {
+    "winter_solstice": 10.666666666666666,
+    "equinox": 12.166666666666666
+   },
+   "timing_s": {
+    "build_s": 2.226563931966666,
+    "real_engine_s": 12.147794824966695,
+    "terrain_engine_s": 12.618193686008453,
+    "build_bldg_s": 1.9352096990332939,
+    "bldg_engine_s": 1.8351571729872376
+   }
+  },
+  {
+   "site_key": "mar\u00e9",
+   "display_name": "Mar\u00e9",
+   "match_method": "complexo_exact",
+   "n_ground": 258178,
+   "n_bldg_subsample": 20000,
+   "flat_reference_elevation_m": 0.0,
+   "flat_reference_elevation_method": "buildings-only surface: footprints' base_attr overridden to a fixed 0.0 m and top_attr dropped, so build_surface falls back to base + altura \u2014 each building's REAL physical height above one common flat plane, its true absolute site elevation discarded entirely. A genuine simplification (not a fabricated height \u2014 altura is read data), which is why this ordering stays a disclosed sensitivity number, never the figure headline. See write_flat_footprints.",
+   "h_flat": {
+    "winter_solstice": 10.666666666666666,
+    "equinox": 12.166666666666666
+   },
+   "timing_s": {
+    "build_s": 8.090548348031007,
+    "real_engine_s": 19.180457844980992,
+    "terrain_engine_s": 19.723594034963753,
+    "build_bldg_s": 6.925697648024652,
+    "bldg_engine_s": 1.8288834420382045
+   }
+  }
+ ],
+ "reproduction_check_pass": true,
+ "reproduction_check_file": "reproduction_check.json"
+}
