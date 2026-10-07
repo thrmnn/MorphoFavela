@@ -78,7 +78,7 @@ CELL_M = 1.0
 #: invalidates the reproduction check, so the frame is reused verbatim rather
 #: than rebuilt from the raster rules a second time) and its wp05_full.parquet
 #: is route (a)'s only input (the stored visibility_packed mask).
-WP05_FULL_RUN_OF_RECORD = "wp05_full_20260914T215419Z"
+WP05_FULL_RUN_OF_RECORD = "wp05_full_20261007T192903Z"
 
 PILOT_TARGET_FRACTION = 0.015  # midpoint of the project's 1-2% pilot rule
 
