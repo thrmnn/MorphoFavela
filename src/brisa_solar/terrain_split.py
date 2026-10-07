@@ -505,80 +505,112 @@ def _max_share_gap(summaries: dict[str, dict], label: str) -> float:
     return max(gaps) if gaps else 0.0
 
 
-def render_split_bars(summaries: dict[str, dict], label: str, out_dir: Path) -> dict:
-    """Horizontal stacked bars, terrain-first split, fixed site order (never
-    ranked by value — same convention wp07_figures.FIGURE_SITE_ORDER uses).
-    Percentage labels sit INSIDE each bar segment, site names OUTSIDE past
-    the bar end with a wide margin, so nothing overlaps the bars — the exact
-    defect the old figure had. Restricted to the sites actually computed in
-    this run (a pilot on one site must not try to plot the other four)."""
-    order = [s for s in FAVELAS if s in summaries]
-    terrain_h = [summaries[s][label]["terrain_first"]["terrain_loss_h_mean"] for s in order]
-    bldg_h = [summaries[s][label]["terrain_first"]["buildings_loss_h_mean"] for s in order]
-    total_h = [t + b for t, b in zip(terrain_h, bldg_h)]
+TERRAIN_COLOR = "#B07A2A"
+BUILDINGS_COLOR = "#3D6FA8"
 
-    y = np.arange(len(order))
-    fig, ax = plt.subplots(figsize=(8.2, 4.8))
-    ax.barh(y, terrain_h, color="#8c6d46", label="terrain")
-    ax.barh(y, bldg_h, left=terrain_h, color="#b5651d", label="buildings")
-    for i, (th, bh, tot) in enumerate(zip(terrain_h, bldg_h, total_h)):
-        if tot > 0 and th / tot > 0.12:
-            ax.text(th / 2, i, f"{th / tot * 100:.0f}%", va="center", ha="center",
-                    color="white", fontsize=8)
-        if tot > 0 and bh / tot > 0.12:
-            ax.text(th + bh / 2, i, f"{bh / tot * 100:.0f}%", va="center", ha="center",
-                    color="white", fontsize=8)
-        ax.text(tot + max(total_h) * 0.03, i, FAVELAS[order[i]], va="center", fontsize=8.5, color="#333")
-    # The reverse ordering belongs ON the figure, not only in the manifest. The two
-    # orderings disagree materially on the shares, so a single stacked bar read alone
-    # overstates how settled the split is. The rule marks where the buildings-first
-    # ordering ends TERRAIN, matching this bar's terrain-on-the-left layout — an
-    # earlier version drew it at the buildings length, i.e. the wrong end entirely
-    # (caught by the guardian read, 2026-09-17). The magnitude is computed below,
-    # never typed: a wrong "62 points" sat in this comment for exactly that reason.
-    bf_boundary = []
-    for sl in order:
-        bf = summaries[sl][label].get("buildings_first_sensitivity") or {}
-        tl = bf.get("terrain_loss_h_mean")
-        bl = bf.get("buildings_loss_h_mean")
-        bf_boundary.append(None if tl is None or bl is None else tl)
-    drawn = False
-    for i, (b, tot) in enumerate(zip(bf_boundary, total_h)):
-        if b is None or tot <= 0:
-            continue
-        ax.plot([b, b], [i - 0.42, i + 0.42], color="#1c1a17", lw=1.6,
-                solid_capstyle="butt", zorder=5,
-                label="terrain/buildings split under the reverse ordering" if not drawn else None)
-        drawn = True
-    ax.set_yticks(y)
-    ax.set_yticklabels([])
-    ax.set_xlabel(f"Sun-hours lost vs open-flat terrain, {label.replace('_', ' ')} (h, mean per site)")
-    ax.set_title("Terrain- vs buildings-driven sun-hours lost — C′ study favelas",
-                 fontsize=11, fontweight="bold", pad=30)
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 1.02), ncol=3,
-              fontsize=8.5, frameon=False, handlelength=1.6, columnspacing=1.6)
-    ax.margins(x=0.32)
-    ax.spines[["top", "right"]].set_visible(False)
-    fig.text(
-        0.5, -0.02,
-        f"Attribution ordering: terrain-first ({ATTRIBUTION_CHOICE}); the two orderings put terrain's share "
-        f"up to {_max_share_gap(summaries, label):.0f} percentage points apart. Terrain is assessed against the open-flat "
-        "reference first, buildings the residual against terrain-only. Slope shading and building shading are "
-        "not additive, so the reverse (buildings-first) ordering splits the same total very differently — the "
-        "vertical rule marks where it puts the boundary. Treat the split as a range, not a value; the totals "
-        "are ordering-independent, the shares are not. Both orderings are in this run's per-site summary.json.",
-        ha="center", va="top", fontsize=6.8, color="#555", wrap=True,
-    )
-    fig.tight_layout()
-    svg_name, png_name = _save_figure(fig, "t1_terrain_buildings_split", out_dir)
+
+def render_split_bars(summaries: dict[str, dict], label: str, out_dir: Path) -> dict:
+    """Horizontal stacked bars of mean direct-sun hours lost per ground point
+    (terrain-first split), fixed site order top to bottom (never ranked by
+    value). The reverse (buildings-first) ordering is drawn on every bar as a
+    hollow diamond at its terrain/buildings boundary and printed as a terrain
+    share, so the split reads as a range. Claim-free: no title, no footer —
+    the caption carries the reading."""
+    from . import p1_style as style
+
+    order = [s for s in style.SITE_ORDER if s in summaries]
+    with plt.rc_context(style.rc()):
+        style._alias_arial()
+        terrain_h = np.array([summaries[s][label]["terrain_first"]["terrain_loss_h_mean"] for s in order])
+        bldg_h = np.array([summaries[s][label]["terrain_first"]["buildings_loss_h_mean"] for s in order])
+        total_h = terrain_h + bldg_h
+        bf_terrain_h, bf_share = [], []
+        for sl in order:
+            bf = summaries[sl][label].get("buildings_first_sensitivity") or {}
+            tl, bl = bf.get("terrain_loss_h_mean"), bf.get("buildings_loss_h_mean")
+            bf_terrain_h.append(None if tl is None or bl is None else tl)
+            bf_share.append(None if tl is None or bl is None or (tl + bl) == 0 else tl / (tl + bl))
+
+        y = np.arange(len(order))
+        fig, ax = plt.subplots(layout="constrained", figsize=(style.WIDTH_DOUBLE_IN, 72 * style.MM))
+        ax.barh(y, terrain_h, height=0.62, color=TERRAIN_COLOR, label="terrain (terrain removed first)")
+        ax.barh(y, bldg_h, left=terrain_h, height=0.62, color=BUILDINGS_COLOR, label="buildings")
+        x_max = float(total_h.max())
+        for i, (th, bh, tot) in enumerate(zip(terrain_h, bldg_h, total_h)):
+            for x0, h, col in ((0.0, th, "black"), (th, bh, "white")):
+                txt = f"{h:.1f} h · {h / tot * 100:.0f}%"
+                if h / x_max > 0.20:
+                    ax.text(x0 + h / 2, i, txt, ha="center", va="center", color=col,
+                            fontsize=style.BASE_PT)
+                else:  # too narrow: label just under the bar, right of the reverse-order marker
+                    ax.text(x0 + h + x_max * 0.02, i + 0.33, txt, ha="left", va="top", fontsize=style.BASE_PT)
+            ax.text(tot + x_max * 0.015, i - 0.08, f"total {tot:.1f} h", ha="left", va="bottom",
+                    fontsize=style.BASE_PT)
+            if bf_share[i] is not None:
+                ax.text(tot + x_max * 0.015, i + 0.02, f"reverse order: terrain {bf_share[i] * 100:.0f}%",
+                        ha="left", va="top", fontsize=style.BASE_PT, color="#333333")
+        drawn = False
+        for i, b in enumerate(bf_terrain_h):
+            if b is None:
+                continue
+            # on the bar's lower edge, clear of the segment labels
+            ax.plot([b], [i + 0.36], marker="D", markersize=5.0, markerfacecolor="white", markeredgecolor="black",
+                    markeredgewidth=1.0, linestyle="none", zorder=5,
+                    label="terrain/buildings boundary, reverse order" if not drawn else None)
+            drawn = True
+        n_lbl = [f"{FAVELAS[s]}\nn = {summaries[s]['n_ground']:,}" for s in order]
+        ax.set_yticks(y)
+        ax.set_yticklabels(n_lbl)
+        ax.set_ylim(len(order) - 0.15, -0.75)
+        ax.tick_params(axis="y", length=0)
+        ax.spines["left"].set_visible(False)
+        ax.set_xlim(0, x_max * 1.42)
+        ax.set_xlabel(f"mean direct-sun hours lost per ground point, {label.replace('_', ' ')}, "
+                      "against open flat ground (h)")
+        h, l = ax.get_legend_handles_labels()
+        ax.legend(h[1:] + h[:1], l[1:] + l[:1], loc="lower left", bbox_to_anchor=(0.0, 1.0), ncol=3, frameon=False,
+                  handlelength=1.4, columnspacing=1.4)
+        min_pt = style.min_text_pt(fig)
+        assert min_pt >= style.MIN_PT, f"t1: text at {min_pt} pt"
+        svg_path = out_dir / "t1_terrain_buildings_split.svg"
+        png_path = out_dir / "t1_terrain_buildings_split.png"
+        fig.savefig(svg_path, format="svg")
+        fig.savefig(png_path, format="png", dpi=style.DPI)
+        plt.close(fig)
     return {
         "id": "t1_terrain_buildings_split", "status": "produced",
-        "svg_path": svg_name, "png_path": png_name,
+        "svg_path": svg_path.name, "png_path": png_path.name,
         "release_class": "publishable-candidate",
         "attribution_choice_headline": ATTRIBUTION_CHOICE,
         "reference_day": label,
+        "n_unit": "1 m ground points of each site's model domain (terrain-first split); the reverse "
+                  f"ordering uses a random subsample of {BLDG_SUBSAMPLE_N:,} ground points per site",
+        "max_terrain_share_gap_points": round(_max_share_gap(summaries, label), 1),
+        "min_text_pt": round(float(min_pt), 2),
+        "final_width_mm": round(float(style.WIDTH_DOUBLE_IN * 25.4), 1),
     }
+
+
+def rerender_split_bars(source_run: Path, out_dir: Path, label: str = "winter_solstice") -> dict:
+    """Redraw t1 from an existing run's per-site summary.json files into a new
+    run dir, without recomputing anything: the numbers are the source run's."""
+    source_run = Path(source_run)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    src_manifest = json.loads((source_run / "manifest.json").read_text())
+    summaries = {}
+    for slug in src_manifest["sites"]:
+        summaries[slug] = json.loads((source_run / slug / "summary.json").read_text())
+    fig = render_split_bars(summaries, label, out_dir)
+    fig["sources"] = [f"{source_run.name}/{slug}/summary.json" for slug in summaries]
+    figure_manifest = {
+        "_utc": _utc_now(),
+        "git_sha": _git_sha(source_run.parents[1]),
+        "rerendered_from": source_run.name,
+        "note": "figure redraw only; every number is read from the source run's summary.json files",
+        "figures": {fig["id"]: fig},
+    }
+    (out_dir / "figure_manifest.json").write_text(json.dumps(figure_manifest, indent=1, ensure_ascii=False))
+    return figure_manifest
 
 
 def render_site_map(slug: str, cells: pd.DataFrame, transform, polygon, label: str, out_dir: Path) -> dict:
@@ -785,7 +817,10 @@ def run_all(
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["pilot", "full"], required=True)
+    ap.add_argument("--mode", choices=["pilot", "full"], default=None)
+    ap.add_argument("--rerender-from", default=None,
+                    help="existing terrain_split run dir: redraw t1 from its summaries into "
+                         "runs/terrain_split_rerender_<UTC>/ (or --run-dir), no recompute")
     ap.add_argument("--run-dir", default=None)
     ap.add_argument("--data-root", default="/home/theo/SCL/SCR/MorphoFavela")
     ap.add_argument("--sites", default=None, help="comma-separated slugs from wp07_ledger.SITES, default one (pilot) or all (full)")
@@ -793,6 +828,14 @@ def main() -> int:
     args = ap.parse_args()
 
     data_root = Path(args.data_root)
+    if args.rerender_from:
+        out = Path(args.run_dir) if args.run_dir else data_root / "runs" / (
+            "terrain_split_rerender_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+        rerender_split_bars(Path(args.rerender_from), out)
+        print(json.dumps({"run_dir": str(out)}))
+        return 0
+    if args.mode is None:
+        ap.error("--mode is required unless --rerender-from is given")
     run_dir = Path(args.run_dir) if args.run_dir else data_root / "runs" / (
         f"terrain_split_{args.mode}_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     )

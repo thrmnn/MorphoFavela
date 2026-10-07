@@ -83,7 +83,8 @@ def test_manifest_records_the_table_h_fallback_order(staged):
 
 # ---------------------------------------------------------------------------
 # (a) every ledger_ids_used exists in the ledger, and every such value's
-# formatted (3-sig-fig) text appears in the figure's own SVG text content.
+# printed text (figs.printed_text, the one P1 number format) appears in the
+# figure's own SVG text content.
 # ---------------------------------------------------------------------------
 
 def test_a_ledger_ids_exist_and_their_values_appear_in_svg_text(staged, ledger):
@@ -96,7 +97,7 @@ def test_a_ledger_ids_exist_and_their_values_appear_in_svg_text(staged, ledger):
         assert f["ledger_ids_used"], f"{fid}: no ledger_ids_used recorded"
         for lid in f["ledger_ids_used"]:
             value, _unit = figs.get_value(ledger, lid)  # raises KeyError if id doesn't exist
-            expected = figs.fmt3(value)
+            expected = figs.printed_text(lid, value)
             assert expected in text, f"{fid}: {lid} = {expected!r} not found in SVG text"
         for lid in f.get("ledger_ids_plotted", []):
             figs.get_value(ledger, lid)  # plotted as a marker position, never printed
@@ -224,7 +225,9 @@ def test_f2_skips_cleanly_when_a_site_parquet_is_missing(tmp_path, ledger):
     run_dir.mkdir(parents=True)
     out_dir = tmp_path / "out"
     out_dir.mkdir()
-    result = figs.render_f2(ledger, repo_root, out_dir)
+    # synthetic hours cannot match the real ledger shares, so the curve-vs-ledger
+    # agreement gate (on by default for real runs) is off here
+    result = figs.render_f2(ledger, repo_root, out_dir, verify_against_ledger=False)
     assert result["status"] == "skipped"
     assert "reason" in result
 
@@ -357,7 +360,9 @@ def test_f2_renders_from_synthetic_site_parquets(tmp_path, ledger):
     out_dir = tmp_path / "out"
     out_dir.mkdir()
 
-    result = figs.render_f2(ledger, repo_root, out_dir)
+    # synthetic hours cannot match the real ledger shares, so the curve-vs-ledger
+    # agreement gate (on by default for real runs) is off here
+    result = figs.render_f2(ledger, repo_root, out_dir, verify_against_ledger=False)
     assert result["status"] == "produced"
     assert (out_dir / result["svg_path"]).exists()
     assert (out_dir / result["png_path"]).exists()
@@ -797,3 +802,24 @@ def test_mare_definitions_pools_and_renders(tmp_path):
     assert fig["values"]["decile_share_A_pct"][0] == pytest.approx((20 * 50 + 10 * 80) / 30)
     assert fig["checklist"]["banned_tokens_absent"]
     assert "Marcílio Dias is excluded" in fig["caption"]
+
+
+def test_printed_text_uses_below_floor_polarity_and_percent():
+    assert figs.printed_text("site.vidigal.ground.share_ge_2h_winter_solstice", 0.549) == "45.1%"
+    assert figs.printed_text("wp06.vidigal.share_n3", 0.0686) == "7%"
+    assert figs.printed_text("wp06.mare.n", 29229) == "29,229"
+    assert figs.printed_text("favela.mare.kwh_m2.percentile", 7.7412) == "7.7"
+
+
+def test_f2_names_the_floor_without_an_attribution(tmp_path, ledger):
+    """The 2 h line is a reference floor only: not the Athens Charter Point 26
+    (cycle-9 check), not WHO."""
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    r4 = figs.render_f4(ledger, ROOT, out_dir)
+    for fid in ("f2_direct_sun_reference_days",):
+        src = Path(figs.__file__).read_text()
+        body = src[src.index("def render_f2("):src.index("# f3 — domain sensitivity")]
+        assert "Athens" not in body and "WHO" not in body and "Point 26" not in body
+        assert "2 h reference floor" in body
+    assert r4["checklist"]["min_text_pt"] >= 7.0

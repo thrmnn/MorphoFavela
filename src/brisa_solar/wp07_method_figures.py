@@ -650,6 +650,319 @@ def render_f4_matrix_decomposition(out_dir: Path, sky, epw_rel: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Manuscript method figure (critic 2026-10-07): one clean 3-panel figure —
+# A ray casting, B visibility matrix x sky vector, C per-point result — plus
+# an appendix figure for the worked row and the three SVF weightings. Drawn
+# at final print width in the shared P1 house style; plain words only.
+# ---------------------------------------------------------------------------
+
+#: Illustrative ground points for panel B, each defined by a horizon profile
+#: h(azimuth) in degrees; a patch is visible when its altitude exceeds h at
+#: its azimuth — the same rule panel A draws for one direction.
+ILLUSTRATIVE_POINTS = (
+    ("open ground", lambda az: np.zeros_like(az)),
+    ("low walls", lambda az: np.full_like(az, 10.0)),
+    ("slope rising to the south", lambda az: np.where(np.abs(az - 180.0) < 90.0, 28.0, 8.0)),
+    ("street, north–south", lambda az: np.where(
+        (np.minimum(az, 360.0 - az) < 20.0) | (np.abs(az - 180.0) < 20.0), 12.0, 58.0)),
+    ("narrow alley", lambda az: np.where(np.abs(az - 90.0) < 12.0, 30.0, 70.0)),
+    ("enclosed courtyard", lambda az: np.full_like(az, 62.0)),
+)
+
+VISIBLE_FILL = "#FFF1C1"
+BLOCKED_FILL = "#1F2A44"
+
+
+def illustrative_visibility(sky) -> tuple[np.ndarray, list[str]]:
+    d = sky.directions
+    alt = np.degrees(np.arcsin(np.clip(d[:, 2], -1.0, 1.0)))
+    az = np.degrees(np.arctan2(d[:, 0], d[:, 1])) % 360.0
+    labels = [lbl for lbl, _ in ILLUSTRATIVE_POINTS]
+    V = np.vstack([alt > h(az) for _, h in ILLUSTRATIVE_POINTS])
+    return V, labels
+
+
+def _band_edges(sky) -> tuple[np.ndarray, np.ndarray]:
+    """Patch-index boundaries between Tregenza altitude bands (patches are
+    stored band by band from the horizon up) and each band's altitude."""
+    alt = np.round(np.degrees(np.arcsin(np.clip(sky.directions[:, 2], -1.0, 1.0))), 3)
+    starts = np.r_[0, np.nonzero(np.diff(alt))[0] + 1]
+    return starts, alt[starts]
+
+
+def render_method_main(out_dir: Path, run_params: dict, sky, epw_rel: str) -> dict:
+    from . import p1_style as style
+
+    fig_id = "f2_method_raycast_matrix"
+    with plt.rc_context(style.rc()):
+        style._alias_arial()
+        P = P1_SKY_PATCHES
+        step_m = run_params["step_m"]
+        obs_height_m = run_params["obs_height_m"]
+        z_ground_obs = 8.0
+        z_obs = z_ground_obs + obs_height_m
+        t, ground = _ray_profile(step_m, run_params["max_dist_m"])
+        ang = np.degrees(np.arctan2(ground - z_obs, t))
+        horizon_deg = float(ang.max())
+        t_star, z_star = float(t[np.argmax(ang)]), float(ground[np.argmax(ang)])
+        band_alts = tregenza_band_altitudes_deg()
+        alt_blocked, alt_visible = float(band_alts[0]), float(band_alts[4])
+        assert alt_blocked < horizon_deg < alt_visible
+
+        fig = plt.figure(figsize=(style.WIDTH_DOUBLE_IN, 92 * style.MM))
+
+        # ---- A: one ray direction ------------------------------------------
+        ax = fig.add_axes([0.065, 0.12, 0.33, 0.80])
+        x_max, y_lo, y_hi = 18.0, 4.0, 26.0
+        disp = t <= x_max
+        tt = np.r_[0.0, t[disp]]
+        gg = np.r_[ground[0], ground[disp]]
+        # sky above the horizon line is what the point sees in this direction
+        xs = np.linspace(0, x_max, 50)
+        hz = z_obs + np.tan(np.radians(horizon_deg)) * xs
+        ax.fill_between(xs, np.minimum(hz, y_hi), y_hi, color=VISIBLE_FILL, lw=0, zorder=0)
+        ax.fill_between(tt, y_lo, gg, step="mid", color="#D9C9B0", lw=0, zorder=1)
+        ax.step(tt, gg, where="mid", color="#5A4A33", linewidth=1.1, zorder=3)
+        ax.plot(xs, hz, color="#222222", linewidth=0.8, linestyle=(0, (4, 2)), zorder=4)
+        ax.plot([t_star], [z_star], marker="o", markersize=3.5, color="#222222", zorder=5)
+
+        def ray(alt_deg, length):
+            return [0, length * np.cos(np.radians(alt_deg))], [z_obs, z_obs + length * np.sin(np.radians(alt_deg))]
+
+        xv, yv = ray(alt_visible, 15.5)
+        ax.annotate("", xy=(xv[1], yv[1]), xytext=(0, z_obs),
+                    arrowprops=dict(arrowstyle="-|>", color="#1F7A4D", lw=1.2), zorder=5)
+        hit_t = 9.0
+        xb = [0, hit_t]
+        yb = [z_obs, z_obs + np.tan(np.radians(alt_blocked)) * hit_t]
+        ax.plot(xb, yb, color="#B2301E", linewidth=1.2, zorder=5)
+        ax.plot([xb[1]], [yb[1]], marker="x", markersize=5, color="#B2301E", markeredgewidth=1.4, zorder=6)
+        ax.plot([0], [z_obs], marker="o", markersize=4.5, color="#111111", zorder=7)
+
+        arc_r = 3.2
+        a = np.radians(np.linspace(0, horizon_deg, 30))
+        ax.plot(arc_r * np.cos(a), z_obs + arc_r * np.sin(a), color="#222222", linewidth=0.7)
+        ax.text(arc_r * 1.15, z_obs + 1.05, f"horizon\n{horizon_deg:.1f}°", ha="left", va="bottom",
+                fontsize=style.BASE_PT)
+        ax.text(xv[1] - 0.3, yv[1] + 0.2, f"patch at {alt_visible:g}°:\nvisible", ha="right", va="bottom",
+                fontsize=style.BASE_PT, color="#1F7A4D")
+        ax.text(0.6, 8.3, f"patch at {alt_blocked:g}°: blocked", ha="left", va="bottom",
+                fontsize=style.BASE_PT, color="#B2301E")
+        ax.text(0.4, 7.6, f"point, {obs_height_m:g} m\nabove ground", ha="left", va="top",
+                fontsize=style.BASE_PT, color="#2A2014")
+        ax.text(0.5, y_hi - 0.5, "visible sky", ha="left", va="top", fontsize=style.BASE_PT,
+                color="#8A6A12")
+        ax.text(11.0, ground[np.searchsorted(t, 11.0)] - 1.0, "obstruction\nsurface", ha="center",
+                va="top", fontsize=style.BASE_PT, color="#3A2E1E")
+        ax.set_xlim(0, x_max)
+        ax.set_ylim(y_lo, y_hi)
+        ax.set_aspect("equal")
+        ax.set_yticks(np.arange(5, y_hi + 0.1, 5))
+        ax.set_xlabel(f"distance along the ray (m), {step_m:g} m steps")
+        ax.set_ylabel("height (m)")
+        style.panel_letter(ax, "A", x=-0.12, y=1.0)
+
+        # ---- B: visibility matrix x sky vector ------------------------------
+        V, labels = illustrative_visibility(sky)
+        n = V.shape[0]
+        w = sky.patch_total_kwh
+        starts, alts = _band_edges(sky)
+        cmap_vb = matplotlib.colors.ListedColormap([BLOCKED_FILL, VISIBLE_FILL])
+        ax_v = fig.add_axes([0.575, 0.47, 0.285, 0.40])
+        ax_v.pcolormesh(np.arange(P + 1) - 0.5, np.arange(n + 1) - 0.5, V.astype(float), cmap=cmap_vb,
+                        vmin=0, vmax=1, shading="flat", rasterized=False)
+        for s0 in starts[1:]:
+            ax_v.axvline(s0 - 0.5, color="#8899AA", linewidth=0.4)
+        ax_v.set_ylim(n - 0.5, -0.5)
+        ax_v.set_yticks(range(n))
+        ax_v.set_yticklabels(labels)
+        ax_v.tick_params(axis="y", length=0, pad=2)
+        ax_v.set_xlim(-0.5, P - 0.5)
+        for sp in ax_v.spines.values():
+            sp.set_visible(False)
+        ax_v.set_title("visibility of each sky patch", loc="left")
+        fig.text(0.415, 0.87 + 0.012, "B", fontsize=style.PANEL_LETTER_PT, fontweight="bold",
+                 ha="left", va="bottom")
+        from matplotlib.patches import Patch
+        ax_v.legend([Patch(fc=VISIBLE_FILL, ec="#B8A060", lw=0.4), Patch(fc=BLOCKED_FILL)],
+                    ["visible", "blocked"], loc="upper right", bbox_to_anchor=(1.0, -0.02), ncol=2,
+                    frameon=False, handlelength=1.0, columnspacing=0.8, borderpad=0.1)
+
+        ax_w = fig.add_axes([0.575, 0.13, 0.285, 0.22], sharex=ax_v)
+        ax_w.bar(np.arange(P), w, width=1.0, color="#DD7A1E", linewidth=0)
+        for s0 in starts[1:]:
+            ax_w.axvline(s0 - 0.5, color="#8899AA", linewidth=0.4)
+        band_mid = (np.r_[starts, P][:-1] + np.r_[starts, P][1:]) / 2 - 0.5
+        wide = np.diff(np.r_[starts, P]) >= 12  # the narrow top bands have no room for a label
+        ax_w.set_xticks(band_mid[wide])
+        ax_w.set_xticklabels([f"{a:.0f}°" for a in alts[wide]])
+        ax_v.tick_params(axis="x", labelbottom=False, length=0)
+        ax_w.tick_params(axis="x", length=0)
+        ax_w.set_xlabel(f"{P} sky patches, by altitude band")
+        ax_w.set_ylabel("kWh/m²\nper year")
+        ax_w.set_title("× annual irradiation from each patch", loc="left", pad=3)
+
+        # ---- C: result per point -------------------------------------------
+        irr = V.astype(float) @ w
+        ax_r = fig.add_axes([0.89, 0.47, 0.075, 0.40], sharey=ax_v)
+        ramp = style.SUN_CMAP(irr / w.sum())
+        ax_r.barh(range(n), irr, color=ramp, edgecolor="#7A4A12", linewidth=0.4, height=0.72)
+        for i, v in enumerate(irr):
+            inside = v > 0.55 * w.sum()
+            ax_r.text(v - w.sum() * 0.04 if inside else v + w.sum() * 0.04, i, f"{v:,.0f}", va="center",
+                      ha="right" if inside else "left", fontsize=style.BASE_PT)
+        ax_r.set_xlim(0, w.sum() * 1.05)
+        ax_r.set_xticks([0, 1500])
+        ax_r.tick_params(axis="y", left=False, labelleft=False)
+        ax_r.set_xlabel("kWh/m²\nper year")
+        ax_r.set_title("= per point", loc="left")
+        fig.text(0.868, 0.882, "C", fontsize=style.PANEL_LETTER_PT, fontweight="bold",
+                 ha="left", va="bottom")
+
+        min_pt = style.min_text_pt(fig)
+        assert min_pt >= style.MIN_PT, f"{fig_id}: text at {min_pt} pt"
+        result = _produced_final(fig, fig_id, out_dir, {
+            "run_params": run_params,
+            "sky_source_epw": epw_rel,
+            "P1_SKY_PATCHES": P,
+            "horizon_deg": horizon_deg,
+            "illustrative_points": labels,
+            "irradiation_kwh_m2_yr": [float(v) for v in irr],
+            "unobstructed_kwh_m2_yr": float(w.sum()),
+            "unobstructed_diffuse_kwh_m2_yr": float(sky.patch_diffuse_kwh.sum()),
+            "unobstructed_direct_kwh_m2_yr": float(sky.patch_direct_kwh.sum()),
+            "geometry": "synthetic illustrative ray profile and horizon profiles, not a real site",
+        })
+    return result
+
+
+def render_method_appendix(out_dir: Path, sky, epw_rel: str) -> dict:
+    from . import p1_style as style
+
+    fig_id = "s_method_worked_row_svf_weightings"
+    with plt.rc_context(style.rc()):
+        style._alias_arial()
+        P = P1_SKY_PATCHES
+        V, labels = illustrative_visibility(sky)
+        w = sky.patch_total_kwh
+        irr = V.astype(float) @ w
+        cw_cos = sky.weights * sky.directions[:, 2]
+        svf_cos = (V.astype(float) @ cw_cos) / cw_cos.sum()
+        assert np.allclose(svf_cos, sky.svf(V))
+        svf_count = svf_unweighted(V)
+        svf_solid = svf_solid_angle(V, sky.weights)
+
+        row = labels.index("slope rising to the south")
+        k = 12
+        # a window of k patches inside one altitude band with the most
+        # visible/blocked changes, so the products show both cases
+        starts, alts = _band_edges(sky)
+        bounds = np.r_[starts, P]
+        best = None
+        for b0, b1, alt_b in zip(bounds[:-1], bounds[1:], alts):
+            for i0 in range(b0, b1 - k + 1):
+                changes = int(np.count_nonzero(np.diff(V[row, i0:i0 + k].astype(int))))
+                if best is None or changes > best[0]:
+                    best = (changes, i0, alt_b)
+        _, i0, alt_b = best
+        v_k = V[row, i0:i0 + k].astype(int)
+        w_k = w[i0:i0 + k]
+
+        fig = plt.figure(figsize=(style.WIDTH_DOUBLE_IN, 92 * style.MM))
+        gs = fig.add_gridspec(2, 1, height_ratios=[0.75, 1.0], left=0.13, right=0.98,
+                              bottom=0.10, top=0.94, hspace=0.35)
+        ax_t = fig.add_subplot(gs[0])
+        ax_t.axis("off")
+        style.panel_letter(ax_t, "A", x=-0.02, y=1.0)
+        ax_t.text(0.0, 1.0, f"Worked row: “{labels[row]}”, {k} of the {P} patches ({alt_b:.0f}° band)",
+                  transform=ax_t.transAxes, ha="left", va="bottom", fontsize=style.LABEL_PT)
+        cell_text = [[str(x) for x in v_k], [f"{x:.1f}" for x in w_k], [f"{x:.1f}" for x in v_k * w_k]]
+        tbl = ax_t.table(cellText=cell_text,
+                         rowLabels=["visible (1) / blocked (0)", "patch kWh/m² per year", "product"],
+                         loc="upper left", cellLoc="center", bbox=[0.2, 0.30, 0.8, 0.62])
+        tbl.auto_set_font_size(False)
+        tbl.set_fontsize(style.BASE_PT)
+        for (r, c), cell in tbl.get_celld().items():
+            cell.set_linewidth(0.4)
+            if r == 0 and c >= 0:
+                vis = cell_text[0][c] == "1"
+                cell.set_facecolor(VISIBLE_FILL if vis else BLOCKED_FILL)
+                cell.get_text().set_color("black" if vis else "white")
+        ax_t.text(0.0, 0.02,
+                  f"Sum of the products over all {P} patches: {irr[row]:,.1f} kWh/m² per year, against "
+                  f"{w.sum():,.1f} for open sky.\nThis point sees {svf_count[row] * 100:.0f}% of the patches.",
+                  transform=ax_t.transAxes, ha="left", va="bottom", fontsize=style.BASE_PT)
+
+        ax_s = fig.add_subplot(gs[1])
+        x = np.arange(len(labels))
+        width = 0.26
+        variants = (
+            (svf_count, "#B9D3EE", "share of patches visible (unweighted)"),
+            (svf_solid, "#5B8DC4", "weighted by patch solid angle"),
+            (svf_cos, "#1F3F73", "weighted by solid angle × cosine (used in the paper)"),
+        )
+        for j, (vals, col, lbl) in enumerate(variants):
+            ax_s.bar(x + (j - 1) * width, vals, width, color=col, label=lbl, linewidth=0)
+        ax_s.set_xticks(x)
+        ax_s.set_xticklabels([lbl.replace(" ", "\n", 1) if len(lbl) > 14 else lbl for lbl in labels])
+        ax_s.set_ylim(0, 1.0)
+        ax_s.set_ylabel("sky view factor")
+        ax_s.legend(loc="upper right", ncol=1, frameon=False, handlelength=1.2)
+        style.panel_letter(ax_s, "B", x=-0.08, y=1.0)
+
+        min_pt = style.min_text_pt(fig)
+        assert min_pt >= style.MIN_PT, f"{fig_id}: text at {min_pt} pt"
+        return _produced_final(fig, fig_id, out_dir, {
+            "sky_source_epw": epw_rel,
+            "P1_SKY_PATCHES": P,
+            "worked_row": labels[row],
+            "svf": {"count": svf_count.tolist(), "solid_angle": svf_solid.tolist(),
+                    "solid_angle_cosine_production": svf_cos.tolist()},
+            "svf_weighting_note": (
+                "CumulativeSky.svf() (wp02_sky.py) is cosine-weighted solid angle "
+                "(weights * directions[:,2]) and is the PRODUCTION number. "
+                "wp02_horizon.svf_unweighted (count ratio) and svf_solid_angle "
+                "(solid-angle only, no cosine) exist only to identify which variant "
+                "the CPU reference implemented (docs/wp02_horizon_engine_spec.md §3) "
+                "and are never the production SVF."
+            ),
+        })
+
+
+def _produced_final(fig, fig_id: str, out_dir: Path, sources: dict) -> dict:
+    """Final-width save: exact print size, no tight crop, 600 dpi PNG."""
+    from . import p1_style as style
+
+    svg_path = out_dir / f"{fig_id}.svg"
+    png_path = out_dir / f"{fig_id}.png"
+    min_pt = style.min_text_pt(fig)
+    width_mm = fig.get_figwidth() * 25.4
+    fig.savefig(svg_path, format="svg")
+    fig.savefig(png_path, format="png", dpi=style.DPI)
+    plt.close(fig)
+    raw = svg_path.read_text()
+    text = _svg_text_content(raw)
+    return {
+        "id": fig_id,
+        "status": "produced",
+        "svg_path": svg_path.name,
+        "png_path": png_path.name,
+        "release_class": "publishable-candidate",
+        "sources": sources,
+        "checklist": {
+            "no_coordinates": _COORD_RE.search(text) is None,
+            "no_basemap": "<image" not in raw,
+            "no_per_cell_geometry": True,
+            "no_favela_named": True,
+            "svg_path_count": raw.count("<path "),
+            "banned_tokens_absent": not _lint._scan_lines(text.split("\n"), fig_id),
+            "min_text_pt": round(float(min_pt), 2),
+            "final_width_mm": round(float(width_mm), 1),
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
 
@@ -666,9 +979,9 @@ def stage_all(repo_root: Path = MAIN_ROOT, out_dir: Path | None = None) -> dict:
 
     figures = {
         "f1_obstruction_surface": render_f1_obstruction_surface(out_dir, run_params, top_rule),
-        "f2_raycast_geometry": render_f2_raycast_geometry(out_dir, run_params),
         "f3_horizon_accumulation": render_f3_horizon_accumulation(out_dir, run_params),
-        "f4_matrix_decomposition": render_f4_matrix_decomposition(out_dir, sky, epw_rel),
+        "f2_method_raycast_matrix": render_method_main(out_dir, run_params, sky, epw_rel),
+        "s_method_worked_row_svf_weightings": render_method_appendix(out_dir, sky, epw_rel),
     }
 
     produced_pngs = [out_dir / f["png_path"] for f in figures.values() if f["status"] == "produced"]

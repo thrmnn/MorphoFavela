@@ -66,8 +66,8 @@ def test_stage_all_produces_all_four_figures(staged):
     out_dir, manifest = staged
     assert (out_dir / "figure_manifest.json").exists()
     expected = {
-        "f1_obstruction_surface", "f2_raycast_geometry",
-        "f3_horizon_accumulation", "f4_matrix_decomposition",
+        "f1_obstruction_surface", "f3_horizon_accumulation",
+        "f2_method_raycast_matrix", "s_method_worked_row_svf_weightings",
     }
     assert set(manifest["figures"]) == expected
     for fid, entry in manifest["figures"].items():
@@ -133,8 +133,8 @@ def test_no_favela_named_anywhere_in_source_or_output(staged):
     src_lower = Path(figs.__file__).read_text().lower()
     for name in favela_names:
         assert name not in src_lower, name
-    for fid in ("f1_obstruction_surface", "f2_raycast_geometry",
-                "f3_horizon_accumulation", "f4_matrix_decomposition"):
+    for fid in ("f1_obstruction_surface", "f3_horizon_accumulation",
+                "f2_method_raycast_matrix", "s_method_worked_row_svf_weightings"):
         text_lower = _svg_text(out_dir, fid).lower()
         for name in favela_names:
             assert name not in text_lower, f"{fid}: {name}"
@@ -157,8 +157,8 @@ def test_p1_sky_patches_never_hardcoded_as_a_literal():
 
 def test_p1_sky_patches_appears_in_the_matrix_figure(staged):
     out_dir, _ = staged
-    text = _svg_text(out_dir, "f4_matrix_decomposition")
-    assert str(P1_SKY_PATCHES) in text
+    for fid in ("f2_method_raycast_matrix", "s_method_worked_row_svf_weightings"):
+        assert str(P1_SKY_PATCHES) in _svg_text(out_dir, fid)
 
 
 # ---------------------------------------------------------------------------
@@ -182,12 +182,26 @@ def test_run_params_are_read_from_the_real_manifest_not_typed():
 
 
 def test_run_params_values_appear_in_the_raycast_figures(staged):
-    out_dir, _ = staged
+    out_dir, manifest = staged
     params = figs.load_horizon_run_params()
-    for fid in ("f2_raycast_geometry", "f3_horizon_accumulation"):
-        text = _svg_text(out_dir, fid)
-        assert f"{params['step_m']:g}" in text
-        assert f"{params['max_dist_m']:g}" in text
+    text = _svg_text(out_dir, "f3_horizon_accumulation")
+    assert f"{params['step_m']:g}" in text
+    assert f"{params['max_dist_m']:g}" in text
+    # the manuscript figure prints the step and the observer height in plain
+    # words; the march length belongs to its caption, read from the manifest
+    main = manifest["figures"]["f2_method_raycast_matrix"]
+    text = _svg_text(out_dir, "f2_method_raycast_matrix")
+    assert f"{params['step_m']:g} m steps" in text
+    assert f"{params['obs_height_m']:g} m" in text
+    assert main["sources"]["run_params"] == params
+
+
+def test_manuscript_method_figures_are_final_width_and_legible(staged):
+    _, manifest = staged
+    for fid in ("f2_method_raycast_matrix", "s_method_worked_row_svf_weightings"):
+        chk = manifest["figures"][fid]["checklist"]
+        assert chk["final_width_mm"] == pytest.approx(155.0)
+        assert chk["min_text_pt"] >= 7.0
 
 
 def test_top_rule_text_is_read_verbatim_from_a_real_meta_json():
@@ -235,7 +249,7 @@ def test_real_sky_reproduces_the_accepted_identity():
 
 def test_svf_weighting_note_names_production_vs_crossreference(staged):
     _, manifest = staged
-    note = manifest["figures"]["f4_matrix_decomposition"]["sources"]["svf_weighting_note"]
+    note = manifest["figures"]["s_method_worked_row_svf_weightings"]["sources"]["svf_weighting_note"]
     assert "CumulativeSky.svf" in note
     assert "PRODUCTION" in note
     assert "svf_unweighted" in note and "svf_solid_angle" in note

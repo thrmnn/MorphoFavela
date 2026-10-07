@@ -45,21 +45,10 @@ from .constants import LAMBDA_F_CONSTRAINT_MIN, REPO_ROOT  # noqa: E402
 from .wp07_ledger import FAVELAS, LOCKED_VARIANT, RUN_OF_RECORD, SITE_DIRS  # noqa: E402
 from scripts import lint_p1_tokens as _lint  # noqa: E402
 
-# ---------------------------------------------------------------------------
-# Local style (≤30 lines) — outputs/paper_figures/fig_style.py imports clean
-# (no simulation module pulled into sys.modules), but it mkdir's
-# outputs/paper_figures/exports/ as an import side effect, and
-# outputs/paper_figures/ is explicitly OUT of scope for WP-07B. A local
-# style avoids writing there at all.
-# ---------------------------------------------------------------------------
+from . import p1_style as style  # noqa: E402
+
 DPI = 300
-COLORS = {  # Tol muted palette, colour-blind-safe
-    "vidigal": "#CC6677",
-    "rocinha": "#DDCC77",
-    "complexo_do_alemao": "#999933",
-    "mare": "#332288",
-    "riodaspedras": "#44AA99",
-}
+COLORS = style.SITE_COLORS
 
 
 def _apply_style() -> None:
@@ -89,9 +78,11 @@ TABLE_H_SEARCH_NOTE = (
     "Complexo do Alemão, Maré, Rio das Pedras."
 )
 
-# Athens Charter (1943), Point 26 — a fixed normative reference constant (an
-# external citation, not a pipeline measurement), so it is not a ledger read.
-ATHENS_CHARTER_FLOOR_HOURS = 2.0
+# The 2 h reference floor — a fixed normative reference, not a pipeline
+# measurement, so not a ledger read. Figures label it "2 h reference floor"
+# only: it is not Point 26 of the Athens Charter and not a WHO value (cycle-9
+# check), so no figure carries an attribution for it.
+REFERENCE_FLOOR_HOURS = 2.0
 
 # WP-06's own geometry grid cell size — scripts/run_lateral_connectivity.py's
 # CELL_M, which src/brisa_solar/wp06_geometry.py imports and computes f4's
@@ -132,6 +123,22 @@ def fmt3(value) -> str:
     if isinstance(value, int):
         return str(value)
     return f"{value:.3g}"
+
+
+def printed_text(ledger_id: str, value) -> str:
+    """The exact string a P1 manuscript figure prints for a ledger value — one
+    convention for every figure (critic 2026-10-07: percent, one decimal or
+    whole, never 3-sig-fig fractions). Shares at/above the floor are printed
+    as the share BELOW it, the polarity the manuscript text uses."""
+    if re.search(r"\.share_ge_\d+h_", ledger_id):
+        return style.fmt_pct(1.0 - value, 1)
+    if ledger_id.startswith("wp06.") and ".share_n" in ledger_id:
+        return style.fmt_pct(value, 0)
+    if ledger_id.startswith("wp06.") and ledger_id.endswith(".n"):
+        return style.fmt_count(value)
+    if ledger_id.endswith("percentile") or ledger_id.startswith("g3.spread."):
+        return f"{value:.1f}"
+    return fmt3(value)
 
 
 # ---------------------------------------------------------------------------
@@ -246,11 +253,21 @@ def _svg_text_content(raw_svg: str) -> str:
     return " ".join(_TAG_RE.sub(" ", b) for b in blocks)
 
 
-def _save_and_checklist(fig, fig_id: str, out_dir: Path) -> tuple[str, str, dict]:
+def _save_and_checklist(fig, fig_id: str, out_dir: Path,
+                        final_width: bool = False) -> tuple[str, str, dict]:
+    """`final_width`: the figure was drawn at its print width, so save it at
+    exactly that size (no tight crop) and refuse any text below MIN_PT."""
     svg_path = out_dir / f"{fig_id}.svg"
     png_path = out_dir / f"{fig_id}.png"
-    fig.savefig(svg_path, format="svg", bbox_inches="tight")
-    fig.savefig(png_path, format="png", dpi=DPI, bbox_inches="tight")
+    min_pt = style.min_text_pt(fig)
+    if final_width:
+        assert min_pt >= style.MIN_PT, f"{fig_id}: text at {min_pt} pt < {style.MIN_PT} pt"
+        fig.savefig(svg_path, format="svg")
+        fig.savefig(png_path, format="png", dpi=style.DPI)
+    else:
+        fig.savefig(svg_path, format="svg", bbox_inches="tight")
+        fig.savefig(png_path, format="png", dpi=DPI, bbox_inches="tight")
+    width_mm = fig.get_figwidth() * 25.4
     plt.close(fig)
 
     raw = svg_path.read_text()
@@ -268,6 +285,8 @@ def _save_and_checklist(fig, fig_id: str, out_dir: Path) -> tuple[str, str, dict
         "sites_fixed_order": True,
         "svg_path_count": raw.count("<path "),
         "banned_tokens_absent": not _lint._scan_lines(text.split("\n"), fig_id),
+        "min_text_pt": round(float(min_pt), 2),
+        "final_width_mm": round(float(width_mm), 1) if final_width else None,
     }
     return svg_path.name, png_path.name, checklist
 
@@ -278,9 +297,10 @@ def _skip(fig_id: str, reason: str) -> dict:
 
 def _produced(fig, fig_id: str, out_dir: Path, ledger_ids: list[str],
               source_parquets: list[str], release_class: str,
-              plotted_ids: list[str] | None = None) -> dict:
-    svg_name, png_name, checklist = _save_and_checklist(fig, fig_id, out_dir)
-    return {
+              plotted_ids: list[str] | None = None, final_width: bool = False,
+              extra: dict | None = None) -> dict:
+    svg_name, png_name, checklist = _save_and_checklist(fig, fig_id, out_dir, final_width)
+    return {**(extra or {}),
         "id": fig_id,
         "status": "produced",
         "svg_path": svg_name,
@@ -329,7 +349,7 @@ def render_f1(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
             plotted_ids.append(median_id)
             ax.axvline(median_val, color=COLORS[slug], linewidth=1.0, linestyle="--")
             # neighbours in x alternate label height so adjacent medians do not overprint
-            ax.text(median_val, ymax * (0.97 - 0.28 * (k % 2)), f"{display} · p{fmt3(pct_val)}",
+            ax.text(median_val, ymax * (0.97 - 0.28 * (k % 2)), f"{display} · p{printed_text(pct_id, pct_val)}",
                     color=COLORS[slug], rotation=90, ha="right", va="top", fontsize=5.5)
 
     source_parquets = [str(path.relative_to(repo_root))]
@@ -350,21 +370,22 @@ def render_f1(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
 # ---------------------------------------------------------------------------
 
 #: 1 / n_deciles — what a uniform decile split looks like. A derived
-#: constant, not a measured quantity, so (like ATHENS_CHARTER_FLOOR_HOURS
+#: constant, not a measured quantity, so (like REFERENCE_FLOOR_HOURS
 #: above) it is not a ledger read.
 UNIFORM_DECILE_SHARE = 0.10
 
 
+@style.styled
 def render_f1_v2(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
     """Deciles are cut on the full citywide kwh_m2 column (the same
     distribution f1 panel B histograms) into 10 equal-count bins; for each
-    study favela, the share of its own ground cells landing in each bin.
-    Bars near flat at UNIFORM_DECILE_SHARE mean a favela's cells are spread
-    across the city's irradiation range like the city as a whole; bars
-    concentrated in the low deciles mean the opposite — read off the bars,
-    never asserted as a favela-vs-formal contrast (L1: this never compares
-    against a non-favela group, only against the citywide pool each favela
-    cell is itself already a member of)."""
+    study favela, the share of its own ground points landing in each bin.
+    Bars near flat at UNIFORM_DECILE_SHARE mean a favela's points spread
+    evenly over the citywide deciles; bars concentrated in the low deciles
+    mean the opposite — read off the bars, never asserted as a favela-vs-
+    formal contrast (L1: the only reference is the citywide pool each favela
+    point is itself already a member of). Bars use the light ramp, dark =
+    least light, so the encoding reads without a key."""
     path = citywide_parquet_path(repo_root)
     fig_id = "f1_v2_decile_share"
     if not path.exists():
@@ -395,100 +416,204 @@ def render_f1_v2(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
     favela_id, kwh = favela_id[finite], kwh[finite]
 
     # 9 interior cut points from the full citywide column; right=False +
-    # interior-only edges keeps every cell in exactly one of 10 bins.
+    # interior-only edges keeps every point in exactly one of 10 bins.
     edges = np.percentile(kwh, np.arange(0, 101, 10))
     decile_idx = np.clip(np.digitize(kwh, edges[1:-1], right=False), 0, 9)
 
-    ledger_ids: list[str] = []
-    fig, axes = plt.subplots(1, len(FIGURE_SITE_ORDER), figsize=(9.4, 2.7), sharey=True)
-    deciles_x = np.arange(1, 11)
-    for ax, slug in zip(axes, FIGURE_SITE_ORDER):
-        display = FAVELAS[slug]
+    shares_by_site: dict[str, np.ndarray] = {}
+    n_by_site: dict[str, int] = {}
+    for slug in FIGURE_SITE_ORDER:
         ids = matched_ids.get(slug)
         if not ids:
-            ax.set_visible(False)
             continue
         mask = np.isin(favela_id, np.fromiter(ids, dtype=favela_id.dtype))
         n = int(mask.sum())
-        counts = np.array([np.count_nonzero((decile_idx == d) & mask) for d in range(10)], dtype=float)
-        shares = counts / n if n > 0 else counts
+        counts = np.bincount(decile_idx[mask], minlength=10).astype(float)
+        shares_by_site[slug] = counts / n if n > 0 else counts
+        n_by_site[slug] = n
+
+    ledger_ids: list[str] = []
+    fig, axes = plt.subplots(1, len(FIGURE_SITE_ORDER), sharey=True, layout="constrained",
+                             figsize=(style.WIDTH_DOUBLE_IN, 66 * style.MM))
+    fig.get_layout_engine().set(w_pad=0.02, wspace=0.06)
+    deciles_x = np.arange(1, 11)
+    bar_colors = style.SUN_CMAP(np.linspace(0.0, 1.0, 10))
+    y_top = max(max(s) for s in shares_by_site.values()) * 100
+    y_max = np.ceil(y_top * 1.12 / 10) * 10
+    for k, (ax, slug) in enumerate(zip(axes, FIGURE_SITE_ORDER)):
+        if slug not in shares_by_site:
+            ax.set_visible(False)
+            continue
+        shares = shares_by_site[slug] * 100
+        ax.bar(deciles_x, shares, color=bar_colors, width=0.82, edgecolor="#7A4A12", linewidth=0.3)
+        ax.axhline(UNIFORM_DECILE_SHARE * 100, color="#222222", linewidth=0.7, linestyle=(0, (1.5, 1.5)))
+        for d, v in zip(deciles_x, shares):
+            if v < 0.5:  # too short to see: print the value so the bar never reads as missing
+                ax.text(d, v + 0.4, f"{v:.1f}%" if v >= 0.05 else "<0.1%", rotation=90, ha="center",
+                        va="bottom", fontsize=style.BASE_PT, color="#444444")
 
         pct_id = f"favela.{slug}.kwh_m2.percentile"
         pct_val, _ = get_value(ledger, pct_id)
         ledger_ids.append(pct_id)
+        # the median's own position on the decile axis: percentile p lies in
+        # decile ceil(p/10), i.e. at x = 0.5 + p/10 on bars centred at 1..10
+        ax.plot([0.5 + pct_val / 10], [0], marker="^", markersize=6, color=style.SITE_COLORS[slug],
+                markeredgecolor="black", markeredgewidth=0.4, clip_on=False, zorder=6)
 
-        ax.bar(deciles_x, shares, color=COLORS[slug], width=0.8)
-        ax.axhline(UNIFORM_DECILE_SHARE, color="black", linewidth=0.8, linestyle=":")
-        ax.set_title(f"{display}\nn={n:,} · citywide p{fmt3(pct_val)}", fontsize=6, loc="left")
+        ax.text(0.0, 1.145, FAVELAS[slug], transform=ax.transAxes, ha="left", va="bottom",
+                fontsize=style.LABEL_PT, fontweight="bold")
+        ax.text(0.0, 1.015, f"n = {n_by_site[slug]:,}\nmedian at P{printed_text(pct_id, pct_val)}",
+                transform=ax.transAxes, ha="left", va="bottom", fontsize=style.BASE_PT, linespacing=1.15)
         ax.set_xticks(deciles_x)
-        ax.set_xticklabels([str(d) for d in deciles_x], fontsize=5.5)
-        ax.set_xlabel("citywide kWh m$^{-2}$ decile", fontsize=6)
-        ax.tick_params(axis="y", labelsize=5.5)
-    axes[0].set_ylabel("share of favela's own ground cells", fontsize=6.5)
-    fig.suptitle(
-        f"Dotted line: {UNIFORM_DECILE_SHARE:.0%} per decile — the share each decile would "
-        "hold if a favela's cells were spread across the citywide range like the city as a whole.",
-        fontsize=6.5, y=1.08)
+        ax.set_xticklabels(["1", "", "", "", "5", "", "", "", "", "10"])
+        ax.set_xlim(0.4, 10.6)
+        ax.set_ylim(0, y_max)
+        ax.tick_params(axis="x", length=2)
+        ax.text(0.0, -0.13, "less light", transform=ax.transAxes, ha="left", va="top",
+                fontsize=style.BASE_PT, color="#5A2A06")
+        ax.text(1.0, -0.13, "more light", transform=ax.transAxes, ha="right", va="top",
+                fontsize=style.BASE_PT, color="#A04A0B")
+        if k == 0:
+            ax.text(8.1, UNIFORM_DECILE_SHARE * 100 + 0.6, f"uniform {UNIFORM_DECILE_SHARE:.0%}",
+                    ha="center", va="bottom", fontsize=style.BASE_PT, color="#222222")
+    axes[0].set_ylabel("share of the site's ground points (%)")
+    fig.supxlabel("decile of citywide annual irradiation (1 = least, 10 = most)\n"
+                  "▲ site median; P = its percentile of citywide annual irradiation",
+                  fontsize=style.LABEL_PT)
 
     source_parquets = [str(path.relative_to(repo_root))]
-    return _produced(fig, fig_id, out_dir, ledger_ids, source_parquets, "staged")
+    extra = {
+        "n_unit": "ground points of the citywide 5 m sampling lattice inside the site's IPP 2019 "
+                  "favela polygons (run-of-record definition)",
+        "n_by_site": {s: n_by_site[s] for s in FIGURE_SITE_ORDER if s in n_by_site},
+        "share_by_decile_pct": {s: [round(float(v) * 100, 3) for v in shares_by_site[s]]
+                                for s in FIGURE_SITE_ORDER if s in shares_by_site},
+        "percentile_metric": "percentile of the citywide annual-irradiation distribution at the site median",
+    }
+    return _produced(fig, fig_id, out_dir, ledger_ids, source_parquets, "staged",
+                     final_width=True, extra=extra)
 
 
 # ---------------------------------------------------------------------------
 # f2 — direct-sun reference days
 # ---------------------------------------------------------------------------
 
-def render_f2(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
+def _day_label(day_key: str) -> str:
+    """'Winter solstice (21 June)' from config/params.yaml's own date, never typed."""
+    iso = load_reference_days()[day_key]
+    d = datetime.strptime(iso, "%Y-%m-%d")
+    return f"{day_key.replace('_', ' ').capitalize()} ({d.day} {d.strftime('%B')})"
+
+
+def load_reference_days() -> dict:
+    from .constants import load_params
+    return load_params()["reference_days"]
+
+
+@style.styled
+def render_f2(ledger: dict, repo_root: Path, out_dir: Path, verify_against_ledger: bool = True) -> dict:
+    """Cumulative share of each site's ground points that receive LESS than
+    x hours of direct sun. Read at the 2 h reference floor, the curve height is
+    the site's share below the floor — the polarity the text uses. Each curve
+    is checked against the ledger's own share at that point before drawing."""
     paths = {slug: site_ground_parquet_path(repo_root, slug) for slug in FIGURE_SITE_ORDER}
     missing = [slug for slug, p in paths.items() if not p.exists()]
     if missing:
         return _skip("f2_direct_sun_reference_days",
-                      f"ground.parquet absent for site(s): {', '.join(missing)}")
+                     f"ground.parquet absent for site(s): {', '.join(missing)}")
 
     ledger_ids: list[str] = []
-    fig, (axA, axB) = plt.subplots(1, 2, figsize=(7.6, 3.7), sharey=True)
-    panels = (("A", "winter_solstice", "winter solstice", axA), ("B", "equinox", "equinox", axB))
-    for tag, day_key, day_label, ax in panels:
-        for slug in FIGURE_SITE_ORDER:
-            display = FAVELAS[slug]
+    n_by_site: dict[str, int] = {}
+    below_by_site: dict[str, dict[str, float]] = {}
+    below_txt: dict[str, dict[str, str]] = {}
+    max_diff = 0.0
+    fig = plt.figure(layout="constrained", figsize=(style.WIDTH_DOUBLE_IN, 96 * style.MM))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1.0, 0.31])
+    ax_a = fig.add_subplot(gs[0, 0])
+    axes = [ax_a, fig.add_subplot(gs[0, 1], sharey=ax_a)]
+    ax_t = fig.add_subplot(gs[1, :])
+    days = (("A", "winter_solstice"), ("B", "equinox"))
+    for (letter, day_key), ax in zip(days, axes):
+        hours_max = 0.0
+        for i, slug in enumerate(FIGURE_SITE_ORDER):
             vals = _read_columns(paths[slug], [f"hours_{day_key}"]).column(0).to_numpy(zero_copy_only=False)
             vals = np.sort(vals[np.isfinite(vals)])
-            frac = np.arange(1, len(vals) + 1) / len(vals)
+            n_by_site[slug] = int(vals.size)
+            hours_max = max(hours_max, float(vals[-1]))
+            grid = np.linspace(0.0, np.ceil(vals[-1]) + 0.5, 600)
+            below = np.searchsorted(vals, grid, side="left") / vals.size
+
             share_id = f"site.{slug}.ground.share_ge_2h_{day_key}"
             share_val, _ = get_value(ledger, share_id)
             ledger_ids.append(share_id)
-            ax.plot(frac, vals, color=COLORS[slug], linewidth=1.0,
-                    label=f"{display}: {fmt3(share_val)}")
-        ax.axhline(ATHENS_CHARTER_FLOOR_HOURS, color="black", linewidth=0.8, linestyle=":")
-        ax.text(0.01, ATHENS_CHARTER_FLOOR_HOURS, "Athens Charter (1943), Point 26",
-                fontsize=5.5, va="bottom")
-        ax.set_xlabel("cumulative fraction of ground cells")
-        # each panel titled with its own reference day — previously only "A"/
-        # "B", which told the reader nothing without cross-checking the code
-        # (PI review 2026-09-17: panel B carried no day label at all).
-        ax.set_title(f"{tag} — {day_label}", loc="left", fontsize=8)
-        ax.set_ylabel("direct-sun hours (h)" if tag == "A" else "")
-        # the legend's numbers are each site's share of ground cells at/above
-        # the floor below — say that once via the legend title rather than
-        # repeating it in every entry.
-        ax.legend(title=f"share ≥ {fmt3(ATHENS_CHARTER_FLOOR_HOURS)} h floor",
-                   fontsize=5, title_fontsize=5.5, loc="upper left", frameon=False)
-    # how to read the curve: sorted ascending, so a point (x, y) means "x
-    # fraction of this site's ground cells receive at most y hours of direct
-    # sun" — an inverted empirical CDF (fraction on x, value on y), which is
-    # not the conventional orientation.
-    fig.suptitle("Reading the curve: at fraction x, y is the direct-sun hours that fraction of "
-                 "ground cells receive at most (sorted ascending).", fontsize=6.5, y=1.01)
+            at_floor = np.searchsorted(vals, REFERENCE_FLOOR_HOURS, side="left") / vals.size
+            max_diff = max(max_diff, abs(at_floor - (1.0 - share_val)))
+            assert not verify_against_ledger or abs(at_floor - (1.0 - share_val)) < 1e-6, (
+                f"{share_id}: parquet gives {1 - at_floor:.6f}, ledger {share_val:.6f}")
+            below_by_site.setdefault(slug, {})[day_key] = 1.0 - share_val
+            below_txt.setdefault(slug, {})[day_key] = printed_text(share_id, share_val)
+
+            ax.step(grid, below * 100, where="post", color=style.SITE_COLORS[slug], linewidth=1.2)
+            # one marker every 2 h, staggered per site so markers never stack
+            mk = np.searchsorted(grid, np.arange(1 + 0.25 * i, grid[-1], 2.0))
+            ax.plot(grid[mk], below[mk] * 100, linestyle="none", marker=style.SITE_MARKERS[slug],
+                    markersize=3.8, color=style.SITE_COLORS[slug], markeredgecolor="white",
+                    markeredgewidth=0.3)
+
+        ax.axvline(REFERENCE_FLOOR_HOURS, color="#222222", linewidth=0.7, linestyle=(0, (1.5, 1.5)))
+        ax.text(REFERENCE_FLOOR_HOURS - 0.12, 98, "2 h reference floor", ha="right", va="top",
+                fontsize=style.BASE_PT, rotation=90)
+        ax.set_xlim(0, np.ceil(hours_max) + 0.3)
+        ax.set_ylim(0, 100)
+        ax.set_xlabel("direct-sun hours (h)")
+        ax.set_title(_day_label(day_key), loc="left")
+        style.panel_letter(ax, letter, x=-0.07, y=1.02)
+    axes[1].tick_params(labelleft=False)
+    axes[0].set_ylabel("share of ground points\nbelow x hours (%)")
+
+    # key + values in one table, fixed site order: replaces the legend
+    ax_t.axis("off")
+    col0, ncols = 0.20, len(FIGURE_SITE_ORDER)
+    colw = (1.0 - col0) / ncols
+    row_y = [0.86, 0.58, 0.34, 0.10]
+    row_lbl = ["", f"below 2 h, {days[0][1].replace('_', ' ')}", f"below 2 h, {days[1][1]}",
+               "ground points (n)"]
+    for r in range(1, 4):
+        ax_t.text(0.0, row_y[r], row_lbl[r], transform=ax_t.transAxes, ha="left", va="center",
+                  fontsize=style.BASE_PT)
+    for j, slug in enumerate(FIGURE_SITE_ORDER):
+        xc = col0 + (j + 0.5) * colw
+        ax_t.plot([xc - 0.022, xc + 0.022], [1.05, 1.05], transform=ax_t.transAxes,
+                  color=style.SITE_COLORS[slug], linewidth=1.2, clip_on=False)
+        ax_t.plot([xc], [1.05], transform=ax_t.transAxes, marker=style.SITE_MARKERS[slug],
+                  markersize=3.8, color=style.SITE_COLORS[slug], clip_on=False)
+        ax_t.text(xc, row_y[0], FAVELAS[slug], transform=ax_t.transAxes, ha="center",
+                  va="center", fontsize=style.BASE_PT, fontweight="bold")
+        for r, txt in ((1, below_txt[slug][days[0][1]]), (2, below_txt[slug][days[1][1]]),
+                       (3, f"{n_by_site[slug]:,}")):
+            ax_t.text(xc, row_y[r], txt, transform=ax_t.transAxes, ha="center", va="center",
+                      fontsize=style.BASE_PT)
+    ax_t.plot([0, 1], [0.72, 0.72], transform=ax_t.transAxes, color="#999999", linewidth=0.4)
 
     source_parquets = [str(paths[slug].relative_to(repo_root)) for slug in FIGURE_SITE_ORDER]
+    extra = {
+        "n_unit": "1 m ground points of each site's model domain (IPP 2019 favela polygons; for Maré "
+                  "the six polygons of the complex, a tile of the full complex)",
+        "n_by_site": n_by_site,
+        "share_below_2h_pct": {s: {d: round(v * 100, 3) for d, v in below_by_site[s].items()}
+                               for s in FIGURE_SITE_ORDER},
+        "polarity": "share BELOW the 2 h reference floor (1 - ledger share_ge_2h)",
+        "curve_vs_ledger_max_abs_diff_at_floor": max_diff,
+    }
     return _produced(fig, "f2_direct_sun_reference_days", out_dir, ledger_ids, source_parquets,
-                      "publishable-candidate")
+                     "publishable-candidate", final_width=True, extra=extra)
 
 
 # ---------------------------------------------------------------------------
 # f3 — domain sensitivity (ledger only)
 # ---------------------------------------------------------------------------
 
+@style.styled
 def render_f3(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
     variants = discover_grid_variants(ledger)
     if not variants:
@@ -496,80 +621,78 @@ def render_f3(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
 
     ledger_ids: list[str] = []
     plotted_ids: list[str] = []
-    fig, ax = plt.subplots(figsize=(7.2, 4.0))
-    x = np.arange(len(variants))
+    fig, ax = plt.subplots(layout="constrained", figsize=(style.WIDTH_DOUBLE_IN, 74 * style.MM))
+    # coverage groups sit apart on x, so a connector never joins two groups
+    groups = [(t, [i for i, _ in idxs]) for t, idxs in
+              groupby(enumerate(variants), key=lambda iv: iv[1][1])]
+    xpos = np.empty(len(variants))
+    for g, (_t, idxs) in enumerate(groups):
+        for j, i in enumerate(idxs):
+            xpos[i] = g * 4 + j
     locked_idx = next((i for i, (_, t, d) in enumerate(variants) if (t, d) == LOCKED_VARIANT), None)
+    if locked_idx is not None:
+        ax.axvspan(xpos[locked_idx] - 0.4, xpos[locked_idx] + 0.4, color="#E8EEF6", zorder=0, lw=0)
 
-    for row, slug in enumerate(FIGURE_SITE_ORDER):
-        display = FAVELAS[slug]
+    handles, labels = [], []
+    ymax = 0.0
+    for slug in FIGURE_SITE_ORDER:
         ys = []
         for i, (gslug, _t, _d) in enumerate(variants):
             gid = f"g3.grid_{gslug}.{slug}.svf_percentile"
             val, _ = get_value(ledger, gid)
             (ledger_ids if i == locked_idx else plotted_ids).append(gid)
             ys.append(val)
+        ys = np.array(ys)
+        ymax = max(ymax, float(ys.max()))
         spread_id = f"g3.spread.{slug}.svf"
         spread_val, _ = get_value(ledger, spread_id)
         ledger_ids.append(spread_id)
-        ax.plot(x, ys, marker="o", markersize=3, linewidth=1.0, color=COLORS[slug],
-                label=f"{display} (spread {fmt3(spread_val)} percentile points)")
-        if locked_idx is not None:
-            ax.annotate(fmt3(ys[locked_idx]), (x[locked_idx], ys[locked_idx]), xytext=(6, -2),
-                        textcoords="offset points", ha="left", fontsize=5, color=COLORS[slug])
+        for _t, idxs in groups:
+            ax.plot(xpos[idxs], ys[idxs], color=style.SITE_COLORS[slug], linewidth=0.9)
+        h = ax.plot(xpos, ys, linestyle="none", marker=style.SITE_MARKERS[slug], markersize=4.2,
+                    color=style.SITE_COLORS[slug], markeredgecolor="white", markeredgewidth=0.3)[0]
+        handles.append(h)
+        locked_txt = (printed_text(f"g3.grid_{variants[locked_idx][0]}.{slug}.svf_percentile",
+                                   ys[locked_idx]) if locked_idx is not None else "–")
+        labels.append(f"{FAVELAS[slug]}: {locked_txt} (range {printed_text(spread_id, spread_val)})")
 
-    if locked_idx is not None:
-        ax.axvline(locked_idx, color="black", linewidth=0.8, linestyle=":")
-        ax.text(locked_idx, ax.get_ylim()[1],
-                 f"{LOCKED_VARIANT[0]:.0%} / {LOCKED_VARIANT[1]:g} m — variant of record (locked)",
-                 fontsize=5.5, ha="center", va="bottom")
-
-    # Two-level x-axis: each point is one (coverage threshold, footprint
-    # distance) grid variant from config/params.yaml's `domain` section
-    # (src/brisa_solar/g3_domain.py FABRIC_COVERAGE_GRID x
-    # FABRIC_FOOTPRINT_DISTANCE_GRID_M) — never re-typed here, both grouping
-    # and tick values come straight out of `variants`, itself parsed from the
-    # ledger ids actually present. A flat "0.05/5 m" tick reads as a
-    # fraction, not a pair, and gives no hint that 3 points share one
-    # coverage threshold — group by threshold and label each level
-    # separately instead (PI review 2026-09-17).
-    ax.set_xticks(x)
-    ax.set_xticklabels([f"{d:g} m" for _, _t, d in variants], rotation=0, ha="center", fontsize=6)
-    groups = [(t, [i for i, _ in idxs]) for t, idxs in
-              groupby(enumerate(variants), key=lambda iv: iv[1][1])]
+    ax.set_ylim(0, np.ceil(ymax * 1.15 / 5) * 5)
+    ax.set_xticks(xpos)
+    ax.set_xticklabels([f"{d:g} m" for _, _t, d in variants])
+    ax.set_xlim(xpos.min() - 0.6, xpos.max() + 0.6)
     trans = blended_transform_factory(ax.transData, ax.transAxes)
-    for t, idxs in groups:
-        center = sum(idxs) / len(idxs)
-        ax.text(center, -0.16, f"{t:.0%} fabric coverage", transform=trans,
-                fontsize=6, ha="center", va="top")
-        if idxs[0] > 0:
-            ax.axvline(idxs[0] - 0.5, color="0.85", linewidth=0.6, zorder=0)
-    ax.set_xlabel("footprint distance (m), grouped by fabric coverage threshold", labelpad=14)
-    ax.set_ylabel("SVF percentile of citywide median")
-    ax.set_title(
-        "Coverage threshold and footprint distance jointly decide which ground cells count as\n"
-        "urban fabric (the citywide SVF denominator) — site ranking is stable across all "
-        f"{len(variants)} variants, only position shifts.",
-        fontsize=6.5, loc="left")
-    ax.legend(fontsize=5, loc="best", frameon=False)
+    for g, (t, idxs) in enumerate(groups):
+        ax.text(xpos[idxs].mean(), 1.02, f"fabric coverage ≥ {t:.0%}", transform=trans,
+                ha="center", va="bottom", fontsize=style.BASE_PT)
+    if locked_idx is not None:
+        ax.text(xpos[locked_idx], 0.985, "variant of\nrecord", transform=trans, ha="center", va="top",
+                fontsize=style.BASE_PT, color="#2B4A73")
+    ax.set_xlabel("distance to nearest building footprint (m)")
+    ax.set_ylabel("percentile of citywide sky view factor\nat the site median")
+    ax.legend(handles, labels, loc="center left", bbox_to_anchor=(1.01, 0.5), frameon=False,
+              title="value at variant of record\n(range over 9 variants, points)",
+              alignment="left", handletextpad=0.4)
 
     return _produced(fig, "f3_domain_sensitivity", out_dir, ledger_ids, [], "publishable-candidate",
-                      plotted_ids=plotted_ids)
+                     plotted_ids=plotted_ids, final_width=True,
+                     extra={"percentile_metric": "percentile of the citywide sky-view-factor "
+                                                 "distribution at the site median"})
 
 
 # ---------------------------------------------------------------------------
 # f4 — geometry constraints (ledger only)
 # ---------------------------------------------------------------------------
 
+#: count ramp, pale = no constraint, dark = all three (a count, not light)
+CONSTRAINT_SHADES = ["#EEEBF5", "#BDB3D8", "#7E6FAE", "#3B2C6E"]
+
+
+@style.styled
 def render_f4(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
     ledger_ids: list[str] = []
-    fig, ax = plt.subplots(figsize=(6.2, 4.1))
-    x = np.arange(len(FIGURE_SITE_ORDER))
-    bottoms = np.zeros(len(FIGURE_SITE_ORDER))
-    shades = ["#E8E8E8", "#B8B8D0", "#7878A8", "#383868"]  # light -> dark == 0 -> 3 constraints
-    # labels spell out both ends so "0" and "3" never need inferring from shade alone
-    k_labels = {0: "0 of 3 (none triggered)", 1: "1 of 3", 2: "2 of 3",
-                3: "3 of 3 (all triggered)"}
-
+    fig, ax = plt.subplots(layout="constrained", figsize=(style.WIDTH_DOUBLE_IN, 58 * style.MM))
+    y = np.arange(len(FIGURE_SITE_ORDER))
+    lefts = np.zeros(len(FIGURE_SITE_ORDER))
     for k in range(4):
         vals = []
         for slug in FIGURE_SITE_ORDER:
@@ -578,38 +701,46 @@ def render_f4(ledger: dict, repo_root: Path, out_dir: Path) -> dict:
             ledger_ids.append(gid)
             vals.append(val)
         vals = np.array(vals)
-        ax.bar(x, vals, bottom=bottoms, color=shades[k], edgecolor="white", linewidth=0.4,
-               label=k_labels[k])
-        for xi, (v, b) in enumerate(zip(vals, bottoms)):
-            if v > 0:
-                ax.text(xi, b + v / 2, fmt3(v), ha="center", va="center", fontsize=5.5)
-        bottoms += vals
+        ax.barh(y, vals * 100, left=lefts * 100, height=0.68, color=CONSTRAINT_SHADES[k],
+                edgecolor="white", linewidth=0.6, label=str(k))
+        for yi, (v, l0, slug) in enumerate(zip(vals, lefts, FIGURE_SITE_ORDER)):
+            if v * 100 >= 2.5:
+                ax.text((l0 + v / 2) * 100, yi, printed_text(f"wp06.{slug}.share_n{k}", v),
+                        ha="center", va="center", fontsize=style.BASE_PT,
+                        color="white" if k >= 2 else "#1E1636")
+            elif v > 0:  # too narrow to hold its label: print it just above the bar
+                ax.text((l0 + v / 2) * 100, yi - 0.36, printed_text(f"wp06.{slug}.share_n{k}", v),
+                        ha="center", va="bottom", fontsize=style.BASE_PT, color="#1E1636")
+        lefts += vals
 
-    for xi, slug in enumerate(FIGURE_SITE_ORDER):
+    ticklabels = []
+    for slug in FIGURE_SITE_ORDER:
         nid = f"wp06.{slug}.n"
         nval, _ = get_value(ledger, nid)
         ledger_ids.append(nid)
-        ax.text(xi, 1.02, f"n={fmt3(nval)}", ha="center", va="bottom", fontsize=5.5)
+        ticklabels.append(f"{FAVELAS[slug]}\nn = {printed_text(nid, nval)}")
 
-    ax.set_xticks(x)
-    ax.set_xticklabels([FAVELAS[s] for s in FIGURE_SITE_ORDER], rotation=20, ha="right")
-    # WP06_GEOMETRY_CELL_M names this figure's own grid explicitly so it
-    # reads as a different (and independent) grid from the citywide 5 m
-    # sampling lattice, not a discrepancy between the two (PI review
-    # 2026-09-17).
-    ax.set_ylabel(f"share of built {WP06_GEOMETRY_CELL_M:g} m grid cells (WP-06's own geometry grid)")
-    ax.set_ylim(0, 1.14)
-    ax.legend(title="constraints triggered", fontsize=5.5, title_fontsize=6, loc="upper center",
-              ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.22))
+    ax.set_yticks(y)
+    ax.set_yticklabels(ticklabels)
+    ax.invert_yaxis()
+    ax.set_xlim(0, 100)
+    ax.set_xticks([0, 25, 50, 75, 100])
+    ax.set_xlabel(f"share of built {WP06_GEOMETRY_CELL_M:g} m grid cells (%)")
+    ax.spines["left"].set_visible(False)
+    ax.tick_params(axis="y", length=0)
+    ax.legend(title="constraints met (of 3)", loc="lower left", bbox_to_anchor=(0.0, 1.0), ncol=4,
+              frameon=False, alignment="left", handlelength=1.4, columnspacing=1.2)
 
     depth_median_m = wp06_depth_median_m(repo_root)
-    ax.set_title(
-        "Constraints (docs/ventaxis_canonical.md): vertical — "
-        f"$\\lambda_f$ mean $\\geq$ {LAMBDA_F_CONSTRAINT_MIN:g} · lateral — open-edge distance "
-        f"$\\geq$ {depth_median_m:.1f} m (pooled median) · directional — exposure ratio $\\geq$ 1.0",
-        fontsize=6, loc="left")
-
-    return _produced(fig, "f4_geometry_constraints", out_dir, ledger_ids, [], "publishable-candidate")
+    return _produced(fig, "f4_geometry_constraints", out_dir, ledger_ids, [], "publishable-candidate",
+                     final_width=True, extra={
+                         "n_unit": f"built {WP06_GEOMETRY_CELL_M:g} m grid cells (geometry grid; for "
+                                   "Maré it spans the whole complex, wider than the ground-model tile)",
+                         "caption_thresholds": {
+                             "lambda_f_mean_min": LAMBDA_F_CONSTRAINT_MIN,
+                             "open_edge_distance_pooled_median_m": round(depth_median_m, 1),
+                             "directional_ratio_min": 1.0,
+                         }})
 
 
 # ---------------------------------------------------------------------------
