@@ -129,7 +129,7 @@ def test_render_page_contains_expected_links_and_numbers():
     html_str = M.render_page(DEFAULT_ROOT)
     assert M.OPS_LINK in html_str
     assert M.PAPER_LINK in html_str
-    version = M.latest_version(PACKAGE_ROOT)
+    version = M.page_versions(PACKAGE_ROOT)[0]
     quality = M.load_json(PACKAGE_ROOT / version / "data" / "quality_report.json")
     assert f'<strong>{quality["route_geometry_flagged_points"]}</strong>' in html_str
     for item in quality["pending_items"]:
@@ -158,7 +158,7 @@ def test_check_fails_on_hand_edited_page():
 
 @pytestmark_real
 def test_report_pdf_is_main_download_and_readme_pdf_secondary():
-    version = M.latest_version(PACKAGE_ROOT)
+    version = M.page_versions(PACKAGE_ROOT)[0]
     version_dir = PACKAGE_ROOT / version
     for name in ("report.pdf", "README.pdf"):
         data = (version_dir / name).read_bytes()
@@ -186,7 +186,7 @@ def test_deck_links_are_the_only_unresolved_exception():
 
 @pytestmark_real
 def test_gallery_shows_every_figure_and_spec_table_is_behind_a_toggle():
-    version = M.latest_version(PACKAGE_ROOT)
+    version = M.page_versions(PACKAGE_ROOT)[0]
     page = M.render_page(DEFAULT_ROOT)
     for png in (PACKAGE_ROOT / version / "figures").glob("*.png"):
         assert re.search(rf'<figure class="tile"><a href="{re.escape(version)}/figures/{re.escape(png.name)}"[^>]*zoom\(', page), png.name

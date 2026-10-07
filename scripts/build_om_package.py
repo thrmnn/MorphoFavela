@@ -40,9 +40,19 @@ Builds, per requested route:
        across versions), rebuilt from this run's outputs by
        scripts/build_om_package_page.py — see that module for its content.
 
+Stages (OM2): three compute stages (route + horizon march, shade, walks;
+src/om_package/stage_*.py) fill a content-addressed cache under
+outputs/_packages/_cache/om2/<stage>/<key>/ (src/om_package/stage_cache.py)
+in layout-independent names; the package stage lays the cached tables out
+under their layout.py names and writes figures, documents, manifest and ZIP.
+A change to layout, docs, figures, manifest or ZIP reruns only the package
+stage. --stage package never runs a compute stage and fails on a missing or
+stale cache entry; --no-cache recomputes every compute stage.
+
 Run:
     python scripts/build_om_package.py --route OM2 --root /home/theo/SCL/SCR/MorphoFavela
     python scripts/build_om_package.py --route ALL --root /home/theo/SCL/SCR/MorphoFavela
+    python scripts/build_om_package.py --stage package --device cpu   # docs-only rebuild, no GPU
 
 Geometry epoch (2019 now; 2024 ALS + footprints later): every geometry input
 is a path, so swapping the epoch is --buildings / --dtm (+ --geometry-epoch
@@ -56,6 +66,7 @@ import re
 import shutil
 import sys
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -67,7 +78,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # for build_om_package
 import geopandas as gpd
 import pandas as pd
 
-from src.om_package.buffers import BUFFER_RADII_M, compute_buffer_variables
+from src.om_package.buffers import BUFFER_RADII_M
 from src.om_package.dictionary import dictionary_dataframe
 from src.om_package.figures import (
     build_fig_form,
@@ -79,32 +90,22 @@ from src.om_package.figures import (
     build_fig_svf_sensor,
 )
 from src.om_package import fig_style as fs_style
-from src.om_package import route_flags
 from src.om_package.fig_flags import build_fig_flags
-from src.om_package.formvars import compute_street_orientation_deg
 from src.om_package.vent_schematic import build_fig_vent_schematic
 from src.om_package.vent_figures import build_fig_shelter_maps, build_fig_vent_profiles, build_fig_wind
-from src.om_package.formvars import compute_form_variables
 from src.om_package import layout
 from src.om_package.io_utils import Paths, hash_tree, write_package_table, write_table
-from src.om_package.neighbourhoods import communities_crossed, join_communities
-from src.om_package.package_docs import DATA_CREDIT, USE_TERMS, VERSION, render_changelog, render_readme
-from src.om_package import p10_p11, walk_tables
-from src.om_package.walks import load_walks
-from src.om_package.wind_regimes import season_regimes, tag_walks, load_campaign, load_climatology
+from src.om_package.package_docs import DATA_CREDIT, USE_TERMS, VERSION, frozen_release_error, render_changelog, render_readme
+from src.om_package import p10_p11
+from src.om_package.wind_regimes import load_campaign, load_climatology
 from src.om_package.provenance import read_om_decisions, read_wind_source_manifest
 from src.om_package.report_pdf import render_readme_pdf
 from src.om_package.quality import write_quality_report
-from src.om_package.routes import compute_route_geometry_flag, densify_route, route_length_m
 from src.om_package.spec import internal_dir_for, write_conformance
-from src.om_package.shade import (
-    OM2_SHADE_MAX_DIST_M,
-    SHADE_STEP_MIN,
-    compute_shade_local,
-    nodata_floor_m as compute_nodata_floor_m,
-)
-from src.om_package.sun_envelope import ENVELOPE_SLOT_MIN, route_centroid_latlon
-from src.om_package.ventilation import compute_ventilation_proxies
+from src.om_package.shade import OM2_SHADE_MAX_DIST_M
+from src.om_package.stage_cache import HASH_MEMO, Entry, HashMemo, StageSpec, load_or_run, module_closure, place
+from src.om_package.stage_route import compute_route, quality_summary
+from src.om_package.stage_shade import LOCAL_TZ
 from src.om_package.wind_obs import WINDOW_END, WINDOW_START, cache_paths as wind_cache_paths, fetch_sbgl
 
 from build_om_package_page import build_page as build_om_package_page, write_package_zip
@@ -237,72 +238,135 @@ def write_disclosure_hits(out_dir: Path, internal_dir: Path) -> Path:
     return out_path
 
 
-def build_one_route(om: str, paths: Paths, out_dir: Path, radii=BUFFER_RADII_M, extras_fn=None, repair=None) -> dict:
-    """Build one route's P-02/P-03/P-04/P-06/P-07 outputs under out_dir.
-    out_dir is either the shared package root (for OM2) or the internal
-    build directory (for OM1/OM3/OM4) — output_files are reported relative
-    to whichever out_dir was passed. ``extras_fn(points_gdf)`` (OM2 only)
-    returns (extra_columns keyed by point_id, p07 extras): it runs on the
-    fully joined table so its columns are written and quality-checked with
-    every other variable. ``repair`` = (classification, buildings) from
-    route_flags.classify_route: every measure is then computed at the repaired
-    position, and the table keeps the traced position in geometry, x and y."""
-    route_json = paths.route_json(om)
-    points = densify_route(route_json)
-    points["route_geometry_flag"] = compute_route_geometry_flag(points, paths).to_numpy()
-    length_m = route_length_m(route_json)
+def build_one_route(om: str, paths: Paths, out_dir: Path, radii=BUFFER_RADII_M) -> dict:
+    """Build an internal route's (OM1/OM3/OM4) point table and quality
+    report under out_dir/OMn. These routes bypass the stage cache; OM2 goes
+    through the cached compute stages (stage_route)."""
+    table, variable_cols, quality_extra, info = compute_route(om, paths, radii=radii)
+    route_dir = out_dir / om.replace("OM_", "OM")
+    written = write_table(table, route_dir, layout.INTERNAL_POINTS_STEM, geo=True)
+    quality = write_quality_report(table, variable_cols, route_dir, extra=quality_extra)
+    info.pop("repair_facts")
+    return {**info, "output_files": [str(p.relative_to(out_dir)) for p in written],
+            "quality_summary": quality_summary(quality, variable_cols)}
 
-    meas = points if repair is None else route_flags.repaired_points(points, repair[0])
-    form = compute_form_variables(meas, paths)
-    if repair is not None:
-        form["street_orientation_deg"] = compute_street_orientation_deg(points)
-    vent = compute_ventilation_proxies(meas, form["street_orientation_deg"].to_numpy(), paths)
-    nbhd = join_communities(points, paths)
 
-    joined = meas.merge(form, on="point_id").merge(vent, on="point_id").merge(nbhd, on="point_id")
+MATCHED_DIR = Path("data") / "maré" / "octopus" / "prerelease_v020" / "matched"
+CODE_ROOT = Path(__file__).resolve().parents[1]
+STAGE_MODULES = {s: CODE_ROOT / "src" / "om_package" / f"stage_{s}.py" for s in ("route", "shade", "walks")}
+#: Left out of the compute stages' code hash: stages write logical names and
+#: only the package stage reads the layout, so a layout rename must not rerun
+#: the horizon march.
+CODE_HASH_EXCLUDE = {CODE_ROOT / "src" / "om_package" / "layout.py"}
 
-    buf = compute_buffer_variables(meas, paths, radii=radii)
-    joined_with_buf = joined.merge(buf, on="point_id")
-    quality_extra = None
-    if extras_fn is not None:
-        extra_cols, quality_extra = extras_fn(joined_with_buf)
-        joined_with_buf = joined_with_buf.merge(extra_cols, on="point_id", how="left")
-    repair_facts = None
-    if repair is not None:
-        joined_with_buf, repair_facts = route_flags.apply_to_table(
-            joined_with_buf, repair[0], repair[1], points, compute_form_variables(points, paths))
-        joined_with_buf["geometry"] = points.geometry.to_numpy()
+#: shipped data files per compute stage: layout key -> extensions, cached as <key>.<ext>
+SHIPPED_TABLES: dict[str, dict[str, tuple[str, ...]]] = {
+    "route": {"route_points": ("gpkg", "parquet", "csv"), "quality_report": ("json", "csv"),
+              "sun_envelope": ("parquet", "csv"), "sun_dose": ("parquet",), "horizon_profiles": ("parquet",)},
+    "shade": {"building_shade": ("parquet",)},
+    "walks": {"walks": ("parquet", "csv"), "walk_points": ("parquet", "csv"), "wind_regimes": ("csv",),
+              "wind_regime_by_hour": ("csv",)},
+}
 
-    if om == "OM_2":
-        written = write_package_table(joined_with_buf, out_dir, "route_points", geo=True)
-        route_dir = out_dir / layout.DATA_DIR
-    else:
-        route_dir = out_dir / om.replace("OM_", "OM")
-        written = write_table(joined_with_buf, route_dir, layout.INTERNAL_POINTS_STEM, geo=True)
 
-    variable_cols = [c for c in joined_with_buf.columns if c not in ("point_id", "route_id", "seq", "distance_along_m", "height_m", "geometry")]
-    quality = write_quality_report(joined_with_buf, variable_cols, route_dir, extra=quality_extra)
+def cache_root_for(root: Path) -> Path:
+    return Path(root) / "outputs" / "_packages" / "_cache" / "om2"
 
-    communities = communities_crossed(points, paths)
 
+def _shapefile(label: str, shp: Path) -> dict[str, Path]:
+    return {f"{label}{p.suffix}": p for p in sorted(shp.parent.glob(f"{shp.stem}.*"))}
+
+
+def stage_specs(paths: Paths, matched_dir: Path, params: dict, upstream_route: str | None = None) -> dict[str, StageSpec]:
+    """The OM2 compute stages: inputs, params and code (the import closure of
+    each stage module). The torch device is not a param: it decides where
+    the march runs, not what it computes."""
+    def spec(name, inputs, prm, upstream):
+        code = module_closure([STAGE_MODULES[name]], CODE_ROOT, exclude=CODE_HASH_EXCLUDE)
+        return StageSpec(name, inputs, prm, code, upstream, CODE_ROOT)
+
+    wind = {"sbgl_campaign": wind_cache_paths(paths.root)[0],
+            "sbgl_climatology": paths.root / "data" / "asos" / "SBGL_2015_2024.csv"}
+    route_inputs = {
+        "route_json": paths.route_json("OM_2"), "matched": matched_dir,
+        **_shapefile("buildings_mare", paths.buildings_mare), **_shapefile("street_mare", paths.street_mare),
+        "buildings_extended_300m": paths.buildings_extended_300m, "dtm_extended_300m": paths.dtm_extended_300m,
+        "features_grid": paths.features_grid, "svf_streets": paths.svf_streets, "hw_streets": paths.hw_streets,
+        "neighbourhoods": paths.neighbourhoods_gpkg, **wind,
+    }
+    up = {"route": upstream_route} if upstream_route else {}
     return {
-        "route_id": om,
-        "repair_facts": repair_facts,
-        "length_m": length_m,
-        "n_points": len(points),
-        "communities_crossed": communities,
-        "output_files": [str(p.relative_to(out_dir)) for p in written],
-        "quality_summary": {
-            "n_points": quality["n_points"],
-            "n_columns_checked": len(variable_cols),
-            "route_geometry_flagged_points": quality.get("route_geometry_flagged_points"),
-        },
+        "route": spec("route", route_inputs, params, {}),
+        "shade": spec("shade", {"dtm_extended_300m": paths.dtm_extended_300m}, {}, up),
+        "walks": spec("walks", wind, {}, up),
     }
 
 
-LOCAL_TZ = "America/Sao_Paulo"
-MATCHED_DIR = Path("data") / "maré" / "octopus" / "prerelease_v020" / "matched"
+def resolve_om2_stages(paths: Paths, matched_dir: Path, params: dict, cache_root: Path, *, run: bool,
+                       use_cache: bool = True, device: str = "cuda", timings: dict | None = None) -> dict[str, Entry]:
+    """Cache entries of the three OM2 compute stages. With run=False no stage
+    function is imported or called: a missing or stale entry raises
+    StaleCacheError."""
+    timings = timings if timings is not None else {}
+    memo = HashMemo(cache_root / HASH_MEMO)
+    entries: dict[str, Entry] = {}
 
+    def resolve(name, spec, make_fn):
+        with timed(f"{'compute' if run else 'cache check'}: {name}", timings):
+            entries[name] = load_or_run(spec, cache_root, make_fn() if run else None, use_cache=use_cache, memo=memo)
+
+    def route_fn():
+        from src.om_package.stage_route import route_stage
+        return lambda work: route_stage(work, paths=paths, matched_dir=matched_dir, device=device, **params)
+
+    resolve("route", stage_specs(paths, matched_dir, params)["route"], route_fn)
+    route = entries["route"]
+    specs = stage_specs(paths, matched_dir, params, upstream_route=route.key)
+
+    def shade_fn():
+        from src.om_package.stage_shade import shade_stage
+
+        def fn(work):
+            lat, lon = route.obj("latlon")
+            return shade_stage(work, paths=paths, route_points=pd.read_parquet(route.file("route_points.parquet")),
+                               walk_dates=route.obj("walk_dates"), lat=lat, lon=lon,
+                               horizon_deg=route.obj("horizon_deg"), azimuths_deg=route.obj("azimuths_deg"))
+        return fn
+
+    def walks_fn():
+        from src.om_package.stage_walks import walks_stage
+
+        def fn(work):
+            lat, lon = route.obj("latlon")
+            return walks_stage(
+                work, root=paths.root, route_points=pd.read_parquet(route.file("route_points.parquet")),
+                walks=route.obj("walks"), fixes=route.obj("walk_fixes"), season=route.obj("season"),
+                regimes=route.obj("regimes"), horizon_tab=route.obj("horizon_tab"),
+                horizon_deg=route.obj("horizon_deg"), azimuths_deg=route.obj("azimuths_deg"), lat=lat, lon=lon)
+        return fn
+
+    resolve("shade", specs["shade"], shade_fn)
+    resolve("walks", specs["walks"], walks_fn)
+    return entries
+
+
+def lay_out_tables(entries: dict[str, Entry], out_dir: Path) -> None:
+    """Shipped data files from the cache to their layout.py names (hard
+    links when the cache and the package share a filesystem)."""
+    for stage, tables in SHIPPED_TABLES.items():
+        for key, exts in tables.items():
+            for ext in exts:
+                place(entries[stage].file(f"{key}.{ext}"), layout.table_path(out_dir, key, ext))
+
+
+@contextmanager
+def timed(label: str, timings: dict):
+    t0 = time.time()
+    try:
+        yield
+    finally:
+        timings[label] = time.time() - t0
+        print(f"[build_om_package] time {label}: {timings[label]:.1f} s")
 
 
 def main() -> int:
@@ -329,8 +393,18 @@ def main() -> int:
     ap.add_argument("--dose-slot-min", type=int, default=p10_p11.DEFAULT_DOSE_SLOT_MIN, help="slot grid of sun_dose, minutes")
     ap.add_argument("--device", default="cuda", help="torch device for the horizon march")
     ap.add_argument("--skip-page", action="store_true", help="do not rebuild the shared package page (index.html)")
+    ap.add_argument(
+        "--stage", choices=("all", "compute", "package"), default="all",
+        help="compute: fill the OM2 stage cache only; package: lay out the package from the cache only "
+             "(never runs a compute stage, fails on a missing or stale entry); all: both",
+    )
+    ap.add_argument("--no-cache", action="store_true", help="recompute every OM2 compute stage and replace its cache entry")
     args = ap.parse_args()
+    if args.stage == "package" and args.no_cache:
+        ap.error("--no-cache recomputes; it cannot be combined with --stage package")
 
+    t_build = time.time()
+    timings: dict[str, float] = {}
     paths = EpochPaths(args.root, buildings=args.buildings, dtm=args.dtm)
     out_dir = Path(args.out) if args.out else paths.package_dir(args.version)
     internal_dir = (
@@ -339,11 +413,45 @@ def main() -> int:
         else paths.root / "outputs" / "_packages" / "_internal" / "mare_routes" / args.version
     )
     pkg_internal_dir = internal_dir_for(out_dir)
+    cache_root = cache_root_for(paths.root)
+    frozen = frozen_release_error(out_dir, paths.package_dir(args.version).parent)
+    if frozen:
+        print(f"[build_om_package] REFUSED: {frozen} (target {out_dir})", file=sys.stderr)
+        return 2
 
     route_sel = args.route.upper().replace("OM_", "OM")
     routes = ALL_ROUTES if route_sel == "ALL" else [f"OM_{route_sel[2:]}"]
 
-    if "OM_2" in routes:
+    internal = [r for r in routes if r != "OM_2"]
+    if internal and args.stage == "package":
+        print(f"[build_om_package] --stage package: internal routes {internal} are not cached; not rebuilt")
+    elif internal:
+        internal_dir.mkdir(parents=True, exist_ok=True)
+        for om in internal:
+            print(f"[build_om_package] {om} -> {internal_dir} (internal-only, not part of the shared package) ...")
+            with timed(f"internal route {om}", timings):
+                result = build_one_route(om, paths, internal_dir)
+            print(f"  length_m={result['length_m']:.1f} n_points={result['n_points']} communities={result['communities_crossed']}")
+
+    if "OM_2" not in routes:
+        print("[build_om_package] OM2 not requested — nothing written to the shared package this run")
+        return 0
+
+    matched_dir = Path(args.matched_dir) if args.matched_dir else paths.root / MATCHED_DIR
+    params = {"geometry_epoch": args.geometry_epoch, "window_start": args.window_start,
+              "window_end": args.window_end, "dose_slot_min": args.dose_slot_min}
+    run = args.stage != "package"
+    if run and not wind_cache_paths(paths.root)[0].exists():
+        print("[build_om_package] SBGL cache missing — fetching from the Iowa ASOS archive ...")
+        fetch_sbgl(paths.root, args.window_start, args.window_end)
+    entries = resolve_om2_stages(paths, matched_dir, params, cache_root, run=run, use_cache=not args.no_cache,
+                                 device=args.device, timings=timings)
+    if args.stage == "compute":
+        print(f"[build_om_package] --stage compute: cache filled under {cache_root}; package not laid out")
+        _print_timings(timings, t_build)
+        return 0
+
+    with timed("package: data layout", timings):
         # A rebuild of a version must not leave files of an earlier layout behind.
         for sub in (layout.DATA_DIR, layout.FIGURES_DIR, layout.SCRIPTS_DIR, "OM2"):
             shutil.rmtree(out_dir / sub, ignore_errors=True)
@@ -351,8 +459,21 @@ def main() -> int:
             legacy.unlink()
         out_dir.mkdir(parents=True, exist_ok=True)
         pkg_internal_dir.mkdir(parents=True, exist_ok=True)
-    if any(r != "OM_2" for r in routes):
-        internal_dir.mkdir(parents=True, exist_ok=True)
+        lay_out_tables(entries, out_dir)
+
+    route, shade, walks = entries["route"], entries["shade"], entries["walks"]
+    route_result = route.obj("route_result")
+    repair_facts = route.obj("repair_facts")
+    regimes, season, walk_dates = route.obj("regimes"), route.obj("season"), route.obj("walk_dates")
+    shade_summary, nodata_floor = shade.obj("shade_summary"), shade.obj("nodata_floor")
+    walks_summary = walks.obj("walks_summary")
+    n_walks = len(route.obj("walks"))
+    om2_df = pd.read_parquet(layout.table_path(out_dir, "route_points", "parquet"))
+    walks_tbl = pd.read_parquet(layout.table_path(out_dir, "walks", "parquet"))
+    p12 = pd.read_parquet(layout.table_path(out_dir, "walk_points", "parquet"))
+    by_hour_tbl = walks.obj("wind_regime_by_hour")
+    print(f"  OM_2 length_m={route_result['length_m']:.1f} n_points={route_result['n_points']} "
+          f"communities={route_result['communities_crossed']}")
 
     manifest = {
         "package_version": args.version,
@@ -361,149 +482,19 @@ def main() -> int:
         "data_credit": DATA_CREDIT,
         "use_terms": USE_TERMS,
         "release_scope": "OM2 only. OM1/OM3/OM4 are built by the same code path into an internal directory outside this package.",
-        "routes": [],
+        "routes": [{
+            **{k: route_result[k] for k in ("route_id", "length_m", "n_points", "communities_crossed")},
+            "output_files": [layout.table("route_points", ext) for ext in route_result["route_point_exts"]],
+            "quality_summary": route_result["quality_summary"],
+        }],
     }
 
-    ctx: dict = {}
-    if "OM_2" in routes:
-        matched_dir = Path(args.matched_dir) if args.matched_dir else paths.root / MATCHED_DIR
-        print(f"[build_om_package] walks: reading {matched_dir} ...")
-        walks_df, fixes = load_walks(matched_dir, paths.route_json("OM_2"))
-        walk_dates = sorted(str(d) for d in walks_df["date"].unique())
-        if not wind_cache_paths(paths.root)[0].exists():
-            print("[build_om_package] SBGL cache missing — fetching from the Iowa ASOS archive ...")
-            fetch_sbgl(paths.root, args.window_start, args.window_end)
-        season = season_regimes(paths.root)
-        regimes = p10_p11.campaign_regime_list(season)
-        print(f"[build_om_package] {len(walks_df)} walks on {len(walk_dates)} dates; campaign regimes: "
-              + ", ".join(f"{g['name']} {g['mean_direction_deg']:.1f} deg" for g in regimes))
-        ctx.update(walks=walks_df, fixes=fixes, walk_dates=walk_dates, season=season, regimes=regimes)
-        print("[build_om_package] route repair: classifying points, GPS consensus, medial axis ...")
-        route_pts = densify_route(paths.route_json("OM_2"))
-        rep_res, rep_fixes, rep_buildings = route_flags.classify_route(route_pts, paths, matched_dir)
-        ctx["repair"] = (rep_res, rep_buildings)
-        ctx["repair_fixes"] = rep_fixes
-        print("[build_om_package] route repair classes: " + str({c: int((rep_res['point_class'] == c).sum()) for c in route_flags.CLASSES}))
-
-    def om2_extras(points_gdf):
-        """P-10/P-11 inputs and the new point columns, from ONE horizon
-        march that the shade table and walk_points reuse below."""
-        print(f"[build_om_package] P-10/P-11: horizon march on {args.device} ({len(points_gdf)} points) ...")
-        horizon_deg, horizon_az, horizon_tab = p10_p11.horizon_arrays_and_table(points_gdf, paths, device=args.device)
-        lat, lon = route_centroid_latlon(points_gdf)
-        new_cols = p10_p11.new_point_columns(
-            points_gdf, horizon_deg, horizon_az, horizon_tab, regimes=ctx["regimes"], lat=lat, lon=lon
-        )
-        sun = p10_p11.sun_tables(
-            horizon_tab, ctx["walk_dates"], lat=lat, lon=lon, window_start=args.window_start, window_end=args.window_end,
-            dose_slot_min=args.dose_slot_min,
-        )
-        p10_summary = {**sun["summary"], "envelope_slot_min": ENVELOPE_SLOT_MIN}
-        ctx.update(
-            horizon_deg=horizon_deg, azimuths_deg=horizon_az, horizon_tab=horizon_tab, sun=sun,
-            p10_summary=p10_summary, lat=lat, lon=lon, point_ids=points_gdf["point_id"].to_numpy(),
-        )
-        regime_info = [{k: g[k] for k in ("key", "name", "slug", "mean_direction_deg")} for g in ctx["regimes"]]
-        quality_extra = {"p10_p11": {
-            "geometry_epoch": args.geometry_epoch,
-            "p10": {k: p10_summary[k] for k in ("window", "tz", "n_days", "n_daylight_point_slots", "date_dependent_share",
-                                              "class_share_of_daylight", "dose_slot_min")},
-            "p11": {"campaign_regimes": regime_info,
-                    "note": "ventilation columns are geometry-derived PROXIES; SBGL wind is an airport reference, not wind at the route"},
-            "walks": {"n_walks": int(len(ctx["walks"])), "n_walk_dates": len(ctx["walk_dates"]),
-                      "n_partial": int(ctx["walks"]["partial"].sum())},
-        }}
-        return new_cols, quality_extra
-
-    om2_df = None
-    for om in routes:
-        route_out_dir = route_output_dir(om, out_dir, internal_dir)
-        print(f"[build_om_package] {om} -> {route_out_dir} ...")
-        result = build_one_route(om, paths, route_out_dir, extras_fn=om2_extras if om == "OM_2" else None,
-                                 repair=ctx.get("repair") if om == "OM_2" else None)
-        if om == "OM_2":
-            ctx["repair_facts"] = result.pop("repair_facts")
-            manifest["routes"].append(result)
-            om2_df = pd.read_parquet(layout.table_path(route_out_dir, "route_points", "parquet"))
-        else:
-            print("  (internal-only, not part of the shared package)")
-        print(f"  length_m={result['length_m']:.1f} n_points={result['n_points']} communities={result['communities_crossed']}")
-
-    if om2_df is None:
-        print("[build_om_package] OM2 not requested — nothing written to the shared package this run")
-        return 0
-    assert list(om2_df["point_id"]) == list(ctx["point_ids"]), "points table order differs from the horizon march order"
-
-    # om2_gdf is needed for the nodata floor (README Known limits, manifest
-    # p05_shade): a property of the OM2 points against the extended DTM.
-    om2_gdf = gpd.GeoDataFrame(
-        om2_df[["point_id"]], geometry=gpd.points_from_xy(om2_df["x_repaired"], om2_df["y_repaired"]), crs=CRS
-    )
-    print("[build_om_package] P-05: measuring the nodata floor (shade.nodata_floor_m) ...")
-    nodata_floor = compute_nodata_floor_m(om2_gdf, paths)
-    print(
-        f"[build_om_package] P-05: nodata floor min={nodata_floor['min']:.1f}m "
-        f"median={nodata_floor['median']:.1f}m max={nodata_floor['max']:.1f}m "
-        f"(OM2_SHADE_MAX_DIST_M={OM2_SHADE_MAX_DIST_M:g}m)"
-    )
-    assert OM2_SHADE_MAX_DIST_M <= nodata_floor["min"], (
-        f"OM2_SHADE_MAX_DIST_M={OM2_SHADE_MAX_DIST_M} exceeds the measured nodata floor "
-        f"minimum {nodata_floor['min']:.1f}m — the horizon march would hit nodata; revisit "
-        "shade.py's OM2_SHADE_MAX_DIST_M before shipping"
-    )
-
-    walks_df, walk_dates, regimes, season = ctx["walks"], ctx["walk_dates"], ctx["regimes"], ctx["season"]
-    lat, lon = ctx["lat"], ctx["lon"]
-    horizon_deg, horizon_az = ctx["horizon_deg"], ctx["azimuths_deg"]
-
-    # P-05: shade on the walk dates, daylight only, Rio local time; parquet only.
-    print(f"[build_om_package] P-05: shade on {len(walk_dates)} walk dates ...")
-    shade_summary, shade_fig = compute_shade_local(
-        om2_df["point_id"], walk_dates, SHADE_STEP_MIN, lat, lon, LOCAL_TZ, horizon_deg, horizon_az,
-        layout.table_path(out_dir, "building_shade", "parquet"),
-    )
-    n_campaign_dates = shade_summary["n_dates"]
-    n_shade_rows = shade_summary["n_rows"]
-    shade_fraction_daylight_pct = shade_summary["shade_fraction_daylight_pct"]
-    print(f"[build_om_package] P-05: {n_shade_rows} rows across {n_campaign_dates} walk dates "
-          f"({shade_fraction_daylight_pct}% in building shade, daylight only, {LOCAL_TZ})")
-    shade_fig = shade_fig.rename(columns={"timestamp_local": "timestamp"})
-
-    # P-10 / P-11 package-root tables (computed in om2_extras above).
-    sun = ctx["sun"]
-    write_package_table(sun["envelope"], out_dir, "sun_envelope")
-    sun["dose"].to_parquet(layout.table_path(out_dir, "sun_dose", "parquet"), index=False)  # parquet only: the CSV was 234 MB
-    layout.table_path(out_dir, "sun_dose", "csv").unlink(missing_ok=True)
-    ctx["horizon_tab"].to_parquet(layout.table_path(out_dir, "horizon_profiles", "parquet"), index=False)
-    regimes_tbl = p10_p11.wind_regimes_table(season)
-    regimes_tbl.to_csv(layout.table_path(out_dir, "wind_regimes", "csv"), index=False)
-    by_hour_tbl = p10_p11.regime_by_hour_table(season, paths.root)
-    by_hour_tbl.to_csv(layout.table_path(out_dir, "wind_regime_by_hour", "csv"), index=False)
-
-    # P-12: walks and per-walk point values.
-    tags = tag_walks(walks_df, load_campaign(paths.root), season["campaign"])
-    walks_tbl = walk_tables.walks_table(walks_df, tags)
-    write_package_table(walks_tbl, out_dir, "walks")
-    regime_measures = [f"{stem}_{g['slug']}" for g in regimes for stem in p10_p11.REGIME_MEASURE_STEMS]
-    t12 = time.time()
-    p12 = walk_tables.walk_points_table(
-        om2_df, ctx["fixes"], walks_df, ctx["horizon_tab"], horizon_deg, horizon_az,
-        regime_measures=regime_measures, lat=lat, lon=lon,
-    )
-    write_package_table(p12, out_dir, "walk_points")
-    print(f"[build_om_package] P-12: {len(walks_tbl)} walks, {len(p12)} walk-point rows ({time.time() - t12:.0f} s); "
-          f"walks tagged: {walks_tbl['wind_regime'].value_counts().to_dict()}")
-    print(
-        f"[build_om_package] P-10/P-11: envelope {len(sun['envelope'])} rows, dose {len(sun['dose'])} rows, "
-        f"horizon {len(ctx['horizon_tab'])} rows, regimes {len(regimes_tbl)} rows, by-hour {len(by_hour_tbl)} rows"
-    )
-
     # P-08: data dictionary (package-wide, not per-route). OM2/shared only.
-    dict_df = dictionary_dataframe(regimes=regimes)
-    write_package_table(dict_df, out_dir, "data_dictionary")
+    write_package_table(dictionary_dataframe(regimes=regimes), out_dir, "data_dictionary")
 
     # Figures. The ventilation figures and the report figure list are the
     # report lane's to redo for two regimes.
+    t_fig = time.time()
     try:
         buildings = gpd.read_file(paths.buildings_mare)
     except Exception as exc:  # pragma: no cover - missing source is a build-config error, not a figure bug
@@ -512,7 +503,6 @@ def main() -> int:
 
     fig_dir = out_dir / layout.FIGURES_DIR
     fig_dir.mkdir(parents=True, exist_ok=True)
-    del shade_fig
     shade_full = load_shade_frame(layout.table_path(out_dir, "building_shade", "parquet"))
     route_total_m = float(om2_df["distance_along_m"].max())
     facts: dict = {"route_length_m": route_total_m, "n_points": int(len(om2_df)),
@@ -529,11 +519,13 @@ def main() -> int:
     _, facts["svf_sensor"] = build_fig_svf_sensor(om2_df, walks_tbl, p12, fig_dir / layout.FIG["svf_sensor"])
     build_fig_vent_schematic(fig_dir / layout.FIG["vent_schematic"],
                              route_median_ratio=float(om2_df["height_width_ratio"].median()))
-    build_fig_flags(ctx["repair"][0], buildings, ctx["repair_fixes"], fig_dir / layout.FIG["flags"])
-    facts["flags"] = ctx["repair_facts"]
+    build_fig_flags(route.obj("repair_res"), buildings, route.obj("repair_fixes"), fig_dir / layout.FIG["flags"])
+    facts["flags"] = repair_facts
     (out_dir / layout.FIGURE_FACTS).write_text(json.dumps(facts, indent=2, default=float))
     print(f"[build_om_package] figures written to {fig_dir} (representative walk for the sensor figure: {facts['svf_sensor']['walk_id']})")
     del shade_full
+    timings["package: figures"] = time.time() - t_fig
+    print(f"[build_om_package] time package: figures: {timings['package: figures']:.1f} s")
 
     # The aggregation script and the shade join example travel INSIDE the
     # package, so a recipient with only this directory can re-aggregate (also
@@ -565,10 +557,10 @@ def main() -> int:
     # io_utils.hash_tree's ``exclude`` docstring). The final write, with the
     # file hashes, is the last thing the build does to the package.
     manifest["p05_shade"] = {
-        "n_walks": len(walks_df),
-        "n_campaign_dates": n_campaign_dates,
-        "n_rows": n_shade_rows,
-        "shade_fraction_daylight_pct": shade_fraction_daylight_pct,
+        "n_walks": n_walks,
+        "n_campaign_dates": shade_summary["n_dates"],
+        "n_rows": shade_summary["n_rows"],
+        "shade_fraction_daylight_pct": shade_summary["shade_fraction_daylight_pct"],
         "tz": LOCAL_TZ,
         "max_dist_m": OM2_SHADE_MAX_DIST_M,
         "nodata_floor_m": nodata_floor,
@@ -576,23 +568,25 @@ def main() -> int:
     }
     manifest["provenance"] = {"decisions": decisions, "wind_source": wind_source}
     manifest["geometry_epoch"] = args.geometry_epoch
+    p10_summary = route.obj("p10_summary")
     manifest["p10"] = {
-        **{k: ctx["p10_summary"][k] for k in ("window", "tz", "n_days", "n_daylight_point_slots", "date_dependent_share",
-                                              "class_share_of_daylight", "dose_slot_min", "dose_hours", "envelope_slot_min")},
+        **{k: p10_summary[k] for k in ("window", "tz", "n_days", "n_daylight_point_slots", "date_dependent_share",
+                                       "class_share_of_daylight", "dose_slot_min", "dose_hours", "envelope_slot_min")},
         "campaign_dates": walk_dates,
     }
     manifest["p11"] = {
         "station": wind_source["station"], "window_utc": wind_source["window_utc"],
         "campaign_regimes": [{k: g[k] for k in ("key", "name", "slug", "mean_direction_deg")} for g in regimes],
-        "regimes": regimes_tbl.to_dict(orient="records"),
+        "regimes": walks.obj("wind_regimes_records"),
     }
     manifest["walks"] = {
-        "source_dir": MATCHED_DIR.as_posix(), "n_walks": int(len(walks_tbl)), "n_dates": n_campaign_dates,
-        "n_partial": int(walks_tbl["partial"].sum()), "n_walk_point_rows": int(len(p12)),
-        "tagged_by_regime": walks_tbl["wind_regime"].value_counts().to_dict(),
+        "source_dir": MATCHED_DIR.as_posix(), "n_walks": walks_summary["n_walks"], "n_dates": shade_summary["n_dates"],
+        "n_partial": walks_summary["n_partial"], "n_walk_point_rows": walks_summary["n_walk_point_rows"],
+        "tagged_by_regime": walks_summary["tagged_by_regime"],
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
+    t_docs = time.time()
     # First pass: README/CHANGELOG without the conformance section, so
     # p00_spec_conformance can be computed over a package directory that
     # already has every other P-01..P-09 artefact (including a README with
@@ -636,24 +630,39 @@ def main() -> int:
     # build's hash of this file.
     hits_path = write_disclosure_hits(out_dir, pkg_internal_dir)
     print(f"[build_om_package] wrote disclosure hits to {hits_path}")
-    manifest["files"] = hash_tree(out_dir, exclude={"manifest.json"})
-    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
+    timings["package: documents"] = time.time() - t_docs
+    print(f"[build_om_package] time package: documents: {timings['package: documents']:.1f} s")
+    with timed("package: manifest", timings):
+        manifest["files"] = hash_tree(out_dir, exclude={"manifest.json"})
+        # Only manifest.json carries the cache keys: written after every
+        # document, so no other shipped file changes when a key does.
+        manifest["cache"] = {name: {"key": e.key, "git_head": e.meta.get("git_head"), "dirty": e.meta.get("dirty")}
+                             for name, e in entries.items()}
+        (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(f"[build_om_package] wrote manifest to {out_dir / 'manifest.json'}")
     print(
         f"[build_om_package] route_geometry_flag: {n_route_geometry_flagged}/{n_om2_points} OM2 points flagged; "
         f"lambda_p=1.0 explained by flag: {n_lambda_p_ones_flagged}/{n_lambda_p_ones} ({lambda_p_share_explained_pct}%)"
     )
 
-    zip_path = write_package_zip(out_dir)
+    with timed("package: zip", timings):
+        zip_path = write_package_zip(out_dir)
     print(f"[build_om_package] wrote {zip_path} ({zip_path.stat().st_size / 1e6:.0f} MB)")
 
     if args.skip_page:
         print("[build_om_package] --skip-page: shared package page (index.html) not rebuilt")
     else:
-        page_path = build_om_package_page(paths.root)
+        with timed("package: page", timings):
+            page_path = build_om_package_page(paths.root)
         print(f"[build_om_package] rebuilt package page: {page_path}")
 
+    _print_timings(timings, t_build)
     return 0
+
+
+def _print_timings(timings: dict, t_build: float) -> None:
+    print("[build_om_package] timings (s): " + ", ".join(f"{k} {v:.1f}" for k, v in timings.items())
+          + f"; total {time.time() - t_build:.1f}")
 
 
 if __name__ == "__main__":

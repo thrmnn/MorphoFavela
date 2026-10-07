@@ -8,6 +8,8 @@ files actually shipped.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import date
 from pathlib import Path
 
@@ -16,7 +18,18 @@ from .vent_indices import DEFAULT_BUFFER_M
 
 #: The one place the package version is set; the build default and every
 #: rendered heading read it.
-VERSION = "v1.0.0"
+VERSION = "v1.0.1"
+#: Versions sent to the team. They are frozen: the build refuses to write
+#: into their directory or ZIP, the package page links only to them, and
+#: verify_released() checks them against these fingerprints (sha256 of the
+#: version's manifest.json and of its ZIP).
+RELEASED_VERSIONS: dict[str, dict[str, str]] = {
+    "v1.0.0": {
+        "manifest_sha256": "09d2f9def1ccc2064975f7fdcf3c5344864cc1f9d0fd172f7c24c2d38e15e9f0",
+        "zip_sha256": "18bd3c204ae4547cc4e66fe02e81261e46eb1133b2b6ce6982c73eff5e929282",
+        "sent": "2026-10-06",
+    },
+}
 #: read from the clock at import time, never typed — this is the date this
 #: version is BUILT, not the date any source data was fetched (the
 #: "fetched" date in the README is computed at build time from the route
@@ -704,11 +717,9 @@ the 2019 epoch. v0.3.0 is a new directory; earlier versions are untouched.
 
 
 
-#: The newest entry: the only part of CHANGELOG.md rendered fresh on every build.
-CURRENT_ENTRY_TEMPLATE = """\
-# Changelog — mare_om2
-
-## {version} — {version_date}
+#: Frozen literal text of the v1.0.0 entry (sent to the team 2026-10-06).
+V100_ENTRY = """\
+## v1.0.0 — 2026-10-06
 
 First version for the whole Octopus team. Same data and method as v0.3.1,
 without the temperature pairing first look (held for a later version: no p13
@@ -727,6 +738,25 @@ tables, no temperature figures).
   dose), no direct sun drawn darker than the scale; ventilation schematic
   redrawn with the three flow regimes.
 - **README**: same wording changes; references list only works cited.
+"""
+
+
+#: The newest entry: the only part of CHANGELOG.md rendered fresh on every build.
+CURRENT_ENTRY_TEMPLATE = """\
+# Changelog — mare_om2
+
+## {version} — {version_date}
+
+Not sent. Same data and method as v1.0.0, which stays frozen as sent.
+
+- **Build**: compute stages (route, shade, walk tables) are cached by a
+  fingerprint of their inputs, parameters and code; a documents-only rebuild
+  needs no GPU and leaves every data file byte-identical.
+- **Route repair**: the alley centreline (medial axis) is now seeded, so the
+  GPS-suggested beco shifts quoted in the report and README no longer change
+  between builds (v1.0.0 quoted a median of 7 m from one unseeded draw).
+- **Release freeze**: a sent version can no longer be rebuilt in place; the
+  package page links only to sent versions.
 
 """
 
@@ -735,4 +765,53 @@ def render_changelog(n_om2_points: int, version: str = VERSION, version_date: st
     """Render CHANGELOG.md: only the newest entry is rendered; v0.1.3 and
     older are frozen literal text (see the constants above)."""
     current = CURRENT_ENTRY_TEMPLATE.format(version=version, version_date=version_date, n_om2_points=n_om2_points)
-    return current + V030_ENTRY + V020_ENTRY + V013_ENTRY + V012_ENTRY + CHANGELOG_V011_ENTRY + CHANGELOG_V01_ENTRY
+    return current + V100_ENTRY + V030_ENTRY + V020_ENTRY + V013_ENTRY + V012_ENTRY + CHANGELOG_V011_ENTRY + CHANGELOG_V01_ENTRY
+
+
+def frozen_release_error(out_dir: Path, package_root: Path) -> str | None:
+    """Why ``out_dir`` must not be written, or None. Only the released
+    version directories under the shared package root are frozen; the same
+    version name under a scratch --out is not."""
+    out_dir = Path(out_dir).resolve()
+    for version, rel in RELEASED_VERSIONS.items():
+        if out_dir == (Path(package_root) / version).resolve():
+            return (f"{version} was sent to the team on {rel['sent']} and is frozen; "
+                    f"build {VERSION} or pass --out to a scratch dir")
+    return None
+
+
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def verify_released(package_root: Path, version: str) -> list[str]:
+    """Differences between a released version on disk and its fingerprints:
+    manifest.json and ZIP sha256, every file the manifest lists, and no
+    file the manifest does not list. Empty list = intact."""
+    rel = RELEASED_VERSIONS[version]
+    vdir = Path(package_root) / version
+    zip_path = Path(package_root) / f"octopus_om2_{version}.zip"
+    manifest_path = vdir / "manifest.json"
+    if not manifest_path.is_file():
+        return [f"{manifest_path} missing"]
+    fails = []
+    if _sha256(manifest_path) != rel["manifest_sha256"]:
+        fails.append(f"{manifest_path}: sha256 differs from the released fingerprint")
+    if not zip_path.is_file():
+        fails.append(f"{zip_path} missing")
+    elif _sha256(zip_path) != rel["zip_sha256"]:
+        fails.append(f"{zip_path}: sha256 differs from the released fingerprint")
+    files = json.loads(manifest_path.read_text(encoding="utf-8")).get("files", {})
+    for name, digest in files.items():
+        p = vdir / name
+        if not p.is_file():
+            fails.append(f"{p}: listed in the manifest but missing")
+        elif _sha256(p) != digest:
+            fails.append(f"{p}: sha256 differs from the manifest")
+    extra = sorted({q.relative_to(vdir).as_posix() for q in vdir.rglob("*") if q.is_file()} - set(files) - {"manifest.json"})
+    fails += [f"{vdir / e}: not listed in the released manifest" for e in extra]
+    return fails

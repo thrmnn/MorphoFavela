@@ -156,3 +156,16 @@ def test_figure_smoke(tmp_path):
     res = rr.classify_points(pts, b, STREETS, fx)
     out = build_fig_flags(res, b, fx, tmp_path / "fig_flags.png", insets=[(30.0, 59.0)])
     assert out.exists() and out.stat().st_size > 5000
+
+
+def test_medial_axis_is_deterministic():
+    import numpy as np
+    import shapely
+
+    from src.om_package.route_repair import medial_axis_cells
+
+    pts = gpd.GeoDataFrame(geometry=[shapely.Point(x, 0) for x in range(0, 60, 2)], crs="EPSG:31983")
+    blocked = shapely.unary_union([shapely.box(10, 3, 30, 12), shapely.box(10, -12, 30, -3),
+                                   shapely.box(35, 2.5, 50, 9), shapely.box(35, -9, 50, -2.5)])
+    a, b = medial_axis_cells(pts, blocked), medial_axis_cells(pts, blocked)
+    assert a.shape == b.shape and np.array_equal(a, b)

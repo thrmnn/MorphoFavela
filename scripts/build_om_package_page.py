@@ -45,6 +45,7 @@ import hubkit  # noqa: E402
 from src.om_package import layout  # noqa: E402
 from src.om_package.figures import SEGMENT_LENGTH_M as SEGMENT_M  # noqa: E402
 from src.om_package.routes import ROUTE_FLAG_MAX_STREET_DIST_M  # noqa: E402
+from src.om_package.package_docs import RELEASED_VERSIONS, verify_released  # noqa: E402
 from src.om_package.spec import internal_dir_for  # noqa: E402
 
 DEFAULT_ROOT = Path("/home/theo/SCL/SCR/MorphoFavela")
@@ -134,6 +135,18 @@ def discover_versions(package_root: Path) -> list[str]:
 def latest_version(package_root: Path) -> str | None:
     versions = discover_versions(package_root)
     return versions[-1] if versions else None
+
+
+def page_versions(package_root: Path) -> tuple[str | None, list[str]]:
+    """(the version the page links to, newer unreleased drafts). The page
+    links to the newest RELEASED version on disk, so the team's links never
+    flip to an unsent build; with no released version on disk it falls back
+    to the newest version."""
+    versions = discover_versions(package_root)
+    released = [v for v in versions if v in RELEASED_VERSIONS]
+    shown = released[-1] if released else (versions[-1] if versions else None)
+    drafts = versions[versions.index(shown) + 1:] if shown else []
+    return shown, drafts
 
 
 def load_json(path: Path) -> dict | None:
@@ -253,9 +266,13 @@ def _table(headers: list[str], rows: list[list[str]], *, escape_cols: set[int] |
 
 def render_page(root: Path) -> str:
     package_root = root / "outputs" / "_packages" / "mare_om2"
-    version = latest_version(package_root)
+    version, drafts = page_versions(package_root)
     if version is None:
         raise SystemExit(f"no version directory under {package_root} — run scripts/build_om_package.py first")
+    if version in RELEASED_VERSIONS:
+        fails = verify_released(package_root, version)
+        if fails:
+            raise SystemExit(f"released {version} no longer matches its fingerprints:\n  " + "\n  ".join(fails))
     version_dir = package_root / version
     manifest = load_json(version_dir / "manifest.json") or {}
     quality_path = layout.table_path(version_dir, "quality_report", "json")
@@ -300,6 +317,9 @@ def render_page(root: Path) -> str:
     )
     report_note = ("" if pdf_path.exists() else
                    '<p class="sub">Report PDF not built for this version: rebuild with scripts/build_om_package.py.</p>')
+    report_note += "".join(
+        f'<p class="sub draft">DRAFT, not sent to the team: {html.escape(d)} is built but unreleased; '
+        f'the links above stay on {html.escape(version)}.</p>' for d in drafts)
     status_html = f"""
 <section id="status" class="top">
   <div class="actions">{"".join(actions)}</div>

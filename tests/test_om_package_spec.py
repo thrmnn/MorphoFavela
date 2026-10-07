@@ -207,7 +207,9 @@ def test_conformance_rows_and_markdown_render_without_error():
 
 def _copy_package(tmp_path: Path) -> Path:
     dest = tmp_path / "_packages" / "mare_om2" / VERSION
-    shutil.copytree(PACKAGE_DIR, dest, ignore=shutil.ignore_patterns("sun_dose.csv", "sun_envelope.csv", "walk_points.csv"))
+    # copyfile, not copy2: a released version is read-only and its copy must not be.
+    shutil.copytree(PACKAGE_DIR, dest, ignore=shutil.ignore_patterns("sun_dose.csv", "sun_envelope.csv", "walk_points.csv"),
+                    copy_function=shutil.copyfile)
     shutil.copytree(internal_dir_for(PACKAGE_DIR), internal_dir_for(dest))
     return dest
 

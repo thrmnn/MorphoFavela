@@ -182,7 +182,9 @@ def medial_axis_cells(points, blocked, *, radius_m: float = MEDIAL_RADIUS_M, cel
     h = int(np.ceil((maxy - miny) / cell_m)) + 1
     tf = from_origin(minx, maxy, cell_m, cell_m)
     mask = features.rasterize([(free, 1)], out_shape=(h, w), transform=tf, fill=0, dtype="uint8").astype(bool)
-    skel, dist = medial_axis(mask, return_distance=True)
+    # medial_axis breaks ties at random unless seeded; unseeded, every build drew a
+    # different skeleton and the beco shift statistics in the report changed between builds
+    skel, dist = medial_axis(mask, return_distance=True, rng=0)
     rows, cols = np.nonzero(skel)
     clear = dist[rows, cols] * cell_m
     keep = clear >= min_clearance_m
