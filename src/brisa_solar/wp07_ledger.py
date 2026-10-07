@@ -26,8 +26,8 @@ from .constants import P1_SKY_PATCHES, REPO_ROOT
 #: Runs of record (docs/wp07_ledger_spec.md "Runs of record"). Never modified,
 #: never re-read from anywhere else.
 RUN_OF_RECORD = {
-    "wp05": "wp05_full_20260914T215419Z",
-    "wp04": "wp04_sites_20260914T230606Z",
+    "wp05": "wp05_full_20261007T192903Z",
+    "wp04": "wp04_sites_20261007T201123Z",
     "g3": "g3_domain_20260915T042927Z",
     "wp06": "wp06_geometry_20260915T052604Z",
     "wp02_crossref": "wp02_horizon_20260914T195630Z",
