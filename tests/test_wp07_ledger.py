@@ -177,6 +177,8 @@ def test_favela_percentiles_match_wp05_and_g3_base_variant(ledger):
 
 # --- (h) CITYHOURS extension: new ids added, every pre-existing value held ---
 
+ROUND2_PREFIXES = ("crosstab.", "xtab_strat.", "boot.", "boot100.", "dec.")
+
 PREEXISTING_LEDGER = RUNS / "wp07_ledger_20260916T164906Z" / "ledger.json"
 
 
@@ -192,7 +194,7 @@ def test_cityhours_entries_added_and_preexisting_values_unchanged(ledger):
         assert ledger["entries"][entry_id]["source"]["json_pointer"] == old_entry["source"]["json_pointer"], entry_id
 
     new_ids = set(ledger["entries"]) - set(preexisting["entries"])
-    new_ids = {i for i in new_ids if ".terrain_split." not in i}
+    new_ids = {i for i in new_ids if ".terrain_split." not in i and not i.startswith(ROUND2_PREFIXES)}
     assert len(new_ids) == 437 - 371, f"expected 66 new CITYHOURS ids, got {len(new_ids)}"
     for entry_id in new_ids:
         assert entry_id.startswith("citywide.sun_h_") or entry_id.startswith("citywide.share_ge_") or (
@@ -211,7 +213,7 @@ def test_terrain_split_entries_added_and_preexisting_values_unchanged(ledger):
     for entry_id, old_entry in preexisting["entries"].items():
         assert ledger["entries"][entry_id]["source"]["json_pointer"] == old_entry["source"]["json_pointer"], entry_id
 
-    new_ids = set(ledger["entries"]) - set(preexisting["entries"])
+    new_ids = {i for i in set(ledger["entries"]) - set(preexisting["entries"]) if not i.startswith(ROUND2_PREFIXES)}
     assert new_ids, "no TERRAIN-SPLIT ids added"
     for entry_id in new_ids:
         assert ".terrain_split." in entry_id, f"unexpected new id outside the TERRAIN-SPLIT family: {entry_id}"
@@ -226,3 +228,23 @@ def test_write_ledger_writes_json_md_manifest(tmp_path):
     assert (run_dir / "manifest.json").exists()
     manifest = json.loads((run_dir / "manifest.json").read_text())
     assert manifest["sky"]["patches"] == w.P1_SKY_PATCHES
+
+
+# --- (j) ROUND-2 extension: every pre-round-2 entry keeps value and pointer ---
+
+PRE_ROUND2_LEDGER = RUNS / "wp07_ledger_20261007T210128Z" / "ledger.json"
+
+
+@pytest.mark.skipif(not PRE_ROUND2_LEDGER.exists(), reason="pre-ROUND-2 ledger snapshot absent")
+def test_round2_entries_added_and_preexisting_values_unchanged(ledger):
+    preexisting = json.loads(PRE_ROUND2_LEDGER.read_text())["entries"]
+    for entry_id, old in preexisting.items():
+        new = ledger["entries"][entry_id]
+        assert new["value"] == old["value"], entry_id
+        assert new["source"] == old["source"], entry_id
+    new_ids = set(ledger["entries"]) - set(preexisting)
+    assert new_ids and all(i.startswith(ROUND2_PREFIXES) for i in new_ids)
+    for entry_id in new_ids:
+        e = ledger["entries"][entry_id]
+        assert e["decided_by"] == w.ROUND2_DECIDED_BY, entry_id
+        assert (e["release_class"] == "reviewer-defence-only") == entry_id.startswith("dec."), entry_id

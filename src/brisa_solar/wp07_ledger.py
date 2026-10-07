@@ -33,6 +33,8 @@ RUN_OF_RECORD = {
     "wp02_crossref": "wp02_horizon_20260914T195630Z",
     "cityhours": "cityhours_full_20261007T201156Z",
     "terrain_split": "terrain_split_full_20261007T201819Z",
+    "crosstab": "wp07_crosstab_20261007T201942Z",
+    "round2": "wp07_round2_20261007T214808Z",
 }
 
 #: docs/cityhours_spec.md ids use "sun_h_winter"/"sun_h_equinox" (the same
@@ -78,6 +80,13 @@ LOCKED_VARIANT = (0.1, 10.0)
 
 DECIDED_BY = ["wp05_run_design 2026-09-15", "g3_domain 2026-09-15"]
 
+#: Entries added for the round-2 reviewer reports (2026-10-07). Computed, not
+#: PI-decided: their provenance is the reviewer item they answer.
+ROUND2_DECIDED_BY = ["P1 round-2 review 2026-10-07 (R2-M9, R3/E4, N10, R1-M2)"]
+
+#: crosstab summary.json keys its sites by the on-disk spelling; "pooled" too.
+CROSSTAB_SITES = {**SITE_DIRS, "pooled": "pooled"}
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -120,7 +129,8 @@ def resolve_pointer(doc, pointer: str):
 
 
 def _add(entries: dict, doc, file_rel: str, entry_id: str, pointer: str,
-         run_id: str, run_utc: str, unit: str, release_class: str = "publishable-candidate") -> None:
+         run_id: str, run_utc: str, unit: str, release_class: str = "publishable-candidate",
+         decided_by: list[str] = DECIDED_BY) -> None:
     if entry_id in entries:
         raise ValueError(f"duplicate ledger id: {entry_id}")
     entries[entry_id] = {
@@ -134,7 +144,7 @@ def _add(entries: dict, doc, file_rel: str, entry_id: str, pointer: str,
             "run_utc": run_utc,
         },
         "status": "final",
-        "decided_by": list(DECIDED_BY),
+        "decided_by": list(decided_by),
         "release_class": release_class,
     }
 
@@ -271,6 +281,81 @@ def _build_engine(entries: dict, crossref: dict, crossref_rel: str, run_id: str)
          f"{base}/p95_abs_delta", run_id, run_utc, "fraction")
 
 
+def _build_crosstab(entries: dict, doc: dict, rel: str, run_id: str) -> None:
+    """crosstab.<site|pooled>.n<k>.{cells,point_deficit} — Table 1's cells and
+    their class sizes (round-2 N10)."""
+    run_utc = doc["_utc"]
+    for slug, key in CROSSTAB_SITES.items():
+        for i, row in enumerate(doc["per_site"][key]["rows"]):
+            k = row["n_constraints"]
+            for field, unit in (("cells", "count"), ("point_deficit", "fraction")):
+                _add(entries, doc, rel, f"crosstab.{slug}.n{k}.{field}",
+                     f"/per_site/{key}/rows/{i}/{field}", run_id, run_utc, unit,
+                     decided_by=ROUND2_DECIDED_BY)
+
+
+def _build_round2(entries: dict, doc: dict, rel: str, run_id: str) -> None:
+    """Round-2 analyses from runs/wp07_round2_*/summary.json (src/brisa_solar/wp07_round2.py).
+
+    xtab_strat.*  — Table 1 within vertical-constraint strata (R2-M9);
+    boot.*        — spatial block-bootstrap 95% intervals (R3/E4), per-site
+                    range-matched blocks; boot100.* the fixed-100 m sensitivity;
+    dec.*         — December-solstice direct sun on the 1 m ground observers
+                    (heat axis, data only: reviewer-defence-only until the PI
+                    decides whether heat enters the paper)."""
+    run_utc = doc["_utc"]
+    add = lambda eid, ptr, unit, rc="publishable-candidate": _add(  # noqa: E731
+        entries, doc, rel, eid, ptr, run_id, run_utc, unit, release_class=rc, decided_by=ROUND2_DECIDED_BY)
+
+    for slug in CROSSTAB_SITES:
+        for v in ("v0", "v1"):
+            for o in ("o0", "o1", "o2"):
+                for field, unit in (("cells", "count"), ("point_deficit", "fraction"), ("cell_deficit", "fraction")):
+                    add(f"xtab_strat.{slug}.{v}.{o}.{field}", f"/stratified/{slug}/{v}/{o}/{field}", unit)
+
+    add("boot.replicates", "/bootstrap/replicates", "count")
+    add("boot.seed", "/bootstrap/seed", "integer")
+    for prefix, section in (("boot", "bootstrap"), ("boot100", "bootstrap_100m")):
+        for slug in SITES:
+            base = f"/{section}/per_site/{slug}"
+            if prefix == "boot":
+                add(f"boot.{slug}.block_m", f"{base}/block_m", "m")
+                add(f"boot.{slug}.n_blocks", f"{base}/n_blocks", "count")
+                add(f"boot.{slug}.range_m", f"/variogram/per_site/{slug}/range_m", "m")
+            for day in ("winter", "equinox"):
+                if prefix == "boot":
+                    add(f"boot.{slug}.share_below_2h_{day}.estimate",
+                        f"{base}/share_below_2h_{day}/estimate", "fraction")
+                for b in ("lo", "hi"):
+                    add(f"{prefix}.{slug}.share_below_2h_{day}.{b}", f"{base}/share_below_2h_{day}/{b}", "fraction")
+            for k in range(4):
+                for b in ("lo", "hi"):
+                    add(f"{prefix}.crosstab.{slug}.n{k}.point_deficit.{b}",
+                        f"{base}/crosstab/n/n{k}/{b}", "fraction")
+        for k in range(4):
+            for b in ("lo", "hi"):
+                add(f"{prefix}.crosstab.pooled.n{k}.point_deficit.{b}",
+                    f"/{section}/pooled/n/n{k}/{b}", "fraction")
+        for v in ("v0", "v1"):
+            for o in ("o0", "o1", "o2"):
+                for b in ("lo", "hi"):
+                    add(f"{prefix}.xtab_strat.pooled.{v}.{o}.point_deficit.{b}",
+                        f"/{section}/pooled/strat/{v}_{o}/{b}", "fraction")
+
+    if "december" in doc:
+        add("dec.reference_day", "/december/reference_day", "date", "reviewer-defence-only")
+        for slug in SITES:
+            base = f"/december/per_site/{slug}/metrics"
+            for field, unit in (
+                ("p25", "hours"), ("p50", "hours"), ("p75", "hours"),
+                ("share_ge_6h", "fraction"), ("share_ge_8h", "fraction"),
+                ("share_lt2h_june_and_ge6h_december", "fraction"),
+                ("share_lt2h_june_and_lt2h_december", "fraction"),
+            ):
+                add(f"dec.{slug}.ground.sun_h_december.{field}" if unit == "hours" else f"dec.{slug}.ground.{field}",
+                    f"{base}/{field}", unit, "reviewer-defence-only")
+
+
 def _favela_svf_percentile(variant: dict, display: str) -> float:
     return variant["study_favelas"][display]["svf_percentile_of_citywide_median"]
 
@@ -328,6 +413,10 @@ def build_ledger(repo_root: Path) -> dict:
     _build_engine(entries, crossref, crossref_rel, RUN_OF_RECORD["wp02_crossref"])
     _build_cityhours(entries, cityhours, cityhours_rel, RUN_OF_RECORD["cityhours"])
     _build_terrain_split(entries, repo_root, RUN_OF_RECORD["terrain_split"])
+    xtab, xtab_rel = _load(repo_root, RUN_OF_RECORD["crosstab"], "summary.json")
+    _build_crosstab(entries, xtab, xtab_rel, RUN_OF_RECORD["crosstab"])
+    round2, round2_rel = _load(repo_root, RUN_OF_RECORD["round2"], "summary.json")
+    _build_round2(entries, round2, round2_rel, RUN_OF_RECORD["round2"])
 
     derived = build_derived(g3)
 

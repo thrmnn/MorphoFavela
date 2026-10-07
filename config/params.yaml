@@ -120,6 +120,7 @@ sampling:
 reference_days:
   winter_solstice: "2026-06-21"
   equinox: "2026-03-20"
+  summer_solstice: "2026-12-21"
   duration_thresholds_h: [1, 2, 3, 4]
   status: default
   floor_provenance: "The 2h daylight floor is the ATHENS CHARTER (1943) Point 26 — NOT a WHO benchmark. Older docstrings in src/solar/ still say 'WHO ≥2h'; that attribution is wrong and must not propagate."
