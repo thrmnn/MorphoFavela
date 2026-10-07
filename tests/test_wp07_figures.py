@@ -15,6 +15,7 @@ from __future__ import annotations
 import ast
 import importlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -32,6 +33,12 @@ from src.brisa_solar import wp07_ledger as ledger_mod
 
 RUNS = ROOT / "runs"
 
+
+
+def _svg_scan_text(raw_svg: str) -> str:
+    """The SVG minus font-family declarations: the house font aliases Arial to
+    Liberation Sans, and "libe-ratio-n" must not trip the banned-token scan."""
+    return re.sub(r"font-family\s*[:=]\s*(\"[^\"]*\"|'[^']*'|[^;\"'>]*)", "", raw_svg)
 
 def _ledger_present() -> bool:
     return bool(list(RUNS.glob("wp07_ledger_*/ledger.json")))
@@ -491,7 +498,7 @@ def test_f5_never_computes_a_favela_vs_non_favela_quantity(tmp_path, ledger):
         blob = json.dumps(result).lower()
         for token in banned:
             assert token not in blob, f"{result['id']}: manifest carries banned token {token!r}"
-        raw_svg = (out_dir / result["svg_path"]).read_text().lower()
+        raw_svg = _svg_scan_text((out_dir / result["svg_path"]).read_text().lower())
         for token in banned:
             assert token not in raw_svg, f"{result['id']}: SVG carries banned token {token!r}"
 
@@ -681,7 +688,7 @@ def test_stage_zoom_never_pairs_a_favela_window_with_a_non_favela_window(tmp_pat
     for fid, f in figures.items():
         if f["status"] != "produced":
             continue
-        raw_svg = (out_dir / f["svg_path"]).read_text().lower()
+        raw_svg = _svg_scan_text((out_dir / f["svg_path"]).read_text().lower())
         for token in banned:
             assert token not in raw_svg, f"{fid}: SVG carries banned token {token!r}"
 
