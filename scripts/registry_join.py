@@ -132,6 +132,12 @@ def badge_text(node: dict | None) -> str:
     return f"{release} · {lifecycle}"
 
 
+def badge_label(badge: str) -> str:
+    """The badge as every surface prints it (review folder card, /ops dossier
+    item): one string, so the live check can compare surfaces verbatim."""
+    return "unclassified" if badge == "unclassified" else f"register: {badge}"
+
+
 def node_by_path(registry: dict) -> dict[str, dict]:
     """`path` (repo-root-relative, e.g. "runs/<run>/<file>.png") -> figure
     node. This is the join key every consumer already has on hand without

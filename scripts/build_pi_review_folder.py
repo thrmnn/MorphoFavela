@@ -210,6 +210,7 @@ def _cta_fields(name: str, src: Path, run_name: str | None,
     return {
         "register_id": row.get("id"),
         "register_state": row.get("state"),
+        "register_claim": row.get("claim") or row.get("description"),
         "governing_decision": _governing_decision(row.get("run_of_record")),
     }
 
@@ -1050,10 +1051,11 @@ def _release_badge_tag(e: dict) -> str:
     badge = e.get("release_badge")
     if not badge:
         return ""
-    label = f"register: {badge}" if badge != "unclassified" else "unclassified"
+    label = registry_join.badge_label(badge)
     if badge == "staged":
         anchor = f"/ops#dec-{e.get('governing_decision') or _FALLBACK_PROMOTION_DECISION}"
-        return f'<a class="tag reg reg-staged" href="{anchor}">{label} → rule on this</a>'
+        return (f'<a class="tag reg reg-staged" href="{anchor}">{label}</a>'
+                f'<a class="tag" href="{anchor}">→ rule on this</a>')
     return f'<span class="tag reg reg-{badge}">{label}</span>'
 
 
@@ -1077,7 +1079,8 @@ def _figure_card(e: dict, slug: str) -> str:
     bits.append(f'{e["bytes"] / 1e6:.1f} MB')
     img = (f'<a href="{slug}/{e["file"]}"><img src="{slug}/{e["thumb"]}" loading="lazy" alt=""></a>'
            if e.get("thumb") else "")
-    link = f'<a href="{slug}/{e["file"]}">{e["file"]}</a>'
+    # the registered caption, the same text the /ops dossier item shows; the filename stays as the tooltip
+    link = f'<a href="{slug}/{e["file"]}" title="{e["file"]}">{_html.escape(e.get("register_claim") or e["file"], quote=False)}</a>'
     return (f'<figure data-file="{e["file"]}">{img}<figcaption>{tags}<div class="name">{link}</div>'
             f'<div class="meta">{" · ".join(bits)}</div></figcaption></figure>')
 

@@ -820,3 +820,16 @@ def test_runs_newest_first_keeps_older_runs_figures(tmp_path, monkeypatch):
         (d / "figure_manifest.json").write_text("{}")
     runs = bprf._runs_newest_first("wp07_figures_*")
     assert [r.name for r in runs] == ["wp07_figures_20261001T131529Z", "wp07_figures_20260924T212023Z"]
+
+
+def test_figure_card_shows_registered_caption_and_shared_badge_label():
+    import registry_join
+
+    e = {"status": "ok", "file": "f1.png", "thumb": "f1_t.png", "bytes": 1000, "release_badge": "staged",
+         "register_claim": "Citywide histogram with the five favela medians.", "governing_decision": "d1"}
+    card = bprf._figure_card(e, "s1")
+    assert re.search(r'<div class="name"><a [^>]*title="f1.png">Citywide histogram with the five favela medians.</a>', card)
+    badge = re.search(r'reg-\w+"[^>]*>([^<]+)</(?:a|span)>', card).group(1)
+    assert badge == registry_join.badge_label("staged") == "register: staged"
+    e.pop("register_claim")
+    assert '>f1.png</a>' in bprf._figure_card(e, "s1")
