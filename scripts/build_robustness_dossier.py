@@ -252,10 +252,14 @@ def build_domain_sensitivity_g3(main_root: Path, ledger_path: Path, ledger: dict
         "narrative": (
             f"Across the {n_grid_variants} grid variants swept, each favela's SVF-percentile "
             f"position moves — by {spread_min:.3g} to {spread_max:.3g} percentile points "
-            f"(min-max spread across the five favelas) — but the ORDERING of the five favelas "
-            f"does not: rank_invariant_across_grid = {invariant} (every one of the "
-            f"{n_grid_variants} variants yields the same descending order). Position moves with "
-            f"the grid; ordering does not."
+            f"(min-max spread across the five favelas). "
+            + (f"The ORDERING of the five favelas does not: rank_invariant_across_grid = {invariant} "
+               f"(every one of the {n_grid_variants} variants yields the same descending order). "
+               f"Position moves with the grid; ordering does not."
+               if invariant else
+               f"The ORDERING is not stable either: rank_invariant_across_grid = {invariant} "
+               f"(at least one of the {n_grid_variants} variants reorders the favelas). "
+               f"The paper therefore lists sites in a fixed order and makes no ordering claim.")
         ),
         "n_grid_variants": n_grid_variants,
         "rows": rows,

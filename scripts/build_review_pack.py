@@ -35,7 +35,7 @@ SECTIONS = [
         (ROOT / "docs/ventaxis_canonical.md", "The second axis — definition of record for the geometry-constraint count"),
     ]),
     ("Validation and sensitivity", [
-        (latest("runs/g3_domain_*/sensitivity.md"), "G3 — domain sensitivity across nine grid variants (the position moves, the ordering does not)"),
+        (latest("runs/g3_domain_*/sensitivity.md"), "G3 — domain sensitivity across nine grid variants (how far each favela's position moves)"),
         (latest("runs/wp03_tls_*/report_v3.md"), "G2 — TLS ground truth vs the 2.5D model (a negative result with a confound, stated as it is)"),
         (latest("runs/wp04f2_facade_*/crossref.md"), "Façade cross-reference — why the façade layer was NOT accepted"),
     ]),

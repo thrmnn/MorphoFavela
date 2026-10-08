@@ -148,21 +148,27 @@ def test_engine_acceptance_has_crossref_numbers_and_self_checks(dossier):
         )
 
 
-# --- (e) G3: position moves, ordering does not — the honest framing, verbatim, with both numbers ---
+# --- (e) G3: position moves; the ordering sentence must match the ledger's rank_invariant ---
 
 def test_g3_says_position_moves_ordering_does_not_with_both_numbers(dossier):
     sec = dossier["sections"]["domain_sensitivity_g3"]
     narrative = sec["narrative"]
     assert "position" in narrative and "moves" in narrative
-    assert "ordering" in narrative and "does not" in narrative
 
     row_by_id = {r["id"]: r["value"] for r in sec["rows"]}
     spread_min = row_by_id["g3.spread.min_across_favelas"]
     spread_max = row_by_id["g3.spread.max_across_favelas"]
     assert f"{spread_min:.3g}" in narrative
     assert f"{spread_max:.3g}" in narrative
-    assert row_by_id["g3.rank_invariant_across_grid"] is True
-    assert str(row_by_id["g3.rank_invariant_across_grid"]) in narrative
+    invariant = row_by_id["g3.rank_invariant_across_grid"]
+    assert isinstance(invariant, bool)
+    assert str(invariant) in narrative
+    if invariant:
+        assert "ordering does not" in narrative and "not stable" not in narrative
+    else:
+        # the bug-fixed ledger (2026-10-07) reorders Vidigal/Rocinha across variants:
+        # the dossier must never keep the old "ordering does not" claim
+        assert "ordering does not" not in narrative and "not stable" in narrative
 
 
 def test_g3_spread_and_rank_match_direct_recomputation_from_sensitivity_json(dossier):
