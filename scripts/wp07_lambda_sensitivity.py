@@ -1,7 +1,7 @@
 """Sensitivity of P1's geometry-constraint count to the lambda_f threshold.
 
-PI ruling 2026-10-08: 0.65 is a study-defined cut (by analogy with Oke's H/W
-skimming criterion); report 0.5 and 0.8. Reads the WP-06 per-cell tables of the
+PI ruling 2026-10-08: 0.65 is a study-defined cut (by analogy with Oke's street
+height-to-width ratio of 0.65); report 0.5 and 0.8. Reads the WP-06 per-cell tables of the
 run of record, re-derives only the vertical flag and n_constraints
 (lateral/directional flags are threshold-independent), and reuses
 wp07_crosstab.crosstab and wp07_round2.stratified_crosstab unchanged. The 0.65
@@ -140,7 +140,7 @@ def main() -> int:
     run_dir.mkdir(parents=True)
     summary = {
         "_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "ruling": "PI 2026-10-08: lambda_f cut is study-defined (analogy with Oke H/W skimming); report 0.5 and 0.8",
+        "ruling": "PI 2026-10-08: lambda_f cut is study-defined (analogy with Oke's street height-to-width ratio of 0.65); report 0.5 and 0.8",
         "thresholds": list(THRESHOLDS),
         "run_of_record_threshold": LAMBDA_F_CONSTRAINT_MIN,
         "site_order": SITE_ORDER,
