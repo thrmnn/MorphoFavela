@@ -1722,11 +1722,147 @@ def render_f6_facade(summary_path: Path, out_dir: Path) -> dict:
     return _produced(fig, fig_id, out_dir, [], [], "staged", extra=extra)
 
 
+F7_HIGH_SUN_HOURS = 6.0
+F7_COLORS = {"lt2": "#4A2E12", "mid": "#E0A030", "ge6": "#F7E9A0"}
+F7_LABEL_MIN_SHARE = 0.15
+
+
+def december_ground_parquet_path(round2_dir: Path, slug: str) -> Path:
+    return Path(round2_dir) / slug / "december_ground.parquet"
+
+
+@style.styled
+def render_f7_seasonal(ledger: dict, round2_dir: Path, out_dir: Path,
+                       repo_root: Path | None = None, verify_against_ledger: bool = True) -> dict:
+    """Panel A: f2's cumulative curve for the summer solstice. Panel B: the
+    ground below the 2 h floor on the winter solstice, split by its December
+    sun. Segments are shares OF that ground, so each bar sums to 1."""
+    fig_id = "f7_seasonal_sun"
+    round2_dir = Path(round2_dir)
+    repo_root = Path(repo_root) if repo_root else round2_dir.parent.parent
+    paths = {slug: december_ground_parquet_path(round2_dir, slug) for slug in FIGURE_SITE_ORDER}
+    missing = [slug for slug, p in paths.items() if not p.exists()]
+    if missing:
+        return _skip(fig_id, f"december_ground.parquet absent for site(s): {', '.join(missing)}")
+    column = "hours_summer_solstice"
+
+    fig = plt.figure(layout="constrained", figsize=(style.WIDTH_DOUBLE_IN, 78 * style.MM))
+    gs = fig.add_gridspec(1, 2, width_ratios=[1.0, 1.0])
+    ax_a = fig.add_subplot(gs[0, 0])
+    ax_b = fig.add_subplot(gs[0, 1])
+
+    ledger_ids: list[str] = []
+    n_by_site: dict[str, int] = {}
+    segments: dict[str, dict[str, float]] = {}
+    hours_max = 0.0
+    for i, slug in enumerate(FIGURE_SITE_ORDER):
+        vals = _read_columns(paths[slug], [column]).column(0).to_numpy(zero_copy_only=False)
+        vals = np.sort(vals[np.isfinite(vals)])
+        n_by_site[slug] = int(vals.size)
+        hours_max = max(hours_max, float(vals[-1]))
+        if verify_against_ledger:
+            med_id = f"dec.{slug}.ground.sun_h_december.p50"
+            med, _ = get_value(ledger, med_id)
+            ledger_ids.append(med_id)
+            assert abs(float(np.median(vals)) - med) < 1e-6, (
+                f"{med_id}: parquet median {np.median(vals):.7f}, ledger {med:.7f}")
+            n_ground = pq.ParquetFile(site_ground_parquet_path(repo_root, slug)).metadata.num_rows
+            assert n_ground == vals.size, f"{slug}: december n {vals.size} != ground n {n_ground}"
+
+        grid = np.linspace(0.0, np.ceil(vals[-1]) + 0.5, 600)
+        below = np.searchsorted(vals, grid, side="left") / vals.size
+        color = style.SITE_COLORS[slug]
+        ax_a.step(grid, below * 100, where="post", color=color, linewidth=1.2,
+                  label=f"{FAVELAS[slug]} (n = {vals.size:,})")
+        mk = np.searchsorted(grid, np.arange(1 + 0.25 * i, grid[-1], 2.0))
+        ax_a.plot(grid[mk], below[mk] * 100, linestyle="none", marker=style.SITE_MARKERS[slug],
+                  markersize=3.8, color=color, markeredgecolor="white", markeredgewidth=0.3)
+
+        ids = {k: f"dec.{slug}.ground.{k}" for k in
+               ("share_lt2h_june_and_lt2h_december", "share_lt2h_june_and_ge6h_december")}
+        win_id = f"site.{slug}.ground.share_ge_2h_winter_solstice"
+        ledger_ids.extend([*ids.values(), win_id])
+        both_low, _ = get_value(ledger, ids["share_lt2h_june_and_lt2h_december"])
+        low_high, _ = get_value(ledger, ids["share_lt2h_june_and_ge6h_december"])
+        win_share, _ = get_value(ledger, win_id)
+        below_june = 1.0 - win_share
+        seg = {"lt2": both_low / below_june, "ge6": low_high / below_june}
+        seg["mid"] = 1.0 - seg["lt2"] - seg["ge6"]
+        assert all(0.0 <= v <= 1.0 for v in seg.values()), f"{slug}: segment outside [0,1]: {seg}"
+        assert abs(sum(seg.values()) - 1.0) < 1e-9, f"{slug}: segments sum to {sum(seg.values())}"
+        segments[slug] = seg
+
+    for h in (REFERENCE_FLOOR_HOURS, F7_HIGH_SUN_HOURS):
+        ax_a.axvline(h, color="#222222", linewidth=0.7, linestyle=(0, (1.5, 1.5)))
+    ax_a.text(REFERENCE_FLOOR_HOURS - 0.12, 98, "2 h reference floor", ha="right", va="top",
+              fontsize=style.BASE_PT, rotation=90)
+    ax_a.text(F7_HIGH_SUN_HOURS - 0.12, 98, "6 h", ha="right", va="top",
+              fontsize=style.BASE_PT, rotation=90)
+    ax_a.set_xlim(0, np.ceil(hours_max) + 0.3)
+    ax_a.set_ylim(0, 100)
+    ax_a.set_xlabel("direct-sun hours (h)")
+    ax_a.set_ylabel("share of ground points\nbelow x hours (%)")
+    ax_a.set_title("Summer solstice (21 December)", loc="left")
+    ax_a.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=1, frameon=False, fontsize=style.BASE_PT,
+                handlelength=2.0, columnspacing=1.0, labelspacing=0.3)
+    style.panel_letter(ax_a, "A", x=-0.12, y=1.02)
+
+    ypos = np.arange(len(FIGURE_SITE_ORDER))
+    left = np.zeros(len(FIGURE_SITE_ORDER))
+    for key, text_color in (("lt2", "white"), ("mid", "#222222"), ("ge6", "#222222")):
+        w = np.array([segments[s][key] for s in FIGURE_SITE_ORDER])
+        ax_b.barh(ypos, w * 100, left=left * 100, height=0.62, color=F7_COLORS[key],
+                  edgecolor="white", linewidth=0.5)
+        for y, l0, wi in zip(ypos, left, w):
+            if wi >= F7_LABEL_MIN_SHARE:
+                ax_b.text((l0 + wi / 2) * 100, y, style.fmt_pct(wi, 0), ha="center", va="center",
+                          fontsize=style.BASE_PT, color=text_color)
+        left = left + w
+    ax_b.set_yticks(ypos, [FAVELAS[s] for s in FIGURE_SITE_ORDER])
+    ax_b.invert_yaxis()
+    ax_b.set_xlim(0, 100)
+    ax_b.set_xlabel("share of the site's ground below 2 h in June (%)")
+    ax_b.set_title("Ground below the winter floor, by December sun", loc="left")
+    ax_b.tick_params(axis="y", length=0)
+    ax_b.spines["left"].set_visible(False)
+    from matplotlib.patches import Patch
+    ax_b.legend(handles=[Patch(facecolor=F7_COLORS[k], label=lbl) for k, lbl in
+                         (("lt2", "<2 h"), ("mid", "2\u20136 h"), ("ge6", "\u22656 h"))],
+                title="December direct sun", loc="upper center", bbox_to_anchor=(0.5, -0.2),
+                ncol=3, frameon=False, fontsize=style.BASE_PT, title_fontsize=style.BASE_PT,
+                handlelength=1.2, columnspacing=1.2)
+    style.panel_letter(ax_b, "B", x=-0.30, y=1.02)
+
+    def _rel(p: Path) -> str:
+        try:
+            return str(p.relative_to(round2_dir))
+        except ValueError:
+            return p.name
+
+    extra = {
+        "n_unit": "1 m ground points of each site's model domain (IPP 2019 favela polygons; for Maré "
+                  "the six polygons of the complex, a tile of the full complex)",
+        "n_by_site": n_by_site,
+        "december_column": column,
+        "panel_b_segment_pct": {s: {k: round(v * 100, 3) for k, v in segments[s].items()}
+                                for s in FIGURE_SITE_ORDER},
+        "panel_b_basis": "shares of the ground below 2 h on the winter solstice "
+                         "(1 - share_ge_2h_winter_solstice); segments <2 h, 2-6 h, >=6 h in December",
+    }
+    return _produced(fig, fig_id, out_dir, ledger_ids, [_rel(paths[s]) for s in FIGURE_SITE_ORDER],
+                     "reviewer-defence-only", final_width=True, extra=extra)
+
+
+def find_latest_round2_dir(repo_root: Path) -> Path | None:
+    found = [p for p in sorted((Path(repo_root) / "runs").glob("wp07_round2_*")) if p.is_dir()]
+    return found[-1] if found else None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-root", default=str(REPO_ROOT))
     ap.add_argument("--out-dir", default=None)
-    ap.add_argument("--target", choices=("figures", "map", "zoom", "mare_defs", "facade"), default="figures",
+    ap.add_argument("--target", choices=("figures", "map", "zoom", "mare_defs", "facade", "seasonal"), default="figures",
                      help="'figures' (default, unchanged): f1-f4 into runs/wp07_figures_<UTC>/. "
                           "'map': WP-07M f5/f5b into runs/wp07_map_<UTC>/ (docs/wp07_map_spec.md). "
                           "'zoom': WP-07Z citywide pair + per-window renders into "
@@ -1742,6 +1878,9 @@ def main() -> int:
     ap.add_argument("--facade-summary", default=None,
                      help="'--target facade': WP-08 summary.json (default: latest "
                           "runs/wp08_facade_plane_*/summary.json under the repo root).")
+    ap.add_argument("--round2-dir", default=None,
+                    help="'--target seasonal': WP-07 round-2 run dir (default: latest "
+                         "runs/wp07_round2_* under the repo root).")
     args = ap.parse_args()
     repo_root = Path(args.repo_root)
     out_dir = Path(args.out_dir) if args.out_dir else None
@@ -1756,6 +1895,19 @@ def main() -> int:
         (out / "figure_manifest.json").write_text(
             json.dumps({"figures": {res["id"]: res}}, indent=1, ensure_ascii=False))
         print(f"f6: {res['status']}" + (f" ({res['reason']})" if res["status"] == "skipped" else ""))
+        return 0
+    if args.target == "seasonal":
+        r2 = Path(args.round2_dir) if args.round2_dir else find_latest_round2_dir(repo_root)
+        out = out_dir or repo_root / "runs" / f"wp07_seasonal_{_utc_now()}"
+        out.mkdir(parents=True, exist_ok=True)
+        if r2 is None:
+            res = _skip("f7_seasonal_sun", "no runs/wp07_round2_*")
+        else:
+            res = render_f7_seasonal(json.loads(find_latest_ledger(repo_root).read_text()), r2, out,
+                                     repo_root=repo_root)
+        (out / "figure_manifest.json").write_text(
+            json.dumps({"figures": {res["id"]: res}}, indent=1, ensure_ascii=False))
+        print(f"f7: {res['status']}" + (f" ({res['reason']})" if res["status"] == "skipped" else ""))
         return 0
     if args.target == "mare_defs":
         manifest = stage_mare_definitions(repo_root, out_dir)

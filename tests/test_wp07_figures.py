@@ -886,3 +886,62 @@ def test_f6_renders_from_the_real_run(tmp_path):
     assert result["status"] == "produced"
     counts = [len(result["robust_storeys_by_site"][s]) for s in figs.FIGURE_SITE_ORDER]
     assert counts == [4, 6, 5, 5, 6]
+
+
+REAL_ROUND2 = Path("/home/theo/SCL/SCR/MorphoFavela/runs/wp07_round2_20261007T214808Z")
+REAL_REPO = Path("/home/theo/SCL/SCR/MorphoFavela")
+
+
+def _synthetic_f7_ledger() -> dict:
+    entries = {}
+    for k, slug in enumerate(figs.FIGURE_SITE_ORDER):
+        win = 0.45 + 0.02 * k
+        for lid, v in ((f"site.{slug}.ground.share_ge_2h_winter_solstice", win),
+                       (f"dec.{slug}.ground.share_lt2h_june_and_lt2h_december", 0.05),
+                       (f"dec.{slug}.ground.share_lt2h_june_and_ge6h_december", 0.25),
+                       (f"dec.{slug}.ground.sun_h_december.p50", 7.0)):
+            entries[lid] = {"value": v, "unit": "fraction"}
+    return {"entries": entries}
+
+
+def test_f7_skips_cleanly_when_round2_dir_is_absent(tmp_path):
+    result = figs.render_f7_seasonal(_synthetic_f7_ledger(), tmp_path / "no_round2", tmp_path)
+    assert result["status"] == "skipped"
+    assert "reason" in result
+
+
+def test_f7_renders_from_synthetic_parquets(tmp_path):
+    from scripts import lint_p1_tokens as lt
+    rng = np.random.default_rng(0)
+    r2 = tmp_path / "runs" / "wp07_round2_x"
+    for slug in figs.FIGURE_SITE_ORDER:
+        (r2 / slug).mkdir(parents=True)
+        pd.DataFrame({"hours_summer_solstice": rng.uniform(0.0, 12.0, 300)}).to_parquet(
+            r2 / slug / "december_ground.parquet")
+    result = figs.render_f7_seasonal(_synthetic_f7_ledger(), r2, tmp_path, verify_against_ledger=False)
+    assert result["status"] == "produced"
+    text = figs._svg_text_content((tmp_path / result["svg_path"]).read_text())
+    assert "Summer solstice (21 December)" in text
+    assert "2 h reference floor" in text
+    pos = [text.index(figs.FAVELAS[s]) for s in figs.FIGURE_SITE_ORDER]
+    assert pos == sorted(pos)
+    assert not lt._scan_lines(text.split("\n"), "f7")
+    assert not lt._scan_lines(json.dumps(result).split("\n"), "f7_manifest")
+    assert not re.search(r"heat|thermal|comfort", text + json.dumps(result), re.I)
+    assert figs._COORD_RE.search(text) is None
+    for seg in result["panel_b_segment_pct"].values():
+        assert abs(sum(seg.values()) - 100.0) < 5e-3
+
+
+def test_f7_renders_from_the_real_run(tmp_path, ledger):
+    import pyarrow.parquet as pq
+    if not REAL_ROUND2.exists():
+        pytest.skip("real round-2 run not present")
+    result = figs.render_f7_seasonal(ledger, REAL_ROUND2, tmp_path, repo_root=REAL_REPO)
+    assert result["status"] == "produced"
+    for slug in figs.FIGURE_SITE_ORDER:
+        assert f"dec.{slug}.ground.sun_h_december.p50" in result["ledger_ids_used"]
+        col = pq.read_table(REAL_ROUND2 / slug / "december_ground.parquet",
+                            columns=["hours_summer_solstice"]).column(0).to_numpy()
+        p50, _ = figs.get_value(ledger, f"dec.{slug}.ground.sun_h_december.p50")
+        assert abs(float(np.median(col[np.isfinite(col)])) - p50) < 1e-6
