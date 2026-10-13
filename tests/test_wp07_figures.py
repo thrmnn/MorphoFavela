@@ -830,3 +830,59 @@ def test_f2_names_the_floor_without_an_attribution(tmp_path, ledger):
         assert "Athens" not in body and "WHO" not in body and "Point 26" not in body
         assert "2 h reference floor" in body
     assert r4["checklist"]["min_text_pt"] >= 7.0
+
+
+# ---------------------------------------------------------------------------
+# f6 - façade storey profile (WP-08 summary)
+# ---------------------------------------------------------------------------
+
+REAL_FACADE_SUMMARY = Path("/home/theo/SCL/SCR/MorphoFavela/runs/wp08_facade_plane_20261008T143053Z/summary.json")
+_F6_NAMES = ["Vidigal", "Rocinha", "Complexo do Alemão", "Maré", "Rio das Pedras"]
+
+
+def _synthetic_facade_summary(path: Path) -> None:
+    def row(m):
+        return {"bands": 5000, "median_count": m, "p10_count": m / 4, "p90_count": m * 3}
+
+    sites = {}
+    for i, name in enumerate(_F6_NAMES):
+        by = {str(k): row(0.2 + 0.1 * k + 0.02 * i) for k in range(1, 5)}
+        by["5"] = {**row(1.0), "bands": 10}
+        sites[name] = {"storeys": {"without_persistent_zeros": {
+            "all_storeys": {"june": {"bands": 140702 + i}},
+            "by_storey": {"june": by},
+            "june_crossing": {"robust_storeys": [1, 2, 3, 4]},
+        }}}
+    path.write_text(json.dumps({"screen_kwh_m2_day": 0.5, "robust_storey_min_bands": 500, "sites": sites}))
+
+
+def test_f6_skips_cleanly_when_summary_absent(tmp_path):
+    result = figs.render_f6_facade(tmp_path / "missing" / "summary.json", tmp_path)
+    assert result["status"] == "skipped"
+    assert "reason" in result
+
+
+def test_f6_renders_from_synthetic_summary(tmp_path):
+    import lint_p1_tokens as lt
+    summary = tmp_path / "summary.json"
+    _synthetic_facade_summary(summary)
+    result = figs.render_f6_facade(summary, tmp_path)
+    assert result["status"] == "produced"
+    raw = (tmp_path / result["svg_path"]).read_text()
+    assert (tmp_path / result["png_path"]).exists()
+    text = figs._svg_text_content(raw)
+    assert not lt._scan_lines(text.split("\n"), "f6")
+    assert not lt._scan_lines(json.dumps(result).split("\n"), "f6_manifest")
+    assert figs._COORD_RE.search(text) is None
+    pos = [text.index(n) for n in _F6_NAMES]
+    assert pos == sorted(pos)
+    assert result["robust_storeys_by_site"]["vidigal"] == [1, 2, 3, 4]
+
+
+def test_f6_renders_from_the_real_run(tmp_path):
+    if not REAL_FACADE_SUMMARY.exists():
+        pytest.skip("real WP-08 summary not present")
+    result = figs.render_f6_facade(REAL_FACADE_SUMMARY, tmp_path)
+    assert result["status"] == "produced"
+    counts = [len(result["robust_storeys_by_site"][s]) for s in figs.FIGURE_SITE_ORDER]
+    assert counts == [4, 6, 5, 5, 6]

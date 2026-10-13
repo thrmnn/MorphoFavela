@@ -1639,11 +1639,94 @@ def stage_all(repo_root: Path, out_dir: Path | None = None) -> dict:
     return manifest
 
 
+# ---------------------------------------------------------------------------
+# f6 - façade storey profile (WP-08 summary, not the WP-07 ledger)
+# ---------------------------------------------------------------------------
+
+F6_SITE_KEYS = {"vidigal": "Vidigal", "rocinha": "Rocinha", "complexo_do_alemao": "Complexo do Alemão",
+                "mare": "Maré", "riodaspedras": "Rio das Pedras"}
+
+
+def find_latest_facade_summary(repo_root: Path) -> Path | None:
+    found = sorted((repo_root / "runs").glob("wp08_facade_plane_*/summary.json"))
+    return found[-1] if found else None
+
+
+def _f6_robust_storeys(by_storey: dict, min_bands: int) -> list[int]:
+    out = []
+    while str(len(out) + 1) in by_storey and by_storey[str(len(out) + 1)]["bands"] >= min_bands:
+        out.append(len(out) + 1)
+    return out
+
+
+def render_f6_facade(summary_path: Path, out_dir: Path) -> dict:
+    fig_id = "f6_facade_storey_profile"
+    summary_path = Path(summary_path)
+    if not summary_path.exists():
+        return _skip(fig_id, f"façade summary not found: {summary_path.name}")
+    summary = json.loads(summary_path.read_text())
+    screen = float(summary["screen_kwh_m2_day"])
+    min_bands = int(summary["robust_storey_min_bands"])
+
+    fig, axes = plt.subplots(1, len(FIGURE_SITE_ORDER), sharey=True, layout="constrained",
+                             figsize=(style.WIDTH_DOUBLE_IN, 66 * style.MM))
+    fig.get_layout_engine().set(w_pad=0.02, wspace=0.06)
+    robust_by_site: dict[str, list[int]] = {}
+    n_by_site: dict[str, int] = {}
+    for k, (ax, slug) in enumerate(zip(axes, FIGURE_SITE_ORDER)):
+        site = summary["sites"][F6_SITE_KEYS[slug]]["storeys"]["without_persistent_zeros"]
+        by_storey = site["by_storey"]["june"]
+        robust = _f6_robust_storeys(by_storey, min_bands)
+        listed = site.get("june_crossing", {}).get("robust_storeys")
+        assert listed is None or list(listed) == robust, f"{slug}: robust storeys {robust} != summary {listed}"
+        robust_by_site[slug] = robust
+        n_by_site[slug] = int(site["all_storeys"]["june"]["bands"])
+        x = np.array(robust)
+        med = np.array([by_storey[str(i)]["median_count"] for i in robust])
+        lo = np.array([by_storey[str(i)]["p10_count"] for i in robust])
+        hi = np.array([by_storey[str(i)]["p90_count"] for i in robust])
+        color = style.SITE_COLORS[slug]
+        ax.fill_between(x, lo, hi, color=color, alpha=0.2, linewidth=0)
+        ax.plot(x, med, color=color, linewidth=1.3, marker="o", markersize=3.5)
+        ax.axhline(screen, color="#222222", linewidth=0.7, linestyle=(0, (1.5, 1.5)))
+        if k == 0:
+            ax.text(0.98, screen + 0.06, "0.5 screen\n(operational)", transform=ax.get_yaxis_transform(),
+                    ha="right", va="bottom", fontsize=style.BASE_PT, color="#222222", linespacing=1.1)
+        ax.text(0.0, 1.145, FAVELAS[slug], transform=ax.transAxes, ha="left", va="bottom",
+                fontsize=style.LABEL_PT, fontweight="bold")
+        ax.text(0.0, 1.015, f"n = {n_by_site[slug]:,}", transform=ax.transAxes, ha="left", va="bottom",
+                fontsize=style.BASE_PT)
+        ax.tick_params(axis="x", length=2)
+    top = max(len(v) for v in robust_by_site.values())
+    for ax, slug in zip(axes, FIGURE_SITE_ORDER):
+        ax.set_xticks(robust_by_site[slug])
+        ax.set_xlim(0.6, top + 0.4)
+    axes[0].set_ylim(bottom=0)
+    axes[0].set_ylabel("June façade irradiation (kWh m⁻² day⁻¹)")
+    fig.supxlabel("storey (robust storeys only; line = median, band = 10th to 90th percentile)",
+                  fontsize=style.LABEL_PT)
+
+    try:
+        src = str(summary_path.relative_to(REPO_ROOT))
+    except ValueError:
+        src = f"{summary_path.parent.name}/{summary_path.name}"
+    extra = {
+        "source_summary": src,
+        "variant": "storeys.without_persistent_zeros.by_storey.june",
+        "n_unit": "façade bands of the all-storeys population inside the site polygon",
+        "n_by_site": n_by_site,
+        "robust_storeys_by_site": robust_by_site,
+        "robust_storey_min_bands": min_bands,
+        "screen_kwh_m2_day": screen,
+    }
+    return _produced(fig, fig_id, out_dir, [], [], "staged", extra=extra)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-root", default=str(REPO_ROOT))
     ap.add_argument("--out-dir", default=None)
-    ap.add_argument("--target", choices=("figures", "map", "zoom", "mare_defs"), default="figures",
+    ap.add_argument("--target", choices=("figures", "map", "zoom", "mare_defs", "facade"), default="figures",
                      help="'figures' (default, unchanged): f1-f4 into runs/wp07_figures_<UTC>/. "
                           "'map': WP-07M f5/f5b into runs/wp07_map_<UTC>/ (docs/wp07_map_spec.md). "
                           "'zoom': WP-07Z citywide pair + per-window renders into "
@@ -1656,9 +1739,24 @@ def main() -> int:
                           "(frame_diagnostics.json#/grid_cell_m) — window renders always use that "
                           "same native sampling pitch regardless of this flag. Ignored for "
                           "'--target figures'.")
+    ap.add_argument("--facade-summary", default=None,
+                     help="'--target facade': WP-08 summary.json (default: latest "
+                          "runs/wp08_facade_plane_*/summary.json under the repo root).")
     args = ap.parse_args()
     repo_root = Path(args.repo_root)
     out_dir = Path(args.out_dir) if args.out_dir else None
+    if args.target == "facade":
+        summary = Path(args.facade_summary) if args.facade_summary else find_latest_facade_summary(repo_root)
+        out = out_dir or repo_root / "runs" / f"wp07_facade_{_utc_now()}"
+        out.mkdir(parents=True, exist_ok=True)
+        if summary is None:
+            res = _skip("f6_facade_storey_profile", "no runs/wp08_facade_plane_*/summary.json")
+        else:
+            res = render_f6_facade(summary, out)
+        (out / "figure_manifest.json").write_text(
+            json.dumps({"figures": {res["id"]: res}}, indent=1, ensure_ascii=False))
+        print(f"f6: {res['status']}" + (f" ({res['reason']})" if res["status"] == "skipped" else ""))
+        return 0
     if args.target == "mare_defs":
         manifest = stage_mare_definitions(repo_root, out_dir)
         label = "mare-definitions figure"
