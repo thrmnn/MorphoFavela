@@ -842,7 +842,8 @@ _F6_NAMES = ["Vidigal", "Rocinha", "Complexo do Alemão", "Maré", "Rio das Pedr
 
 def _synthetic_facade_summary(path: Path) -> None:
     def row(m):
-        return {"bands": 5000, "median_count": m, "p10_count": m / 4, "p90_count": m * 3}
+        return {"bands": 5000, "median_count": m, "p10_count": m / 4, "p90_count": m * 3,
+                "median_area_weighted": m, "p10_area_weighted": m / 4, "p90_area_weighted": m * 3}
 
     sites = {}
     for i, name in enumerate(_F6_NAMES):

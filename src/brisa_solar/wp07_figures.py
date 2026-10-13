@@ -1682,9 +1682,9 @@ def render_f6_facade(summary_path: Path, out_dir: Path) -> dict:
         robust_by_site[slug] = robust
         n_by_site[slug] = int(site["all_storeys"]["june"]["bands"])
         x = np.array(robust)
-        med = np.array([by_storey[str(i)]["median_count"] for i in robust])
-        lo = np.array([by_storey[str(i)]["p10_count"] for i in robust])
-        hi = np.array([by_storey[str(i)]["p90_count"] for i in robust])
+        med = np.array([by_storey[str(i)]["median_area_weighted"] for i in robust])
+        lo = np.array([by_storey[str(i)]["p10_area_weighted"] for i in robust])
+        hi = np.array([by_storey[str(i)]["p90_area_weighted"] for i in robust])
         color = style.SITE_COLORS[slug]
         ax.fill_between(x, lo, hi, color=color, alpha=0.2, linewidth=0)
         ax.plot(x, med, color=color, linewidth=1.3, marker="o", markersize=3.5)
