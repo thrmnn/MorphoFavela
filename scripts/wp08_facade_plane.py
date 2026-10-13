@@ -92,10 +92,10 @@ def load_facade(site: str) -> pd.DataFrame:
     return d
 
 
-def population(site: str, poly) -> tuple[pd.DataFrame, dict]:
+def population(site: str, poly, classes: tuple[str, ...]) -> tuple[pd.DataFrame, dict]:
     d = load_facade(site)
     n0 = len(d)
-    e = d[d.wall_class == "exposed_candidate"]
+    e = d[d.wall_class.isin(classes)]
     n1 = len(e)
     m = e[e.geometry_mapping_ok]
     n2 = len(m)
@@ -192,15 +192,19 @@ def association(p: pd.DataFrame, g: pd.DataFrame) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=None)
+    ap.add_argument("--include-narrow-gap", action="store_true",
+                    help="sensitivity (intake audit condition 1): add narrow_gap_under_0.5m_candidate walls to the population")
     a = ap.parse_args()
+    classes = ("exposed_candidate", "narrow_gap_under_0.5m_candidate") if a.include_narrow_gap else ("exposed_candidate",)
     utc = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = Path(a.out) if a.out else ROOT / "runs" / f"wp08_facade_plane_{utc}"
     out.mkdir(parents=True, exist_ok=True)
 
     fav = gpd.read_file(FAV, engine="fiona")
-    summary = {"_utc": utc, "status": "PROVISIONAL: option A pre-computation, PI has not ruled",
+    summary = {"_utc": utc, "status": "ruling p1_facade_mare_extent_2026_10_08: clip_to_p1_polygons"
+                         + (" (narrow-gap sensitivity)" if a.include_narrow_gap else ""),
                "source": "the external façade package",
-               "population_rule": "wall_class == exposed_candidate AND geometry_mapping_ok, inside the P1 site polygon "
+               "population_rule": f"wall_class in {list(classes)} AND geometry_mapping_ok, inside the P1 site polygon "
                                   "(match_favela_group on Favelas_Limit_2019.shp, Maré = definition A)",
                "screen_kwh_m2_day": SCREEN, "storey": "floor_id + 1",
                "sustained_definition": "majority (share > 0.5) of bands at or above the screen at the storey and at "
@@ -216,7 +220,7 @@ def main() -> None:
                "sites": {}}
     for s in SITES:
         poly = match_favela_group(fav, s)[0].geometry.union_all()
-        p, drops = population(s, poly)
+        p, drops = population(s, poly, classes)
         assert p.jun20_kwh_m2_day.ge(0).all() and p[DATES].ge(0).all().all(), f"negative value in {s}"
         assert drops["all_rows"] - drops["dropped_not_exposed"] - drops["dropped_unmapped"] - drops["dropped_outside_polygon"] == drops["in_p1_polygon"]
         tabs = storey_tables(p)
