@@ -922,7 +922,7 @@ def test_f7_renders_from_synthetic_parquets(tmp_path):
     assert result["status"] == "produced"
     text = figs._svg_text_content((tmp_path / result["svg_path"]).read_text())
     assert "Summer solstice (21 December)" in text
-    assert "2 h reference floor" in text
+    assert "2 h" in text and "reference floor" not in text  # the floor is defined for June, not December
     pos = [text.index(figs.FAVELAS[s]) for s in figs.FIGURE_SITE_ORDER]
     assert pos == sorted(pos)
     assert not lt._scan_lines(text.split("\n"), "f7")

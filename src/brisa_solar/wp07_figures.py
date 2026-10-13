@@ -1794,7 +1794,7 @@ def render_f7_seasonal(ledger: dict, round2_dir: Path, out_dir: Path,
 
     for h in (REFERENCE_FLOOR_HOURS, F7_HIGH_SUN_HOURS):
         ax_a.axvline(h, color="#222222", linewidth=0.7, linestyle=(0, (1.5, 1.5)))
-    ax_a.text(REFERENCE_FLOOR_HOURS - 0.12, 98, "2 h reference floor", ha="right", va="top",
+    ax_a.text(REFERENCE_FLOOR_HOURS - 0.12, 98, "2 h", ha="right", va="top",
               fontsize=style.BASE_PT, rotation=90)
     ax_a.text(F7_HIGH_SUN_HOURS - 0.12, 98, "6 h", ha="right", va="top",
               fontsize=style.BASE_PT, rotation=90)
