@@ -163,6 +163,10 @@ def association(p: pd.DataFrame, g: pd.DataFrame) -> dict:
     f["iy"] = np.floor((f.y_utm_m - y0) / CELL_M).astype(np.int64)
     agg = f.groupby(["ix", "iy"]).agg(bands=("jun20_kwh_m2_day", "size"),
                                       facade_median_june=("jun20_kwh_m2_day", "median")).reset_index()
+    # Ruling p1_facade_scope_2026_10_07: façade numbers enter area-weighted.
+    wmed = f.groupby(["ix", "iy"]).apply(
+        lambda g: wquantile(g.jun20_kwh_m2_day.to_numpy(), g.band_area_m2.to_numpy(), 0.5), include_groups=False)
+    agg = agg.merge(wmed.rename("facade_wmedian_june").reset_index(), on=["ix", "iy"])
     j = g.merge(agg, on=["ix", "iy"], how="inner")
     assert j.facade_median_june.ge(0).all()
     assert (j.bands >= 1).all()
@@ -180,11 +184,12 @@ def association(p: pd.DataFrame, g: pd.DataFrame) -> dict:
         r = {"cells": int(len(k))}
         for mlab, col in (("ground_share_below_2h", "ground_share_below_2h"),
                           ("median_winter_sun_hours", "sun_h_winter_p50")):
-            if len(k) >= 3:
-                rho = spearmanr(k[col], k.facade_median_june).statistic
-                r[f"rho_{mlab}"] = None if np.isnan(rho) else float(rho)
-            else:
-                r[f"rho_{mlab}"] = None
+            for suffix, fcol in (("", "facade_median_june"), ("_area_weighted", "facade_wmedian_june")):
+                if len(k) >= 3:
+                    rho = spearmanr(k[col], k[fcol]).statistic
+                    r[f"rho_{mlab}{suffix}"] = None if np.isnan(rho) else float(rho)
+                else:
+                    r[f"rho_{mlab}{suffix}"] = None
         res[lab] = r
     return res
 
@@ -214,7 +219,7 @@ def main() -> None:
                "cell_grid": "P1 WP-06 10 m built-cell grid (per_patch_geometry_nodata0.csv; origin as in bin_ground_to_cells)",
                "ground_metric": "1 - share_ge_2h_winter (share of ground points below the 2 h winter floor); "
                                 "median winter sun-hours (sun_h_winter_p50) also given",
-               "facade_cell_metric": "median June irradiation of first-storey (floor_id 0) population bands, band-count",
+               "facade_cell_metric": "median June irradiation of first-storey (floor_id 0) population bands, band-count (rho_*) and façade-area-weighted (rho_*_area_weighted)",
                "cell_filter": f"at least {MIN_GROUND_PTS} ground points and at least {MIN_BANDS} façade bands (mirrors the package's own filter, ground points in place of street observers)",
                "association_inputs": {"wp04_run": WP04.name, "wp06_run": "wp06_geometry_20261007T201840Z"},
                "sites": {}}
