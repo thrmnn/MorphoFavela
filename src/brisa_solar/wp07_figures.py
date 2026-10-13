@@ -1690,7 +1690,7 @@ def render_f6_facade(summary_path: Path, out_dir: Path) -> dict:
         ax.plot(x, med, color=color, linewidth=1.3, marker="o", markersize=3.5)
         ax.axhline(screen, color="#222222", linewidth=0.7, linestyle=(0, (1.5, 1.5)))
         if k == 0:
-            ax.text(0.98, screen + 0.06, "0.5 screen\n(operational)", transform=ax.get_yaxis_transform(),
+            ax.text(0.98, screen + 0.06, "0.5 screen\n(descriptive)", transform=ax.get_yaxis_transform(),
                     ha="right", va="bottom", fontsize=style.BASE_PT, color="#222222", linespacing=1.1)
         ax.text(0.0, 1.145, FAVELAS[slug], transform=ax.transAxes, ha="left", va="bottom",
                 fontsize=style.LABEL_PT, fontweight="bold")
